@@ -80,7 +80,7 @@ public class StockMarketSyncTask {
             StockMarketDataDTO quote = this.stockMarketApi.getQuote(stock.getSecid());
             this.stockQuoteSnapshotManage.saveLatest(StockQuoteSnapshotPO.fromApiResponse(stock, quote.data()));
             this.sleepForRateLimit();
-
+            // TODO 这块数据库存储要存 influxDB 改逻辑
             StockMarketDataDTO trends = this.stockMarketApi.getTrends(stock.getSecid());
             this.saveTrends(stock, trends.data(), syncBatchNo);
             this.sleepForRateLimit();
