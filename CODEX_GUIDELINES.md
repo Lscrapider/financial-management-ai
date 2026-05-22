@@ -63,15 +63,15 @@ Controller -> Service -> Manage / API / Mapper -> Domain
 
 1. `Controller` 只做接口入口，不写复杂业务。
 2. `Service` 负责业务逻辑。
-3. `Manage` 负责复杂流程编排和 MyBatis Plus 查询封装。
-4. `Mapper` 只负责数据库操作。
+3. `Manage` 只负责最小数据库操作封装，优先基于 MyBatis Plus 完成基础查询、保存、批量保存、更新等动作，不放业务编排、参数归一化和 VO 转换。
+4. `Mapper` 只负责数据库访问；只有 MyBatis Plus 函数式查询无法表达或明显不适合时，才在 `Mapper` 中手写 SQL。
 5. `API` 只负责第三方接口调用。
 6. 请求入参使用 `Param`。
 7. 返回前端使用 `VO`。
 8. 数据库对象使用 `PO`。
 9. 不要直接把 `PO` 返回给前端。
 10. 不要在 `Controller` 中直接调用 `Mapper`，`Controller` 只能调用 `Service` 作为传递。
-11. 数据库查询、插入、修改和删除操作优先通过 `manager` 层基于 MyBatis Plus 完成。
+11. 数据库查询、插入、修改和删除操作优先通过 `manage` 层基于 MyBatis Plus 完成；业务逻辑必须放在 `service` / `service.impl`，不要下沉到 `manage`。
 12. Java 类中调用本类方法时必须显式使用 `this`。
 13. Java 代码中优先使用 lambda 风格编写集合处理、回调和函数式接口逻辑。
 14. `JsonNode`、第三方响应、DTO 或中间数据构建具体 `PO` 时，构建逻辑优先放到对应实体类的静态方法中，例如 `StockQuoteSnapshotPO.fromApiResponse(...)`，不要散落在 `task`、`service` 或 `manage` 中。

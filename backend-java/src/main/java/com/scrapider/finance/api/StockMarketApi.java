@@ -1,7 +1,10 @@
 package com.scrapider.finance.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scrapider.finance.domain.dto.StockMarketDataDTO;
+import java.io.IOException;
+import java.nio.charset.Charset;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -9,46 +12,58 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Component
 public class StockMarketApi {
 
-    private static final String SOURCE = "eastmoney";
-    private static final String STOCK_QUOTE_URL =
-            "https://push2.eastmoney.com/api/qt/stock/get";
-    private static final String STOCK_TRENDS_URL =
-            "https://push2his.eastmoney.com/api/qt/stock/trends2/get";
-    private static final String QUOTE_FIELDS =
-            "f43,f44,f45,f46,f47,f48,f50,f51,f52,f57,f58,f60,f116,f117,"
-                    + "f162,f167,f168,f169,f170,f171,f292";
-    private static final String TRENDS_FIELDS1 =
-            "f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13";
-    private static final String TRENDS_FIELDS2 =
-            "f51,f52,f53,f54,f55,f56,f57,f58";
-    private final RestTemplate restTemplate;
+    private static final String SOURCE = "tencent";
+    private static final Charset GBK = Charset.forName("GBK");
+    private static final String TENCENT_QUOTE_URL = "https://qt.gtimg.cn/q={symbol}";
+    private static final String TENCENT_TRENDS_URL =
+            "https://web.ifzq.gtimg.cn/appstock/app/minute/query";
 
-    public StockMarketApi(RestTemplate restTemplate) {
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
+
+    public StockMarketApi(RestTemplate restTemplate, ObjectMapper objectMapper) {
         this.restTemplate = restTemplate;
+        this.objectMapper = objectMapper;
     }
 
     public StockMarketDataDTO getQuote(String secid) {
-        String url = UriComponentsBuilder.fromUriString(STOCK_QUOTE_URL)
-                .queryParam("secid", secid)
-                .queryParam("fields", QUOTE_FIELDS)
-                .toUriString();
-        return this.get(url);
+        String symbol = this.toTencentSymbol(secid);
+        String url = TENCENT_QUOTE_URL.replace("{symbol}", symbol);
+        byte[] bytes = this.restTemplate.getForObject(url, byte[].class);
+        String body = bytes == null ? "" : new String(bytes, GBK);
+        return new StockMarketDataDTO(SOURCE, url, this.textNode(body));
     }
 
-    public StockMarketDataDTO getTrends(String secid, int ndays) {
-        String url = UriComponentsBuilder.fromUriString(STOCK_TRENDS_URL)
-                .queryParam("secid", secid)
-                .queryParam("fields1", TRENDS_FIELDS1)
-                .queryParam("fields2", TRENDS_FIELDS2)
-                .queryParam("iscr", 0)
-                .queryParam("iscca", 0)
-                .queryParam("ndays", ndays)
+    public StockMarketDataDTO getTrends(String secid) {
+        String symbol = this.toTencentSymbol(secid);
+        String url = UriComponentsBuilder.fromUriString(TENCENT_TRENDS_URL)
+                .queryParam("code", symbol)
                 .toUriString();
         return this.get(url);
     }
 
     private StockMarketDataDTO get(String url) {
-        JsonNode body = this.restTemplate.getForObject(url, JsonNode.class);
-        return new StockMarketDataDTO(SOURCE, url, body);
+        String body = this.restTemplate.getForObject(url, String.class);
+        return new StockMarketDataDTO(SOURCE, url, this.jsonNode(body));
+    }
+
+    private JsonNode textNode(String body) {
+        return this.objectMapper.getNodeFactory().textNode(body);
+    }
+
+    private JsonNode jsonNode(String body) {
+        try {
+            return this.objectMapper.readTree(body);
+        } catch (IOException ex) {
+            throw new IllegalArgumentException("invalid tencent api json response", ex);
+        }
+    }
+
+    private String toTencentSymbol(String secid) {
+        String[] parts = secid.split("\\.");
+        if (parts.length != 2) {
+            throw new IllegalArgumentException("invalid secid: " + secid);
+        }
+        return "1".equals(parts[0]) ? "sh" + parts[1] : "sz" + parts[1];
     }
 }

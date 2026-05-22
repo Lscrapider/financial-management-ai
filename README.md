@@ -52,6 +52,7 @@
 - Vite
 - Pinia
 - Vue Router
+- Vben Admin
 - ECharts / AntV / TradingView Lightweight Charts
 
 ### 数据库与存储
@@ -64,6 +65,22 @@
 
 - Docker
 - Docker Compose
+
+## 前端启动
+
+前端骨架已接入 Vben Admin，当前默认使用 Element Plus 版本：
+
+```bash
+./scripts/run-frontend.sh
+```
+
+也可以直接进入前端目录启动：
+
+```bash
+cd frontend-vue
+pnpm install
+pnpm dev:ele
+```
 
 ## 推荐目录结构
 

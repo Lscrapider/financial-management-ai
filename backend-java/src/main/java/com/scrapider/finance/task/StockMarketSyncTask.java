@@ -38,9 +38,6 @@ public class StockMarketSyncTask {
     @Value("${stock.sync.request-interval-ms:1500}")
     private long requestIntervalMs;
 
-    @Value("${stock.sync.trend-days:1}")
-    private int trendDays;
-
     public StockMarketSyncTask(
             StockMarketApi stockMarketApi,
             StockConfigManage stockConfigManage,
@@ -53,8 +50,8 @@ public class StockMarketSyncTask {
     }
 
     @Scheduled(
-            initialDelayString = "${stock.sync.initial-delay-ms:10000}",
-            fixedDelayString = "${stock.sync.fixed-delay-ms:300000}")
+            initialDelayString = "${stock.sync.initial-delay-ms}",
+            fixedDelayString = "${stock.sync.fixed-delay-ms}")
     public void syncStockMarketData() {
         if (!this.enabled) {
             log.debug("Stock market sync task is disabled.");
@@ -84,7 +81,7 @@ public class StockMarketSyncTask {
             this.stockQuoteSnapshotManage.saveLatest(StockQuoteSnapshotPO.fromApiResponse(stock, quote.data()));
             this.sleepForRateLimit();
 
-            StockMarketDataDTO trends = this.stockMarketApi.getTrends(stock.getSecid(), this.normalizeTrendDays());
+            StockMarketDataDTO trends = this.stockMarketApi.getTrends(stock.getSecid());
             this.saveTrends(stock, trends.data(), syncBatchNo);
             this.sleepForRateLimit();
         } catch (Exception ex) {
@@ -97,13 +94,16 @@ public class StockMarketSyncTask {
     }
 
     private void saveTrends(StockConfigPO stock, JsonNode response, String syncBatchNo) {
-        JsonNode data = response.path("data");
-        BigDecimal previousClosePrice = StockMarketJsonParser.decimal(data, "preClose");
+        String tencentSymbol = this.toTencentSymbol(stock.getSecid());
+        JsonNode data = response.path("data").path(tencentSymbol).path("data");
+        String tradeDate = data.path("date").asText();
+        BigDecimal previousClosePrice = this.previousClosePrice(response, tencentSymbol);
         LocalDateTime syncedAt = LocalDateTime.now();
-        List<StockIntradayTrendPO> trends = StreamSupport.stream(data.path("trends").spliterator(), false)
+        List<StockIntradayTrendPO> trends = StreamSupport.stream(data.path("data").spliterator(), false)
                 .map(JsonNode::asText)
                 .map(line -> StockIntradayTrendPO.fromTrendLine(
                         stock,
+                        tradeDate,
                         line,
                         previousClosePrice,
                         syncedAt,
@@ -120,10 +120,16 @@ public class StockMarketSyncTask {
         }
     }
 
-    private int normalizeTrendDays() {
-        if (this.trendDays < 1) {
-            return 1;
+    private BigDecimal previousClosePrice(JsonNode response, String tencentSymbol) {
+        JsonNode quote = response.path("data").path(tencentSymbol).path("qt").path(tencentSymbol);
+        return StockMarketJsonParser.decimal(quote.path(4).asText());
+    }
+
+    private String toTencentSymbol(String secid) {
+        String[] parts = secid.split("\\.");
+        if (parts.length != 2) {
+            throw new IllegalArgumentException("invalid secid: " + secid);
         }
-        return Math.min(this.trendDays, 5);
+        return "1".equals(parts[0]) ? "sh" + parts[1] : "sz" + parts[1];
     }
 }
