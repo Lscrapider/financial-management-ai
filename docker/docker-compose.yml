@@ -1,0 +1,54 @@
+name: financial-management-ai
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: finance-postgres
+    ports:
+      - "5432:5432"
+    env_file:
+      - ../.env
+    environment:
+      POSTGRES_DB: ${POSTGRES_ADMIN_DATABASE:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - finance-network
+
+  database-init:
+    build:
+      context: ..
+      dockerfile: database/Dockerfile
+    container_name: finance-database-init
+    env_file:
+      - ../.env
+    depends_on:
+      - postgres
+    networks:
+      - finance-network
+
+  backend-java:
+    build:
+      context: ../backend-java
+    container_name: finance-backend-java
+    ports:
+      - "8080:8080"
+    env_file:
+      - ../.env
+    environment:
+      POSTGRES_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-finance_management}
+      POSTGRES_USERNAME: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    depends_on:
+      - postgres
+    networks:
+      - finance-network
+
+volumes:
+  postgres-data:
+
+networks:
+  finance-network:
+    name: finance-network

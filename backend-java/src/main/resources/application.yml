@@ -1,0 +1,24 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: finance-backend
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: ${POSTGRES_URL:jdbc:postgresql://localhost:5432/finance_management}
+    username: ${POSTGRES_USERNAME:postgres}
+    password: ${POSTGRES_PASSWORD:postgres}
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+stock:
+  sync:
+    enabled: ${STOCK_SYNC_ENABLED:true}
+    initial-delay-ms: ${STOCK_SYNC_INITIAL_DELAY_MS:10000}
+    fixed-delay-ms: ${STOCK_SYNC_FIXED_DELAY_MS:300000}
+    request-interval-ms: ${STOCK_SYNC_REQUEST_INTERVAL_MS:1500}
+    trend-days: ${STOCK_SYNC_TREND_DAYS:1}
