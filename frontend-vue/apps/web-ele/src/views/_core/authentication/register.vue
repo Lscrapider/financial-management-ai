@@ -3,13 +3,19 @@ import type { VbenFormSchema } from '@vben/common-ui';
 import type { Recordable } from '@vben/types';
 
 import { computed, h, ref } from 'vue';
+import { useRouter } from 'vue-router';
 
 import { AuthenticationRegister, z } from '@vben/common-ui';
 import { $t } from '@vben/locales';
 
+import { ElMessage } from 'element-plus';
+
+import { registerApi } from '#/api';
+
 defineOptions({ name: 'Register' });
 
 const loading = ref(false);
+const router = useRouter();
 
 const formSchema = computed((): VbenFormSchema[] => {
   return [
@@ -81,8 +87,15 @@ const formSchema = computed((): VbenFormSchema[] => {
   ];
 });
 
-function handleSubmit(value: Recordable<any>) {
-  void value;
+async function handleSubmit(value: Recordable<any>) {
+  try {
+    loading.value = true;
+    await registerApi(value);
+    ElMessage.success($t('authentication.signUp'));
+    await router.push('/auth/login');
+  } finally {
+    loading.value = false;
+  }
 }
 </script>
 

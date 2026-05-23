@@ -16,6 +16,13 @@ export namespace AuthApi {
     data: string;
     status: number;
   }
+
+  /** 注册接口参数 */
+  export interface RegisterParams {
+    confirmPassword?: string;
+    password?: string;
+    username?: string;
+  }
 }
 
 /**
@@ -23,6 +30,13 @@ export namespace AuthApi {
  */
 export async function loginApi(data: AuthApi.LoginParams) {
   return requestClient.post<AuthApi.LoginResult>('/auth/login', data);
+}
+
+/**
+ * 注册
+ */
+export async function registerApi(data: AuthApi.RegisterParams) {
+  return requestClient.post<void>('/auth/register', data);
 }
 
 /**
