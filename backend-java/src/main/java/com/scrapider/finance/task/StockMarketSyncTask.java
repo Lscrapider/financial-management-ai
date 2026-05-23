@@ -14,6 +14,8 @@ import com.scrapider.finance.manage.StockIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -38,6 +40,15 @@ public class StockMarketSyncTask {
     @Value("${stock.sync.request-interval-ms:1500}")
     private long requestIntervalMs;
 
+    @Value("${stock.sync.start-time:09:29}")
+    private String startTime;
+
+    @Value("${stock.sync.end-time:16:00}")
+    private String endTime;
+
+    @Value("${stock.sync.timezone:Asia/Shanghai}")
+    private String timezone;
+
     public StockMarketSyncTask(
             StockMarketApi stockMarketApi,
             StockConfigManage stockConfigManage,
@@ -55,6 +66,10 @@ public class StockMarketSyncTask {
     public void syncStockMarketData() {
         if (!this.enabled) {
             log.debug("Stock market sync task is disabled.");
+            return;
+        }
+        if (!this.isInSyncWindow()) {
+            log.debug("Stock market sync task is outside sync window.");
             return;
         }
 
@@ -117,6 +132,13 @@ public class StockMarketSyncTask {
         if (this.requestIntervalMs > 0) {
             Thread.sleep(this.requestIntervalMs);
         }
+    }
+
+    private boolean isInSyncWindow() {
+        LocalTime now = LocalTime.now(ZoneId.of(this.timezone));
+        LocalTime start = LocalTime.parse(this.startTime);
+        LocalTime end = LocalTime.parse(this.endTime);
+        return !now.isBefore(start) && !now.isAfter(end);
     }
 
     private BigDecimal previousClosePrice(JsonNode response, String tencentSymbol) {

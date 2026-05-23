@@ -21,6 +21,9 @@ stock:
     initial-delay-ms: ${STOCK_SYNC_INITIAL_DELAY_MS:10000}
     fixed-delay-ms: ${STOCK_SYNC_FIXED_DELAY_MS:120000}
     request-interval-ms: ${STOCK_SYNC_REQUEST_INTERVAL_MS:1500}
+    start-time: ${STOCK_SYNC_START_TIME:09:29}
+    end-time: ${STOCK_SYNC_END_TIME:16:00}
+    timezone: ${STOCK_SYNC_TIMEZONE:Asia/Shanghai}
 
 influxdb:
   url: ${INFLUXDB_URL:http://localhost:8086}
