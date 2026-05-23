@@ -94,33 +94,27 @@ financial-management-ai/
 │   ├── api.md                        # 接口文档
 │   ├── database.md                   # 数据库设计
 │   └── ai-workflow.md                # AI 处理流程说明
-├── backend-java/                     # Java Spring Boot 后端服务
-│   ├── Dockerfile                    # Java 服务 Docker 构建文件
-│   ├── src/
-│   │   ├── main/
-│   │   │   ├── java/
-│   │   │   │   └── com/scrapider/finance/
-│   │   │   │       ├── FinanceApplication.java # Spring Boot 启动类
-│   │   │   │       ├── controller/             # 控制层
-│   │   │   │       ├── service/                # 服务层接口
-│   │   │   │       │   └── impl/               # 服务层实现
-│   │   │   │       ├── manage/                 # MyBatis-Plus 管理封装
-│   │   │   │       ├── mapper/                 # MyBatis-Plus Mapper
-│   │   │   │       ├── domain/                 # 领域对象
-│   │   │   │       │   ├── po/                 # 持久化对象
-│   │   │   │       │   ├── dto/                # 数据传输对象
-│   │   │   │       │   ├── vo/                 # 视图返回对象
-│   │   │   │       │   ├── param/              # 请求参数对象
-│   │   │   │       │   ├── enums/              # 枚举
-│   │   │   │       │   └── constant/           # 常量
-│   │   │   │       ├── config/                 # Spring 配置
-│   │   │   │       └── task/                   # Spring 定时任务
-│   │   │   └── resources/
-│   │   │       ├── application.yml             # 应用配置
-│   │   │       └── mapper/                     # Mapper XML
-│   │   └── test/                     # Java 测试代码
-│   ├── pom.xml                       # Maven 配置
-│   └── README.md                     # Java 服务说明
+├── backend-java/                     # Java 后端聚合目录
+│   ├── pom.xml                       # Java 后端聚合工程配置
+│   ├── finance-service/              # 主业务 Java 服务
+│   │   ├── Dockerfile                # 主业务服务 Docker 构建文件
+│   │   ├── pom.xml                   # 主业务服务 Maven 配置
+│   │   └── src/
+│   │       ├── main/
+│   │       │   ├── java/
+│   │       │   │   └── com/scrapider/finance/
+│   │       │   │       ├── FinanceApplication.java # Spring Boot 启动类
+│   │       │   │       ├── controller/             # 控制层
+│   │       │   │       ├── service/                # 服务层接口
+│   │       │   │       ├── manage/                 # MyBatis-Plus 管理封装
+│   │       │   │       ├── mapper/                 # MyBatis-Plus Mapper
+│   │       │   │       └── domain/                 # 领域对象
+│   │       │   └── resources/
+│   │       │       └── application.yml             # 应用配置
+│   │       └── test/                 # Java 测试代码
+│   └── finance-ai/                   # Spring AI Java 能力模块
+│       ├── pom.xml                   # AI 模块 Maven 配置
+│       └── src/
 ├── ai-python/                        # Python AI 服务
 │   ├── app/
 │   │   ├── api/                      # FastAPI 路由

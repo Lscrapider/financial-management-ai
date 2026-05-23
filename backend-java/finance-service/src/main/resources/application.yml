@@ -3,7 +3,15 @@ server:
 
 spring:
   application:
-    name: finance-backend
+    name: finance-service
+  ai:
+    openai:
+      api-key: ${DASHSCOPE_API_KEY:}
+      base-url: ${DASHSCOPE_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode}
+      chat:
+        options:
+          model: ${DASHSCOPE_MODEL:qwen3-plus}
+          temperature: ${DASHSCOPE_TEMPERATURE:0.3}
   datasource:
     driver-class-name: org.postgresql.Driver
     url: ${POSTGRES_URL:jdbc:postgresql://localhost:5432/finance_management}
