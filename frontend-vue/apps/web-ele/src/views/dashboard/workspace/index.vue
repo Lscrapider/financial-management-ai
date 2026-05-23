@@ -1,9 +1,11 @@
 <script lang="ts" setup>
 import type { EchartsUIType } from '@vben/plugins/echarts';
 
+import type { IndexQuote } from '#/api/index-market';
 import type { StockIntradayTrend, StockQuote } from '#/api/stock';
 
 import { computed, nextTick, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 
 import { Page } from '@vben/common-ui';
 import { EchartsUI, useEcharts } from '@vben/plugins/echarts';
@@ -20,19 +22,23 @@ import {
 } from 'element-plus';
 import type { Sort } from 'element-plus';
 
+import { listIndexQuotes } from '#/api/index-market';
 import { listStockIntradayTrends, listStockQuotes } from '#/api/stock';
 
 const marketOptions = [
-  { label: '全部市场', value: '' },
-  { label: '科创板', value: 'STAR' },
-  { label: '创业板', value: 'CHINEXT' },
-  { label: '沪市主板', value: 'SH_MAIN' },
-  { label: '深市主板', value: 'SZ_MAIN' },
+  { label: '全部市场', relatedIndexSecids: [], value: '' },
+  { label: '科创板', relatedIndexSecids: ['1.000688', '1.000001'], value: 'STAR' },
+  { label: '创业板', relatedIndexSecids: ['0.399006'], value: 'CHINEXT' },
+  { label: '沪市主板', relatedIndexSecids: ['1.000001'], value: 'SH_MAIN' },
+  { label: '深市主板', relatedIndexSecids: ['0.399001'], value: 'SZ_MAIN' },
 ];
 
 const chartRef = ref<EchartsUIType>();
 const { renderEcharts } = useEcharts(chartRef);
+const router = useRouter();
 
+const indexQuotes = ref<IndexQuote[]>([]);
+const loadingIndexQuotes = ref(false);
 const loadingQuotes = ref(false);
 const loadingTrends = ref(false);
 const marketCode = ref('');
@@ -44,6 +50,28 @@ const selectedStockCode = ref('');
 
 const selectedQuote = computed(() => {
   return quotes.value.find((item) => item.stockCode === selectedStockCode.value);
+});
+
+const relatedIndexQuotes = computed(() => {
+  const option = marketOptions.find((item) => item.value === marketCode.value);
+  const relatedSecids = option?.relatedIndexSecids ?? [];
+  if (relatedSecids.length === 0) {
+    return indexQuotes.value;
+  }
+  const matched = relatedSecids
+    .map((secid) => indexQuotes.value.find((item) => item.secid === secid))
+    .filter((item): item is IndexQuote => Boolean(item));
+  return matched.length > 0 ? matched : indexQuotes.value;
+});
+
+const indexSectionTitle = computed(() => {
+  const option = marketOptions.find((item) => item.value === marketCode.value);
+  return option?.value ? `${option.label}参考指数` : '市场指数';
+});
+
+const indexSectionSubtitle = computed(() => {
+  const option = marketOptions.find((item) => item.value === marketCode.value);
+  return option?.value ? '当前市场对应指数快照' : '主要指数快照';
 });
 
 const riseCount = computed(() => {
@@ -59,8 +87,23 @@ const syncedAt = computed(() => {
 });
 
 onMounted(() => {
+  refreshIndexQuotes();
   refreshQuotes();
 });
+
+async function refreshIndexQuotes() {
+  loadingIndexQuotes.value = true;
+  try {
+    indexQuotes.value = await listIndexQuotes({
+      limit: 10,
+      marketCode: 'INDEX',
+      sortField: 'indexCode',
+      sortOrder: 'asc',
+    });
+  } finally {
+    loadingIndexQuotes.value = false;
+  }
+}
 
 async function refreshQuotes() {
   loadingQuotes.value = true;
@@ -109,6 +152,15 @@ function sortQuotes(sort: Sort) {
   sortField.value = String(sort.prop || 'changePercent');
   sortOrder.value = sort.order === 'ascending' ? 'asc' : 'desc';
   refreshQuotes();
+}
+
+function openIndexMarket(indexQuote: IndexQuote) {
+  router.push({
+    name: 'IndexMarket',
+    query: {
+      secid: indexQuote.secid,
+    },
+  });
 }
 
 function renderTrendChart() {
@@ -266,6 +318,45 @@ function toNumber(value?: number | string | null) {
 <template>
   <Page title="股票行情">
     <div class="stock-workspace">
+      <section class="market-index-section">
+        <div class="section-header">
+          <div>
+            <h2>{{ indexSectionTitle }}</h2>
+            <span>{{ indexSectionSubtitle }}</span>
+          </div>
+          <ElButton
+            :loading="loadingIndexQuotes"
+            size="small"
+            @click="refreshIndexQuotes"
+          >
+            刷新指数
+          </ElButton>
+        </div>
+        <div
+          v-if="relatedIndexQuotes.length > 0"
+          v-loading="loadingIndexQuotes"
+          class="index-card-grid"
+        >
+          <button
+            v-for="item in relatedIndexQuotes"
+            :key="item.secid"
+            class="index-card"
+            type="button"
+            @click="openIndexMarket(item)"
+          >
+            <span class="index-card-name">{{ item.indexName }}</span>
+            <strong :class="changeClass(item.changePercent)">
+              {{ formatPrice(item.latestPrice) }}
+            </strong>
+            <span :class="['index-card-change', changeClass(item.changePercent)]">
+              {{ formatChangePercent(item.changePercent) }}
+            </span>
+            <small>{{ item.exchangeCode }} · {{ formatMoney(item.turnoverAmount) }}</small>
+          </button>
+        </div>
+        <ElEmpty v-else description="暂无指数数据" />
+      </section>
+
       <section class="overview-band">
         <div>
           <div class="stock-title">
@@ -510,6 +601,85 @@ function toNumber(value?: number | string | null) {
   margin-top: 8px;
 }
 
+.market-index-section {
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+  padding: 16px 18px;
+}
+
+.section-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.section-header h2 {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.section-header span {
+  color: var(--el-text-color-secondary);
+  display: block;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.index-card-grid {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.index-card {
+  background: var(--el-fill-color-lighter);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  flex: 0 0 240px;
+  gap: 6px;
+  min-height: 116px;
+  padding: 14px;
+  text-align: left;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.index-card:hover {
+  background: var(--el-fill-color-light);
+  border-color: var(--el-color-primary-light-5);
+}
+
+.index-card-name {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.index-card strong {
+  font-size: 24px;
+  line-height: 1.1;
+}
+
+.index-card-change {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.index-card small {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
 .overview-stats {
   display: grid;
   gap: 24px;
@@ -620,6 +790,10 @@ function toNumber(value?: number | string | null) {
 
   .overview-stats {
     min-width: 0;
+  }
+
+  .index-card {
+    flex-basis: 210px;
   }
 
   .metric-grid {

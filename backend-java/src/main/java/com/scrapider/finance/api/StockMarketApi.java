@@ -17,6 +17,8 @@ public class StockMarketApi {
     private static final String TENCENT_QUOTE_URL = "https://qt.gtimg.cn/q={symbol}";
     private static final String TENCENT_TRENDS_URL =
             "https://web.ifzq.gtimg.cn/appstock/app/minute/query";
+    private static final String TENCENT_DAILY_KLINE_URL =
+            "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get";
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
@@ -38,6 +40,15 @@ public class StockMarketApi {
         String symbol = this.toTencentSymbol(secid);
         String url = UriComponentsBuilder.fromUriString(TENCENT_TRENDS_URL)
                 .queryParam("code", symbol)
+                .toUriString();
+        return this.get(url);
+    }
+
+    public StockMarketDataDTO getDailyKlines(String secid, Integer limit) {
+        String symbol = this.toTencentSymbol(secid);
+        String param = "%s,day,,,%d,qfq".formatted(symbol, limit == null || limit < 1 ? 250 : limit);
+        String url = UriComponentsBuilder.fromUriString(TENCENT_DAILY_KLINE_URL)
+                .queryParam("param", param)
                 .toUriString();
         return this.get(url);
     }

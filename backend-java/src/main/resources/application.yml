@@ -25,6 +25,18 @@ stock:
     end-time: ${STOCK_SYNC_END_TIME:16:00}
     timezone: ${STOCK_SYNC_TIMEZONE:Asia/Shanghai}
 
+index:
+  sync:
+    enabled: ${INDEX_SYNC_ENABLED:true}
+    daily-kline-enabled: ${INDEX_DAILY_KLINE_SYNC_ENABLED:true}
+    daily-kline-limit: ${INDEX_DAILY_KLINE_LIMIT:250}
+    initial-delay-ms: ${INDEX_SYNC_INITIAL_DELAY_MS:15000}
+    fixed-delay-ms: ${INDEX_SYNC_FIXED_DELAY_MS:300000}
+    request-interval-ms: ${INDEX_SYNC_REQUEST_INTERVAL_MS:1500}
+    start-time: ${INDEX_SYNC_START_TIME:09:29}
+    end-time: ${INDEX_SYNC_END_TIME:16:00}
+    timezone: ${INDEX_SYNC_TIMEZONE:Asia/Shanghai}
+
 influxdb:
   url: ${INFLUXDB_URL:http://localhost:8086}
   token: ${INFLUXDB_ADMIN_TOKEN:finance-management-local-token}

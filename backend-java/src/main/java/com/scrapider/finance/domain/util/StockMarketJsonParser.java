@@ -64,7 +64,7 @@ public final class StockMarketJsonParser {
         if (StrUtil.isBlank(value) || "-".equals(value.trim())) {
             return null;
         }
-        return Long.parseLong(value.trim());
+        return NumberUtil.toBigDecimal(value.trim()).longValue();
     }
 
     public static Integer intValue(JsonNode node, String fieldName) {

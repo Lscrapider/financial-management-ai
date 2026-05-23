@@ -31,6 +31,15 @@ const routes: RouteRecordRaw[] = [
           title: $t('page.dashboard.workspace'),
         },
       },
+      {
+        name: 'IndexMarket',
+        path: '/index-market',
+        component: () => import('#/views/dashboard/index-market/index.vue'),
+        meta: {
+          icon: 'lucide:chart-candlestick',
+          title: $t('page.dashboard.indexMarket'),
+        },
+      },
     ],
   },
 ];
