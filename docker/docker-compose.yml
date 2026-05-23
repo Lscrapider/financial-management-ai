@@ -64,8 +64,10 @@ services:
       POSTGRES_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-finance_management}
       POSTGRES_USERNAME: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      INFLUXDB_URL: http://influxdb:8086
     depends_on:
       - postgres
+      - influxdb
     networks:
       - finance-network
 

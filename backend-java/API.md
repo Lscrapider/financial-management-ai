@@ -53,7 +53,7 @@ GET /api/stocks/quotes?marketCode=CHINEXT&limit=50&sortField=changePercent&sortO
 GET /api/stocks/intraday-trends
 ```
 
-用于前端绘制分时图，返回指定股票最新同步批次的分钟走势数据，数据来自数据库表 `stock_intraday_trend`。
+用于前端绘制分时图，返回指定股票最新同步批次的分钟走势数据，数据来自 InfluxDB bucket `stock_intraday`。
 
 ### Query Parameters
 
@@ -75,7 +75,9 @@ GET /api/stocks/intraday-trends?stockCode=688526
 | `stockName` | 股票名称 |
 | `secid` | 第三方行情接口证券 ID |
 | `syncBatchNo` | 同步批次号 |
-| `trendTime` | 分时时间 |
+| `trendTime` | 分时时间，北京时间，例如 `2026-05-22T09:30:00`。 |
+| `trendDate` | 分时日期，北京时间日期字符串，例如 `2026-05-22`。 |
+| `trendMinute` | 分时时分，北京时间时分字符串，例如 `09:30`，前端画图 X 轴可直接使用。 |
 | `openPrice` | 分钟开盘价 |
 | `closePrice` | 分钟收盘价，用于价格线 |
 | `highPrice` | 分钟最高价 |

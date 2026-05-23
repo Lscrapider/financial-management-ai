@@ -10,7 +10,7 @@ import com.scrapider.finance.domain.po.StockIntradayTrendPO;
 import com.scrapider.finance.domain.po.StockQuoteSnapshotPO;
 import com.scrapider.finance.domain.util.StockMarketJsonParser;
 import com.scrapider.finance.manage.StockConfigManage;
-import com.scrapider.finance.manage.StockIntradayTrendManage;
+import com.scrapider.finance.manage.StockIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -30,7 +30,7 @@ public class StockMarketSyncTask {
     private final StockMarketApi stockMarketApi;
     private final StockConfigManage stockConfigManage;
     private final StockQuoteSnapshotManage stockQuoteSnapshotManage;
-    private final StockIntradayTrendManage stockIntradayTrendManage;
+    private final StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage;
 
     @Value("${stock.sync.enabled:false}")
     private boolean enabled;
@@ -42,11 +42,11 @@ public class StockMarketSyncTask {
             StockMarketApi stockMarketApi,
             StockConfigManage stockConfigManage,
             StockQuoteSnapshotManage stockQuoteSnapshotManage,
-            StockIntradayTrendManage stockIntradayTrendManage) {
+            StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage) {
         this.stockMarketApi = stockMarketApi;
         this.stockConfigManage = stockConfigManage;
         this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
-        this.stockIntradayTrendManage = stockIntradayTrendManage;
+        this.stockIntradayTrendInfluxManage = stockIntradayTrendInfluxManage;
     }
 
     @Scheduled(
@@ -80,7 +80,6 @@ public class StockMarketSyncTask {
             StockMarketDataDTO quote = this.stockMarketApi.getQuote(stock.getSecid());
             this.stockQuoteSnapshotManage.saveLatest(StockQuoteSnapshotPO.fromApiResponse(stock, quote.data()));
             this.sleepForRateLimit();
-            // TODO 这块数据库存储要存 influxDB 改逻辑
             StockMarketDataDTO trends = this.stockMarketApi.getTrends(stock.getSecid());
             this.saveTrends(stock, trends.data(), syncBatchNo);
             this.sleepForRateLimit();
@@ -111,7 +110,7 @@ public class StockMarketSyncTask {
                 .filter(Objects::nonNull)
                 .toList();
 
-        this.stockIntradayTrendManage.saveTrends(trends);
+        this.stockIntradayTrendInfluxManage.saveTrends(trends);
     }
 
     private void sleepForRateLimit() throws InterruptedException {

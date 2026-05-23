@@ -7,7 +7,7 @@ import com.scrapider.finance.domain.param.StockIntradayTrendParam;
 import com.scrapider.finance.domain.param.StockQuoteListParam;
 import com.scrapider.finance.domain.vo.StockIntradayTrendVO;
 import com.scrapider.finance.domain.vo.StockQuoteVO;
-import com.scrapider.finance.manage.StockIntradayTrendManage;
+import com.scrapider.finance.manage.StockIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
 import com.scrapider.finance.service.StockMarketQueryService;
 import java.util.List;
@@ -20,13 +20,13 @@ public class StockMarketQueryServiceImpl implements StockMarketQueryService {
     private static final int MAX_LIMIT = 500;
 
     private final StockQuoteSnapshotManage stockQuoteSnapshotManage;
-    private final StockIntradayTrendManage stockIntradayTrendManage;
+    private final StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage;
 
     public StockMarketQueryServiceImpl(
             StockQuoteSnapshotManage stockQuoteSnapshotManage,
-            StockIntradayTrendManage stockIntradayTrendManage) {
+            StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage) {
         this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
-        this.stockIntradayTrendManage = stockIntradayTrendManage;
+        this.stockIntradayTrendInfluxManage = stockIntradayTrendInfluxManage;
     }
 
     @Override
@@ -48,11 +48,11 @@ public class StockMarketQueryServiceImpl implements StockMarketQueryService {
             throw new IllegalArgumentException("stockCode must not be blank");
         }
         String stockCode = param.getStockCode().trim();
-        String latestBatchNo = this.stockIntradayTrendManage.getLatestBatchNo(stockCode);
+        String latestBatchNo = this.stockIntradayTrendInfluxManage.getLatestBatchNo(stockCode);
         if (StrUtil.isBlank(latestBatchNo)) {
             return List.of();
         }
-        return this.stockIntradayTrendManage
+        return this.stockIntradayTrendInfluxManage
                 .listByBatchNo(stockCode, latestBatchNo)
                 .stream()
                 .map(StockIntradayTrendVO::fromPO)

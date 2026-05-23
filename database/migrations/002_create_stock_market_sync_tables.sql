@@ -47,38 +47,3 @@ CREATE INDEX IF NOT EXISTS idx_stock_quote_snapshot_market_code
 
 CREATE INDEX IF NOT EXISTS idx_stock_quote_snapshot_change_percent
     ON stock_quote_snapshot (change_percent DESC);
-
-CREATE TABLE IF NOT EXISTS stock_intraday_trend (
-    id BIGSERIAL PRIMARY KEY,
-    sync_batch_no VARCHAR(64) NOT NULL,
-    stock_code VARCHAR(32) NOT NULL,
-    stock_name VARCHAR(100) NOT NULL,
-    secid VARCHAR(32) NOT NULL,
-    trend_time TIMESTAMP NOT NULL,
-    open_price NUMERIC(18, 4),
-    close_price NUMERIC(18, 4),
-    high_price NUMERIC(18, 4),
-    low_price NUMERIC(18, 4),
-    average_price NUMERIC(18, 4),
-    volume BIGINT,
-    turnover_amount NUMERIC(24, 4),
-    previous_close_price NUMERIC(18, 4),
-    synced_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uk_stock_intraday_trend_batch_code_time UNIQUE (sync_batch_no, stock_code, trend_time)
-);
-
-COMMENT ON TABLE stock_intraday_trend IS '股票分时走势分钟数据表';
-COMMENT ON COLUMN stock_intraday_trend.sync_batch_no IS '同步批次号';
-COMMENT ON COLUMN stock_intraday_trend.stock_code IS '股票代码';
-COMMENT ON COLUMN stock_intraday_trend.trend_time IS '分时时间';
-COMMENT ON COLUMN stock_intraday_trend.close_price IS '分钟收盘价，用于画价格线';
-COMMENT ON COLUMN stock_intraday_trend.average_price IS '分钟均价，用于画均价线';
-COMMENT ON COLUMN stock_intraday_trend.previous_close_price IS '昨收价，用于画参考线';
-
-CREATE INDEX IF NOT EXISTS idx_stock_intraday_trend_code_time
-    ON stock_intraday_trend (stock_code, trend_time);
-
-CREATE INDEX IF NOT EXISTS idx_stock_intraday_trend_batch_no
-    ON stock_intraday_trend (sync_batch_no);

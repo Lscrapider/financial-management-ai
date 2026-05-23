@@ -6,7 +6,7 @@ spring:
     name: finance-backend
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: ${POSTGRES_URL:jdbc:postgresql://localhost:5433/finance_management}
+    url: ${POSTGRES_URL:jdbc:postgresql://localhost:5432/finance_management}
     username: ${POSTGRES_USERNAME:postgres}
     password: ${POSTGRES_PASSWORD:123456}
 
@@ -21,3 +21,11 @@ stock:
     initial-delay-ms: ${STOCK_SYNC_INITIAL_DELAY_MS:10000}
     fixed-delay-ms: ${STOCK_SYNC_FIXED_DELAY_MS:120000}
     request-interval-ms: ${STOCK_SYNC_REQUEST_INTERVAL_MS:1500}
+
+influxdb:
+  url: ${INFLUXDB_URL:http://localhost:8086}
+  token: ${INFLUXDB_ADMIN_TOKEN:finance-management-local-token}
+  org: ${INFLUXDB_ORG:finance}
+  bucket: ${INFLUXDB_BUCKET:stock_intraday}
+  stock-minute-measurement: ${INFLUXDB_STOCK_MINUTE_MEASUREMENT:stock_minute}
+  timezone: ${INFLUXDB_TIMEZONE:Asia/Shanghai}
