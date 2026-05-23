@@ -1,11 +1,11 @@
-name: financial-management-ai
+name: finance-database
 
 services:
   postgres:
     image: postgres:15
     container_name: finance-postgres
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     env_file:
       - ../.env
     environment:
@@ -15,7 +15,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks:
-      - finance-network
+      - finance-database-network
 
   database-init:
     build:
@@ -30,7 +30,7 @@ services:
     depends_on:
       - postgres
     networks:
-      - finance-network
+      - finance-database-network
 
   influxdb:
     image: influxdb:2.7
@@ -50,24 +50,7 @@ services:
       - influxdb-data:/var/lib/influxdb2
       - influxdb-config:/etc/influxdb2
     networks:
-      - finance-network
-
-  backend-java:
-    build:
-      context: ../backend-java
-    container_name: finance-backend-java
-    ports:
-      - "8080:8080"
-    env_file:
-      - ../.env
-    environment:
-      POSTGRES_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-finance_management}
-      POSTGRES_USERNAME: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-    depends_on:
-      - postgres
-    networks:
-      - finance-network
+      - finance-database-network
 
 volumes:
   postgres-data:
@@ -75,5 +58,5 @@ volumes:
   influxdb-config:
 
 networks:
-  finance-network:
-    name: finance-network
+  finance-database-network:
+    name: finance-database-network

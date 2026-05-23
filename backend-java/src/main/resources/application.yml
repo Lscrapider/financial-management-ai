@@ -8,7 +8,7 @@ spring:
     driver-class-name: org.postgresql.Driver
     url: ${POSTGRES_URL:jdbc:postgresql://localhost:5433/finance_management}
     username: ${POSTGRES_USERNAME:postgres}
-    password: ${POSTGRES_PASSWORD:password123}
+    password: ${POSTGRES_PASSWORD:123456}
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
