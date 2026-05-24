@@ -12,6 +12,7 @@
     <description>理财分析 AI 项目 Java 后端聚合工程</description>
 
     <modules>
+        <module>finance-data</module>
         <module>finance-ai</module>
         <module>finance-service</module>
     </modules>

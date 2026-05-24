@@ -1,6 +1,7 @@
 FROM maven:3.9.9-eclipse-temurin-17 AS build
 WORKDIR /app
 COPY pom.xml .
+COPY finance-data ./finance-data
 COPY finance-ai ./finance-ai
 COPY finance-service ./finance-service
 RUN mvn -q -pl finance-service -am -DskipTests package

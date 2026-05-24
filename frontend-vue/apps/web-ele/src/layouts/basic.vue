@@ -20,6 +20,7 @@ import { openWindow } from '@vben/utils';
 
 import { $t } from '#/locales';
 import { useAuthStore } from '#/store';
+import AiChatDrawer from '#/widgets/ai-chat/ai-chat-drawer.vue';
 import LoginForm from '#/views/_core/authentication/login.vue';
 
 const notifications = ref<NotificationItem[]>([
@@ -242,6 +243,7 @@ watch(
       />
     </template>
     <template #extra>
+      <AiChatDrawer />
       <AuthenticationLoginExpiredModal
         v-model:open="accessStore.loginExpired"
         :avatar

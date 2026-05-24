@@ -30,6 +30,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
+                        .requestMatchers("/api/ai/**").authenticated()
                         .anyRequest().hasRole("admin"))
                 .addFilterBefore(
                         new BearerTokenAuthenticationFilter(tokenStore),
