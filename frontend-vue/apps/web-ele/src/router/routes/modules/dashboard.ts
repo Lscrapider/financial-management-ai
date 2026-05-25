@@ -13,16 +13,6 @@ const routes: RouteRecordRaw[] = [
     path: '/dashboard',
     children: [
       {
-        name: 'Analytics',
-        path: '/analytics',
-        component: () => import('#/views/dashboard/analytics/index.vue'),
-        meta: {
-          affixTab: true,
-          icon: 'lucide:area-chart',
-          title: $t('page.dashboard.analytics'),
-        },
-      },
-      {
         name: 'Workspace',
         path: '/workspace',
         component: () => import('#/views/dashboard/workspace/index.vue'),
@@ -38,6 +28,27 @@ const routes: RouteRecordRaw[] = [
         meta: {
           icon: 'lucide:chart-candlestick',
           title: $t('page.dashboard.indexMarket'),
+        },
+      },
+    ],
+  },
+  {
+    meta: {
+      icon: 'lucide:settings',
+      order: 100,
+      title: $t('page.systemConfig.title'),
+    },
+    name: 'SystemConfig',
+    path: '/system-config',
+    children: [
+      {
+        name: 'Analytics',
+        path: '/analytics',
+        component: () => import('#/views/dashboard/analytics/index.vue'),
+        meta: {
+          affixTab: true,
+          icon: 'lucide:area-chart',
+          title: $t('page.dashboard.analytics'),
         },
       },
     ],

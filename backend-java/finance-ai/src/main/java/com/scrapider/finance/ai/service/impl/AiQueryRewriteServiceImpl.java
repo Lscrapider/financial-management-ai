@@ -4,7 +4,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scrapider.finance.ai.domain.vo.AiQueryRewriteVO;
 import com.scrapider.finance.ai.service.AiQueryRewriteService;
+import com.scrapider.finance.ai.service.AiTokenUsageService;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.api.ResponseFormat;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -12,7 +16,7 @@ public class AiQueryRewriteServiceImpl implements AiQueryRewriteService {
 
     private static final String SYSTEM_PROMPT = """
             你负责把用户的理财分析问题改写成后端可执行的数据需求。
-            只返回一个 JSON 对象，不要返回 Markdown，不要返回解释文本。
+            必须返回标准 JSON 对象。只返回 JSON，不要返回 Markdown，不要返回解释文本。
             字段必须包含：
             enabled: boolean，只有理财分析、股票、指数、市场、资产配置、投资研究、财务指标解释类问题才为 true
             disabledReason: string，enabled=false 时说明原因，enabled=true 时为空字符串
@@ -46,22 +50,45 @@ public class AiQueryRewriteServiceImpl implements AiQueryRewriteService {
             如果无法确定股票或指数代码，代码字段返回空字符串，不要猜代码；可以用 targetName 保留用户提到的名称。
             """;
 
+    private static final OpenAiChatOptions JSON_OBJECT_OPTIONS = OpenAiChatOptions.builder()
+            .responseFormat(ResponseFormat.builder()
+                    .type(ResponseFormat.Type.JSON_OBJECT)
+                    .build())
+            .reasoningEffort("high")
+            .build();
+
     private final ChatClient chatClient;
     private final ObjectMapper objectMapper;
+    private final AiTokenUsageService aiTokenUsageService;
 
-    public AiQueryRewriteServiceImpl(ChatClient.Builder chatClientBuilder, ObjectMapper objectMapper) {
+    public AiQueryRewriteServiceImpl(ChatClient.Builder chatClientBuilder,
+            ObjectMapper objectMapper,
+            AiTokenUsageService aiTokenUsageService) {
         this.chatClient = chatClientBuilder.build();
         this.objectMapper = objectMapper;
+        this.aiTokenUsageService = aiTokenUsageService;
     }
 
     @Override
     public AiQueryRewriteVO rewrite(String message) {
-        String content = this.chatClient.prompt()
+        ChatResponse response = this.chatClient.prompt()
                 .system(SYSTEM_PROMPT)
                 .user(message)
+                .options(JSON_OBJECT_OPTIONS)
                 .call()
-                .content();
+                .chatResponse();
+        this.aiTokenUsageService.recordChatResponse(response);
+        String content = this.content(response);
         return this.parseRewrite(content, message);
+    }
+
+    private String content(ChatResponse response) {
+        if (response == null) {
+            return "";
+        } else {
+            response.getResult();
+        }
+        return response.getResult().getOutput().getText();
     }
 
     private AiQueryRewriteVO parseRewrite(String content, String message) {

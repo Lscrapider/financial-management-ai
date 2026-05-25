@@ -8,9 +8,16 @@
     "profile": "个人中心"
   },
   "dashboard": {
-    "title": "概览",
-    "analytics": "分析页",
-    "workspace": "工作台",
+    "title": "行情中心",
+    "analytics": "控制台",
+    "workspace": "市场看板",
     "indexMarket": "指数行情"
+  },
+  "aiCenter": {
+    "title": "AI中心",
+    "knowledgeProcessing": "知识库处理进度"
+  },
+  "systemConfig": {
+    "title": "系统配置"
   }
 }

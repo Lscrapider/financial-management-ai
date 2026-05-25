@@ -8,9 +8,16 @@
     "profile": "Profile"
   },
   "dashboard": {
-    "title": "Dashboard",
-    "analytics": "Analytics",
-    "workspace": "Workspace",
+    "title": "Market Center",
+    "analytics": "Console",
+    "workspace": "Market Dashboard",
     "indexMarket": "Index Market"
+  },
+  "aiCenter": {
+    "title": "AI Center",
+    "knowledgeProcessing": "Knowledge Processing"
+  },
+  "systemConfig": {
+    "title": "System Config"
   }
 }

@@ -16,4 +16,8 @@ public class AppUserManage extends ServiceImpl<AppUserMapper, AppUserPO> {
     public void saveUser(AppUserPO user) {
         this.save(user);
     }
+
+    public long countEnabledUsers() {
+        return this.count(new LambdaQueryWrapper<AppUserPO>().eq(AppUserPO::getEnabled, true));
+    }
 }

@@ -2,36 +2,162 @@
 
 ## 服务定位
 
-本目录是理财分析 AI 项目的主业务 Java 后端服务，基于 Spring Boot、Maven、MyBatis-Plus 和 PostgreSQL 构建。
-
-本服务主要负责业务接口、数据编排、定时任务、数据库访问和对其他服务的调用。
+`finance-service` 是理财分析 AI 项目的 Spring Boot 主应用，负责应用启动、HTTP 接口、安全认证、行情同步任务、外部行情 API 调用和业务编排。公共数据层来自 `finance-data`，AI 能力来自 `finance-ai`。
 
 ## 基础信息
 
 - 包名：`com.scrapider.finance`
-- 构建工具：Maven
-- Web 框架：Spring Boot
-- 分层方式：MVC 三层结构
-- ORM 工具：MyBatis-Plus
+- 启动类：`FinanceApplication`
+- 默认端口：`8081`
+- Web 框架：Spring Boot 3.x
+- 权限：Spring Security + 内存 TokenStore
+- ORM：MyBatis-Plus
 - 定时任务：Spring Scheduling
-- 代码简化：Lombok
-- 数据库：PostgreSQL
+- 关系型数据库：PostgreSQL
+- 时序数据库：InfluxDB
+- 外部行情源：腾讯行情接口
 
-## 运行前提
+## 目录结构
 
-本服务基于 Spring Boot 3.x，要求使用 JDK 17 或更高版本。
+```text
+backend-java/finance-service/
+├── Dockerfile
+├── pom.xml
+└── src/main/
+    ├── java/com/scrapider/finance/
+    │   ├── FinanceApplication.java            # Spring Boot 启动类
+    │   ├── api/                               # 外部行情 API 调用
+    │   ├── config/                            # 安全、RestTemplate、WebMvc、DeepSeek 请求配置
+    │   ├── controller/                        # Auth、股票行情、指数行情接口
+    │   ├── interceptor/                       # 访问日志拦截器
+    │   ├── security/                          # 登录用户、Bearer Token 过滤器、TokenStore、密码编码
+    │   ├── service/                           # 业务服务接口
+    │   │   └── impl/                          # 业务服务实现
+    │   └── task/                              # 股票和指数行情同步任务
+    └── resources/
+        └── application.yml                    # 应用配置
+```
 
-如果在本地 IDE 中启动，请确认项目 SDK、Maven Runner 使用的 JDK 都是 17+。如果使用 Docker 启动，请先确认 Docker Desktop 或 Docker daemon 已启动。
+## 接口分组
+
+| 分组 | 路径 | 说明 |
+| --- | --- | --- |
+| 认证 | `/api/auth/**` | 登录、注册、登出、刷新 Token、权限码占位接口。 |
+| 用户 | `/api/user/info` | 返回当前登录用户信息。 |
+| 股票 | `/api/stocks/**` | 股票最新行情列表、单只股票最新一批分时走势。 |
+| 指数 | `/api/indices/**` | 指数最新行情列表、指数日 K。 |
+| AI | `/api/ai/**` | 由 `finance-ai` 提供，随主应用启动后暴露，包括 Chat、OCR、Token 用量和控制台指标。 |
+
+根目录 `API_DOCUMENTATION.md` 中维护了接口级参数和返回字段说明。
+
+## 权限规则
+
+```text
+匿名可访问：
+POST /api/auth/login
+POST /api/auth/register
+
+登录后可访问：
+/api/ai/**
+
+admin 角色可访问：
+除上述规则外的其他接口
+```
+
+登录后使用以下请求头传递 Token：
+
+```http
+Authorization: Bearer <accessToken>
+```
+
+当前密码编码器为 Base64 编码，默认初始化用户来自数据库迁移：
+
+```text
+username: admin
+password: 123456
+role: admin
+```
+
+## 核心业务
+
+### 认证与用户
+
+- 登录成功后返回 `accessToken`。
+- 注册时校验用户名、密码和确认密码，并默认创建 `admin` 角色用户。
+- 登出会从内存 `TokenStore` 移除当前 Token。
+- 刷新 Token 接口当前返回原 Token。
+- 用户信息接口返回用户 ID、用户名、展示名、头像、角色、默认首页和当前 Token。
+
+### 股票行情
+
+- 定时读取启用的 `stock_config` 股票配置。
+- 调用腾讯行情接口同步股票最新行情快照到 PostgreSQL。
+- 调用腾讯分时接口同步股票分钟走势到 InfluxDB。
+- 查询接口支持按市场过滤、限制数量、排序字段和排序方向。
+- 分时查询返回指定股票最新同步批次的数据。
+
+### 指数行情
+
+- 定时读取启用的 `index_config` 指数配置。
+- 调用腾讯行情接口同步指数最新行情快照到 PostgreSQL。
+- 可同步指数日 K 到 PostgreSQL。
+- 查询接口支持指数行情列表和指定指数/`secid` 的日 K。
+
+### 访问日志
+
+`AppVisitLogInterceptor` 会记录 `/api/**` 请求，排除 `/api/ai/console/**`，记录用户名、请求方法、路径、状态码、耗时、客户端地址和 User-Agent。
+
+## 配置项
+
+### 数据库
+
+| 环境变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `POSTGRES_URL` | `jdbc:postgresql://localhost:5432/finance_management` | PostgreSQL JDBC 地址。 |
+| `POSTGRES_USERNAME` | `postgres` | PostgreSQL 用户名。 |
+| `POSTGRES_PASSWORD` | `123456` | PostgreSQL 密码。 |
+| `INFLUXDB_URL` | `http://localhost:8086` | InfluxDB 地址。 |
+| `INFLUXDB_ADMIN_TOKEN` | `finance-management-local-token` | InfluxDB Token。 |
+| `INFLUXDB_ORG` | `finance` | InfluxDB Org。 |
+| `INFLUXDB_BUCKET` | `stock_intraday` | InfluxDB Bucket。 |
+
+### AI
+
+| 环境变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `DEEPSEEK_API_KEY` | 空 | DeepSeek/OpenAI 兼容接口 Key。 |
+| `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | 模型服务地址。 |
+| `DEEPSEEK_COMPLETIONS_PATH` | `/chat/completions` | Chat Completions 路径。 |
+| `DEEPSEEK_MODEL` | `deepseek-v4-pro` | 默认模型。 |
+| `DEEPSEEK_TEMPERATURE` | `0.3` | 生成温度。 |
+| `DEEPSEEK_REASONING_EFFORT` | `high` | 推理强度。 |
+| `DEEPSEEK_THINKING_ENABLED` | `true` | 是否启用思考模式。 |
+| `DEEPSEEK_THINKING_TYPE` | `enabled` | 思考模式类型。 |
+
+### 同步任务
+
+| 配置 | 默认值 | 说明 |
+| --- | --- | --- |
+| `STOCK_SYNC_ENABLED` | `true` | 是否启用股票同步。 |
+| `STOCK_SYNC_INITIAL_DELAY_MS` | `10000` | 股票同步首次延迟。 |
+| `STOCK_SYNC_FIXED_DELAY_MS` | `120000` | 股票同步固定延迟。 |
+| `STOCK_SYNC_REQUEST_INTERVAL_MS` | `1500` | 股票接口请求间隔。 |
+| `STOCK_SYNC_START_TIME` | `09:29` | 股票同步窗口开始。 |
+| `STOCK_SYNC_END_TIME` | `16:00` | 股票同步窗口结束。 |
+| `INDEX_SYNC_ENABLED` | `true` | 是否启用指数同步。 |
+| `INDEX_DAILY_KLINE_SYNC_ENABLED` | `true` | 是否同步指数日 K。 |
+| `INDEX_DAILY_KLINE_LIMIT` | `250` | 指数日 K 同步条数。 |
+| `INDEX_SYNC_FIXED_DELAY_MS` | `300000` | 指数同步固定延迟。 |
 
 ## 启动方式
 
 ### 本地启动
 
+项目未提交 Maven Wrapper，本地需要先安装 Maven，并使用 JDK 17+。
+
 ```bash
 mvn -pl backend-java/finance-service -am spring-boot:run
 ```
-
-当前项目没有提交 Maven Wrapper，因此本地启动需要先安装 Maven。
 
 ### Docker 启动
 
@@ -41,45 +167,8 @@ mvn -pl backend-java/finance-service -am spring-boot:run
 docker compose -f docker/docker-compose.yml up --build finance-service
 ```
 
-默认会读取以下数据库环境变量：
+## 构建
 
-- `POSTGRES_URL`
-- `POSTGRES_USERNAME`
-- `POSTGRES_PASSWORD`
-- `DASHSCOPE_API_KEY`
-- `DASHSCOPE_BASE_URL`
-- `DASHSCOPE_MODEL`
-
-如果没有设置，Docker Compose 会使用连接宿主机 PostgreSQL 的默认值。
-
-## 目录结构
-
-```text
-backend-java/finance-service/
-├── pom.xml
-├── Dockerfile
-└── src/
-    ├── main/
-    │   ├── java/
-    │   │   └── com/scrapider/finance/
-    │   │       ├── FinanceApplication.java    # Spring Boot 启动类
-    │   │       ├── controller/                # 控制层
-    │   │       ├── service/                   # 服务层接口
-    │   │       │   └── impl/                  # 服务层实现
-    │   │       ├── manage/                    # MyBatis-Plus 管理封装
-    │   │       ├── mapper/                    # MyBatis-Plus Mapper
-    │   │       ├── domain/                    # 领域对象
-    │   │       │   ├── po/                    # 持久化对象
-    │   │       │   ├── dto/                   # 数据传输对象
-    │   │       │   ├── vo/                    # 视图返回对象
-    │   │       │   ├── param/                 # 请求参数对象
-    │   │       │   ├── enums/                 # 枚举
-    │   │       │   └── constant/              # 常量
-    │   │       ├── config/                    # Spring 配置
-    │   │       └── task/                      # 定时任务
-    │   └── resources/
-    │       ├── application.yml                # 应用配置
-    │       └── mapper/                        # Mapper XML
-    └── test/
-        └── java/com/scrapider/finance/        # 测试代码
+```bash
+mvn -pl backend-java/finance-service -am package
 ```

@@ -1,0 +1,48 @@
+package com.scrapider.finance.ai.controller;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.scrapider.finance.ai.domain.vo.AiTokenUsageLogVO;
+import com.scrapider.finance.ai.domain.vo.AiTokenUsageOverviewVO;
+import com.scrapider.finance.ai.domain.vo.AiTokenUsageTrendVO;
+import com.scrapider.finance.ai.domain.vo.ErrorResponseVO;
+import com.scrapider.finance.ai.service.AiTokenUsageService;
+import java.util.List;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/ai/token-usage")
+public class AiTokenUsageController {
+
+    private final AiTokenUsageService aiTokenUsageService;
+
+    public AiTokenUsageController(AiTokenUsageService aiTokenUsageService) {
+        this.aiTokenUsageService = aiTokenUsageService;
+    }
+
+    @PostMapping("/deepseek-response")
+    public ResponseEntity<AiTokenUsageLogVO> recordDeepSeekResponse(@RequestBody JsonNode response) {
+        return ResponseEntity.ok(this.aiTokenUsageService.recordDeepSeekResponse(response));
+    }
+
+    @GetMapping("/overview")
+    public ResponseEntity<AiTokenUsageOverviewVO> overview(@RequestParam(required = false) Integer days) {
+        return ResponseEntity.ok(this.aiTokenUsageService.overview(days));
+    }
+
+    @GetMapping("/trends")
+    public ResponseEntity<List<AiTokenUsageTrendVO>> trends(@RequestParam(required = false) Integer days) {
+        return ResponseEntity.ok(this.aiTokenUsageService.trends(days));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponseVO> handleBadRequest(IllegalArgumentException ex) {
+        return ResponseEntity.badRequest().body(new ErrorResponseVO(ex.getMessage()));
+    }
+}

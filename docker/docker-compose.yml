@@ -66,9 +66,14 @@ services:
       POSTGRES_USERNAME: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       INFLUXDB_URL: http://influxdb:8086
-      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
-      DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode}
-      DASHSCOPE_MODEL: ${DASHSCOPE_MODEL:-qwen3-plus}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_COMPLETIONS_PATH: ${DEEPSEEK_COMPLETIONS_PATH:-/chat/completions}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-pro}
+      DEEPSEEK_TEMPERATURE: ${DEEPSEEK_TEMPERATURE:-0.3}
+      DEEPSEEK_REASONING_EFFORT: ${DEEPSEEK_REASONING_EFFORT:-high}
+      DEEPSEEK_THINKING_ENABLED: ${DEEPSEEK_THINKING_ENABLED:-true}
+      DEEPSEEK_THINKING_TYPE: ${DEEPSEEK_THINKING_TYPE:-enabled}
     depends_on:
       - postgres
       - influxdb

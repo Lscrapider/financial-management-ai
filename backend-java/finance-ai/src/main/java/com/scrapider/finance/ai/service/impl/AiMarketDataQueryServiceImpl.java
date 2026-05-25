@@ -77,6 +77,7 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
     }
 
     private Map<String, Object> queryStockQuoteByCode(AiDataRequestVO request) {
+        request = this.resolveStockRequest(request);
         if (StrUtil.isBlank(request.targetCode())) {
             return Map.of();
         }
@@ -100,6 +101,7 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
     }
 
     private Map<String, Object> queryStockIntradayByCode(AiDataRequestVO request) {
+        request = this.resolveStockRequest(request);
         if (StrUtil.isBlank(request.targetCode())) {
             return Map.of();
         }
@@ -119,6 +121,7 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
     }
 
     private Map<String, Object> queryIndexQuoteByCode(AiDataRequestVO request) {
+        request = this.resolveIndexRequest(request);
         if (StrUtil.isBlank(request.targetCode())) {
             return Map.of();
         }
@@ -142,6 +145,7 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
     }
 
     private Map<String, Object> queryIndexDailyKlines(AiDataRequestVO request) {
+        request = this.resolveIndexRequest(request);
         if (StrUtil.isBlank(request.targetCode())) {
             return Map.of();
         }
@@ -165,6 +169,66 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
         result.put("targetName", request.targetName());
         result.put("rows", rows);
         return result;
+    }
+
+    private AiDataRequestVO resolveStockRequest(AiDataRequestVO request) {
+        if (StrUtil.isNotBlank(request.targetCode()) || StrUtil.isBlank(request.targetName())) {
+            return request;
+        }
+        StockQuoteSnapshotPO quote = this.findStockQuoteByName(request.targetName());
+        if (quote == null || StrUtil.isBlank(quote.getStockCode())) {
+            return request;
+        }
+        return new AiDataRequestVO(
+                request.source(),
+                request.queryType(),
+                quote.getStockCode(),
+                request.targetName(),
+                request.limit());
+    }
+
+    private StockQuoteSnapshotPO findStockQuoteByName(String stockName) {
+        StockQuoteSnapshotPO quote = this.stockQuoteSnapshotManage.getOne(
+                new LambdaQueryWrapper<StockQuoteSnapshotPO>()
+                        .eq(StockQuoteSnapshotPO::getStockName, stockName)
+                        .last("LIMIT 1"));
+        if (quote != null) {
+            return quote;
+        }
+        return this.stockQuoteSnapshotManage.getOne(
+                new LambdaQueryWrapper<StockQuoteSnapshotPO>()
+                        .like(StockQuoteSnapshotPO::getStockName, stockName)
+                        .last("LIMIT 1"));
+    }
+
+    private AiDataRequestVO resolveIndexRequest(AiDataRequestVO request) {
+        if (StrUtil.isNotBlank(request.targetCode()) || StrUtil.isBlank(request.targetName())) {
+            return request;
+        }
+        IndexQuoteSnapshotPO quote = this.findIndexQuoteByName(request.targetName());
+        if (quote == null || StrUtil.isBlank(quote.getIndexCode())) {
+            return request;
+        }
+        return new AiDataRequestVO(
+                request.source(),
+                request.queryType(),
+                quote.getIndexCode(),
+                request.targetName(),
+                request.limit());
+    }
+
+    private IndexQuoteSnapshotPO findIndexQuoteByName(String indexName) {
+        IndexQuoteSnapshotPO quote = this.indexQuoteSnapshotManage.getOne(
+                new LambdaQueryWrapper<IndexQuoteSnapshotPO>()
+                        .eq(IndexQuoteSnapshotPO::getIndexName, indexName)
+                        .last("LIMIT 1"));
+        if (quote != null) {
+            return quote;
+        }
+        return this.indexQuoteSnapshotManage.getOne(
+                new LambdaQueryWrapper<IndexQuoteSnapshotPO>()
+                        .like(IndexQuoteSnapshotPO::getIndexName, indexName)
+                        .last("LIMIT 1"));
     }
 
     private Map<String, Object> stockQuoteToMap(StockQuoteSnapshotPO quote) {

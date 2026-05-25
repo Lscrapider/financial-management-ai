@@ -6,17 +6,24 @@ spring:
     name: finance-service
   ai:
     openai:
-      api-key: ${DASHSCOPE_API_KEY:sk-1ef7eabc3eae4b439de96141b505462d}
-      base-url: ${DASHSCOPE_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode}
+      api-key: ${DEEPSEEK_API_KEY:sk-bc2601f8c64c42e382494926caa1c2fe}
+      base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
       chat:
+        completions-path: ${DEEPSEEK_COMPLETIONS_PATH:/chat/completions}
         options:
-          model: ${DASHSCOPE_MODEL:qwen3.6-plus}
-          temperature: ${DASHSCOPE_TEMPERATURE:0.3}
+          model: ${DEEPSEEK_MODEL:deepseek-v4-pro}
+          temperature: ${DEEPSEEK_TEMPERATURE:0.3}
+          reasoning-effort: ${DEEPSEEK_REASONING_EFFORT:high}
   datasource:
     driver-class-name: org.postgresql.Driver
     url: ${POSTGRES_URL:jdbc:postgresql://localhost:5432/finance_management}
     username: ${POSTGRES_USERNAME:postgres}
     password: ${POSTGRES_PASSWORD:123456}
+
+deepseek:
+  chat:
+    thinking-enabled: ${DEEPSEEK_THINKING_ENABLED:true}
+    thinking-type: ${DEEPSEEK_THINKING_TYPE:enabled}
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml

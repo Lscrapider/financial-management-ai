@@ -7,8 +7,10 @@ import com.scrapider.finance.ai.domain.vo.AiQueryRewriteVO;
 import com.scrapider.finance.ai.service.AiChatService;
 import com.scrapider.finance.ai.service.AiMarketDataQueryService;
 import com.scrapider.finance.ai.service.AiQueryRewriteService;
+import com.scrapider.finance.ai.service.AiTokenUsageService;
 import java.time.LocalDateTime;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -25,15 +27,18 @@ public class AiChatServiceImpl implements AiChatService {
     private final ChatClient chatClient;
     private final AiQueryRewriteService aiQueryRewriteService;
     private final AiMarketDataQueryService aiMarketDataQueryService;
+    private final AiTokenUsageService aiTokenUsageService;
     private final String model;
 
     public AiChatServiceImpl(ChatClient.Builder chatClientBuilder,
             AiQueryRewriteService aiQueryRewriteService,
             AiMarketDataQueryService aiMarketDataQueryService,
+            AiTokenUsageService aiTokenUsageService,
             @Value("${spring.ai.openai.chat.options.model}") String model) {
         this.chatClient = chatClientBuilder.build();
         this.aiQueryRewriteService = aiQueryRewriteService;
         this.aiMarketDataQueryService = aiMarketDataQueryService;
+        this.aiTokenUsageService = aiTokenUsageService;
         this.model = model;
     }
 
@@ -48,12 +53,21 @@ public class AiChatServiceImpl implements AiChatService {
             return new AiChatVO(message, answer, this.model, queryRewrite, AiDatabaseContextVO.empty(), LocalDateTime.now());
         }
         AiDatabaseContextVO databaseContext = this.aiMarketDataQueryService.query(queryRewrite);
-        String answer = this.chatClient.prompt()
+        ChatResponse response = this.chatClient.prompt()
                 .system(SYSTEM_PROMPT)
                 .user(this.buildUserPrompt(message, queryRewrite, databaseContext))
                 .call()
-                .content();
+                .chatResponse();
+        this.aiTokenUsageService.recordChatResponse(response);
+        String answer = this.content(response);
         return new AiChatVO(message, answer, this.model, queryRewrite, databaseContext, LocalDateTime.now());
+    }
+
+    private String content(ChatResponse response) {
+        if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+            return "";
+        }
+        return response.getResult().getOutput().getText();
     }
 
     private String normalizeMessage(AiChatParam param) {
