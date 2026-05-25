@@ -7,8 +7,8 @@ CREATE TABLE IF NOT EXISTS ocr_task (
     file_type VARCHAR(32) NOT NULL,
     content_type VARCHAR(255),
     file_size BIGINT NOT NULL DEFAULT 0,
-    status VARCHAR(32) NOT NULL DEFAULT 'pending',
-    current_stage VARCHAR(64) NOT NULL DEFAULT '等待处理',
+    status VARCHAR(32) NOT NULL DEFAULT 'ready',
+    current_stage VARCHAR(64) NOT NULL DEFAULT 'document.normalize',
     progress INTEGER NOT NULL DEFAULT 0,
     page_count INTEGER NOT NULL DEFAULT 0,
     segment_count INTEGER NOT NULL DEFAULT 0,
@@ -26,8 +26,8 @@ COMMENT ON COLUMN ocr_task.file_path IS '本地文件路径';
 COMMENT ON COLUMN ocr_task.file_type IS '文件类型，例如 pdf、png、jpg';
 COMMENT ON COLUMN ocr_task.content_type IS '上传文件 Content-Type';
 COMMENT ON COLUMN ocr_task.file_size IS '文件大小，单位字节';
-COMMENT ON COLUMN ocr_task.status IS '任务状态：pending、running、finished、failed';
-COMMENT ON COLUMN ocr_task.current_stage IS '当前处理阶段';
+COMMENT ON COLUMN ocr_task.status IS '任务状态：ready、running、manual_review_required、finished、failed';
+COMMENT ON COLUMN ocr_task.current_stage IS '当前处理阶段：document.normalize、ocr.recognize、text.clean、quality.validate、embedding.index';
 COMMENT ON COLUMN ocr_task.progress IS '处理进度百分比';
 COMMENT ON COLUMN ocr_task.page_count IS '扫描页数';
 COMMENT ON COLUMN ocr_task.segment_count IS '文本分段数';

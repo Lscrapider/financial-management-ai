@@ -9,17 +9,37 @@ export interface OcrTask {
   pageCount: number;
   progress: number;
   segmentCount: number;
-  status: 'failed' | 'finished' | 'pending' | 'running';
+  status:
+    | 'failed'
+    | 'finished'
+    | 'manual_review_required'
+    | 'ready'
+    | 'running';
   submittedAt: string;
   taskNo: string;
   updatedAt: string;
 }
 
-export function submitOcrTask(file: File) {
-  return requestClient.upload<OcrTask>(
+export function listOcrTasks(limit = 50) {
+  return requestClient.get<OcrTask[]>('/ai/ocr/tasks', {
+    params: { limit },
+    responseReturn: 'body',
+  });
+}
+
+export function submitOcrTask(files: File[]) {
+  const formData = new FormData();
+  files.forEach((file) => {
+    formData.append('file', file);
+  });
+
+  return requestClient.post<OcrTask[]>(
     '/ai/ocr/tasks',
-    { file },
+    formData,
     {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
       responseReturn: 'body',
     },
   );

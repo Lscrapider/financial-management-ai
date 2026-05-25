@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
 
@@ -17,13 +17,15 @@ import {
   ElUpload,
 } from 'element-plus';
 import type { UploadFile, UploadRawFile } from 'element-plus';
+import type { UploadInstance } from 'element-plus';
 
-import { submitOcrTask, type OcrTask } from '#/api/ocr-task';
+import { listOcrTasks, submitOcrTask, type OcrTask } from '#/api/ocr-task';
 
-type ProcessingStatus = 'failed' | 'finished' | 'pending' | 'running';
+type ProcessingStatus = OcrTask['status'];
+type ProcessingStage = OcrTask['currentStage'];
 
 interface ProcessingTask {
-  currentStage: string;
+  currentStage: ProcessingStage;
   fileName: string;
   id: string;
   pages: number;
@@ -34,61 +36,21 @@ interface ProcessingTask {
 }
 
 const activeTab = ref('knowledgeProcessing');
-const selectedTaskId = ref('scan-20260525-002');
-const selectedFile = ref<File>();
+const selectedTaskId = ref('');
+const selectedFiles = ref<File[]>([]);
+const uploadRef = ref<UploadInstance>();
 const submitting = ref(false);
+const loadingTasks = ref(false);
 
 const pipelineStages = [
-  { key: 'upload', label: '扫描件上传' },
-  { key: 'ocr', label: 'OCR识别' },
-  { key: 'clean', label: '文本清洗' },
-  { key: 'split', label: '文本切分' },
-  { key: 'vectorize', label: '向量化' },
-  { key: 'indexed', label: '写入向量库' },
+  { key: 'document.normalize', label: '格式校验' },
+  { key: 'ocr.recognize', label: 'OCR识别' },
+  { key: 'text.clean', label: '文本清洗' },
+  { key: 'quality.validate', label: '质量校验' },
+  { key: 'embedding.index', label: '向量入库' },
 ];
 
-const processingTasks = ref<ProcessingTask[]>([
-  {
-    currentStage: '写入向量库',
-    fileName: '手写副本-估值框架-001.pdf',
-    id: 'scan-20260525-001',
-    pages: 28,
-    progress: 100,
-    segments: 146,
-    status: 'finished',
-    updatedAt: '2026-05-25 15:48',
-  },
-  {
-    currentStage: 'OCR识别',
-    fileName: '手写副本-交易纪律-002.pdf',
-    id: 'scan-20260525-002',
-    pages: 16,
-    progress: 42,
-    segments: 0,
-    status: 'running',
-    updatedAt: '2026-05-25 16:08',
-  },
-  {
-    currentStage: '文本清洗',
-    fileName: '手写副本-行业笔记-003.pdf',
-    id: 'scan-20260525-003',
-    pages: 22,
-    progress: 68,
-    segments: 84,
-    status: 'running',
-    updatedAt: '2026-05-25 16:03',
-  },
-  {
-    currentStage: '等待处理',
-    fileName: '手写副本-财报摘要-004.pdf',
-    id: 'scan-20260525-004',
-    pages: 9,
-    progress: 0,
-    segments: 0,
-    status: 'pending',
-    updatedAt: '2026-05-25 15:57',
-  },
-]);
+const processingTasks = ref<ProcessingTask[]>([]);
 
 const selectedTask = computed(() => {
   return (
@@ -107,9 +69,8 @@ const runningCount = computed(() => {
     .length;
 });
 
-const pendingCount = computed(() => {
-  return processingTasks.value.filter((item) => item.status === 'pending')
-    .length;
+const readyCount = computed(() => {
+  return processingTasks.value.filter((item) => item.status === 'ready').length;
 });
 
 const totalPages = computed(() => {
@@ -123,21 +84,37 @@ const totalSegments = computed(() => {
   );
 });
 
-const canSubmit = computed(() => Boolean(selectedFile.value) && !submitting.value);
+const canSubmit = computed(() => selectedFiles.value.length > 0 && !submitting.value);
+
+onMounted(() => {
+  void loadTasks();
+});
+
+async function loadTasks() {
+  loadingTasks.value = true;
+  try {
+    const tasks = await listOcrTasks();
+    processingTasks.value = tasks.map(toProcessingTask);
+    selectedTaskId.value = processingTasks.value[0]?.id ?? '';
+  } finally {
+    loadingTasks.value = false;
+  }
+}
 
 async function submitTask() {
-  if (!selectedFile.value) {
+  if (selectedFiles.value.length === 0) {
     ElMessage.warning('请选择 PDF 或图片文件');
     return;
   }
   submitting.value = true;
   try {
-    const task = await submitOcrTask(selectedFile.value);
-    const processingTask = toProcessingTask(task);
-    processingTasks.value.unshift(processingTask);
-    selectedTaskId.value = processingTask.id;
-    selectedFile.value = undefined;
-    ElMessage.success('识别任务已提交');
+    const tasks = await submitOcrTask(selectedFiles.value);
+    const newProcessingTasks = tasks.map(toProcessingTask);
+    processingTasks.value.unshift(...newProcessingTasks);
+    selectedTaskId.value = newProcessingTasks[0]?.id ?? selectedTaskId.value;
+    selectedFiles.value = [];
+    uploadRef.value?.clearFiles();
+    ElMessage.success(`已提交 ${newProcessingTasks.length} 个识别任务`);
   } finally {
     submitting.value = false;
   }
@@ -158,14 +135,21 @@ function beforeUpload(file: UploadRawFile) {
 function changeUploadFile(file: UploadFile) {
   const rawFile = file.raw;
   if (!rawFile || !beforeUpload(rawFile)) {
-    selectedFile.value = undefined;
+    selectedFiles.value = selectedFiles.value.filter(
+      (item) => item.name !== file.name,
+    );
     return;
   }
-  selectedFile.value = rawFile;
+  selectedFiles.value = [
+    ...selectedFiles.value.filter((item) => item.name !== rawFile.name),
+    rawFile,
+  ];
 }
 
-function removeUploadFile() {
-  selectedFile.value = undefined;
+function removeUploadFile(file: UploadFile) {
+  selectedFiles.value = selectedFiles.value.filter(
+    (item) => item.name !== file.name,
+  );
 }
 
 function isSupportedFile(file: File) {
@@ -196,7 +180,8 @@ function statusLabel(status: ProcessingStatus) {
   const labels: Record<ProcessingStatus, string> = {
     failed: '失败',
     finished: '完成',
-    pending: '等待中',
+    manual_review_required: '需人工介入',
+    ready: '等待中',
     running: '处理中',
   };
   return labels[status];
@@ -207,10 +192,17 @@ function statusType(status: ProcessingStatus) {
     {
       failed: 'danger',
       finished: 'success',
-      pending: 'info',
+      manual_review_required: 'warning',
+      ready: 'info',
       running: 'warning',
     };
   return types[status];
+}
+
+function stageLabel(stage: ProcessingStage) {
+  return (
+    pipelineStages.find((item) => item.key === stage)?.label ?? '未知阶段'
+  );
 }
 
 function stageClass(index: number) {
@@ -219,8 +211,11 @@ function stageClass(index: number) {
     return '';
   }
   const currentIndex = pipelineStages.findIndex(
-    (item) => item.label === task.currentStage,
+    (item) => item.key === task.currentStage,
   );
+  if (currentIndex < 0) {
+    return '';
+  }
   if (task.status === 'finished' || index < currentIndex) {
     return 'is-done';
   }
@@ -260,16 +255,23 @@ function formatDateTime(value?: string) {
             </div>
 
             <ElUpload
+              ref="uploadRef"
               :auto-upload="false"
               :before-upload="beforeUpload"
-              :limit="1"
               accept=".pdf,.png,.jpg,.jpeg,.webp"
               drag
+              multiple
               @change="changeUploadFile"
               @remove="removeUploadFile"
             >
               <div class="upload-content">
-                <strong>{{ selectedFile?.name ?? '选择或拖入文件' }}</strong>
+                <strong>
+                  {{
+                    selectedFiles.length > 0
+                      ? `已选择 ${selectedFiles.length} 个文件`
+                      : '选择或拖入文件'
+                  }}
+                </strong>
                 <span>支持 PDF、PNG、JPG、JPEG、WEBP，单个文件不超过50MB</span>
               </div>
             </ElUpload>
@@ -286,7 +288,7 @@ function formatDateTime(value?: string) {
             </div>
             <div class="metric-item">
               <span>等待中</span>
-              <strong>{{ pendingCount }}</strong>
+              <strong>{{ readyCount }}</strong>
             </div>
             <div class="metric-item">
               <span>扫描页数</span>
@@ -320,13 +322,18 @@ function formatDateTime(value?: string) {
 
               <ElTable
                 :data="processingTasks"
+                v-loading="loadingTasks"
                 height="520"
                 highlight-current-row
                 row-key="id"
                 @row-click="selectTask"
               >
                 <ElTableColumn label="文件" min-width="220" prop="fileName" />
-                <ElTableColumn label="阶段" min-width="120" prop="currentStage" />
+                <ElTableColumn label="阶段" min-width="120">
+                  <template #default="{ row }">
+                    {{ stageLabel(row.currentStage) }}
+                  </template>
+                </ElTableColumn>
                 <ElTableColumn label="状态" width="100">
                   <template #default="{ row }">
                     <ElTag :type="statusType(row.status)" effect="plain">
@@ -360,8 +367,8 @@ function formatDateTime(value?: string) {
             <aside class="detail-panel">
               <div class="panel-header">
                 <div>
-                  <h2>{{ selectedTask?.fileName }}</h2>
-                  <span>{{ selectedTask?.id }}</span>
+                  <h2>{{ selectedTask?.fileName ?? '-' }}</h2>
+                  <span>{{ selectedTask?.id ?? '-' }}</span>
                 </div>
                 <ElTag
                   v-if="selectedTask"

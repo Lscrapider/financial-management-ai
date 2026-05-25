@@ -1,6 +1,8 @@
 package com.scrapider.finance.domain.po;
 
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.scrapider.finance.domain.enums.OcrTaskStageEnum;
+import com.scrapider.finance.domain.enums.OcrTaskStatusEnum;
 import java.time.LocalDateTime;
 import lombok.Data;
 
@@ -26,7 +28,7 @@ public class OcrTaskPO {
     private LocalDateTime updatedAt;
     private LocalDateTime createdAt;
 
-    public static OcrTaskPO createPending(
+    public static OcrTaskPO createReady(
             String taskNo,
             String originalFilename,
             String storedFilename,
@@ -43,8 +45,8 @@ public class OcrTaskPO {
         task.setFileType(fileType);
         task.setContentType(contentType);
         task.setFileSize(fileSize);
-        task.setStatus("pending");
-        task.setCurrentStage("等待处理");
+        task.setStatus(OcrTaskStatusEnum.READY.getCode());
+        task.setCurrentStage(OcrTaskStageEnum.DOCUMENT_NORMALIZE.getCode());
         task.setProgress(0);
         task.setPageCount(0);
         task.setSegmentCount(0);

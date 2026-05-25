@@ -1,0 +1,259 @@
+{
+  "users": [
+    {
+      "name": "finance",
+      "password_hash": "W1iHqisMlHi4booe8CIoHVUKaDJzk7k8NYakReQPlcJRldRv",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": [
+        "administrator"
+      ]
+    }
+  ],
+  "vhosts": [
+    {
+      "name": "finance"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "finance",
+      "vhost": "finance",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "finance.ocr.topic",
+      "vhost": "finance",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "finance.ocr.dlx",
+      "vhost": "finance",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "finance.ocr.retry.topic",
+      "vhost": "finance",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "finance.ocr.document.normalize",
+      "vhost": "finance",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "finance.ocr.dlx",
+        "x-dead-letter-routing-key": "ocr.document.normalize.dead"
+      }
+    },
+    {
+      "name": "finance.ocr.recognize",
+      "vhost": "finance",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "finance.ocr.dlx",
+        "x-dead-letter-routing-key": "ocr.recognize.dead"
+      }
+    },
+    {
+      "name": "finance.ocr.text.clean",
+      "vhost": "finance",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "finance.ocr.dlx",
+        "x-dead-letter-routing-key": "ocr.text.clean.dead"
+      }
+    },
+    {
+      "name": "finance.ocr.quality.validate",
+      "vhost": "finance",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "finance.ocr.dlx",
+        "x-dead-letter-routing-key": "ocr.quality.validate.dead"
+      }
+    },
+    {
+      "name": "finance.ocr.embedding.index",
+      "vhost": "finance",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "finance.ocr.dlx",
+        "x-dead-letter-routing-key": "ocr.embedding.index.dead"
+      }
+    },
+    {
+      "name": "finance.ocr.document.normalize.retry",
+      "vhost": "finance",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 30000,
+        "x-dead-letter-exchange": "finance.ocr.topic",
+        "x-dead-letter-routing-key": "ocr.document.normalize"
+      }
+    },
+    {
+      "name": "finance.ocr.recognize.retry",
+      "vhost": "finance",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 30000,
+        "x-dead-letter-exchange": "finance.ocr.topic",
+        "x-dead-letter-routing-key": "ocr.recognize"
+      }
+    },
+    {
+      "name": "finance.ocr.text.clean.retry",
+      "vhost": "finance",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 30000,
+        "x-dead-letter-exchange": "finance.ocr.topic",
+        "x-dead-letter-routing-key": "ocr.text.clean"
+      }
+    },
+    {
+      "name": "finance.ocr.quality.validate.retry",
+      "vhost": "finance",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 30000,
+        "x-dead-letter-exchange": "finance.ocr.topic",
+        "x-dead-letter-routing-key": "ocr.quality.validate"
+      }
+    },
+    {
+      "name": "finance.ocr.embedding.index.retry",
+      "vhost": "finance",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 30000,
+        "x-dead-letter-exchange": "finance.ocr.topic",
+        "x-dead-letter-routing-key": "ocr.embedding.index"
+      }
+    },
+    {
+      "name": "finance.ocr.dlq",
+      "vhost": "finance",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    }
+  ],
+  "bindings": [
+    {
+      "source": "finance.ocr.topic",
+      "vhost": "finance",
+      "destination": "finance.ocr.document.normalize",
+      "destination_type": "queue",
+      "routing_key": "ocr.document.normalize",
+      "arguments": {}
+    },
+    {
+      "source": "finance.ocr.topic",
+      "vhost": "finance",
+      "destination": "finance.ocr.recognize",
+      "destination_type": "queue",
+      "routing_key": "ocr.recognize",
+      "arguments": {}
+    },
+    {
+      "source": "finance.ocr.topic",
+      "vhost": "finance",
+      "destination": "finance.ocr.text.clean",
+      "destination_type": "queue",
+      "routing_key": "ocr.text.clean",
+      "arguments": {}
+    },
+    {
+      "source": "finance.ocr.topic",
+      "vhost": "finance",
+      "destination": "finance.ocr.quality.validate",
+      "destination_type": "queue",
+      "routing_key": "ocr.quality.validate",
+      "arguments": {}
+    },
+    {
+      "source": "finance.ocr.topic",
+      "vhost": "finance",
+      "destination": "finance.ocr.embedding.index",
+      "destination_type": "queue",
+      "routing_key": "ocr.embedding.index",
+      "arguments": {}
+    },
+    {
+      "source": "finance.ocr.dlx",
+      "vhost": "finance",
+      "destination": "finance.ocr.dlq",
+      "destination_type": "queue",
+      "routing_key": "ocr.*.dead",
+      "arguments": {}
+    },
+    {
+      "source": "finance.ocr.retry.topic",
+      "vhost": "finance",
+      "destination": "finance.ocr.document.normalize.retry",
+      "destination_type": "queue",
+      "routing_key": "ocr.document.normalize.retry",
+      "arguments": {}
+    },
+    {
+      "source": "finance.ocr.retry.topic",
+      "vhost": "finance",
+      "destination": "finance.ocr.recognize.retry",
+      "destination_type": "queue",
+      "routing_key": "ocr.recognize.retry",
+      "arguments": {}
+    },
+    {
+      "source": "finance.ocr.retry.topic",
+      "vhost": "finance",
+      "destination": "finance.ocr.text.clean.retry",
+      "destination_type": "queue",
+      "routing_key": "ocr.text.clean.retry",
+      "arguments": {}
+    },
+    {
+      "source": "finance.ocr.retry.topic",
+      "vhost": "finance",
+      "destination": "finance.ocr.quality.validate.retry",
+      "destination_type": "queue",
+      "routing_key": "ocr.quality.validate.retry",
+      "arguments": {}
+    },
+    {
+      "source": "finance.ocr.retry.topic",
+      "vhost": "finance",
+      "destination": "finance.ocr.embedding.index.retry",
+      "destination_type": "queue",
+      "routing_key": "ocr.embedding.index.retry",
+      "arguments": {}
+    }
+  ]
+}

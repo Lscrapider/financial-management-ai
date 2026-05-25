@@ -1,57 +1,57 @@
-# OCR Pipeline Design
+# OCR 流水线设计
 
-## Goal
+## 目标
 
-The OCR pipeline starts after the Java service has stored the uploaded file and created an OCR task. Java owns upload, file metadata, task creation, and the first message dispatch. Python owns document normalization, OCR recognition, text cleanup, quality validation, and embedding indexing.
+OCR 流水线在 Java 服务保存上传文件并创建 OCR 任务之后启动。Java 负责文件上传、文件元数据、任务创建和第一条消息投递。Python 负责文档标准化、OCR 识别、文本清洗、质量校验和向量索引。
 
-## Service Boundary
+## 服务边界
 
-Java responsibilities:
+Java 职责：
 
-- Receive the uploaded file.
-- Store the original file through the file storage service.
-- Create the `ocr_task` record.
-- Mark the task as `ready`.
-- Publish the first RabbitMQ message with routing key `ocr.document.normalize`.
-- Expose task query, retry, manual review, and business-facing APIs.
+- 接收上传文件。
+- 通过文件存储服务保存原始文件。
+- 创建 `ocr_task` 记录。
+- 将任务标记为 `ready`。
+- 使用路由键 `ocr.document.normalize` 发布第一条 RabbitMQ 消息。
+- 提供任务查询、重试、人工复核和面向业务的接口。
 
-Python responsibilities:
+Python 职责：
 
-- Consume OCR stage messages from RabbitMQ.
-- Read files and artifacts through storage references.
-- Execute every OCR processing stage after upload.
-- Persist stage inputs, outputs, metrics, and errors.
-- Update task and stage status.
-- Publish the next stage message after each successful stage.
+- 消费 RabbitMQ 中的 OCR 阶段消息。
+- 通过存储引用读取文件和中间产物。
+- 执行上传之后的所有 OCR 处理阶段。
+- 持久化每个阶段的输入、输出、指标和错误信息。
+- 更新任务和阶段状态。
+- 每个阶段成功后发布下一阶段消息。
 
-## Pipeline Stages
+## 流水线阶段
 
-The pipeline uses stage-level messages. Each stage has its own input, output, status, retry boundary, and routing key.
+流水线使用阶段级消息。每个阶段都有独立的输入、输出、状态、重试边界和路由键。
 
-| Order | Stage | Routing key | Purpose | Main output |
+| 顺序 | 阶段 | 路由键 | 目的 | 主要输出 |
 | --- | --- | --- | --- | --- |
-| 1 | Document normalization | `ocr.document.normalize` | Validate file format and convert PDF/images into a unified document format. | Standard document manifest |
-| 2 | OCR recognition | `ocr.recognize` | Run OCR on normalized pages and produce structured recognition results. | Page/block/line OCR result |
-| 3 | Text cleanup | `ocr.text.clean` | Normalize text, merge paragraphs, keep formatting hints, and mark suspected typos. | Cleaned text and paragraph model |
-| 4 | Quality validation | `ocr.quality.validate` | Calculate quality metrics and decide whether manual review is required. | Validation report |
-| 5 | Embedding indexing | `ocr.embedding.index` | Split approved text, generate embeddings, and write vectors to the vector store. | Vector index references |
-| 6 | Task finished | No separate processing stage required | Mark the OCR task as finished after embedding succeeds. | Final task status |
+| 1 | 文档标准化 | `ocr.document.normalize` | 校验文件格式，并将 PDF/图片转换为统一的文档格式。 | 标准文档清单 |
+| 2 | OCR 识别 | `ocr.recognize` | 对标准化后的页面执行 OCR，并产出结构化识别结果。 | 页面/块/行级 OCR 结果 |
+| 3 | 文本清洗 | `ocr.text.clean` | 规范化文本、合并段落、保留格式提示，并标记疑似错字。 | 清洗后的文本和段落模型 |
+| 4 | 质量校验 | `ocr.quality.validate` | 计算质量指标，并判断是否需要人工复核。 | 校验报告 |
+| 5 | 向量索引 | `ocr.embedding.index` | 拆分已通过的文本、生成 embedding，并将向量写入向量存储。 | 向量索引引用 |
+| 6 | 任务完成 | 不需要单独处理阶段 | embedding 成功后将 OCR 任务标记为完成。 | 最终任务状态 |
 
-Java does not publish `ocr.file.stored`. File storage is already complete before Java sends the first OCR message.
+Java 不发布 `ocr.file.stored`。Java 发送第一条 OCR 消息之前，文件存储已经完成。
 
-## Status Model
+## 状态模型
 
-The task table should represent the overall lifecycle.
+任务表应该表示整体生命周期。
 
-Recommended `ocr_task.status` values:
+建议的 `ocr_task.status` 取值：
 
-- `ready`: File is stored and the first stage message has been published.
-- `running`: Python has started processing at least one pipeline stage.
-- `manual_review_required`: Quality validation found that human review is needed.
-- `finished`: Embedding indexing completed successfully.
-- `failed`: A stage failed permanently or exceeded retry limits.
+- `ready`：文件已存储，第一阶段消息已发布。
+- `running`：Python 已开始处理至少一个流水线阶段。
+- `manual_review_required`：质量校验发现需要人工复核。
+- `finished`：向量索引已成功完成。
+- `failed`：某个阶段永久失败或超过重试次数。
 
-Recommended `ocr_task.current_stage` values:
+建议的 `ocr_task.current_stage` 取值：
 
 - `document.normalize`
 - `ocr.recognize`
@@ -59,13 +59,13 @@ Recommended `ocr_task.current_stage` values:
 - `quality.validate`
 - `embedding.index`
 
-Each stage should also have a separate stage record, for example `ocr_task_stage`.
+每个阶段也应该有独立的阶段记录，例如 `ocr_task_stage`。
 
-Recommended stage fields:
+建议的阶段字段：
 
 - `task_no`
 - `stage`
-- `status`: `pending`, `running`, `finished`, `failed`
+- `status`：`pending`、`running`、`finished`、`failed`
 - `attempt_count`
 - `max_attempts`
 - `input_ref`
@@ -76,11 +76,11 @@ Recommended stage fields:
 - `finished_at`
 - `updated_at`
 
-## Message Contract
+## 消息契约
 
-Messages should be lightweight. They should carry identifiers and storage references, not file bytes or large OCR payloads.
+消息应该保持轻量，只携带标识和存储引用，不携带文件字节或大型 OCR 载荷。
 
-Initial message published by Java:
+Java 发布的初始消息：
 
 ```json
 {
@@ -96,7 +96,7 @@ Initial message published by Java:
 }
 ```
 
-Stage messages published by Python:
+Python 发布的阶段消息：
 
 ```json
 {
@@ -118,11 +118,11 @@ Stage messages published by Python:
 }
 ```
 
-## Artifact Flow
+## 产物流转
 
-Every stage writes its result to storage before publishing the next message.
+每个阶段都先将结果写入存储，再发布下一条消息。
 
-Document normalization output:
+文档标准化输出：
 
 ```json
 {
@@ -146,7 +146,7 @@ Document normalization output:
 }
 ```
 
-OCR recognition output:
+OCR 识别输出：
 
 ```json
 {
@@ -173,7 +173,7 @@ OCR recognition output:
 }
 ```
 
-Text cleanup output:
+文本清洗输出：
 
 ```json
 {
@@ -195,7 +195,7 @@ Text cleanup output:
 }
 ```
 
-Quality validation output:
+质量校验输出：
 
 ```json
 {
@@ -212,119 +212,119 @@ Quality validation output:
 }
 ```
 
-## Quality Decision
+## 质量决策
 
-Recommended quality thresholds:
+建议的质量阈值：
 
-- `qualityScore >= 85`: Pass automatically and continue to embedding.
-- `60 <= qualityScore < 85`: Continue to embedding, but mark the result as low confidence.
-- `qualityScore < 60`: Stop the automatic pipeline and set task status to `manual_review_required`.
+- `qualityScore >= 85`：自动通过，并继续向量索引。
+- `60 <= qualityScore < 85`：继续向量索引，但将结果标记为低置信度。
+- `qualityScore < 60`：停止自动流水线，并将任务状态设置为 `manual_review_required`。
 
-The score should consider:
+评分应考虑：
 
-- Average OCR confidence.
-- Low-confidence text ratio.
-- Blank page ratio.
-- Garbled text ratio.
-- Suspected typo count.
-- Page count and page artifact completeness.
-- Text density anomalies.
-- Required structured field completeness, if the document type requires fields.
+- OCR 平均置信度。
+- 低置信度文本比例。
+- 空白页比例。
+- 乱码文本比例。
+- 疑似错字数量。
+- 页数和页面产物完整性。
+- 文本密度异常。
+- 如果文档类型要求结构化字段，则需要考虑必填结构化字段完整性。
 
-## Retry Boundary
+## 重试边界
 
-Retries should happen at the failed stage, not from the beginning.
+重试应该发生在失败阶段，而不是从头开始。
 
-Examples:
+示例：
 
-- If `document.normalize` fails, retry `ocr.document.normalize`.
-- If `ocr.recognize` fails, retry `ocr.recognize` using the normalized document manifest.
-- If `ocr.text.clean` fails, retry `ocr.text.clean` using the OCR recognition output.
-- If `ocr.quality.validate` fails, retry `ocr.quality.validate` using cleaned text.
-- If `ocr.embedding.index` fails, retry `ocr.embedding.index` using the validated cleaned text.
+- 如果 `document.normalize` 失败，重试 `ocr.document.normalize`。
+- 如果 `ocr.recognize` 失败，使用标准化文档清单重试 `ocr.recognize`。
+- 如果 `ocr.text.clean` 失败，使用 OCR 识别输出重试 `ocr.text.clean`。
+- 如果 `ocr.quality.validate` 失败，使用清洗后的文本重试 `ocr.quality.validate`。
+- 如果 `ocr.embedding.index` 失败，使用已校验的清洗文本重试 `ocr.embedding.index`。
 
-RabbitMQ can use one topic exchange and stage-specific queues:
+RabbitMQ 可以使用一个 topic exchange 和按阶段划分的队列：
 
-- Exchange: `finance.ocr.topic`
-- Queues:
+- Exchange：`finance.ocr.topic`
+- 队列：
   - `finance.ocr.document.normalize`
   - `finance.ocr.recognize`
   - `finance.ocr.text.clean`
   - `finance.ocr.quality.validate`
   - `finance.ocr.embedding.index`
 
-Recommended RabbitMQ features:
+建议的 RabbitMQ 特性：
 
-- Durable exchange and queues.
-- Persistent messages.
-- Manual ack.
-- Worker `prefetch` set to `1` or `2`.
-- Stage-specific retry queues.
-- Stage-specific or unified dead-letter queue.
-- Idempotency based on `taskNo` and `stage`.
+- 持久化 exchange 和队列。
+- 持久化消息。
+- 手动 ack。
+- Worker `prefetch` 设置为 `1` 或 `2`。
+- 按阶段划分的重试队列。
+- 按阶段划分或统一的死信队列。
+- 基于 `taskNo` 和 `stage` 实现幂等。
 
-## Worker Processing Rule
+## Worker 处理规则
 
-Each worker should follow the same processing pattern:
+每个 worker 应遵循相同的处理模式：
 
 ```text
-consume message
- -> load task and stage records
- -> if stage is already finished, ack message
- -> validate whether this stage can run
- -> mark task running and stage running
- -> load input artifact
- -> execute stage logic
- -> save output artifact
- -> save metrics
- -> mark stage finished
- -> publish next stage message, if any
- -> ack current message
+消费消息
+ -> 加载任务和阶段记录
+ -> 如果阶段已经完成，则 ack 消息
+ -> 校验当前阶段是否可以运行
+ -> 将任务标记为 running，并将阶段标记为 running
+ -> 加载输入产物
+ -> 执行阶段逻辑
+ -> 保存输出产物
+ -> 保存指标
+ -> 将阶段标记为 finished
+ -> 如果存在下一阶段，则发布下一阶段消息
+ -> ack 当前消息
 ```
 
-On failure:
+失败时：
 
 ```text
-recoverable failure
- -> save error
- -> increase attempt count
- -> publish or route to retry queue
- -> ack or reject according to the retry strategy
+可恢复失败
+ -> 保存错误
+ -> 增加尝试次数
+ -> 发布或路由到重试队列
+ -> 根据重试策略 ack 或 reject
 
-permanent failure
- -> save error
- -> mark stage failed
- -> mark task failed
- -> route message to DLQ or ack after failure is persisted
+永久失败
+ -> 保存错误
+ -> 将阶段标记为 failed
+ -> 将任务标记为 failed
+ -> 将消息路由到 DLQ，或在失败信息持久化后 ack
 ```
 
-## End-to-End Flow
+## 端到端流程
 
 ```text
-Java stores file
- -> Java creates ocr_task with status ready
- -> Java publishes ocr.document.normalize
+Java 保存文件
+ -> Java 创建状态为 ready 的 ocr_task
+ -> Java 发布 ocr.document.normalize
 
 Python document.normalize
- -> validates and standardizes the file
- -> publishes ocr.recognize
+ -> 校验并标准化文件
+ -> 发布 ocr.recognize
 
 Python ocr.recognize
- -> runs OCR against normalized pages
- -> publishes ocr.text.clean
+ -> 对标准化后的页面执行 OCR
+ -> 发布 ocr.text.clean
 
 Python text.clean
- -> cleans text, normalizes format, and marks suspected typos
- -> publishes ocr.quality.validate
+ -> 清洗文本、规范化格式，并标记疑似错字
+ -> 发布 ocr.quality.validate
 
 Python quality.validate
- -> computes quality score
- -> if manual review is required, marks task manual_review_required
- -> otherwise publishes ocr.embedding.index
+ -> 计算质量分
+ -> 如果需要人工复核，则将任务标记为 manual_review_required
+ -> 否则发布 ocr.embedding.index
 
 Python embedding.index
- -> splits text
- -> generates embeddings
- -> writes vectors
- -> marks task finished
+ -> 拆分文本
+ -> 生成 embedding
+ -> 写入向量
+ -> 将任务标记为 finished
 ```

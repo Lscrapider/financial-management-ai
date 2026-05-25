@@ -1,18 +1,18 @@
 package com.scrapider.finance.ai.service.impl;
 
 import com.scrapider.finance.ai.domain.vo.OcrTaskVO;
+import com.scrapider.finance.ai.domain.dto.OcrNormalizeMessageDTO;
+import com.scrapider.finance.ai.domain.dto.StoredOcrFileDTO;
+import com.scrapider.finance.ai.service.OcrFileStorageService;
 import com.scrapider.finance.ai.service.OcrTaskService;
+import com.scrapider.finance.ai.service.OcrTaskMessagePublisher;
 import com.scrapider.finance.domain.po.OcrTaskPO;
 import com.scrapider.finance.manage.OcrTaskManage;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -21,48 +21,62 @@ public class OcrTaskServiceImpl implements OcrTaskService {
 
     private static final Set<String> ALLOWED_FILE_TYPES = Set.of("pdf", "png", "jpg", "jpeg", "webp");
     private static final long MAX_FILE_SIZE = 50L * 1024L * 1024L;
+    private static final int DEFAULT_LIST_LIMIT = 50;
+    private static final int MAX_LIST_LIMIT = 200;
 
     private final OcrTaskManage ocrTaskManage;
-    private final Path storageRoot;
+    private final OcrFileStorageService ocrFileStorageService;
+    private final OcrTaskMessagePublisher ocrTaskMessagePublisher;
 
     public OcrTaskServiceImpl(
             OcrTaskManage ocrTaskManage,
-            @Value("${finance.ocr.storage-path:../data/scans}") String storagePath) {
+            OcrFileStorageService ocrFileStorageService,
+            OcrTaskMessagePublisher ocrTaskMessagePublisher) {
         this.ocrTaskManage = ocrTaskManage;
-        this.storageRoot = Path.of(storagePath).toAbsolutePath().normalize();
+        this.ocrFileStorageService = ocrFileStorageService;
+        this.ocrTaskMessagePublisher = ocrTaskMessagePublisher;
     }
 
     @Override
-    public OcrTaskVO submit(MultipartFile file) {
-        this.validateFile(file);
+    public List<OcrTaskVO> submit(List<MultipartFile> files) {
+        if (files == null || files.isEmpty()) {
+            throw new IllegalArgumentException("上传文件不能为空");
+        }
+        files.forEach(this::validateFile);
+        return files.stream().map(this::submitOne).toList();
+    }
+
+    @Override
+    public List<OcrTaskVO> listRecent(int limit) {
+        int normalizedLimit = this.normalizeLimit(limit);
+        return this.ocrTaskManage.listRecentTasks(normalizedLimit).stream()
+                .map(OcrTaskVO::fromPO)
+                .toList();
+    }
+
+    private OcrTaskVO submitOne(MultipartFile file) {
         String originalFilename = this.originalFilename(file);
         String fileType = this.fileType(originalFilename);
         String taskNo = "ocr-" + UUID.randomUUID().toString().replace("-", "");
-        String storedFilename = taskNo + "." + fileType;
-        Path targetPath = this.storageRoot.resolve(storedFilename).normalize();
+        StoredOcrFileDTO storedFile = this.ocrFileStorageService.saveOriginalFile(taskNo, fileType, file);
 
-        if (!targetPath.startsWith(this.storageRoot)) {
-            throw new IllegalArgumentException("文件路径不合法");
-        }
-
-        try {
-            Files.createDirectories(this.storageRoot);
-            try (InputStream inputStream = file.getInputStream()) {
-                Files.copy(inputStream, targetPath, StandardCopyOption.REPLACE_EXISTING);
-            }
-        } catch (IOException ex) {
-            throw new IllegalStateException("保存上传文件失败", ex);
-        }
-
-        OcrTaskPO task = OcrTaskPO.createPending(
+        OcrTaskPO task = OcrTaskPO.createReady(
                 taskNo,
                 originalFilename,
-                storedFilename,
-                targetPath.toString(),
+                storedFile.storedFilename(),
+                storedFile.storageUri(),
                 fileType,
                 file.getContentType(),
                 file.getSize());
-        return OcrTaskVO.fromPO(this.ocrTaskManage.saveTask(task));
+        OcrTaskPO savedTask = this.ocrTaskManage.saveTask(task);
+        this.ocrTaskMessagePublisher.publishNormalizeMessage(OcrNormalizeMessageDTO.create(
+                taskNo,
+                storedFile.bucket(),
+                storedFile.objectKey(),
+                originalFilename,
+                file.getContentType(),
+                file.getSize()));
+        return OcrTaskVO.fromPO(savedTask);
     }
 
     private void validateFile(MultipartFile file) {
@@ -92,5 +106,12 @@ public class OcrTaskServiceImpl implements OcrTaskService {
             return "";
         }
         return filename.substring(index + 1).toLowerCase(Locale.ROOT);
+    }
+
+    private int normalizeLimit(int limit) {
+        if (limit <= 0) {
+            return DEFAULT_LIST_LIMIT;
+        }
+        return Math.min(limit, MAX_LIST_LIMIT);
     }
 }

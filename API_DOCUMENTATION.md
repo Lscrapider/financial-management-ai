@@ -239,6 +239,20 @@
 
 ## OCR 任务
 
+### 查询 OCR 任务列表
+
+`GET /api/ai/ocr/tasks`
+
+需要 Token。
+
+请求参数：
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `limit` | number | 否 | 返回最近任务数量，默认 `50`，最大 `200` |
+
+返回：`OcrTaskVO[]`，按提交时间倒序排列。
+
 ### 提交 OCR 文件
 
 `POST /api/ai/ocr/tasks`
@@ -249,9 +263,9 @@
 
 | 参数 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `file` | file | 是 | 支持 `pdf`、`png`、`jpg`、`jpeg`、`webp`，最大 `50MB` |
+| `file` | file[] | 是 | 支持重复传入多个 `file`，每个文件支持 `pdf`、`png`、`jpg`、`jpeg`、`webp`，单文件最大 `50MB` |
 
-返回：`OcrTaskVO`
+返回：`OcrTaskVO[]`
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
@@ -260,8 +274,8 @@
 | `originalFilename` | string | 原始文件名 |
 | `fileType` | string | 文件类型 |
 | `fileSize` | number | 文件大小，单位字节 |
-| `status` | string | 任务状态，初始为 `pending` |
-| `currentStage` | string | 当前阶段，初始为 `等待处理` |
+| `status` | string | 任务状态 code，初始为 `ready`，可选值：`ready`、`running`、`manual_review_required`、`finished`、`failed` |
+| `currentStage` | string | 当前阶段 code，初始为 `document.normalize`，可选值：`document.normalize`、`ocr.recognize`、`text.clean`、`quality.validate`、`embedding.index` |
 | `progress` | number | 处理进度，初始为 `0` |
 | `pageCount` | number | 页数，初始为 `0` |
 | `segmentCount` | number | 文本分段数，初始为 `0` |

@@ -52,10 +52,76 @@ services:
     networks:
       - finance-database-network
 
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: finance-rabbitmq
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    env_file:
+      - ../.env
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-finance}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-finance123456}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-finance}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+    networks:
+      - finance-database-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: finance-minio
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    env_file:
+      - ../.env
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-finance}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-finance123456}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - finance-database-network
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: finance-minio-init
+    env_file:
+      - ../.env
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-finance}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-finance123456}
+      MINIO_OCR_BUCKET: ${MINIO_OCR_BUCKET:-finance-ocr}
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        until mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"; do
+          sleep 2
+        done
+        mc mb --ignore-existing "local/$${MINIO_OCR_BUCKET}"
+        mc anonymous set none "local/$${MINIO_OCR_BUCKET}"
+    depends_on:
+      - minio
+    networks:
+      - finance-database-network
+
 volumes:
   postgres-data:
   influxdb-data:
   influxdb-config:
+  rabbitmq-data:
+  minio-data:
 
 networks:
   finance-database-network:
