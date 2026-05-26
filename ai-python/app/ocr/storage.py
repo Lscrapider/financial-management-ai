@@ -21,6 +21,13 @@ class OcrArtifactStorage:
         data = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
         self.put_bytes(bucket, object_key, data, content_type="application/json")
 
+    def get_json(self, bucket: str, object_key: str) -> dict[str, Any]:
+        data = self.get_bytes(bucket, object_key)
+        payload = json.loads(data.decode("utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError(f"JSON object expected: minio://{bucket}/{object_key}")
+        return payload
+
     def get_bytes(self, bucket: str, object_key: str) -> bytes:
         response = self._client.get_object(bucket_name=bucket, object_name=object_key)
         try:

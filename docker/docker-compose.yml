@@ -170,6 +170,9 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-finance}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-finance123456}
       MINIO_OCR_BUCKET: ${MINIO_OCR_BUCKET:-finance-ocr}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      QWEN_OCR_MODEL: ${QWEN_OCR_MODEL:-qwen-vl-ocr-latest}
     depends_on:
       - postgres
       - rabbitmq

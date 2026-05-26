@@ -96,12 +96,14 @@ class OcrTaskRepository:
                 )
             connection.commit()
 
-    def finish_document_normalize(
+    def finish_stage(
         self,
         task_no: str,
         stage: str,
         next_stage: str,
+        progress: int,
         page_count: int,
+        segment_count: int,
         output_ref: dict[str, Any],
         output_message: dict[str, Any],
         metrics: dict[str, Any],
@@ -113,14 +115,14 @@ class OcrTaskRepository:
                     UPDATE ocr_task
                     SET status = 'running',
                         current_stage = %s,
-                        progress = 20,
+                        progress = %s,
                         page_count = %s,
-                        segment_count = 0,
+                        segment_count = %s,
                         error_message = NULL,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE task_no = %s
                     """,
-                    (next_stage, page_count, task_no),
+                    (next_stage, progress, page_count, segment_count, task_no),
                 )
                 cursor.execute(
                     """

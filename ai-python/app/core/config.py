@@ -48,10 +48,19 @@ class MinioSettings:
 
 
 @dataclass(frozen=True)
+class QwenOcrSettings:
+    api_key: str = os.getenv("DASHSCOPE_API_KEY", "sk-1ef7eabc3eae4b439de96141b505462d")
+    base_url: str = os.getenv("DASHSCOPE_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+    model: str = os.getenv("QWEN_OCR_MODEL", "qwen-vl-ocr-latest")
+    timeout_seconds: int = _int_env("QWEN_OCR_TIMEOUT_SECONDS", 120)
+
+
+@dataclass(frozen=True)
 class Settings:
     rabbitmq: RabbitMqSettings = RabbitMqSettings()
     postgres: PostgresSettings = PostgresSettings()
     minio: MinioSettings = MinioSettings()
+    qwen_ocr: QwenOcrSettings = QwenOcrSettings()
 
 
 settings = Settings()

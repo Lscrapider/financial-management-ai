@@ -179,25 +179,46 @@ OCR 识别输出：
 ```json
 {
   "taskNo": "ocr-xxx",
+  "engine": "qwen-vl-ocr-latest",
+  "pageCount": 1,
   "pages": [
     {
       "pageNo": 1,
-      "blocks": [
+      "imageRef": {
+        "storageType": "minio",
+        "bucket": "finance-ocr",
+        "objectKey": "stage-1-output/2026/05/25/ocr-xxx/pages/page-001.png"
+      },
+      "width": 2480,
+      "height": 3508,
+      "enabled": true,
+      "segments": [
         {
-          "type": "text",
-          "bbox": [100, 120, 800, 260],
-          "confidence": 0.93,
-          "lines": [
-            {
-              "text": "现金流折现模型",
-              "confidence": 0.95,
-              "bbox": [120, 140, 760, 180]
-            }
-          ]
+          "segmentNo": 1,
+          "confidence": 0.95,
+          "content": "现金流折现模型"
         }
-      ]
+      ],
+      "rawContent": "{\"enabled\":true,\"segments\":[...]}",
+      "usage": {
+        "prompt_tokens": 8376,
+        "completion_tokens": 597,
+        "total_tokens": 8973
+      }
     }
-  ]
+  ],
+  "metrics": {
+    "enabledPageCount": 1,
+    "emptyPageCount": 0,
+    "segmentCount": 1,
+    "avgConfidence": 0.95,
+    "usage": {
+      "promptTokens": 8376,
+      "completionTokens": 597,
+      "totalTokens": 8973
+    }
+  },
+  "createdAt": "2026-05-25T16:40:00"
 }
 ```
 
@@ -206,20 +227,40 @@ OCR 识别输出：
 ```json
 {
   "taskNo": "ocr-xxx",
+  "paragraphCount": 1,
   "paragraphs": [
     {
       "paragraphNo": 1,
       "text": "现金流折现模型用于...",
       "sourcePages": [1],
+      "sourceSegments": [
+        {
+          "pageNo": 1,
+          "segmentNo": 1
+        }
+      ],
+      "avgConfidence": 0.95,
       "warnings": [
         {
-          "type": "possible_typo",
-          "text": "现今流",
-          "suggestion": "现金流"
+          "type": "low_confidence",
+          "confidence": 0.62
         }
       ]
     }
-  ]
+  ],
+  "metrics": {
+    "paragraphCount": 1,
+    "emptySegmentCount": 0,
+    "warningCount": 1,
+    "lowConfidenceParagraphCount": 1,
+    "avgConfidence": 0.95
+  },
+  "sourceRef": {
+    "storageType": "minio",
+    "bucket": "finance-ocr",
+    "objectKey": "stage-2-output/2026/05/25/ocr-xxx/ocr/raw/result.json"
+  },
+  "createdAt": "2026-05-25T16:45:00"
 }
 ```
 
