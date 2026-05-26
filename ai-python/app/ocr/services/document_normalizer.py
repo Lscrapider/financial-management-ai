@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date
 from io import BytesIO
 from typing import Any
 
@@ -21,34 +21,22 @@ class DocumentNormalizer:
         source_bytes = self._storage.get_bytes(source_bucket, source_object_key)
 
         task_no = str(message["taskNo"])
+        output_prefix = self._stage_output_prefix(task_no)
         source_type = self._detect_source_type(message)
         if source_type == "pdf":
-            pages = self._normalize_pdf(task_no, source_bucket, source_bytes)
+            pages = self._normalize_pdf(output_prefix, source_bucket, source_bytes)
         elif source_type == "image":
-            pages = [self._normalize_image(task_no, source_bucket, source_bytes, page_no=1)]
+            pages = [self._normalize_image(output_prefix, source_bucket, source_bytes, page_no=1)]
         else:
             raise ValueError(f"unsupported document source type: {source_type}")
 
-        manifest = {
-            "taskNo": task_no,
-            "sourceType": source_type,
-            "pageCount": len(pages),
-            "pages": pages,
+        return {
             "sourceRef": {
-                "storageType": message.get("storageType", "minio"),
+                "storageType": "minio",
                 "bucket": source_bucket,
                 "objectKey": source_object_key,
             },
-            "createdAt": datetime.now().isoformat(timespec="seconds"),
-        }
-        manifest_key = f"{task_no}/document/manifest.json"
-        self._storage.put_json(source_bucket, manifest_key, manifest)
-        return {
-            "manifestRef": {
-                "storageType": "minio",
-                "bucket": source_bucket,
-                "objectKey": manifest_key,
-            },
+            "pages": pages,
             "pageCount": len(pages),
             "metrics": {
                 "sourceType": source_type,
@@ -71,7 +59,11 @@ class DocumentNormalizer:
             return "image"
         return "unknown"
 
-    def _normalize_pdf(self, task_no: str, bucket: str, source_bytes: bytes) -> list[dict[str, Any]]:
+    def _stage_output_prefix(self, task_no: str) -> str:
+        today = date.today()
+        return f"stage-1-output/{today:%Y/%m/%d}/{task_no}"
+
+    def _normalize_pdf(self, output_prefix: str, bucket: str, source_bytes: bytes) -> list[dict[str, Any]]:
         document = fitz.open(stream=source_bytes, filetype="pdf")
         try:
             pages: list[dict[str, Any]] = []
@@ -80,7 +72,7 @@ class DocumentNormalizer:
             for index, page in enumerate(document, start=1):
                 pixmap = page.get_pixmap(matrix=matrix, alpha=False)
                 image_bytes = pixmap.tobytes("png")
-                object_key = f"{task_no}/pages/page-{index:03d}.png"
+                object_key = f"{output_prefix}/pages/page-{index:03d}.png"
                 self._storage.put_bytes(bucket, object_key, image_bytes, content_type="image/png")
                 pages.append(
                     {
@@ -104,7 +96,7 @@ class DocumentNormalizer:
 
     def _normalize_image(
         self,
-        task_no: str,
+        output_prefix: str,
         bucket: str,
         source_bytes: bytes,
         page_no: int,
@@ -116,7 +108,7 @@ class DocumentNormalizer:
             output = BytesIO()
             normalized.save(output, format="PNG")
             image_bytes = output.getvalue()
-            object_key = f"{task_no}/pages/page-{page_no:03d}.png"
+            object_key = f"{output_prefix}/pages/page-{page_no:03d}.png"
             self._storage.put_bytes(bucket, object_key, image_bytes, content_type="image/png")
             return {
                 "pageNo": page_no,

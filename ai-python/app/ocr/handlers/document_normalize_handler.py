@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 import logging
 import uuid
 
@@ -63,8 +63,11 @@ class DocumentNormalizeHandler(MessageHandler):
             )
             raise
 
-        output_ref = normalize_result["manifestRef"]
-        next_message = self._build_next_message(message, output_ref)
+        output_ref = {
+            "storageType": "minio",
+            "pages": normalize_result["pages"],
+        }
+        next_message = self._build_next_message(message, normalize_result)
         self._repository.finish_document_normalize(
             task_no=message.task_no,
             stage=STAGE_DOCUMENT_NORMALIZE,
@@ -97,17 +100,23 @@ class DocumentNormalizeHandler(MessageHandler):
             "objectKey": payload.get("objectKey"),
         }
 
-    def _build_next_message(self, message: IncomingMessage, output_ref: dict) -> dict:
+    def _build_next_message(self, message: IncomingMessage, normalize_result: dict) -> dict:
         return {
             "eventId": str(uuid.uuid4()),
             "taskNo": message.task_no,
             "stage": STAGE_OCR_RECOGNIZE,
             "attempt": 1,
-            "inputRef": output_ref,
+            "sourceRef": normalize_result["sourceRef"],
+            "pages": normalize_result["pages"],
+            "pageCount": normalize_result["pageCount"],
             "outputPrefix": {
-                "storageType": output_ref.get("storageType", "minio"),
-                "bucket": output_ref.get("bucket"),
-                "objectKey": f"{message.task_no}/ocr/raw/",
+                "storageType": "minio",
+                "bucket": normalize_result["sourceRef"].get("bucket"),
+                "objectKey": f"{self._stage_output_prefix(message.task_no)}/ocr/raw/",
             },
             "createdAt": datetime.now().isoformat(timespec="seconds"),
         }
+
+    def _stage_output_prefix(self, task_no: str) -> str:
+        today = date.today()
+        return f"stage-2-output/{today:%Y/%m/%d}/{task_no}"

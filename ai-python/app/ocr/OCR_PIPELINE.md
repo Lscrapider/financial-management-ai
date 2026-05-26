@@ -104,15 +104,30 @@ Python 发布的阶段消息：
   "taskNo": "ocr-xxx",
   "stage": "ocr.recognize",
   "attempt": 1,
-  "inputRef": {
+  "sourceRef": {
     "storageType": "minio",
-    "bucket": "ocr-artifacts",
-    "objectKey": "ocr-xxx/document/manifest.json"
+    "bucket": "ocr-scans",
+    "objectKey": "2026/05/25/ocr-xxx.pdf"
   },
+  "pageCount": 12,
+  "pages": [
+    {
+      "pageNo": 1,
+      "imageRef": {
+        "storageType": "minio",
+        "bucket": "ocr-scans",
+        "objectKey": "stage-1-output/2026/05/25/ocr-xxx/pages/page-001.png"
+      },
+      "width": 2480,
+      "height": 3508,
+      "dpi": 300,
+      "rotation": 0
+    }
+  ],
   "outputPrefix": {
     "storageType": "minio",
     "bucket": "ocr-artifacts",
-    "objectKey": "ocr-xxx/ocr/raw/"
+    "objectKey": "stage-2-output/2026/05/25/ocr-xxx/ocr/raw/"
   },
   "createdAt": "2026-05-25T16:35:00"
 }
@@ -120,7 +135,7 @@ Python 发布的阶段消息：
 
 ## 产物流转
 
-每个阶段都先将结果写入存储，再发布下一条消息。
+每个阶段都先将大产物写入存储，再发布下一条消息。文档标准化阶段只将页面图片写入对象存储，页面列表直接放入下一阶段 RabbitMQ 消息体。
 
 文档标准化输出：
 
@@ -135,7 +150,7 @@ Python 发布的阶段消息：
       "imageRef": {
         "storageType": "minio",
         "bucket": "ocr-artifacts",
-        "objectKey": "ocr-xxx/pages/page-001.png"
+        "objectKey": "stage-1-output/2026/05/25/ocr-xxx/pages/page-001.png"
       },
       "width": 2480,
       "height": 3508,
