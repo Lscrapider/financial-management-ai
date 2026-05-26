@@ -148,6 +148,35 @@ services:
     networks:
       - finance-network
 
+  finance-python-worker:
+    build:
+      context: ..
+      dockerfile: ai-python/Dockerfile
+    container_name: finance-python-worker
+    env_file:
+      - ../.env
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-finance_management}
+      POSTGRES_USERNAME: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-123456}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-finance}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-finance123456}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-finance}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-finance}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-finance123456}
+      MINIO_OCR_BUCKET: ${MINIO_OCR_BUCKET:-finance-ocr}
+    depends_on:
+      - postgres
+      - rabbitmq
+      - minio
+    networks:
+      - finance-network
+
 volumes:
   postgres-data:
   influxdb-data:

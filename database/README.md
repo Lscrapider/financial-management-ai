@@ -45,6 +45,7 @@ docker compose -f database/docker-compose.yml up -d
 | `006_create_ai_token_usage_log.sql` | 创建 AI Token 用量日志表。 |
 | `007_create_app_visit_log.sql` | 创建应用访问日志表。 |
 | `008_create_ocr_task.sql` | 创建 OCR 识别任务表。 |
+| `009_create_ocr_task_stage.sql` | 创建 OCR 阶段处理记录表。 |
 
 ## 种子数据
 
@@ -66,6 +67,7 @@ docker compose -f database/docker-compose.yml up -d
 | `ai_token_usage_log` | AI 模型 Token 用量日志。 |
 | `app_visit_log` | 后端 API 访问日志。 |
 | `ocr_task` | OCR 文件上传和识别任务状态。 |
+| `ocr_task_stage` | OCR 各阶段输入、输出、指标和错误记录。 |
 
 股票分钟级分时走势不存 PostgreSQL，由 Java 后端写入 InfluxDB。
 
