@@ -59,7 +59,7 @@ def build_worker() -> RabbitMqWorker:
             handler_key=ROUTING_KEY_TEXT_CLEAN,
         ),
     ]
-    return RabbitMqWorker(settings.rabbitmq, routes, registry)
+    return RabbitMqWorker(settings.rabbitmq, routes, registry, repository.is_deleted)
 
 
 def main() -> None:

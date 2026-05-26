@@ -1,16 +1,18 @@
 package com.scrapider.finance.ai.controller;
 
+import com.scrapider.finance.ai.domain.param.OcrTaskDeleteParam;
+import com.scrapider.finance.ai.domain.param.OcrTaskPageParam;
 import com.scrapider.finance.ai.domain.vo.ErrorResponseVO;
+import com.scrapider.finance.ai.domain.vo.OcrTaskPageVO;
 import com.scrapider.finance.ai.domain.vo.OcrTaskVO;
 import com.scrapider.finance.ai.service.OcrTaskService;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -24,9 +26,15 @@ public class OcrTaskController {
         this.ocrTaskService = ocrTaskService;
     }
 
-    @GetMapping
-    public ResponseEntity<List<OcrTaskVO>> listRecent(@RequestParam(defaultValue = "50") int limit) {
-        return ResponseEntity.ok(this.ocrTaskService.listRecent(limit));
+    @PostMapping("/page")
+    public ResponseEntity<OcrTaskPageVO> page(@RequestBody(required = false) OcrTaskPageParam param) {
+        return ResponseEntity.ok(this.ocrTaskService.page(param));
+    }
+
+    @PostMapping("/delete")
+    public ResponseEntity<Void> delete(@RequestBody OcrTaskDeleteParam param) {
+        this.ocrTaskService.delete(param);
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping

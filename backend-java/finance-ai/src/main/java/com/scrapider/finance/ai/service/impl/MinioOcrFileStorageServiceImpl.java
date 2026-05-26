@@ -1,11 +1,15 @@
 package com.scrapider.finance.ai.service.impl;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scrapider.finance.ai.domain.dto.StoredOcrFileDTO;
 import com.scrapider.finance.ai.service.OcrFileStorageService;
 import io.minio.BucketExistsArgs;
+import io.minio.GetObjectArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.time.LocalDate;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,12 +20,15 @@ import org.springframework.web.multipart.MultipartFile;
 public class MinioOcrFileStorageServiceImpl implements OcrFileStorageService {
 
     private final MinioClient minioClient;
+    private final ObjectMapper objectMapper;
     private final String bucket;
 
     public MinioOcrFileStorageServiceImpl(
             MinioClient minioClient,
+            ObjectMapper objectMapper,
             @Value("${finance.minio.ocr-bucket}") String bucket) {
         this.minioClient = minioClient;
+        this.objectMapper = objectMapper;
         this.bucket = bucket;
     }
 
@@ -56,6 +63,42 @@ public class MinioOcrFileStorageServiceImpl implements OcrFileStorageService {
                 objectKey,
                 "minio://" + this.bucket + "/" + objectKey,
                 storedFilename);
+    }
+
+    @Override
+    public JsonNode readJson(String bucket, String objectKey) {
+        try {
+            return this.objectMapper.readTree(this.readBytes(bucket, objectKey));
+        } catch (Exception ex) {
+            throw new IllegalStateException("读取 OCR 对象存储 JSON 失败", ex);
+        }
+    }
+
+    @Override
+    public byte[] readBytes(String bucket, String objectKey) {
+        try (InputStream inputStream = this.minioClient.getObject(GetObjectArgs.builder()
+                .bucket(bucket)
+                .object(objectKey)
+                .build())) {
+            return inputStream.readAllBytes();
+        } catch (Exception ex) {
+            throw new IllegalStateException("读取 OCR 对象存储文件失败", ex);
+        }
+    }
+
+    @Override
+    public void writeJson(String bucket, String objectKey, JsonNode content) {
+        try {
+            byte[] bytes = this.objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(content);
+            this.minioClient.putObject(PutObjectArgs.builder()
+                    .bucket(bucket)
+                    .object(objectKey)
+                    .stream(new ByteArrayInputStream(bytes), bytes.length, -1)
+                    .contentType("application/json")
+                    .build());
+        } catch (Exception ex) {
+            throw new IllegalStateException("写入 OCR 对象存储 JSON 失败", ex);
+        }
     }
 
     private void ensureBucketExists() throws Exception {

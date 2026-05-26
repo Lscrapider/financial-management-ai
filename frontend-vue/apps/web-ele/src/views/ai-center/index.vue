@@ -1,12 +1,17 @@
 <script lang="ts" setup>
 import { computed, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 
 import { Page } from '@vben/common-ui';
 
 import {
   ElButton,
   ElMessage,
+  ElPagination,
+  ElPopconfirm,
   ElProgress,
+  ElOption,
+  ElSelect,
   ElTabPane,
   ElTable,
   ElTableColumn,
@@ -19,7 +24,12 @@ import {
 import type { UploadFile, UploadRawFile } from 'element-plus';
 import type { UploadInstance } from 'element-plus';
 
-import { listOcrTasks, submitOcrTask, type OcrTask } from '#/api/ocr-task';
+import {
+  deleteOcrTask,
+  pageOcrTasks,
+  submitOcrTask,
+  type OcrTask,
+} from '#/api/ocr-task';
 
 type ProcessingStatus = OcrTask['status'];
 type ProcessingStage = OcrTask['currentStage'];
@@ -36,11 +46,17 @@ interface ProcessingTask {
 }
 
 const activeTab = ref('knowledgeProcessing');
+const router = useRouter();
 const selectedTaskId = ref('');
 const selectedFiles = ref<File[]>([]);
 const uploadRef = ref<UploadInstance>();
 const submitting = ref(false);
 const loadingTasks = ref(false);
+const deletingTaskNo = ref('');
+const statusFilter = ref<ProcessingStatus | 'all'>('all');
+const pageNum = ref(1);
+const pageSize = ref(20);
+const totalTasks = ref(0);
 
 const pipelineStages = [
   { key: 'document.normalize', label: '格式校验' },
@@ -51,6 +67,18 @@ const pipelineStages = [
 ];
 
 const processingTasks = ref<ProcessingTask[]>([]);
+
+const statusFilterOptions: Array<{
+  label: string;
+  value: ProcessingStatus | 'all';
+}> = [
+  { label: '全部状态', value: 'all' },
+  { label: '处理中', value: 'running' },
+  { label: '已完成', value: 'finished' },
+  { label: '等待中', value: 'ready' },
+  { label: '审核中', value: 'manual_review_required' },
+  { label: '失败', value: 'failed' },
+];
 
 const selectedTask = computed(() => {
   return (
@@ -77,11 +105,10 @@ const totalPages = computed(() => {
   return processingTasks.value.reduce((total, item) => total + item.pages, 0);
 });
 
-const totalSegments = computed(() => {
-  return processingTasks.value.reduce(
-    (total, item) => total + item.segments,
-    0,
-  );
+const reviewingCount = computed(() => {
+  return processingTasks.value.filter(
+    (item) => item.status === 'manual_review_required',
+  ).length;
 });
 
 const canSubmit = computed(() => selectedFiles.value.length > 0 && !submitting.value);
@@ -93,8 +120,13 @@ onMounted(() => {
 async function loadTasks() {
   loadingTasks.value = true;
   try {
-    const tasks = await listOcrTasks();
-    processingTasks.value = tasks.map(toProcessingTask);
+    const page = await pageOcrTasks({
+      pageNum: pageNum.value,
+      pageSize: pageSize.value,
+      status: statusFilter.value === 'all' ? undefined : statusFilter.value,
+    });
+    processingTasks.value = page.records.map(toProcessingTask);
+    totalTasks.value = page.total;
     selectedTaskId.value = processingTasks.value[0]?.id ?? '';
   } finally {
     loadingTasks.value = false;
@@ -110,11 +142,12 @@ async function submitTask() {
   try {
     const tasks = await submitOcrTask(selectedFiles.value);
     const newProcessingTasks = tasks.map(toProcessingTask);
-    processingTasks.value.unshift(...newProcessingTasks);
+    pageNum.value = 1;
     selectedTaskId.value = newProcessingTasks[0]?.id ?? selectedTaskId.value;
     selectedFiles.value = [];
     uploadRef.value?.clearFiles();
     ElMessage.success(`已提交 ${newProcessingTasks.length} 个识别任务`);
+    await loadTasks();
   } finally {
     submitting.value = false;
   }
@@ -174,6 +207,43 @@ function toProcessingTask(task: OcrTask): ProcessingTask {
 
 function selectTask(row: ProcessingTask) {
   selectedTaskId.value = row.id;
+}
+
+function changeStatusFilter() {
+  pageNum.value = 1;
+  void loadTasks();
+}
+
+function changePageNum(value: number) {
+  pageNum.value = value;
+  void loadTasks();
+}
+
+function changePageSize(value: number) {
+  pageNum.value = 1;
+  pageSize.value = value;
+  void loadTasks();
+}
+
+function openReview(row: ProcessingTask) {
+  void router.push({
+    name: 'AiOcrReview',
+    params: { taskNo: row.id },
+  });
+}
+
+async function removeTask(row: ProcessingTask) {
+  deletingTaskNo.value = row.id;
+  try {
+    await deleteOcrTask(row.id);
+    ElMessage.success('已删除任务');
+    if (processingTasks.value.length === 1 && pageNum.value > 1) {
+      pageNum.value -= 1;
+    }
+    await loadTasks();
+  } finally {
+    deletingTaskNo.value = '';
+  }
 }
 
 function statusLabel(status: ProcessingStatus) {
@@ -295,8 +365,8 @@ function formatDateTime(value?: string) {
               <strong>{{ totalPages }}</strong>
             </div>
             <div class="metric-item">
-              <span>文本分段</span>
-              <strong>{{ totalSegments }}</strong>
+              <span>审核中</span>
+              <strong>{{ reviewingCount }}</strong>
             </div>
           </section>
 
@@ -318,30 +388,51 @@ function formatDateTime(value?: string) {
                   <h2>处理队列</h2>
                   <span>{{ selectedTask?.updatedAt ?? '-' }}</span>
                 </div>
+                <div class="queue-tools">
+                  <ElSelect
+                    v-model="statusFilter"
+                    size="small"
+                    @change="changeStatusFilter"
+                  >
+                    <ElOption
+                      v-for="option in statusFilterOptions"
+                      :key="option.value"
+                      :label="option.label"
+                      :value="option.value"
+                    />
+                  </ElSelect>
+                </div>
               </div>
 
               <ElTable
                 :data="processingTasks"
                 v-loading="loadingTasks"
-                height="520"
+                border
+                height="560"
                 highlight-current-row
                 row-key="id"
                 @row-click="selectTask"
               >
-                <ElTableColumn label="文件" min-width="220" prop="fileName" />
-                <ElTableColumn label="阶段" min-width="120">
+                <ElTableColumn
+                  label="文件"
+                  min-width="220"
+                  prop="fileName"
+                  resizable
+                  show-overflow-tooltip
+                />
+                <ElTableColumn label="阶段" min-width="120" resizable>
                   <template #default="{ row }">
                     {{ stageLabel(row.currentStage) }}
                   </template>
                 </ElTableColumn>
-                <ElTableColumn label="状态" width="100">
+                <ElTableColumn label="状态" resizable width="132">
                   <template #default="{ row }">
                     <ElTag :type="statusType(row.status)" effect="plain">
                       {{ statusLabel(row.status) }}
                     </ElTag>
                   </template>
                 </ElTableColumn>
-                <ElTableColumn label="进度" min-width="180">
+                <ElTableColumn label="进度" min-width="190" resizable>
                   <template #default="{ row }">
                     <ElProgress
                       :percentage="row.progress"
@@ -353,15 +444,64 @@ function formatDateTime(value?: string) {
                   align="right"
                   label="页数"
                   prop="pages"
+                  resizable
                   width="80"
                 />
                 <ElTableColumn
                   align="right"
                   label="分段"
                   prop="segments"
+                  resizable
                   width="90"
                 />
+                <ElTableColumn
+                  align="right"
+                  fixed="right"
+                  label="操作"
+                  resizable
+                  width="150"
+                >
+                  <template #default="{ row }">
+                    <div class="table-actions" @click.stop>
+                      <ElButton
+                        v-if="row.status === 'manual_review_required'"
+                        link
+                        type="primary"
+                        @click="openReview(row)"
+                      >
+                        复核
+                      </ElButton>
+                      <ElPopconfirm
+                        title="确认删除该任务？"
+                        @confirm="removeTask(row)"
+                      >
+                        <template #reference>
+                          <ElButton
+                            :loading="deletingTaskNo === row.id"
+                            link
+                            type="danger"
+                          >
+                            删除
+                          </ElButton>
+                        </template>
+                      </ElPopconfirm>
+                    </div>
+                  </template>
+                </ElTableColumn>
               </ElTable>
+
+              <div class="queue-pagination">
+                <ElPagination
+                  :current-page="pageNum"
+                  :page-size="pageSize"
+                  :page-sizes="[10, 20, 50, 100]"
+                  :total="totalTasks"
+                  background
+                  layout="total, sizes, prev, pager, next, jumper"
+                  @current-change="changePageNum"
+                  @size-change="changePageSize"
+                />
+              </div>
             </section>
 
             <aside class="detail-panel">
@@ -464,7 +604,7 @@ function formatDateTime(value?: string) {
 
 .pipeline-band {
   display: grid;
-  grid-template-columns: repeat(6, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
   padding: 14px;
   margin-bottom: 16px;
@@ -533,9 +673,31 @@ function formatDateTime(value?: string) {
   margin-bottom: 22px;
 }
 
+.table-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.queue-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.queue-tools :deep(.el-select) {
+  width: 132px;
+}
+
+.queue-pagination {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 14px;
+}
+
 @media (max-width: 1200px) {
-  .overview-band,
-  .pipeline-band {
+  .overview-band {
     grid-template-columns: repeat(3, minmax(120px, 1fr));
   }
 

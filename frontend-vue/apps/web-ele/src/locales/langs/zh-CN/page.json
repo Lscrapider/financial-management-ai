@@ -15,7 +15,8 @@
   },
   "aiCenter": {
     "title": "AI中心",
-    "knowledgeProcessing": "知识库处理进度"
+    "knowledgeProcessing": "知识库处理进度",
+    "ocrReview": "OCR人工复核"
   },
   "systemConfig": {
     "title": "系统配置"

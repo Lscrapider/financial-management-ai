@@ -1,6 +1,7 @@
 from concurrent.futures import Future, ThreadPoolExecutor
 import json
 import logging
+from collections.abc import Callable
 from typing import Any
 
 import pika
@@ -25,10 +26,12 @@ class RabbitMqWorker:
         settings: RabbitMqSettings,
         routes: list[HandlerRoute],
         registry: HandlerRegistry,
+        task_deleted_checker: Callable[[str], bool] | None = None,
     ) -> None:
         self._settings = settings
         self._routes = routes
         self._registry = registry
+        self._task_deleted_checker = task_deleted_checker
         self._executor = ThreadPoolExecutor(max_workers=settings.handler_threads)
         self._connection: pika.BlockingConnection | None = None
         self._channel: pika.adapters.blocking_connection.BlockingChannel | None = None
@@ -78,6 +81,15 @@ class RabbitMqWorker:
         future.add_done_callback(lambda completed: self._schedule_finalize(message, completed))
 
     def _dispatch(self, route: HandlerRoute, message: IncomingMessage) -> HandlerResult:
+        if self._task_deleted_checker is not None and message.task_no:
+            if self._task_deleted_checker(message.task_no):
+                logger.info(
+                    "skip soft deleted task message task_no=%s stage=%s routing_key=%s",
+                    message.task_no,
+                    message.stage,
+                    message.routing_key,
+                )
+                return HandlerResult()
         handler = self._registry.get(route.handler_key)
         if handler is None:
             raise PermanentMessageError(f"no handler registered for {route.handler_key}")

@@ -20,11 +20,47 @@ export interface OcrTask {
   updatedAt: string;
 }
 
-export function listOcrTasks(limit = 50) {
-  return requestClient.get<OcrTask[]>('/ai/ocr/tasks', {
-    params: { limit },
+export type OcrTaskStatus = OcrTask['status'];
+
+export interface OcrTaskPage {
+  pageNum: number;
+  pageSize: number;
+  pages: number;
+  records: OcrTask[];
+  total: number;
+}
+
+export interface OcrTaskPageParams {
+  pageNum?: number;
+  pageSize?: number;
+  status?: OcrTaskStatus;
+}
+
+export function pageOcrTasks(params: OcrTaskPageParams = {}) {
+  const requestBody: {
+    pageNum: number;
+    pageSize: number;
+    status?: OcrTaskStatus;
+  } = {
+    pageNum: params.pageNum ?? 1,
+    pageSize: params.pageSize ?? 20,
+  };
+  if (params.status) {
+    requestBody.status = params.status;
+  }
+  return requestClient.post<OcrTaskPage>('/ai/ocr/tasks/page', requestBody, {
     responseReturn: 'body',
   });
+}
+
+export function deleteOcrTask(taskNo: string) {
+  return requestClient.post<void>(
+    '/ai/ocr/tasks/delete',
+    { taskNo },
+    {
+      responseReturn: 'body',
+    },
+  );
 }
 
 export function submitOcrTask(files: File[]) {

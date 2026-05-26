@@ -34,7 +34,7 @@ def connect(database: str):
         host=env("POSTGRES_HOST", "localhost"),
         port=int(env("POSTGRES_PORT", "5432")),
         user=env("POSTGRES_USER", "postgres"),
-        password=env("POSTGRES_PASSWORD", "postgres"),
+        password=env("POSTGRES_PASSWORD", "123456"),
         dbname=database,
         autocommit=True,
     )

@@ -27,6 +27,7 @@ public class OcrTaskPO {
     private LocalDateTime submittedAt;
     private LocalDateTime updatedAt;
     private LocalDateTime createdAt;
+    private LocalDateTime deletedAt;
 
     public static OcrTaskPO createReady(
             String taskNo,

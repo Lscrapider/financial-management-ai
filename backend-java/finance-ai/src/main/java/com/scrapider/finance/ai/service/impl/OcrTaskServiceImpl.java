@@ -1,11 +1,16 @@
 package com.scrapider.finance.ai.service.impl;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.scrapider.finance.ai.domain.param.OcrTaskDeleteParam;
+import com.scrapider.finance.ai.domain.param.OcrTaskPageParam;
 import com.scrapider.finance.ai.domain.vo.OcrTaskVO;
+import com.scrapider.finance.ai.domain.vo.OcrTaskPageVO;
 import com.scrapider.finance.ai.domain.dto.OcrNormalizeMessageDTO;
 import com.scrapider.finance.ai.domain.dto.StoredOcrFileDTO;
 import com.scrapider.finance.ai.service.OcrFileStorageService;
 import com.scrapider.finance.ai.service.OcrTaskService;
 import com.scrapider.finance.ai.service.OcrTaskMessagePublisher;
+import com.scrapider.finance.domain.enums.OcrTaskStatusEnum;
 import com.scrapider.finance.domain.po.OcrTaskPO;
 import com.scrapider.finance.manage.OcrTaskManage;
 import java.nio.file.Path;
@@ -21,8 +26,9 @@ public class OcrTaskServiceImpl implements OcrTaskService {
 
     private static final Set<String> ALLOWED_FILE_TYPES = Set.of("pdf", "png", "jpg", "jpeg", "webp");
     private static final long MAX_FILE_SIZE = 50L * 1024L * 1024L;
-    private static final int DEFAULT_LIST_LIMIT = 50;
-    private static final int MAX_LIST_LIMIT = 200;
+    private static final int DEFAULT_PAGE_NUM = 1;
+    private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final int MAX_PAGE_SIZE = 200;
 
     private final OcrTaskManage ocrTaskManage;
     private final OcrFileStorageService ocrFileStorageService;
@@ -47,11 +53,24 @@ public class OcrTaskServiceImpl implements OcrTaskService {
     }
 
     @Override
-    public List<OcrTaskVO> listRecent(int limit) {
-        int normalizedLimit = this.normalizeLimit(limit);
-        return this.ocrTaskManage.listRecentTasks(normalizedLimit).stream()
-                .map(OcrTaskVO::fromPO)
-                .toList();
+    public OcrTaskPageVO page(OcrTaskPageParam param) {
+        OcrTaskPageParam query = param == null ? new OcrTaskPageParam() : param;
+        int pageNum = this.normalizePageNum(query.getPageNum());
+        int pageSize = this.normalizePageSize(query.getPageSize());
+        OcrTaskStatusEnum taskStatus = OcrTaskStatusEnum.fromCode(query.getStatus());
+        Page<OcrTaskPO> page = this.ocrTaskManage.pageTasks(pageNum, pageSize, taskStatus);
+        return OcrTaskPageVO.fromPage(page);
+    }
+
+    @Override
+    public void delete(OcrTaskDeleteParam param) {
+        if (param == null || param.taskNo() == null || param.taskNo().isBlank()) {
+            throw new IllegalArgumentException("任务编号不能为空");
+        }
+        boolean deleted = this.ocrTaskManage.softDelete(param.taskNo().trim());
+        if (!deleted) {
+            throw new IllegalArgumentException("OCR 任务不存在或已删除");
+        }
     }
 
     private OcrTaskVO submitOne(MultipartFile file) {
@@ -108,10 +127,17 @@ public class OcrTaskServiceImpl implements OcrTaskService {
         return filename.substring(index + 1).toLowerCase(Locale.ROOT);
     }
 
-    private int normalizeLimit(int limit) {
-        if (limit <= 0) {
-            return DEFAULT_LIST_LIMIT;
+    private int normalizePageNum(Integer pageNum) {
+        if (pageNum == null || pageNum <= 0) {
+            return DEFAULT_PAGE_NUM;
         }
-        return Math.min(limit, MAX_LIST_LIMIT);
+        return pageNum;
+    }
+
+    private int normalizePageSize(Integer pageSize) {
+        if (pageSize == null || pageSize <= 0) {
+            return DEFAULT_PAGE_SIZE;
+        }
+        return Math.min(pageSize, MAX_PAGE_SIZE);
     }
 }

@@ -21,6 +21,17 @@ const routes: RouteRecordRaw[] = [
           title: $t('page.aiCenter.knowledgeProcessing'),
         },
       },
+      {
+        name: 'AiOcrReview',
+        path: '/ai-center/ocr-review/:taskNo?',
+        component: () => import('#/views/ai-center/ocr-review/index.vue'),
+        meta: {
+          activePath: '/ai-center/knowledge-processing',
+          hideInMenu: true,
+          icon: 'lucide:file-check-2',
+          title: $t('page.aiCenter.ocrReview'),
+        },
+      },
     ],
   },
 ];

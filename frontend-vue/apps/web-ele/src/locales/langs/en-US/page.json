@@ -15,7 +15,8 @@
   },
   "aiCenter": {
     "title": "AI Center",
-    "knowledgeProcessing": "Knowledge Processing"
+    "knowledgeProcessing": "Knowledge Processing",
+    "ocrReview": "OCR Review"
   },
   "systemConfig": {
     "title": "System Config"

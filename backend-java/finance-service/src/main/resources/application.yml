@@ -80,3 +80,5 @@ finance:
     rabbitmq:
       exchange: ${OCR_RABBITMQ_EXCHANGE:finance.ocr.topic}
       normalize-routing-key: ${OCR_RABBITMQ_NORMALIZE_ROUTING_KEY:ocr.document.normalize}
+      quality-validate-queue: ${OCR_RABBITMQ_QUALITY_VALIDATE_QUEUE:finance.ocr.quality.validate}
+      embedding-index-routing-key: ${OCR_RABBITMQ_EMBEDDING_INDEX_ROUTING_KEY:ocr.embedding.index}

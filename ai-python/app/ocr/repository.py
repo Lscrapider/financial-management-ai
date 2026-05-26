@@ -13,6 +13,7 @@ class OcrTask:
     task_no: str
     status: str
     current_stage: str
+    deleted: bool
 
 
 class OcrTaskRepository:
@@ -24,7 +25,7 @@ class OcrTaskRepository:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT task_no, status, current_stage
+                    SELECT task_no, status, current_stage, deleted_at
                     FROM ocr_task
                     WHERE task_no = %s
                     """,
@@ -37,7 +38,22 @@ class OcrTaskRepository:
             task_no=str(row["task_no"]),
             status=str(row["status"]),
             current_stage=str(row["current_stage"]),
+            deleted=row["deleted_at"] is not None,
         )
+
+    def is_deleted(self, task_no: str) -> bool:
+        with psycopg.connect(self._settings.dsn, row_factory=dict_row) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT deleted_at
+                    FROM ocr_task
+                    WHERE task_no = %s
+                    """,
+                    (task_no,),
+                )
+                row = cursor.fetchone()
+        return row is not None and row["deleted_at"] is not None
 
     def mark_running(self, task_no: str, stage: str, progress: int) -> None:
         with psycopg.connect(self._settings.dsn) as connection:
