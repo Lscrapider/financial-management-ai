@@ -317,6 +317,10 @@ onMounted(async () => {
   font-weight: 700;
   color: var(--el-color-primary);
   line-height: 1.3;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .stat-value--small {
