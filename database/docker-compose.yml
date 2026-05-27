@@ -2,7 +2,7 @@ name: finance-database
 
 services:
   postgres:
-    image: postgres:15
+    image: pgvector/pgvector:pg15
     container_name: finance-postgres
     ports:
       - "${POSTGRES_PORT:-5432}:5432"

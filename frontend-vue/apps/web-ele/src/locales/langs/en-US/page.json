@@ -18,6 +18,10 @@
     "knowledgeProcessing": "Knowledge Processing",
     "ocrReview": "OCR Review"
   },
+  "knowledge": {
+    "title": "Knowledge Base",
+    "base": "Knowledge Browser"
+  },
   "systemConfig": {
     "title": "System Config"
   }

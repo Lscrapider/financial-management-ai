@@ -18,6 +18,10 @@
     "knowledgeProcessing": "知识库处理进度",
     "ocrReview": "OCR人工复核"
   },
+  "knowledge": {
+    "title": "知识库",
+    "base": "知识库浏览"
+  },
   "systemConfig": {
     "title": "系统配置"
   }

@@ -163,6 +163,56 @@ class OcrTaskRepository:
                 )
             connection.commit()
 
+    def finish_task(
+        self,
+        task_no: str,
+        stage: str,
+        progress: int,
+        page_count: int,
+        segment_count: int,
+        output_ref: dict[str, Any],
+        output_message: dict[str, Any],
+        metrics: dict[str, Any],
+    ) -> None:
+        with psycopg.connect(self._settings.dsn) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE ocr_task_stage
+                    SET status = 'finished',
+                        output_ref = %s,
+                        output_message = %s,
+                        metrics = %s,
+                        error_message = NULL,
+                        finished_at = CURRENT_TIMESTAMP,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE task_no = %s
+                      AND stage = %s
+                    """,
+                    (
+                        Jsonb(output_ref),
+                        Jsonb(output_message),
+                        Jsonb(metrics),
+                        task_no,
+                        stage,
+                    ),
+                )
+                cursor.execute(
+                    """
+                    UPDATE ocr_task
+                    SET status = 'finished',
+                        current_stage = %s,
+                        progress = %s,
+                        page_count = %s,
+                        segment_count = %s,
+                        error_message = NULL,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE task_no = %s
+                    """,
+                    (stage, progress, page_count, segment_count, task_no),
+                )
+            connection.commit()
+
     def fail_stage(self, task_no: str, stage: str, error_message: str, mark_task_failed: bool) -> None:
         with psycopg.connect(self._settings.dsn) as connection:
             with connection.cursor() as cursor:

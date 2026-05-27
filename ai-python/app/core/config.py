@@ -56,11 +56,20 @@ class QwenOcrSettings:
 
 
 @dataclass(frozen=True)
+class EmbeddingSettings:
+    provider: str = os.getenv("EMBEDDING_PROVIDER", "local")
+    model_name: str = os.getenv("EMBEDDING_MODEL_NAME", "BAAI/bge-small-zh-v1.5")
+    device: str = os.getenv("EMBEDDING_DEVICE", "cpu")
+    batch_size: int = _int_env("EMBEDDING_BATCH_SIZE", 8)
+
+
+@dataclass(frozen=True)
 class Settings:
     rabbitmq: RabbitMqSettings = RabbitMqSettings()
     postgres: PostgresSettings = PostgresSettings()
     minio: MinioSettings = MinioSettings()
     qwen_ocr: QwenOcrSettings = QwenOcrSettings()
+    embedding: EmbeddingSettings = EmbeddingSettings()
 
 
 settings = Settings()

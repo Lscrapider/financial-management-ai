@@ -5,20 +5,26 @@ from app.messaging.rabbit_worker import RabbitMqWorker
 from app.messaging.registry import HandlerRegistry
 from app.ocr.constants import (
     QUEUE_DOCUMENT_NORMALIZE,
+    QUEUE_EMBEDDING_INDEX,
     QUEUE_OCR_RECOGNIZE,
     QUEUE_TEXT_CLEAN,
     ROUTING_KEY_DOCUMENT_NORMALIZE,
+    ROUTING_KEY_EMBEDDING_INDEX,
     ROUTING_KEY_OCR_RECOGNIZE,
     ROUTING_KEY_TEXT_CLEAN,
 )
+from app.ocr.engines.embedding_engine import SentenceTransformersEngine
 from app.ocr.engines.qwen_vl_ocr_engine import QwenVlOcrEngine
 from app.ocr.handlers.document_normalize_handler import DocumentNormalizeHandler
+from app.ocr.handlers.embedding_index_handler import EmbeddingIndexHandler
 from app.ocr.handlers.ocr_recognize_handler import OcrRecognizeHandler
 from app.ocr.handlers.text_clean_handler import TextCleanHandler
 from app.ocr.repository import OcrTaskRepository
 from app.ocr.services.document_normalizer import DocumentNormalizer
+from app.ocr.services.embedding_service import EmbeddingService
 from app.ocr.services.ocr_recognizer import OcrRecognizer
 from app.ocr.services.text_cleaner import TextCleaner
+from app.ocr.services.vector_store import VectorStore
 from app.ocr.storage import OcrArtifactStorage
 
 
@@ -42,6 +48,23 @@ def build_worker() -> RabbitMqWorker:
         ROUTING_KEY_TEXT_CLEAN,
         TextCleanHandler(repository, cleaner, settings.rabbitmq.max_attempts),
     )
+    embedding_engine = SentenceTransformersEngine(
+        settings.embedding.model_name,
+        settings.embedding.device,
+        settings.embedding.batch_size,
+    )
+    embedding_service = EmbeddingService(embedding_engine, settings.embedding.model_name)
+    vector_store = VectorStore(settings.postgres)
+    registry.register(
+        ROUTING_KEY_EMBEDDING_INDEX,
+        EmbeddingIndexHandler(
+            repository,
+            embedding_service,
+            vector_store,
+            storage,
+            settings.rabbitmq.max_attempts,
+        ),
+    )
     routes = [
         HandlerRoute(
             queue=QUEUE_DOCUMENT_NORMALIZE,
@@ -57,6 +80,11 @@ def build_worker() -> RabbitMqWorker:
             queue=QUEUE_TEXT_CLEAN,
             routing_key=ROUTING_KEY_TEXT_CLEAN,
             handler_key=ROUTING_KEY_TEXT_CLEAN,
+        ),
+        HandlerRoute(
+            queue=QUEUE_EMBEDDING_INDEX,
+            routing_key=ROUTING_KEY_EMBEDDING_INDEX,
+            handler_key=ROUTING_KEY_EMBEDDING_INDEX,
         ),
     ]
     return RabbitMqWorker(settings.rabbitmq, routes, registry, repository.is_deleted)
