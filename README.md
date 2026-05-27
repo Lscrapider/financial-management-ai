@@ -14,6 +14,29 @@
 - PostgreSQL 负责业务数据、行情数据、结构化分析结果和向量化数据存储。
 - Docker 负责项目整体部署和本地开发环境编排。
 
+## 文档索引
+
+根目录文档按用途拆分：
+
+| 文档 | 说明 |
+| --- | --- |
+| [OCR_PIPELINE.md](./OCR_PIPELINE.md) | OCR 全链路实现说明，包括 Java/Python 边界、RabbitMQ 队列、阶段消息、MinIO 产物、人工复核、chunk 规则、软删除和向量入库。 |
+| [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) | 后端接口文档，记录主要 API 的请求方式、请求参数和响应结构。 |
+| [COMPLETED_REQUIREMENTS.md](./COMPLETED_REQUIREMENTS.md) | 已完成需求记录，用于追踪阶段性功能交付情况。 |
+| [CODEX_GUIDELINES.md](./CODEX_GUIDELINES.md) | Codex 在本仓库写代码、改代码和审查代码时需要遵守的协作与代码规范。 |
+| [AGENTS.md](./AGENTS.md) | Agent 入口说明，要求修改代码前先阅读 `CODEX_GUIDELINES.md`。 |
+
+模块内文档：
+
+| 文档 | 说明 |
+| --- | --- |
+| [backend-java/README.md](./backend-java/README.md) | Java 后端聚合工程说明。 |
+| [backend-java/finance-ai/README.md](./backend-java/finance-ai/README.md) | Java AI 能力模块说明，包括 AI Chat、OCR 上传、人工复核和知识库接口。 |
+| [backend-java/finance-service/README.md](./backend-java/finance-service/README.md) | Java 主服务说明。 |
+| [database/README.md](./database/README.md) | 数据库和迁移脚本说明。 |
+| [frontend-vue/README.md](./frontend-vue/README.md) | 前端工程说明。 |
+| [ai-python/app/ocr/OCR_PIPELINE.md](./ai-python/app/ocr/OCR_PIPELINE.md) | OCR 旧路径跳转文件，实际内容以根目录 `OCR_PIPELINE.md` 为准。 |
+
 ## 核心目标
 
 - 接入股市 API，定时获取股票行情、指数、财务数据、公告或新闻等信息。
@@ -43,7 +66,7 @@
 - LangChain / LlamaIndex（可选）
 - PyTorch / Transformers（按模型需要引入）
 - Sentence Transformers / Embedding 模型
-- OCR 工具，例如 PaddleOCR 或 Tesseract
+- OCR 大模型接口，例如 `qwen-vl-ocr-latest`
 
 ### 前端
 
@@ -212,11 +235,13 @@ Vue 前端展示
 ```text
 扫描件上传
   ↓
+文档标准化
+  ↓
 OCR 识别
   ↓
 文本清洗
   ↓
-文本切分
+人工复核
   ↓
 Embedding 向量化
   ↓
@@ -224,6 +249,8 @@ Embedding 向量化
   ↓
 用于 AI 检索增强分析
 ```
+
+OCR 详细阶段、消息体、产物目录和人工复核规则见 [OCR_PIPELINE.md](./OCR_PIPELINE.md)。
 
 ## 结构化分析结果示例
 
