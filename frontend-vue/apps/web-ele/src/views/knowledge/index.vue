@@ -170,7 +170,7 @@ onMounted(async () => {
       </ElRow>
 
       <ElRow :gutter="16" class="content-row">
-        <ElCol :span="8">
+        <ElCol :span="6">
           <ElCard header="知识条目" class="chunk-list-card">
             <div v-loading="loading">
               <ElTable
@@ -215,7 +215,7 @@ onMounted(async () => {
           </ElCard>
         </ElCol>
 
-        <ElCol :span="16">
+        <ElCol :span="18">
           <ElCard v-if="selectedChunk" class="detail-card">
             <template #header>
               <div class="detail-header">
@@ -257,7 +257,7 @@ onMounted(async () => {
               v-if="editing"
               v-model="editText"
               type="textarea"
-              :rows="10"
+              :rows="20"
               class="chunk-editor"
             />
             <div v-else class="chunk-text">{{ selectedChunk.text }}</div>
@@ -359,6 +359,13 @@ onMounted(async () => {
   height: 100%;
 }
 
+.detail-card :deep(.el-card__body) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
 .detail-header {
   display: flex;
   align-items: center;
@@ -382,6 +389,11 @@ onMounted(async () => {
 
 .chunk-editor {
   margin-bottom: 16px;
+  flex: 1;
+}
+
+.chunk-editor :deep(.el-textarea__inner) {
+  height: 100%;
 }
 
 .chunk-text {
@@ -393,6 +405,9 @@ onMounted(async () => {
   line-height: 1.8;
   white-space: pre-wrap;
   word-break: break-word;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 300px;
 }
 
 .chunk-meta {

@@ -5,7 +5,7 @@ import { $t } from '#/locales';
 const routes: RouteRecordRaw[] = [
   {
     meta: {
-      icon: 'lucide:brain-circuit',
+      icon: 'lucide:sparkles',
       order: 20,
       title: $t('page.aiCenter.title'),
     },
