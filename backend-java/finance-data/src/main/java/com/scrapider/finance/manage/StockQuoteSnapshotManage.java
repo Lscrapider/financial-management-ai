@@ -7,6 +7,7 @@ import com.scrapider.finance.domain.enums.SortOrderEnum;
 import com.scrapider.finance.domain.enums.StockQuoteSortFieldEnum;
 import com.scrapider.finance.domain.po.StockQuoteSnapshotPO;
 import com.scrapider.finance.mapper.StockQuoteSnapshotMapper;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -36,5 +37,13 @@ public class StockQuoteSnapshotManage extends ServiceImpl<StockQuoteSnapshotMapp
             wrapper.last("LIMIT " + limit);
         }
         return this.list(wrapper);
+    }
+
+    public List<StockQuoteSnapshotPO> listByStockCodes(Collection<String> stockCodes) {
+        if (stockCodes == null || stockCodes.isEmpty()) {
+            return List.of();
+        }
+        return this.list(new LambdaQueryWrapper<StockQuoteSnapshotPO>()
+                .in(StockQuoteSnapshotPO::getStockCode, stockCodes));
     }
 }

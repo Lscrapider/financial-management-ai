@@ -80,6 +80,7 @@ frontend-vue/.tools/
 *.sqlite3
 pgdata/
 postgres-data/
+database/migrations/insert_qingnong_bank_config.sql
 
 # 项目数据与知识库文件
 data/
@@ -104,3 +105,6 @@ docker-compose.override.yml
 # 编译和缓存
 .cache/
 .parcel-cache/
+/database/migrations/insert_qingnong_bank_config.sql
+/backend-java/finance-service/src/main/resources/application.yml
+/ai-python/app/core/config.py

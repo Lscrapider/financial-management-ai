@@ -11,7 +11,8 @@
     "title": "行情中心",
     "analytics": "控制台",
     "workspace": "市场看板",
-    "indexMarket": "指数行情"
+    "indexMarket": "指数行情",
+    "stockAlert": "股票提醒"
   },
   "aiCenter": {
     "title": "AI中心",

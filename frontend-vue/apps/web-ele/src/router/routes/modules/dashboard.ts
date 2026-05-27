@@ -30,6 +30,15 @@ const routes: RouteRecordRaw[] = [
           title: $t('page.dashboard.indexMarket'),
         },
       },
+      {
+        name: 'StockAlert',
+        path: '/stock-alert',
+        component: () => import('#/views/dashboard/stock-alert/index.vue'),
+        meta: {
+          icon: 'lucide:bell-ring',
+          title: $t('page.dashboard.stockAlert'),
+        },
+      },
     ],
   },
   {

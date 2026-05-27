@@ -18,6 +18,10 @@ public class AppUserPO {
     private String avatar;
     private Boolean enabled;
     private String homePath;
+    private String introduction;
+    private String email;
+    private String phone;
+    private Boolean emailNotification;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -30,6 +34,7 @@ public class AppUserPO {
         user.setAvatar(AuthConstant.DEFAULT_AVATAR);
         user.setEnabled(true);
         user.setHomePath(AuthConstant.DEFAULT_HOME_PATH);
+        user.setEmailNotification(true);
         return user;
     }
 }

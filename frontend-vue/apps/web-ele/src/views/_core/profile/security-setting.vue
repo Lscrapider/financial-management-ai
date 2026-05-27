@@ -1,43 +1,79 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { onMounted, reactive, ref } from 'vue';
 
-import { ProfileSecuritySetting } from '@vben/common-ui';
+import { useUserStore } from '@vben/stores';
 
-const formSchema = computed(() => {
-  return [
-    {
-      value: true,
-      fieldName: 'accountPassword',
-      label: '账户密码',
-      description: '当前密码强度：强',
-    },
-    {
-      value: true,
-      fieldName: 'securityPhone',
-      label: '密保手机',
-      description: '已绑定手机：138****8293',
-    },
-    {
-      value: true,
-      fieldName: 'securityQuestion',
-      label: '密保问题',
-      description: '未设置密保问题，密保问题可有效保护账户安全',
-    },
-    {
-      value: true,
-      fieldName: 'securityEmail',
-      label: '备用邮箱',
-      description: '已绑定邮箱：ant***sign.com',
-    },
-    {
-      value: false,
-      fieldName: 'securityMfa',
-      label: 'MFA 设备',
-      description: '未绑定 MFA 设备，绑定后，可以进行二次确认',
-    },
-  ];
+import { ElButton, ElForm, ElFormItem, ElInput, ElMessage } from 'element-plus';
+
+import { updateProfileApi } from '#/api';
+
+const userStore = useUserStore();
+
+const form = reactive({
+  email: '',
+  phone: '',
 });
+const saving = ref(false);
+
+onMounted(() => {
+  form.email = userStore.userInfo?.email ?? '';
+  form.phone = userStore.userInfo?.phone ?? '';
+});
+
+async function handleSubmit() {
+  saving.value = true;
+  try {
+    const values = {
+      email: form.email || null,
+      phone: form.phone || null,
+    };
+    await updateProfileApi(values);
+    if (userStore.userInfo) {
+      userStore.userInfo.email = values.email ?? undefined;
+      userStore.userInfo.phone = values.phone ?? undefined;
+    }
+    ElMessage.success('更新成功');
+  } finally {
+    saving.value = false;
+  }
+}
 </script>
+
 <template>
-  <ProfileSecuritySetting :form-schema="formSchema" />
+  <div class="security-setting">
+    <div class="security-item rounded-lg border p-4">
+      <div class="space-y-0.5">
+        <span class="text-base font-medium">账户密码</span>
+        <p class="text-sm text-muted-foreground">当前密码强度：强</p>
+      </div>
+    </div>
+
+    <ElForm :model="form" label-width="100px" class="security-form">
+      <ElFormItem label="备用邮箱">
+        <ElInput v-model="form.email" placeholder="请输入邮箱" />
+      </ElFormItem>
+      <ElFormItem label="密保手机">
+        <ElInput v-model="form.phone" placeholder="请输入手机号" />
+      </ElFormItem>
+      <ElFormItem>
+        <ElButton type="primary" :loading="saving" @click="handleSubmit">
+          保存
+        </ElButton>
+      </ElFormItem>
+    </ElForm>
+  </div>
 </template>
+
+<style scoped>
+.security-setting {
+  max-width: 480px;
+}
+
+.security-item {
+  margin-bottom: 24px;
+}
+
+.security-form {
+  margin-top: 8px;
+}
+</style>

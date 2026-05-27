@@ -11,7 +11,8 @@
     "title": "Market Center",
     "analytics": "Console",
     "workspace": "Market Dashboard",
-    "indexMarket": "Index Market"
+    "indexMarket": "Index Market",
+    "stockAlert": "Stock Alerts"
   },
   "aiCenter": {
     "title": "AI Center",

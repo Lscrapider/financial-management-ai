@@ -15,4 +15,11 @@ public class StockConfigManage extends ServiceImpl<StockConfigMapper, StockConfi
                 .eq(StockConfigPO::getEnabled, true)
                 .orderByAsc(StockConfigPO::getStockCode));
     }
+
+    public StockConfigPO getEnabledByStockCode(String stockCode) {
+        return this.getOne(new LambdaQueryWrapper<StockConfigPO>()
+                .eq(StockConfigPO::getEnabled, true)
+                .eq(StockConfigPO::getStockCode, stockCode)
+                .last("LIMIT 1"));
+    }
 }

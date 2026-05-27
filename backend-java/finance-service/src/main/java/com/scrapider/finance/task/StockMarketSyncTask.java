@@ -12,6 +12,7 @@ import com.scrapider.finance.domain.util.StockMarketJsonParser;
 import com.scrapider.finance.manage.StockConfigManage;
 import com.scrapider.finance.manage.StockIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
+import com.scrapider.finance.service.StockAlertService;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -33,6 +34,7 @@ public class StockMarketSyncTask {
     private final StockConfigManage stockConfigManage;
     private final StockQuoteSnapshotManage stockQuoteSnapshotManage;
     private final StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage;
+    private final StockAlertService stockAlertService;
 
     @Value("${stock.sync.enabled:false}")
     private boolean enabled;
@@ -53,11 +55,13 @@ public class StockMarketSyncTask {
             StockMarketApi stockMarketApi,
             StockConfigManage stockConfigManage,
             StockQuoteSnapshotManage stockQuoteSnapshotManage,
-            StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage) {
+            StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage,
+            StockAlertService stockAlertService) {
         this.stockMarketApi = stockMarketApi;
         this.stockConfigManage = stockConfigManage;
         this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
         this.stockIntradayTrendInfluxManage = stockIntradayTrendInfluxManage;
+        this.stockAlertService = stockAlertService;
     }
 
     @Scheduled(
@@ -81,6 +85,7 @@ public class StockMarketSyncTask {
 
         log.info("Start syncing stock market data, stock count: {}", stocks.size());
         stocks.forEach(this::syncOneStock);
+        this.stockAlertService.checkAlerts();
         log.info("Finished syncing stock market data.");
     }
 

@@ -16,4 +16,8 @@ public class UserInfoVO {
     private String desc;
     private String homePath;
     private String token;
+    private String introduction;
+    private String email;
+    private String phone;
+    private Boolean emailNotification;
 }

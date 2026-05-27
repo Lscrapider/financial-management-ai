@@ -2,8 +2,11 @@ package com.scrapider.finance.service.impl;
 
 import cn.hutool.core.util.StrUtil;
 import com.scrapider.finance.domain.constant.AuthConstant;
+import com.scrapider.finance.domain.param.ChangePasswordParam;
 import com.scrapider.finance.domain.param.LoginParam;
 import com.scrapider.finance.domain.param.RegisterParam;
+import com.scrapider.finance.domain.param.UpdateNotificationParam;
+import com.scrapider.finance.domain.param.UpdateProfileParam;
 import com.scrapider.finance.domain.po.AppUserPO;
 import com.scrapider.finance.domain.vo.LoginResultVO;
 import com.scrapider.finance.domain.vo.UserInfoVO;
@@ -67,7 +70,10 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public UserInfoVO getUserInfo(LoginUser loginUser, String token) {
-        AppUserPO user = loginUser.getUser();
+        AppUserPO user = this.appUserManage.getById(loginUser.getUser().getId());
+        if (user == null) {
+            throw new IllegalArgumentException("User not found.");
+        }
         String roleCode = loginUser.getRoleCode();
         List<String> roles = StrUtil.isBlank(roleCode) ? List.of() : List.of(roleCode);
         return new UserInfoVO(
@@ -76,14 +82,65 @@ public class AuthServiceImpl implements AuthService {
                 user.getRealName(),
                 user.getAvatar(),
                 roles,
-                AuthConstant.DEFAULT_USER_DESC,
+                user.getIntroduction(),
                 user.getHomePath(),
-                token);
+                token,
+                user.getIntroduction(),
+                user.getEmail(),
+                user.getPhone(),
+                user.getEmailNotification());
     }
 
     @Override
     public String refresh(String token) {
         return token;
+    }
+
+    @Override
+    public void updateProfile(LoginUser loginUser, UpdateProfileParam param) {
+        AppUserPO user = this.appUserManage.getById(loginUser.getUser().getId());
+        if (param.getRealName() != null) {
+            user.setRealName(param.getRealName());
+        }
+        if (param.getIntroduction() != null) {
+            user.setIntroduction(param.getIntroduction());
+        }
+        if (param.getEmail() != null) {
+            user.setEmail(param.getEmail());
+        }
+        if (param.getPhone() != null) {
+            user.setPhone(param.getPhone());
+        }
+        this.appUserManage.updateById(user);
+    }
+
+    @Override
+    public void changePassword(LoginUser loginUser, ChangePasswordParam param) {
+        if (param == null
+                || StrUtil.isBlank(param.getOldPassword())
+                || StrUtil.isBlank(param.getNewPassword())) {
+            throw new IllegalArgumentException("Old password and new password are required.");
+        }
+        if (!param.getNewPassword().equals(param.getConfirmPassword())) {
+            throw new IllegalArgumentException("Password confirmation does not match.");
+        }
+
+        AppUserPO user = this.appUserManage.getById(loginUser.getUser().getId());
+        if (!this.passwordEncoder.matches(param.getOldPassword(), user.getPassword())) {
+            throw new IllegalArgumentException("Old password is incorrect.");
+        }
+
+        user.setPassword(this.passwordEncoder.encode(param.getNewPassword()));
+        this.appUserManage.updateById(user);
+    }
+
+    @Override
+    public void updateNotificationSetting(LoginUser loginUser, UpdateNotificationParam param) {
+        AppUserPO user = loginUser.getUser();
+        if (param.getEmailNotification() != null) {
+            user.setEmailNotification(param.getEmailNotification());
+        }
+        this.appUserManage.updateById(user);
     }
 
     private void validateRegisterParam(RegisterParam param) {
