@@ -12,6 +12,7 @@ import com.scrapider.finance.ai.service.OcrTaskService;
 import com.scrapider.finance.ai.service.OcrTaskMessagePublisher;
 import com.scrapider.finance.domain.enums.OcrTaskStatusEnum;
 import com.scrapider.finance.domain.po.OcrTaskPO;
+import com.scrapider.finance.manage.KnowledgeVectorManage;
 import com.scrapider.finance.manage.OcrTaskManage;
 import java.nio.file.Path;
 import java.util.List;
@@ -31,14 +32,17 @@ public class OcrTaskServiceImpl implements OcrTaskService {
     private static final int MAX_PAGE_SIZE = 200;
 
     private final OcrTaskManage ocrTaskManage;
+    private final KnowledgeVectorManage knowledgeVectorManage;
     private final OcrFileStorageService ocrFileStorageService;
     private final OcrTaskMessagePublisher ocrTaskMessagePublisher;
 
     public OcrTaskServiceImpl(
             OcrTaskManage ocrTaskManage,
+            KnowledgeVectorManage knowledgeVectorManage,
             OcrFileStorageService ocrFileStorageService,
             OcrTaskMessagePublisher ocrTaskMessagePublisher) {
         this.ocrTaskManage = ocrTaskManage;
+        this.knowledgeVectorManage = knowledgeVectorManage;
         this.ocrFileStorageService = ocrFileStorageService;
         this.ocrTaskMessagePublisher = ocrTaskMessagePublisher;
     }
@@ -71,6 +75,7 @@ public class OcrTaskServiceImpl implements OcrTaskService {
         if (!deleted) {
             throw new IllegalArgumentException("OCR 任务不存在或已删除");
         }
+        this.knowledgeVectorManage.deleteByTaskNo(param.taskNo().trim());
     }
 
     private OcrTaskVO submitOne(MultipartFile file) {

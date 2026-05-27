@@ -6,7 +6,6 @@ import com.scrapider.finance.domain.po.KnowledgeVectorPO;
 import com.scrapider.finance.mapper.KnowledgeVectorMapper;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 
@@ -26,24 +25,22 @@ public class KnowledgeVectorManage extends ServiceImpl<KnowledgeVectorMapper, Kn
                 .one();
     }
 
+    public void deleteByTaskNo(String taskNo) {
+        this.lambdaUpdate()
+                .eq(KnowledgeVectorPO::getTaskNo, taskNo)
+                .remove();
+    }
+
     public Map<String, Object> stats() {
-        List<KnowledgeVectorPO> all = this.lambdaQuery()
-                .select(KnowledgeVectorPO::getTaskNo,
-                        KnowledgeVectorPO::getId,
-                        KnowledgeVectorPO::getText,
-                        KnowledgeVectorPO::getCreatedAt)
-                .list();
-        long chunkCount = all.size();
-        long taskCount = all.stream()
-                .map(KnowledgeVectorPO::getTaskNo)
-                .distinct()
-                .count();
-        long totalTextLength = all.stream()
-                .mapToLong(chunk -> chunk.getText() != null ? chunk.getText().length() : 0)
-                .sum();
-        OffsetDateTime latest = all.stream()
+        long chunkCount = this.count();
+        long taskCount = this.baseMapper.countDistinctTaskNo();
+        long totalTextLength = this.baseMapper.sumTextLength();
+        OffsetDateTime latest = this.lambdaQuery()
+                .select(KnowledgeVectorPO::getCreatedAt)
+                .orderByDesc(KnowledgeVectorPO::getCreatedAt)
+                .last("LIMIT 1")
+                .oneOpt()
                 .map(KnowledgeVectorPO::getCreatedAt)
-                .max(OffsetDateTime::compareTo)
                 .orElse(null);
         Map<String, Object> result = new HashMap<>();
         result.put("taskCount", taskCount);

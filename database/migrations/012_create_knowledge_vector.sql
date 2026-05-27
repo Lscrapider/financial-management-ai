@@ -1,6 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS vector;
 
-CREATE TABLE knowledge_vector (
+CREATE TABLE IF NOT EXISTS knowledge_vector (
     id BIGSERIAL PRIMARY KEY,
     task_no VARCHAR(64) NOT NULL,
     chunk_index INTEGER NOT NULL,
@@ -10,8 +10,8 @@ CREATE TABLE knowledge_vector (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_knowledge_vector_task_no ON knowledge_vector(task_no);
-CREATE INDEX idx_knowledge_vector_embedding ON knowledge_vector
+CREATE INDEX IF NOT EXISTS idx_knowledge_vector_task_no ON knowledge_vector(task_no);
+CREATE INDEX IF NOT EXISTS idx_knowledge_vector_embedding ON knowledge_vector
     USING hnsw (embedding vector_cosine_ops);
 
 COMMENT ON TABLE knowledge_vector IS '知识库向量存储表';
