@@ -2,7 +2,7 @@
 
 ## 目标
 
-OCR 流水线在 Java 服务保存上传文件并创建 OCR 任务之后启动。Java 负责文件上传、文件元数据、任务创建、第一条消息投递、人工复核和后续质量确认入口。Python 负责文档标准化、OCR 识别和文本清洗。
+OCR 流水线在 Java 服务保存上传文件并创建 OCR 任务之后启动。Java 负责文件上传、文件元数据、任务创建、第一条消息投递、人工复核和后续质量确认入口。Python 负责文档标准化、OCR 识别、文本清洗和向量索引。
 
 ## 服务边界
 
@@ -21,7 +21,7 @@ Python 职责：
 
 - 消费 RabbitMQ 中的 OCR 阶段消息。
 - 通过存储引用读取文件和中间产物。
-- 执行文档标准化、OCR 识别和文本清洗。
+- 执行文档标准化、OCR 识别、文本清洗和向量索引。
 - 持久化每个阶段的输入、输出、指标和错误信息。
 - 更新任务和阶段状态。
 - 每个阶段成功后发布下一阶段消息。
@@ -37,7 +37,7 @@ Python 职责：
 | 2 | OCR 识别 | `ocr.recognize` | 对标准化后的页面执行 OCR，并产出结构化识别结果。 | 页面/块/行级 OCR 结果 |
 | 3 | 文本清洗 | `ocr.text.clean` | 规范化文本、合并段落、保留格式提示，并标记疑似错字。 | 清洗后的文本和段落模型 |
 | 4 | 质量校验 / 人工复核入口 | `ocr.quality.validate` | Java 消费清洗结果，创建人工复核任务。 | `ocr_review` 草稿 |
-| 5 | 向量索引 | `ocr.embedding.index` | 人工复核确认后，拆分已确认文本、生成 embedding，并将向量写入向量存储。 | 向量索引引用 |
+| 5 | 向量索引 | `ocr.embedding.index` | Python 消费人工复核后的文本，拆分已确认文本、生成 embedding，并将向量写入向量存储。 | 向量索引引用 |
 | 6 | 任务完成 | 不需要单独处理阶段 | embedding 成功后将 OCR 任务标记为完成。 | 最终任务状态 |
 
 Java 不发布 `ocr.file.stored`。Java 发送第一条 OCR 消息之前，文件存储已经完成。
@@ -484,7 +484,8 @@ Java quality.validate
  -> 将 ocr_task.segment_count 更新为最终 paragraphs 数量
  -> 发布 ocr.embedding.index
 
-Java embedding.index
+Python embedding.index
+ -> 读取 reviewed.json
  -> 拆分文本
  -> 生成 embedding
  -> 写入向量
