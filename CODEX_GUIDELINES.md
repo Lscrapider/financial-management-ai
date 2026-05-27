@@ -77,4 +77,5 @@ Controller -> Service -> Manage / API / Mapper -> Domain
 14. `JsonNode`、第三方响应、DTO 或中间数据构建具体 `PO` 时，构建逻辑优先放到对应实体类的静态方法中，例如 `StockQuoteSnapshotPO.fromApiResponse(...)`，不要散落在 `task`、`service` 或 `manage` 中。
 15. 常见判空、字符串处理、集合判断、数字转换、日期转换等通用操作优先使用 Hutool 工具包，例如 `StrUtil`、`CollUtil`、`NumberUtil`、`DateUtil`；不要重复手写通用工具逻辑，除非 Hutool 不适合当前场景。
 16. 未使用到的代码要及时删除，包括未使用的类、方法、字段、局部变量、import、配置项和依赖；不要为“以后可能用到”保留死代码。
-17. 分页查询接口因该使用pageSize和pageNum，并且接口类型是post
+17. 分页查询接口因该使用pageSize和pageNum，并且接口类型是post。
+18. `Controller` 中不要编写局部 `@ExceptionHandler`。异常必须由模块级或全局 `@RestControllerAdvice` 统一处理，并且异常处理器必须使用日志打印异常对象，保留完整堆栈，避免吞掉真实报错原因。

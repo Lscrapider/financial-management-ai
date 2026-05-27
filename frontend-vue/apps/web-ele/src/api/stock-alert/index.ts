@@ -1,8 +1,8 @@
 import { requestClient } from '#/api/request';
 
 export interface StockAlertConfig {
-  id: number;
-  userId?: number;
+  id: string;
+  userId?: string;
   username?: string;
   realName?: string;
   email?: string;
@@ -27,7 +27,7 @@ export interface StockAlertStockOption {
 
 export interface SaveStockAlertParams {
   enabled?: boolean;
-  id?: number;
+  id?: string;
   stockCode: string;
   thresholdPercent: number;
 }
@@ -46,7 +46,7 @@ export function saveStockAlert(data: SaveStockAlertParams) {
   return requestClient.post<StockAlertConfig>('/stock-alerts', data);
 }
 
-export function deleteStockAlert(id: number) {
+export function deleteStockAlert(id: string) {
   return requestClient.delete<void>(`/stock-alerts/${id}`);
 }
 

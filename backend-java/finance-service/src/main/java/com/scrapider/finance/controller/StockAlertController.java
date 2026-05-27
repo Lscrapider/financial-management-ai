@@ -7,10 +7,8 @@ import com.scrapider.finance.domain.vo.StockAlertStockOptionVO;
 import com.scrapider.finance.security.LoginUser;
 import com.scrapider.finance.service.StockAlertService;
 import java.util.List;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -60,10 +58,5 @@ public class StockAlertController {
         }
         this.stockAlertService.checkAlerts();
         return ApiResponseVO.success(null);
-    }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ApiResponseVO<Void>> handleIllegalArgumentException(IllegalArgumentException ex) {
-        return ResponseEntity.badRequest().body(ApiResponseVO.error(ex.getMessage()));
     }
 }

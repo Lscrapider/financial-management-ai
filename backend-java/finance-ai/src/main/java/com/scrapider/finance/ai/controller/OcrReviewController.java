@@ -1,12 +1,10 @@
 package com.scrapider.finance.ai.controller;
 
 import com.scrapider.finance.ai.domain.param.OcrReviewDraftParam;
-import com.scrapider.finance.ai.domain.vo.ErrorResponseVO;
 import com.scrapider.finance.ai.domain.vo.OcrReviewVO;
 import com.scrapider.finance.ai.service.OcrReviewService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -49,10 +47,5 @@ public class OcrReviewController {
     @GetMapping(value = "/{taskNo}/pages/{pageNo}/image", produces = MediaType.IMAGE_PNG_VALUE)
     public ResponseEntity<byte[]> pageImage(@PathVariable String taskNo, @PathVariable Integer pageNo) {
         return ResponseEntity.ok(this.ocrReviewService.pageImage(taskNo, pageNo));
-    }
-
-    @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
-    public ResponseEntity<ErrorResponseVO> handleBadRequest(RuntimeException ex) {
-        return ResponseEntity.badRequest().body(new ErrorResponseVO(ex.getMessage()));
     }
 }

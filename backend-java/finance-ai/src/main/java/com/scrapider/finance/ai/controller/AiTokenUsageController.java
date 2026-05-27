@@ -4,11 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageLogVO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageOverviewVO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageTrendVO;
-import com.scrapider.finance.ai.domain.vo.ErrorResponseVO;
 import com.scrapider.finance.ai.service.AiTokenUsageService;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -39,10 +37,5 @@ public class AiTokenUsageController {
     @GetMapping("/trends")
     public ResponseEntity<List<AiTokenUsageTrendVO>> trends(@RequestParam(required = false) Integer days) {
         return ResponseEntity.ok(this.aiTokenUsageService.trends(days));
-    }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponseVO> handleBadRequest(IllegalArgumentException ex) {
-        return ResponseEntity.badRequest().body(new ErrorResponseVO(ex.getMessage()));
     }
 }

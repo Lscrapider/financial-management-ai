@@ -41,7 +41,7 @@ import {
 
 interface AlertFormState {
   enabled: boolean;
-  id?: number;
+  id?: string;
   stockCode: string;
   thresholdPercent: number;
 }

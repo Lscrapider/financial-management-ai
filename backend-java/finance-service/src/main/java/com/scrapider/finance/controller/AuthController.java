@@ -14,11 +14,7 @@ import com.scrapider.finance.security.LoginUser;
 import com.scrapider.finance.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -89,17 +85,6 @@ public class AuthController {
     @PostMapping("/api/auth/refresh")
     public ApiResponseVO<String> refresh(HttpServletRequest request) {
         return ApiResponseVO.success(this.authService.refresh(this.resolveToken(request)));
-    }
-
-    @ExceptionHandler(AuthenticationException.class)
-    public ResponseEntity<ApiResponseVO<Void>> handleAuthenticationException() {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ApiResponseVO.error("Username or password is incorrect."));
-    }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ApiResponseVO<Void>> handleIllegalArgumentException(IllegalArgumentException ex) {
-        return ResponseEntity.badRequest().body(ApiResponseVO.error(ex.getMessage()));
     }
 
     private String resolveToken(HttpServletRequest request) {

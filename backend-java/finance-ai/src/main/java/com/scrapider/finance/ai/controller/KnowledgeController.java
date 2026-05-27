@@ -1,13 +1,11 @@
 package com.scrapider.finance.ai.controller;
 
-import com.scrapider.finance.ai.domain.vo.ErrorResponseVO;
 import com.scrapider.finance.ai.domain.vo.KnowledgeChunkPageVO;
 import com.scrapider.finance.ai.domain.vo.KnowledgeChunkVO;
 import com.scrapider.finance.ai.domain.vo.KnowledgeStatsVO;
 import com.scrapider.finance.ai.service.KnowledgeService;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -49,10 +47,5 @@ public class KnowledgeController {
             @RequestBody Map<String, String> body) {
         String text = body.get("text");
         return ResponseEntity.ok(this.knowledgeService.updateChunk(id, text));
-    }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponseVO> handleBadRequest(IllegalArgumentException ex) {
-        return ResponseEntity.badRequest().body(new ErrorResponseVO(ex.getMessage()));
     }
 }

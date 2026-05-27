@@ -9,8 +9,8 @@ import lombok.Data;
 @Data
 public class StockAlertConfigVO {
 
-    private Long id;
-    private Long userId;
+    private String id;
+    private String userId;
     private String username;
     private String realName;
     private String email;
@@ -27,8 +27,8 @@ public class StockAlertConfigVO {
 
     public static StockAlertConfigVO fromPO(StockAlertConfigPO config, StockQuoteSnapshotPO quote) {
         StockAlertConfigVO vo = new StockAlertConfigVO();
-        vo.setId(config.getId());
-        vo.setUserId(config.getUserId());
+        vo.setId(String.valueOf(config.getId()));
+        vo.setUserId(String.valueOf(config.getUserId()));
         vo.setStockCode(config.getStockCode());
         vo.setStockName(config.getStockName());
         vo.setThresholdPercent(config.getThresholdPercent());

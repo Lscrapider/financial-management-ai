@@ -2,10 +2,8 @@ package com.scrapider.finance.ai.controller;
 
 import com.scrapider.finance.ai.domain.param.AiChatParam;
 import com.scrapider.finance.ai.domain.vo.AiChatVO;
-import com.scrapider.finance.ai.domain.vo.ErrorResponseVO;
 import com.scrapider.finance.ai.service.AiChatService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,10 +22,5 @@ public class AiChatController {
     @PostMapping("/chat")
     public ResponseEntity<AiChatVO> chat(@RequestBody AiChatParam param) {
         return ResponseEntity.ok(this.aiChatService.chat(param));
-    }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponseVO> handleBadRequest(IllegalArgumentException ex) {
-        return ResponseEntity.badRequest().body(new ErrorResponseVO(ex.getMessage()));
     }
 }

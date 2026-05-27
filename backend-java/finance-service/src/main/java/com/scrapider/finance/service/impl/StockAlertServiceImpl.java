@@ -76,9 +76,9 @@ public class StockAlertServiceImpl implements StockAlertService {
             throw new IllegalArgumentException("Stock config not found or disabled.");
         }
 
-        StockAlertConfigPO config = this.resolveSaveConfig(userId, stock, param);
+        StockAlertConfigPO config = this.resolveSaveConfig(loginUser, userId, stock, param);
         this.stockAlertConfigManage.saveOrUpdate(config);
-        StockAlertConfigPO saved = this.stockAlertConfigManage.getByUserIdAndStockCode(userId, stock.getStockCode());
+        StockAlertConfigPO saved = this.stockAlertConfigManage.getById(config.getId());
         return this.toVOList(List.of(saved)).get(0);
     }
 
@@ -87,10 +87,11 @@ public class StockAlertServiceImpl implements StockAlertService {
         if (id == null) {
             throw new IllegalArgumentException("id must not be null.");
         }
-        StockAlertConfigPO config = this.stockAlertConfigManage.getByIdAndUserId(id, this.currentUserId(loginUser));
+        StockAlertConfigPO config = this.stockAlertConfigManage.getById(id);
         if (config == null) {
             throw new IllegalArgumentException("Stock alert config not found.");
         }
+        this.validateEditable(loginUser, this.currentUserId(loginUser), config);
         this.stockAlertConfigManage.removeById(config.getId());
     }
 
@@ -105,16 +106,21 @@ public class StockAlertServiceImpl implements StockAlertService {
         configs.forEach(config -> this.checkOneAlert(config, userMap.get(config.getUserId()), quoteMap.get(config.getStockCode())));
     }
 
-    private StockAlertConfigPO resolveSaveConfig(Long userId, StockConfigPO stock, StockAlertConfigSaveParam param) {
+    private StockAlertConfigPO resolveSaveConfig(
+            LoginUser loginUser,
+            Long currentUserId,
+            StockConfigPO stock,
+            StockAlertConfigSaveParam param) {
         StockAlertConfigPO existing = param.getId() == null
-                ? this.stockAlertConfigManage.getByUserIdAndStockCode(userId, stock.getStockCode())
-                : this.stockAlertConfigManage.getByIdAndUserId(param.getId(), userId);
-        StockAlertConfigPO config = StockAlertConfigPO.fromSaveParam(userId, stock, param);
+                ? this.stockAlertConfigManage.getByUserIdAndStockCode(currentUserId, stock.getStockCode())
+                : this.resolveEditableConfig(loginUser, currentUserId, param.getId());
         if (param.getId() != null && existing == null) {
             throw new IllegalArgumentException("Stock alert config not found.");
         }
+        Long targetUserId = existing == null ? currentUserId : existing.getUserId();
+        StockAlertConfigPO config = StockAlertConfigPO.fromSaveParam(targetUserId, stock, param);
         StockAlertConfigPO sameStockConfig =
-                this.stockAlertConfigManage.getByUserIdAndStockCode(userId, stock.getStockCode());
+                this.stockAlertConfigManage.getByUserIdAndStockCode(targetUserId, stock.getStockCode());
         if (sameStockConfig != null && (existing == null || !sameStockConfig.getId().equals(existing.getId()))) {
             throw new IllegalArgumentException("Stock alert config already exists.");
         }
@@ -122,11 +128,27 @@ public class StockAlertServiceImpl implements StockAlertService {
             config.setId(existing.getId());
             boolean thresholdChanged = existing.getThresholdPercent() == null
                     || existing.getThresholdPercent().compareTo(config.getThresholdPercent()) != 0;
-            config.setAlertActive(!thresholdChanged && existing.getAlertActive());
+            config.setAlertActive(!thresholdChanged && Boolean.TRUE.equals(existing.getAlertActive()));
             config.setLastAlertChangePercent(existing.getLastAlertChangePercent());
             config.setLastAlertedAt(existing.getLastAlertedAt());
         }
         return config;
+    }
+
+    private StockAlertConfigPO resolveEditableConfig(LoginUser loginUser, Long currentUserId, Long id) {
+        StockAlertConfigPO config = this.stockAlertConfigManage.getById(id);
+        if (config == null) {
+            return null;
+        }
+        this.validateEditable(loginUser, currentUserId, config);
+        return config;
+    }
+
+    private void validateEditable(LoginUser loginUser, Long currentUserId, StockAlertConfigPO config) {
+        if (this.isAdmin(loginUser) || Objects.equals(config.getUserId(), currentUserId)) {
+            return;
+        }
+        throw new IllegalArgumentException("No permission to edit this stock alert config.");
     }
 
     private List<StockAlertConfigVO> toVOList(List<StockAlertConfigPO> configs) {
