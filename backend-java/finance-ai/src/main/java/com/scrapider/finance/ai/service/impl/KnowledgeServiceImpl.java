@@ -1,10 +1,12 @@
 package com.scrapider.finance.ai.service.impl;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.scrapider.finance.ai.domain.dto.KnowledgeReembedMessageDTO;
 import com.scrapider.finance.ai.domain.vo.KnowledgeChunkPageVO;
 import com.scrapider.finance.ai.domain.vo.KnowledgeChunkVO;
 import com.scrapider.finance.ai.domain.vo.KnowledgeStatsVO;
 import com.scrapider.finance.ai.service.KnowledgeService;
+import com.scrapider.finance.ai.service.OcrTaskMessagePublisher;
 import com.scrapider.finance.domain.po.KnowledgeVectorPO;
 import com.scrapider.finance.manage.KnowledgeVectorManage;
 import java.time.OffsetDateTime;
@@ -19,9 +21,13 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     private static final int MAX_PAGE_SIZE = 200;
 
     private final KnowledgeVectorManage knowledgeVectorManage;
+    private final OcrTaskMessagePublisher ocrTaskMessagePublisher;
 
-    public KnowledgeServiceImpl(KnowledgeVectorManage knowledgeVectorManage) {
+    public KnowledgeServiceImpl(
+            KnowledgeVectorManage knowledgeVectorManage,
+            OcrTaskMessagePublisher ocrTaskMessagePublisher) {
         this.knowledgeVectorManage = knowledgeVectorManage;
+        this.ocrTaskMessagePublisher = ocrTaskMessagePublisher;
     }
 
     @Override
@@ -52,5 +58,30 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             throw new IllegalArgumentException("知识条目不存在");
         }
         return KnowledgeChunkVO.fromPO(po);
+    }
+
+    @Override
+    public KnowledgeChunkVO updateChunk(Long id, String newText) {
+        if (id == null) {
+            throw new IllegalArgumentException("id 不能为空");
+        }
+        if (newText == null || newText.isBlank()) {
+            throw new IllegalArgumentException("文本内容不能为空");
+        }
+        KnowledgeVectorPO po = this.knowledgeVectorManage.findById(id);
+        if (po == null) {
+            throw new IllegalArgumentException("知识条目不存在");
+        }
+        String chunkId = null;
+        if (po.getMetadata() != null && po.getMetadata().has("chunkId")) {
+            chunkId = po.getMetadata().get("chunkId").asText();
+        }
+        this.knowledgeVectorManage.updateText(id, newText);
+        if (chunkId != null) {
+            this.ocrTaskMessagePublisher.publishReembedMessage(
+                    KnowledgeReembedMessageDTO.create(chunkId, newText));
+        }
+        KnowledgeVectorPO updated = this.knowledgeVectorManage.findById(id);
+        return KnowledgeChunkVO.fromPO(updated);
     }
 }

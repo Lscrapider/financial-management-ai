@@ -46,3 +46,13 @@ export function getKnowledgeChunkDetail(id: number) {
     responseReturn: 'body',
   });
 }
+
+export function updateKnowledgeChunk(id: number, text: string) {
+  return requestClient.put<KnowledgeChunk>(
+    `/knowledge/chunks/${id}`,
+    { text },
+    {
+      responseReturn: 'body',
+    },
+  );
+}

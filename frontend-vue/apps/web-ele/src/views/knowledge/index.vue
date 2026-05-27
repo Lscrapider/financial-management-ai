@@ -4,11 +4,13 @@ import { onMounted, ref } from 'vue';
 import { Page } from '@vben/common-ui';
 
 import {
+  ElButton,
   ElCard,
   ElCol,
   ElDescriptions,
   ElDescriptionsItem,
   ElEmpty,
+  ElInput,
   ElPagination,
   ElRow,
   ElTable,
@@ -17,9 +19,9 @@ import {
 } from 'element-plus';
 
 import {
-  getKnowledgeChunkDetail,
   getKnowledgeChunks,
   getKnowledgeStats,
+  updateKnowledgeChunk,
   type KnowledgeChunk,
   type KnowledgeStats,
 } from '#/api/knowledge';
@@ -71,6 +73,8 @@ async function fetchChunks() {
 
 function selectChunk(chunk: KnowledgeChunk | undefined) {
   if (!chunk) return;
+  editing.value = false;
+  editText.value = '';
   selectedChunk.value = chunk;
 }
 
@@ -89,6 +93,41 @@ function textPreview(text: string, maxLen = 60) {
   if (!text) return '';
   const cleaned = text.replace(/\s+/g, ' ');
   return cleaned.length > maxLen ? `${cleaned.slice(0, maxLen)}...` : cleaned;
+}
+
+const editing = ref(false);
+const editText = ref('');
+const saving = ref(false);
+
+function startEdit() {
+  if (!selectedChunk.value) return;
+  editText.value = selectedChunk.value.text;
+  editing.value = true;
+}
+
+function cancelEdit() {
+  editing.value = false;
+  editText.value = '';
+}
+
+async function saveEdit() {
+  if (!selectedChunk.value || saving.value) return;
+  saving.value = true;
+  try {
+    const updated = await updateKnowledgeChunk(
+      selectedChunk.value.id,
+      editText.value,
+    );
+    if (updated) {
+      selectedChunk.value = updated;
+      const idx = chunks.value.findIndex((c) => c.id === updated.id);
+      if (idx !== -1) chunks.value[idx] = updated;
+    }
+    editing.value = false;
+    editText.value = '';
+  } finally {
+    saving.value = false;
+  }
 }
 
 onMounted(async () => {
@@ -191,10 +230,37 @@ onMounted(async () => {
                 >
                   置信度 {{ (selectedChunk.avgConfidence * 100).toFixed(0) }}%
                 </ElTag>
+                <div class="header-actions">
+                  <template v-if="!editing">
+                    <ElButton size="small" type="primary" @click="startEdit">
+                      编辑
+                    </ElButton>
+                  </template>
+                  <template v-else>
+                    <ElButton
+                      size="small"
+                      type="success"
+                      :loading="saving"
+                      @click="saveEdit"
+                    >
+                      保存
+                    </ElButton>
+                    <ElButton size="small" @click="cancelEdit">
+                      取消
+                    </ElButton>
+                  </template>
+                </div>
               </div>
             </template>
 
-            <div class="chunk-text">{{ selectedChunk.text }}</div>
+            <ElInput
+              v-if="editing"
+              v-model="editText"
+              type="textarea"
+              :rows="10"
+              class="chunk-editor"
+            />
+            <div v-else class="chunk-text">{{ selectedChunk.text }}</div>
 
             <ElDescriptions :column="2" border size="small" class="chunk-meta">
               <ElDescriptionsItem label="文档编号">
@@ -306,6 +372,16 @@ onMounted(async () => {
 
 .confidence-tag {
   margin-left: 8px;
+}
+
+.header-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+
+.chunk-editor {
+  margin-bottom: 16px;
 }
 
 .chunk-text {

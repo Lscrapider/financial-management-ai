@@ -4,10 +4,12 @@ from app.messaging.models import HandlerRoute
 from app.messaging.rabbit_worker import RabbitMqWorker
 from app.messaging.registry import HandlerRegistry
 from app.ocr.constants import (
+    QUEUE_CHUNK_REEMBED,
     QUEUE_DOCUMENT_NORMALIZE,
     QUEUE_EMBEDDING_INDEX,
     QUEUE_OCR_RECOGNIZE,
     QUEUE_TEXT_CLEAN,
+    ROUTING_KEY_CHUNK_REEMBED,
     ROUTING_KEY_DOCUMENT_NORMALIZE,
     ROUTING_KEY_EMBEDDING_INDEX,
     ROUTING_KEY_OCR_RECOGNIZE,
@@ -15,6 +17,7 @@ from app.ocr.constants import (
 )
 from app.ocr.engines.embedding_engine import SentenceTransformersEngine
 from app.ocr.engines.qwen_vl_ocr_engine import QwenVlOcrEngine
+from app.ocr.handlers.chunk_reembed_handler import ChunkReembedHandler
 from app.ocr.handlers.document_normalize_handler import DocumentNormalizeHandler
 from app.ocr.handlers.embedding_index_handler import EmbeddingIndexHandler
 from app.ocr.handlers.ocr_recognize_handler import OcrRecognizeHandler
@@ -65,6 +68,10 @@ def build_worker() -> RabbitMqWorker:
             settings.rabbitmq.max_attempts,
         ),
     )
+    registry.register(
+        ROUTING_KEY_CHUNK_REEMBED,
+        ChunkReembedHandler(embedding_engine, vector_store),
+    )
     routes = [
         HandlerRoute(
             queue=QUEUE_DOCUMENT_NORMALIZE,
@@ -85,6 +92,11 @@ def build_worker() -> RabbitMqWorker:
             queue=QUEUE_EMBEDDING_INDEX,
             routing_key=ROUTING_KEY_EMBEDDING_INDEX,
             handler_key=ROUTING_KEY_EMBEDDING_INDEX,
+        ),
+        HandlerRoute(
+            queue=QUEUE_CHUNK_REEMBED,
+            routing_key=ROUTING_KEY_CHUNK_REEMBED,
+            handler_key=ROUTING_KEY_CHUNK_REEMBED,
         ),
     ]
     return RabbitMqWorker(settings.rabbitmq, routes, registry, repository.is_deleted)

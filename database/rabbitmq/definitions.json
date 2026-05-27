@@ -159,6 +159,16 @@
       }
     },
     {
+      "name": "finance.knowledge.chunk.reembed",
+      "vhost": "finance",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "finance.ocr.dlx",
+        "x-dead-letter-routing-key": "knowledge.chunk.reembed.dead"
+      }
+    },
+    {
       "name": "finance.ocr.dlq",
       "vhost": "finance",
       "durable": true,
@@ -208,11 +218,19 @@
       "arguments": {}
     },
     {
+      "source": "finance.ocr.topic",
+      "vhost": "finance",
+      "destination": "finance.knowledge.chunk.reembed",
+      "destination_type": "queue",
+      "routing_key": "knowledge.chunk.reembed",
+      "arguments": {}
+    },
+    {
       "source": "finance.ocr.dlx",
       "vhost": "finance",
       "destination": "finance.ocr.dlq",
       "destination_type": "queue",
-      "routing_key": "ocr.*.dead",
+      "routing_key": "#",
       "arguments": {}
     },
     {

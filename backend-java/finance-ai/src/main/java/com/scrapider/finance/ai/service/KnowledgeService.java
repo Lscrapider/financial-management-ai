@@ -11,4 +11,6 @@ public interface KnowledgeService {
     KnowledgeChunkPageVO pageChunks(int pageNum, int pageSize);
 
     KnowledgeChunkVO chunkDetail(Long id);
+
+    KnowledgeChunkVO updateChunk(Long id, String newText);
 }

@@ -31,6 +31,13 @@ public class KnowledgeVectorManage extends ServiceImpl<KnowledgeVectorMapper, Kn
                 .remove();
     }
 
+    public void updateText(Long id, String newText) {
+        this.lambdaUpdate()
+                .eq(KnowledgeVectorPO::getId, id)
+                .set(KnowledgeVectorPO::getText, newText)
+                .update();
+    }
+
     public Map<String, Object> stats() {
         long chunkCount = this.count();
         long taskCount = this.baseMapper.countDistinctTaskNo();

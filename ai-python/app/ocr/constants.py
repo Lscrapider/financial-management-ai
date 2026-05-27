@@ -14,5 +14,7 @@ QUEUE_DOCUMENT_NORMALIZE = "finance.ocr.document.normalize"
 QUEUE_OCR_RECOGNIZE = "finance.ocr.recognize"
 QUEUE_TEXT_CLEAN = "finance.ocr.text.clean"
 QUEUE_EMBEDDING_INDEX = "finance.ocr.embedding.index"
+ROUTING_KEY_CHUNK_REEMBED = "knowledge.chunk.reembed"
+QUEUE_CHUNK_REEMBED = "finance.knowledge.chunk.reembed"
 
 TASK_STATUS_RUNNING = "running"
