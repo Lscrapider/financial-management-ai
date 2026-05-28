@@ -8,9 +8,13 @@ import com.scrapider.finance.ai.domain.vo.KnowledgeStatsVO;
 import com.scrapider.finance.ai.service.KnowledgeService;
 import com.scrapider.finance.ai.service.OcrTaskMessagePublisher;
 import com.scrapider.finance.domain.po.KnowledgeVectorPO;
+import com.scrapider.finance.domain.po.OcrTaskPO;
 import com.scrapider.finance.manage.KnowledgeVectorManage;
+import com.scrapider.finance.manage.OcrTaskManage;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -21,12 +25,15 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     private static final int MAX_PAGE_SIZE = 200;
 
     private final KnowledgeVectorManage knowledgeVectorManage;
+    private final OcrTaskManage ocrTaskManage;
     private final OcrTaskMessagePublisher ocrTaskMessagePublisher;
 
     public KnowledgeServiceImpl(
             KnowledgeVectorManage knowledgeVectorManage,
+            OcrTaskManage ocrTaskManage,
             OcrTaskMessagePublisher ocrTaskMessagePublisher) {
         this.knowledgeVectorManage = knowledgeVectorManage;
+        this.ocrTaskManage = ocrTaskManage;
         this.ocrTaskMessagePublisher = ocrTaskMessagePublisher;
     }
 
@@ -45,7 +52,8 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         int pn = Math.max(pageNum, DEFAULT_PAGE_NUM);
         int ps = Math.min(Math.max(pageSize, DEFAULT_PAGE_SIZE), MAX_PAGE_SIZE);
         Page<KnowledgeVectorPO> page = this.knowledgeVectorManage.pageChunks(pn, ps);
-        return KnowledgeChunkPageVO.fromPage(page);
+        Map<String, String> filenameMap = this.filenameMap(page);
+        return KnowledgeChunkPageVO.fromPage(page, filenameMap);
     }
 
     @Override
@@ -57,7 +65,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         if (po == null) {
             throw new IllegalArgumentException("知识条目不存在");
         }
-        return KnowledgeChunkVO.fromPO(po);
+        return KnowledgeChunkVO.fromPO(po, this.originalFilename(po.getTaskNo()));
     }
 
     @Override
@@ -82,6 +90,24 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                     KnowledgeReembedMessageDTO.create(chunkId, newText));
         }
         KnowledgeVectorPO updated = this.knowledgeVectorManage.findById(id);
-        return KnowledgeChunkVO.fromPO(updated);
+        return KnowledgeChunkVO.fromPO(updated, this.originalFilename(updated.getTaskNo()));
+    }
+
+    private Map<String, String> filenameMap(Page<KnowledgeVectorPO> page) {
+        return this.ocrTaskManage.listByTaskNos(page.getRecords().stream()
+                        .map(KnowledgeVectorPO::getTaskNo)
+                        .collect(Collectors.toSet()))
+                .stream()
+                .collect(Collectors.toMap(
+                        OcrTaskPO::getTaskNo,
+                        OcrTaskPO::getOriginalFilename,
+                        (left, right) -> left));
+    }
+
+    private String originalFilename(String taskNo) {
+        return this.ocrTaskManage.listByTaskNos(List.of(taskNo)).stream()
+                .findFirst()
+                .map(OcrTaskPO::getOriginalFilename)
+                .orElse(null);
     }
 }

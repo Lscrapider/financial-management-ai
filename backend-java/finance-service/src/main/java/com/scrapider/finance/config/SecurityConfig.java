@@ -1,7 +1,7 @@
 package com.scrapider.finance.config;
 
-import com.scrapider.finance.security.Base64PasswordEncoder;
 import com.scrapider.finance.security.BearerTokenAuthenticationFilter;
+import com.scrapider.finance.security.JwtUtils;
 import com.scrapider.finance.security.TokenStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,6 +11,7 @@ import org.springframework.security.config.annotation.authentication.configurati
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -23,7 +24,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, TokenStore tokenStore) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtUtils jwtUtils, TokenStore tokenStore) throws Exception {
         return http.csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -34,7 +35,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll())
                 .addFilterBefore(
-                        new BearerTokenAuthenticationFilter(tokenStore),
+                        new BearerTokenAuthenticationFilter(jwtUtils, tokenStore),
                         UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
@@ -46,7 +47,7 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new Base64PasswordEncoder();
+        return new BCryptPasswordEncoder();
     }
 
     @Bean

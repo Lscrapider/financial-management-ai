@@ -7,6 +7,7 @@ import com.scrapider.finance.domain.enums.IndexQuoteSortFieldEnum;
 import com.scrapider.finance.domain.enums.SortOrderEnum;
 import com.scrapider.finance.domain.po.IndexQuoteSnapshotPO;
 import com.scrapider.finance.mapper.IndexQuoteSnapshotMapper;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -36,5 +37,13 @@ public class IndexQuoteSnapshotManage extends ServiceImpl<IndexQuoteSnapshotMapp
             wrapper.last("LIMIT " + limit);
         }
         return this.list(wrapper);
+    }
+
+    public List<IndexQuoteSnapshotPO> listByIndexCodes(Collection<String> indexCodes) {
+        if (indexCodes == null || indexCodes.isEmpty()) {
+            return List.of();
+        }
+        return this.list(new LambdaQueryWrapper<IndexQuoteSnapshotPO>()
+                .in(IndexQuoteSnapshotPO::getIndexCode, indexCodes));
     }
 }

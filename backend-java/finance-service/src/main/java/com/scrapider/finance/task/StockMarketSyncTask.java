@@ -20,6 +20,9 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.StreamSupport;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,6 +38,8 @@ public class StockMarketSyncTask {
     private final StockQuoteSnapshotManage stockQuoteSnapshotManage;
     private final StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage;
     private final StockAlertService stockAlertService;
+    private final AtomicBoolean syncing = new AtomicBoolean(false);
+    private final ExecutorService manualSyncExecutor = Executors.newSingleThreadExecutor();
 
     @Value("${stock.sync.enabled:false}")
     private boolean enabled;
@@ -77,6 +82,40 @@ public class StockMarketSyncTask {
             return;
         }
 
+        this.runSyncIfIdle();
+    }
+
+    public boolean startManualSync() {
+        if (!this.syncing.compareAndSet(false, true)) {
+            return false;
+        }
+        this.manualSyncExecutor.submit(() -> {
+            try {
+                this.doSyncStockMarketData();
+            } finally {
+                this.syncing.set(false);
+            }
+        });
+        return true;
+    }
+
+    public boolean isSyncing() {
+        return this.syncing.get();
+    }
+
+    private void runSyncIfIdle() {
+        if (!this.syncing.compareAndSet(false, true)) {
+            log.info("Stock market sync task is already running.");
+            return;
+        }
+        try {
+            this.doSyncStockMarketData();
+        } finally {
+            this.syncing.set(false);
+        }
+    }
+
+    private void doSyncStockMarketData() {
         List<StockConfigPO> stocks = this.stockConfigManage.listEnabledStocks();
         if (CollUtil.isEmpty(stocks)) {
             log.info("No enabled stock config found.");
@@ -117,7 +156,9 @@ public class StockMarketSyncTask {
         JsonNode data = response.path("data").path(tencentSymbol).path("data");
         String tradeDate = data.path("date").asText();
         BigDecimal previousClosePrice = this.previousClosePrice(response, tencentSymbol);
-        LocalDateTime syncedAt = LocalDateTime.now();
+        ZoneId zoneId = ZoneId.of(this.timezone);
+        LocalDateTime now = LocalDateTime.now(zoneId);
+        LocalDateTime syncedAt = now;
         List<StockIntradayTrendPO> trends = StreamSupport.stream(data.path("data").spliterator(), false)
                 .map(JsonNode::asText)
                 .map(line -> StockIntradayTrendPO.fromTrendLine(
@@ -128,6 +169,7 @@ public class StockMarketSyncTask {
                         syncedAt,
                         syncBatchNo))
                 .filter(Objects::nonNull)
+                .filter(trend -> this.isNotFutureTrend(trend, now))
                 .toList();
 
         this.stockIntradayTrendInfluxManage.saveTrends(trends);
@@ -144,6 +186,14 @@ public class StockMarketSyncTask {
         LocalTime start = LocalTime.parse(this.startTime);
         LocalTime end = LocalTime.parse(this.endTime);
         return !now.isBefore(start) && !now.isAfter(end);
+    }
+
+    private boolean isNotFutureTrend(StockIntradayTrendPO trend, LocalDateTime now) {
+        LocalDateTime trendTime = trend.getTrendTime();
+        if (trendTime == null || trendTime.toLocalDate().isBefore(now.toLocalDate())) {
+            return true;
+        }
+        return !trendTime.isAfter(now);
     }
 
     private BigDecimal previousClosePrice(JsonNode response, String tencentSymbol) {

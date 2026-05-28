@@ -48,12 +48,12 @@ public class StockMarketQueryServiceImpl implements StockMarketQueryService {
             throw new IllegalArgumentException("stockCode must not be blank");
         }
         String stockCode = param.getStockCode().trim();
-        String latestBatchNo = this.stockIntradayTrendInfluxManage.getLatestBatchNo(stockCode);
+        String latestBatchNo = this.stockIntradayTrendInfluxManage.getLatestTodayBatchNo(stockCode);
         if (StrUtil.isBlank(latestBatchNo)) {
             return List.of();
         }
         return this.stockIntradayTrendInfluxManage
-                .listByBatchNo(stockCode, latestBatchNo)
+                .listTodayByBatchNo(stockCode, latestBatchNo)
                 .stream()
                 .map(StockIntradayTrendVO::fromPO)
                 .toList();

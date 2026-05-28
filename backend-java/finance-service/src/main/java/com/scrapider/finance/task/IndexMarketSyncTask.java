@@ -13,6 +13,9 @@ import com.scrapider.finance.manage.IndexQuoteSnapshotManage;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -26,6 +29,8 @@ public class IndexMarketSyncTask {
     private final IndexConfigManage indexConfigManage;
     private final IndexQuoteSnapshotManage indexQuoteSnapshotManage;
     private final IndexDailyKlineManage indexDailyKlineManage;
+    private final AtomicBoolean syncing = new AtomicBoolean(false);
+    private final ExecutorService manualSyncExecutor = Executors.newSingleThreadExecutor();
 
     @Value("${index.sync.enabled:false}")
     private boolean enabled;
@@ -72,6 +77,40 @@ public class IndexMarketSyncTask {
 //            return;
 //        }
 
+        this.runSyncIfIdle();
+    }
+
+    public boolean startManualSync() {
+        if (!this.syncing.compareAndSet(false, true)) {
+            return false;
+        }
+        this.manualSyncExecutor.submit(() -> {
+            try {
+                this.doSyncIndexMarketData();
+            } finally {
+                this.syncing.set(false);
+            }
+        });
+        return true;
+    }
+
+    public boolean isSyncing() {
+        return this.syncing.get();
+    }
+
+    private void runSyncIfIdle() {
+        if (!this.syncing.compareAndSet(false, true)) {
+            log.info("Index market sync task is already running.");
+            return;
+        }
+        try {
+            this.doSyncIndexMarketData();
+        } finally {
+            this.syncing.set(false);
+        }
+    }
+
+    private void doSyncIndexMarketData() {
         List<IndexConfigPO> indices = this.indexConfigManage.listEnabledIndices();
         if (CollUtil.isEmpty(indices)) {
             log.info("No enabled index config found.");

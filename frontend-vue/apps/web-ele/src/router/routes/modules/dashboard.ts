@@ -31,6 +31,15 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
+        name: 'WatchPool',
+        path: '/watch-pool',
+        component: () => import('#/views/dashboard/watch-pool/index.vue'),
+        meta: {
+          icon: 'lucide:folder-heart',
+          title: $t('page.dashboard.watchPool'),
+        },
+      },
+      {
         name: 'StockAlert',
         path: '/stock-alert',
         component: () => import('#/views/dashboard/stock-alert/index.vue'),

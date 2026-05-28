@@ -14,6 +14,7 @@ import {
   ElButton,
   ElCard,
   ElEmpty,
+  ElMessage,
   ElOption,
   ElSelect,
   ElTable,
@@ -23,11 +24,20 @@ import {
 import type { Sort } from 'element-plus';
 
 import { listIndexQuotes } from '#/api/index-market';
-import { listStockIntradayTrends, listStockQuotes } from '#/api/stock';
+import {
+  getStockMarketSyncStatus,
+  listStockIntradayTrends,
+  listStockQuotes,
+  syncStockMarketData,
+} from '#/api/stock';
 
 const marketOptions = [
   { label: '全部市场', relatedIndexSecids: [], value: '' },
-  { label: '科创板', relatedIndexSecids: ['1.000688', '1.000001'], value: 'STAR' },
+  {
+    label: '科创板',
+    relatedIndexSecids: ['1.000688', '1.000001'],
+    value: 'STAR',
+  },
   { label: '创业板', relatedIndexSecids: ['0.399006'], value: 'CHINEXT' },
   { label: '沪市主板', relatedIndexSecids: ['1.000001'], value: 'SH_MAIN' },
   { label: '深市主板', relatedIndexSecids: ['0.399001'], value: 'SZ_MAIN' },
@@ -40,6 +50,7 @@ const router = useRouter();
 const indexQuotes = ref<IndexQuote[]>([]);
 const loadingIndexQuotes = ref(false);
 const loadingQuotes = ref(false);
+const loadingSync = ref(false);
 const loadingTrends = ref(false);
 const marketCode = ref('');
 const quotes = ref<StockQuote[]>([]);
@@ -49,7 +60,9 @@ const trends = ref<StockIntradayTrend[]>([]);
 const selectedStockCode = ref('');
 
 const selectedQuote = computed(() => {
-  return quotes.value.find((item) => item.stockCode === selectedStockCode.value);
+  return quotes.value.find(
+    (item) => item.stockCode === selectedStockCode.value,
+  );
 });
 
 const relatedIndexQuotes = computed(() => {
@@ -85,6 +98,22 @@ const fallCount = computed(() => {
 const syncedAt = computed(() => {
   return selectedQuote.value?.syncedAt ?? quotes.value[0]?.syncedAt ?? '-';
 });
+
+const latestTrend = computed(() => {
+  return trends.value.at(-1);
+});
+
+const trendStatusText = computed(() => {
+  if (!latestTrend.value) {
+    return '暂无分时数据';
+  }
+  return `分时截至 ${formatDateTime(latestTrend.value.trendTime)} · 同步于 ${formatDateTime(latestTrend.value.syncedAt)}`;
+});
+
+const delay = (ms: number) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 
 onMounted(() => {
   refreshIndexQuotes();
@@ -143,6 +172,37 @@ async function refreshTrends() {
   }
 }
 
+async function manualSyncStocks() {
+  if (loadingSync.value) return;
+  loadingSync.value = true;
+  try {
+    const status = await syncStockMarketData();
+    ElMessage.info(
+      status.started ? '股票行情同步已开始' : '股票行情同步正在执行',
+    );
+    const completed = await waitStockSyncCompleted();
+    await refreshQuotes();
+    if (completed) {
+      ElMessage.success('股票行情同步完成，数据已刷新');
+    } else {
+      ElMessage.warning('同步仍在后台执行，可稍后刷新查看');
+    }
+  } finally {
+    loadingSync.value = false;
+  }
+}
+
+async function waitStockSyncCompleted() {
+  for (let i = 0; i < 120; i += 1) {
+    await delay(3000);
+    const status = await getStockMarketSyncStatus();
+    if (!status.running) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function selectQuote(row: StockQuote) {
   selectedStockCode.value = row.stockCode;
   refreshTrends();
@@ -164,7 +224,9 @@ function openIndexMarket(indexQuote: IndexQuote) {
 }
 
 function renderTrendChart() {
-  const times = trends.value.map((item) => formatTime(item.trendTime));
+  const times = trends.value.map(
+    (item) => item.trendMinute || formatTime(item.trendTime),
+  );
   const prices = trends.value.map((item) => toNullableNumber(item.closePrice));
   const averages = trends.value.map((item) =>
     toNullableNumber(item.averagePrice),
@@ -316,7 +378,7 @@ function toNumber(value?: number | string | null) {
 </script>
 
 <template>
-  <Page title="股票行情">
+  <Page title="行情总览">
     <div class="stock-workspace">
       <section class="market-index-section">
         <div class="section-header">
@@ -348,10 +410,15 @@ function toNumber(value?: number | string | null) {
             <strong :class="changeClass(item.changePercent)">
               {{ formatPrice(item.latestPrice) }}
             </strong>
-            <span :class="['index-card-change', changeClass(item.changePercent)]">
+            <span
+              :class="['index-card-change', changeClass(item.changePercent)]"
+            >
               {{ formatChangePercent(item.changePercent) }}
             </span>
-            <small>{{ item.exchangeCode }} · {{ formatMoney(item.turnoverAmount) }}</small>
+            <small
+              >{{ item.exchangeCode }} ·
+              {{ formatMoney(item.turnoverAmount) }}</small
+            >
           </button>
         </div>
         <ElEmpty v-else description="暂无指数数据" />
@@ -407,6 +474,13 @@ function toNumber(value?: number | string | null) {
                     :value="item.value"
                   />
                 </ElSelect>
+                <ElButton
+                  :loading="loadingSync"
+                  size="small"
+                  @click="manualSyncStocks"
+                >
+                  手动同步
+                </ElButton>
                 <ElButton size="small" type="primary" @click="refreshQuotes">
                   刷新
                 </ElButton>
@@ -489,7 +563,9 @@ function toNumber(value?: number | string | null) {
             <template #header>
               <div class="panel-header">
                 <span>盘口数据</span>
-                <span class="muted">{{ selectedQuote?.exchangeCode ?? '-' }}</span>
+                <span class="muted">{{
+                  selectedQuote?.exchangeCode ?? '-'
+                }}</span>
               </div>
             </template>
             <div v-if="selectedQuote" class="metric-grid">
@@ -499,7 +575,9 @@ function toNumber(value?: number | string | null) {
               </div>
               <div class="metric-item">
                 <span>昨收</span>
-                <strong>{{ formatPrice(selectedQuote.previousClosePrice) }}</strong>
+                <strong>{{
+                  formatPrice(selectedQuote.previousClosePrice)
+                }}</strong>
               </div>
               <div class="metric-item">
                 <span>最高</span>
@@ -515,11 +593,15 @@ function toNumber(value?: number | string | null) {
               </div>
               <div class="metric-item">
                 <span>换手率</span>
-                <strong>{{ formatChangePercent(selectedQuote.turnoverRate) }}</strong>
+                <strong>{{
+                  formatChangePercent(selectedQuote.turnoverRate)
+                }}</strong>
               </div>
               <div class="metric-item">
                 <span>振幅</span>
-                <strong>{{ formatChangePercent(selectedQuote.amplitude) }}</strong>
+                <strong>{{
+                  formatChangePercent(selectedQuote.amplitude)
+                }}</strong>
               </div>
               <div class="metric-item">
                 <span>成交额</span>
@@ -527,7 +609,9 @@ function toNumber(value?: number | string | null) {
               </div>
               <div class="metric-item">
                 <span>总市值</span>
-                <strong>{{ formatMoney(selectedQuote.totalMarketValue) }}</strong>
+                <strong>{{
+                  formatMoney(selectedQuote.totalMarketValue)
+                }}</strong>
               </div>
             </div>
             <ElEmpty v-else description="暂无行情数据" />
@@ -537,6 +621,7 @@ function toNumber(value?: number | string | null) {
             <template #header>
               <div class="panel-header">
                 <span>分时走势</span>
+                <span class="muted trend-status">{{ trendStatusText }}</span>
                 <ElButton
                   :disabled="!selectedStockCode"
                   :loading="loadingTrends"
@@ -548,7 +633,11 @@ function toNumber(value?: number | string | null) {
               </div>
             </template>
             <div v-loading="loadingTrends" class="chart-wrap">
-              <EchartsUI v-if="trends.length > 0" ref="chartRef" height="100%" />
+              <EchartsUI
+                v-if="trends.length > 0"
+                ref="chartRef"
+                height="100%"
+              />
               <ElEmpty v-else description="暂无分时数据" />
             </div>
           </ElCard>
@@ -719,8 +808,20 @@ function toNumber(value?: number | string | null) {
 .panel-header {
   align-items: center;
   display: flex;
+  gap: 10px;
   font-weight: 600;
   justify-content: space-between;
+  min-width: 0;
+}
+
+.trend-status {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 400;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .header-actions {

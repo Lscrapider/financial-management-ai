@@ -6,6 +6,7 @@ export interface KnowledgeChunk {
   createdAt: string;
   id: number;
   metadata: Record<string, unknown>;
+  originalFilename: null | string;
   pageNos: number[];
   paragraphNos: number[];
   taskNo: string;

@@ -7,6 +7,8 @@ import com.scrapider.finance.domain.enums.OcrTaskStatusEnum;
 import com.scrapider.finance.domain.po.OcrTaskPO;
 import com.scrapider.finance.mapper.OcrTaskMapper;
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -23,6 +25,15 @@ public class OcrTaskManage extends ServiceImpl<OcrTaskMapper, OcrTaskPO> {
                 .eq(status != null, OcrTaskPO::getStatus, status == null ? null : status.getCode())
                 .orderByDesc(OcrTaskPO::getSubmittedAt)
                 .page(Page.of(pageNum, pageSize));
+    }
+
+    public List<OcrTaskPO> listByTaskNos(Collection<String> taskNos) {
+        if (taskNos == null || taskNos.isEmpty()) {
+            return List.of();
+        }
+        return this.lambdaQuery()
+                .in(OcrTaskPO::getTaskNo, taskNos)
+                .list();
     }
 
     public boolean softDelete(String taskNo) {

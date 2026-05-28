@@ -54,6 +54,11 @@ export interface IndexDailyKlineParams {
   startDate?: string;
 }
 
+export interface MarketSyncStatus {
+  running: boolean;
+  started: boolean;
+}
+
 export function listIndexQuotes(params: IndexQuoteListParams) {
   return requestClient.get<IndexQuote[]>('/indices/quotes', {
     params,
@@ -65,5 +70,17 @@ export function listIndexDailyKlines(params: IndexDailyKlineParams) {
   return requestClient.get<IndexDailyKline[]>('/indices/daily-klines', {
     params,
     responseReturn: 'body',
+  });
+}
+
+export function syncIndexMarketData() {
+  return requestClient.post<MarketSyncStatus>('/indices/sync', undefined, {
+    timeout: 60_000,
+  });
+}
+
+export function getIndexMarketSyncStatus() {
+  return requestClient.get<MarketSyncStatus>('/indices/sync/status', {
+    timeout: 60_000,
   });
 }

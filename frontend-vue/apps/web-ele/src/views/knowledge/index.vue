@@ -22,9 +22,8 @@ import {
   getKnowledgeChunks,
   getKnowledgeStats,
   updateKnowledgeChunk,
-  type KnowledgeChunk,
-  type KnowledgeStats,
 } from '#/api/knowledge';
+import type { KnowledgeChunk, KnowledgeStats } from '#/api/knowledge';
 
 const stats = ref<KnowledgeStats>({
   chunkCount: 0,
@@ -93,6 +92,20 @@ function textPreview(text: string, maxLen = 60) {
   if (!text) return '';
   const cleaned = text.replace(/\s+/g, ' ');
   return cleaned.length > maxLen ? `${cleaned.slice(0, maxLen)}...` : cleaned;
+}
+
+function chunkDocumentName(chunk: KnowledgeChunk) {
+  return chunk.originalFilename || chunk.taskNo;
+}
+
+function chunkNoLabel(chunk: KnowledgeChunk) {
+  return `Chunk #${chunk.chunkIndex}`;
+}
+
+function sourcePageLabel(chunk: KnowledgeChunk) {
+  return chunk.pageNos?.length
+    ? `来源页 ${chunk.pageNos.join(', ')}`
+    : '来源页 -';
 }
 
 const editing = ref(false);
@@ -170,7 +183,7 @@ onMounted(async () => {
       </ElRow>
 
       <ElRow :gutter="16" class="content-row">
-        <ElCol :span="6">
+        <ElCol :xs="24" :lg="10">
           <ElCard header="知识条目" class="chunk-list-card">
             <div v-loading="loading">
               <ElTable
@@ -180,22 +193,29 @@ onMounted(async () => {
                 style="width: 100%"
                 @current-change="selectChunk"
               >
-                <ElTableColumn label="文档" min-width="140" show-overflow-tooltip>
+                <ElTableColumn label="文档片段" min-width="260">
                   <template #default="{ row }">
-                    <span class="task-no">{{ row.taskNo }}</span>
+                    <div class="chunk-doc-cell">
+                      <div class="chunk-title-line">
+                        <span class="file-name" :title="chunkDocumentName(row)">
+                          {{ chunkDocumentName(row) }}
+                        </span>
+                        <ElTag size="small" type="primary">
+                          {{ chunkNoLabel(row) }}
+                        </ElTag>
+                      </div>
+                      <div class="chunk-submeta">
+                        <span class="task-no">{{ row.taskNo }}</span>
+                        <span>{{ sourcePageLabel(row) }}</span>
+                      </div>
+                    </div>
                   </template>
                 </ElTableColumn>
-                <ElTableColumn label="页码" width="80" align="center">
+                <ElTableColumn label="内容" min-width="260">
                   <template #default="{ row }">
-                    <ElTag v-if="row.pageNos?.length" size="small" type="info">
-                      {{ row.pageNos.join(',') }}
-                    </ElTag>
-                    <span v-else>-</span>
-                  </template>
-                </ElTableColumn>
-                <ElTableColumn label="内容" min-width="160" show-overflow-tooltip>
-                  <template #default="{ row }">
-                    {{ textPreview(row.text) }}
+                    <div class="chunk-preview">
+                      {{ textPreview(row.text, 90) }}
+                    </div>
                   </template>
                 </ElTableColumn>
               </ElTable>
@@ -215,17 +235,24 @@ onMounted(async () => {
           </ElCard>
         </ElCol>
 
-        <ElCol :span="18">
+        <ElCol :xs="24" :lg="14">
           <ElCard v-if="selectedChunk" class="detail-card">
             <template #header>
               <div class="detail-header">
-                <span>{{ selectedChunk.taskNo }}</span>
+                <span
+                  class="detail-title"
+                  :title="chunkDocumentName(selectedChunk)"
+                >
+                  {{ chunkDocumentName(selectedChunk) }}
+                </span>
                 <span class="detail-header-sep">/</span>
-                <span>片段 #{{ selectedChunk.chunkIndex }}</span>
+                <span>{{ chunkNoLabel(selectedChunk) }}</span>
                 <ElTag
                   v-if="selectedChunk.avgConfidence != null"
                   size="small"
-                  :type="selectedChunk.avgConfidence >= 0.8 ? 'success' : 'warning'"
+                  :type="
+                    selectedChunk.avgConfidence >= 0.8 ? 'success' : 'warning'
+                  "
                   class="confidence-tag"
                 >
                   置信度 {{ (selectedChunk.avgConfidence * 100).toFixed(0) }}%
@@ -245,9 +272,7 @@ onMounted(async () => {
                     >
                       保存
                     </ElButton>
-                    <ElButton size="small" @click="cancelEdit">
-                      取消
-                    </ElButton>
+                    <ElButton size="small" @click="cancelEdit"> 取消 </ElButton>
                   </template>
                 </div>
               </div>
@@ -263,20 +288,35 @@ onMounted(async () => {
             <div v-else class="chunk-text">{{ selectedChunk.text }}</div>
 
             <ElDescriptions :column="2" border size="small" class="chunk-meta">
-              <ElDescriptionsItem label="文档编号">
+              <ElDescriptionsItem label="上传文件名">
+                {{ selectedChunk.originalFilename || '-' }}
+              </ElDescriptionsItem>
+              <ElDescriptionsItem label="任务编号">
                 {{ selectedChunk.taskNo }}
               </ElDescriptionsItem>
               <ElDescriptionsItem label="片段序号">
-                {{ selectedChunk.chunkIndex }}
+                {{ chunkNoLabel(selectedChunk) }}
               </ElDescriptionsItem>
               <ElDescriptionsItem label="来源页码">
-                {{ selectedChunk.pageNos?.length ? selectedChunk.pageNos.join(', ') : '-' }}
+                {{
+                  selectedChunk.pageNos?.length
+                    ? selectedChunk.pageNos.join(', ')
+                    : '-'
+                }}
               </ElDescriptionsItem>
               <ElDescriptionsItem label="来源段落">
-                {{ selectedChunk.paragraphNos?.length ? selectedChunk.paragraphNos.join(', ') : '-' }}
+                {{
+                  selectedChunk.paragraphNos?.length
+                    ? selectedChunk.paragraphNos.join(', ')
+                    : '-'
+                }}
               </ElDescriptionsItem>
               <ElDescriptionsItem label="置信度">
-                {{ selectedChunk.avgConfidence != null ? (selectedChunk.avgConfidence * 100).toFixed(1) + '%' : '-' }}
+                {{
+                  selectedChunk.avgConfidence != null
+                    ? (selectedChunk.avgConfidence * 100).toFixed(1) + '%'
+                    : '-'
+                }}
               </ElDescriptionsItem>
               <ElDescriptionsItem label="版本">
                 {{ selectedChunk.version ?? '-' }}
@@ -337,6 +377,7 @@ onMounted(async () => {
 .content-row {
   flex: 1;
   min-height: 0;
+  row-gap: 16px;
 }
 
 .chunk-list-card {
@@ -353,10 +394,56 @@ onMounted(async () => {
   padding: 12px 0;
 }
 
+.chunk-list-card :deep(.el-table__row) {
+  cursor: pointer;
+}
+
+.chunk-doc-cell {
+  min-width: 0;
+  padding: 4px 0;
+}
+
+.chunk-title-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--el-text-color-primary);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chunk-title-line :deep(.el-tag) {
+  flex: none;
+}
+
+.chunk-submeta {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .task-no {
   font-family: monospace;
   font-size: 12px;
   color: var(--el-text-color-regular);
+}
+
+.chunk-preview {
+  color: var(--el-text-color-regular);
+  line-height: 1.5;
+  word-break: break-word;
 }
 
 .detail-card {
@@ -375,6 +462,13 @@ onMounted(async () => {
   align-items: center;
   gap: 6px;
   font-weight: 600;
+  min-width: 0;
+}
+
+.detail-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .detail-header-sep {

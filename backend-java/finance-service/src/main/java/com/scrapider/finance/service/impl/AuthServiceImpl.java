@@ -11,9 +11,11 @@ import com.scrapider.finance.domain.po.AppUserPO;
 import com.scrapider.finance.domain.vo.LoginResultVO;
 import com.scrapider.finance.domain.vo.UserInfoVO;
 import com.scrapider.finance.manage.AppUserManage;
+import com.scrapider.finance.security.JwtUtils;
 import com.scrapider.finance.security.LoginUser;
 import com.scrapider.finance.security.TokenStore;
 import com.scrapider.finance.service.AuthService;
+import io.jsonwebtoken.Claims;
 import java.util.List;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -27,16 +29,19 @@ public class AuthServiceImpl implements AuthService {
     private final AuthenticationManager authenticationManager;
     private final AppUserManage appUserManage;
     private final PasswordEncoder passwordEncoder;
+    private final JwtUtils jwtUtils;
     private final TokenStore tokenStore;
 
     public AuthServiceImpl(
             AuthenticationManager authenticationManager,
             AppUserManage appUserManage,
             PasswordEncoder passwordEncoder,
+            JwtUtils jwtUtils,
             TokenStore tokenStore) {
         this.authenticationManager = authenticationManager;
         this.appUserManage = appUserManage;
         this.passwordEncoder = passwordEncoder;
+        this.jwtUtils = jwtUtils;
         this.tokenStore = tokenStore;
     }
 
@@ -44,7 +49,12 @@ public class AuthServiceImpl implements AuthService {
     public LoginResultVO login(LoginParam param) {
         Authentication authentication = this.authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(param.getUsername(), param.getPassword()));
-        return new LoginResultVO(this.tokenStore.createToken(authentication));
+        LoginUser loginUser = (LoginUser) authentication.getPrincipal();
+        String token = this.jwtUtils.generateToken(
+                loginUser.getUser().getId(),
+                loginUser.getUsername(),
+                loginUser.getRoleCode());
+        return new LoginResultVO(token);
     }
 
     @Override
@@ -64,7 +74,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void logout(String token) {
         if (StrUtil.isNotBlank(token)) {
-            this.tokenStore.removeToken(token);
+            this.tokenStore.blacklist(token);
         }
     }
 
@@ -93,7 +103,14 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public String refresh(String token) {
-        return token;
+        if (StrUtil.isBlank(token)) {
+            throw new IllegalArgumentException("Token is required.");
+        }
+        Claims claims = this.jwtUtils.parseTokenLenient(token);
+        Long userId = Long.valueOf(claims.getSubject());
+        String username = claims.get("username", String.class);
+        String role = claims.get("role", String.class);
+        return this.jwtUtils.generateToken(userId, username, role);
     }
 
     @Override

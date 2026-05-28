@@ -10,7 +10,8 @@
   "dashboard": {
     "title": "Market Center",
     "analytics": "Console",
-    "workspace": "Market Dashboard",
+    "workspace": "Market Overview",
+    "watchPool": "Investment Watch Pool",
     "indexMarket": "Index Market",
     "stockAlert": "Stock Alerts"
   },

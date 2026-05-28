@@ -8,6 +8,7 @@ import java.util.List;
 public record KnowledgeChunkVO(
         Long id,
         String taskNo,
+        String originalFilename,
         Integer chunkIndex,
         String text,
         List<Integer> pageNos,
@@ -18,6 +19,10 @@ public record KnowledgeChunkVO(
         OffsetDateTime createdAt) {
 
     public static KnowledgeChunkVO fromPO(KnowledgeVectorPO po) {
+        return fromPO(po, null);
+    }
+
+    public static KnowledgeChunkVO fromPO(KnowledgeVectorPO po, String originalFilename) {
         JsonNode meta = po.getMetadata();
         List<Integer> pageNos = List.of();
         List<Integer> paragraphNos = List.of();
@@ -44,6 +49,7 @@ public record KnowledgeChunkVO(
         return new KnowledgeChunkVO(
                 po.getId(),
                 po.getTaskNo(),
+                originalFilename,
                 po.getChunkIndex(),
                 po.getText(),
                 pageNos,

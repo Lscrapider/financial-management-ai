@@ -9,7 +9,10 @@ import com.influxdb.query.FluxRecord;
 import com.influxdb.query.FluxTable;
 import com.scrapider.finance.config.InfluxDbProperties;
 import com.scrapider.finance.domain.po.StockIntradayTrendPO;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -66,6 +69,34 @@ public class StockIntradayTrendInfluxManage {
                 .orElse(null);
     }
 
+    public String getLatestTodayBatchNo(String stockCode) {
+        return this.getLatestBatchNoByTrendDate(stockCode, LocalDate.now(this.zoneId));
+    }
+
+    public String getLatestBatchNoByTrendDate(String stockCode, LocalDate trendDate) {
+        String flux = """
+                from(bucket: "%s")
+                  |> range(start: %s, stop: %s)
+                  |> filter(fn: (r) => r["_measurement"] == "%s")
+                  |> filter(fn: (r) => r["stockCode"] == "%s")
+                  |> filter(fn: (r) => r["_field"] == "syncedAtEpoch")
+                  |> sort(columns: ["_value"], desc: true)
+                  |> limit(n: 1)
+                """.formatted(
+                escape(this.influxDbProperties.getBucket()),
+                this.rangeStart(trendDate),
+                this.rangeEnd(trendDate),
+                escape(this.influxDbProperties.getStockMinuteMeasurement()),
+                escape(stockCode));
+        List<FluxTable> tables = this.queryApi.query(flux, this.influxDbProperties.getOrg());
+        return tables.stream()
+                .flatMap(table -> table.getRecords().stream())
+                .map(record -> String.valueOf(record.getValueByKey("syncBatchNo")))
+                .filter(StrUtil::isNotBlank)
+                .findFirst()
+                .orElse(null);
+    }
+
     public List<StockIntradayTrendPO> listByBatchNo(String stockCode, String syncBatchNo) {
         String flux = """
                 from(bucket: "%s")
@@ -87,11 +118,53 @@ public class StockIntradayTrendInfluxManage {
                 .toList();
     }
 
+    public List<StockIntradayTrendPO> listTodayByBatchNo(String stockCode, String syncBatchNo) {
+        return this.listByBatchNoAndTrendDate(stockCode, syncBatchNo, LocalDate.now(this.zoneId));
+    }
+
+    public List<StockIntradayTrendPO> listByBatchNoAndTrendDate(
+            String stockCode,
+            String syncBatchNo,
+            LocalDate trendDate) {
+        String flux = """
+                from(bucket: "%s")
+                  |> range(start: %s, stop: %s)
+                  |> filter(fn: (r) => r["_measurement"] == "%s")
+                  |> filter(fn: (r) => r["stockCode"] == "%s")
+                  |> filter(fn: (r) => r["syncBatchNo"] == "%s")
+                  |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+                  |> sort(columns: ["_time"])
+                """.formatted(
+                escape(this.influxDbProperties.getBucket()),
+                this.rangeStart(trendDate),
+                this.rangeEnd(trendDate),
+                escape(this.influxDbProperties.getStockMinuteMeasurement()),
+                escape(stockCode),
+                escape(syncBatchNo));
+        List<FluxTable> tables = this.queryApi.query(flux, this.influxDbProperties.getOrg());
+        return tables.stream()
+                .flatMap(table -> table.getRecords().stream())
+                .map(this::toTrend)
+                .toList();
+    }
+
     private StockIntradayTrendPO toTrend(FluxRecord record) {
         return StockIntradayTrendPO.fromInfluxRecord(record, this.zoneId);
     }
 
     private static String escape(String value) {
         return value.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+
+    private String rangeStart(LocalDate date) {
+        return this.fluxTime(date.atStartOfDay(this.zoneId).toInstant());
+    }
+
+    private String rangeEnd(LocalDate date) {
+        return this.fluxTime(date.plusDays(1).atStartOfDay(this.zoneId).toInstant());
+    }
+
+    private String fluxTime(Instant instant) {
+        return DateTimeFormatter.ISO_INSTANT.format(instant);
     }
 }
