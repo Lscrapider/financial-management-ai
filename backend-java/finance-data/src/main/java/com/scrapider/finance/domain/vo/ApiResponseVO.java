@@ -19,4 +19,8 @@ public class ApiResponseVO<T> {
     public static <T> ApiResponseVO<T> error(String message) {
         return new ApiResponseVO<>(-1, null, message, message);
     }
+
+    public static <T> ApiResponseVO<T> error(Integer code, String message) {
+        return new ApiResponseVO<>(code, null, message, message);
+    }
 }

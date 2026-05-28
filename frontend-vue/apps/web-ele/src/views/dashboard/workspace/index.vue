@@ -29,6 +29,7 @@ import {
   listStockIntradayTrends,
   listStockQuotes,
   syncStockMarketData,
+  syncStockTrendData,
 } from '#/api/stock';
 
 const marketOptions = [
@@ -178,17 +179,32 @@ async function manualSyncStocks() {
   try {
     const status = await syncStockMarketData();
     ElMessage.info(
-      status.started ? '股票行情同步已开始' : '股票行情同步正在执行',
+      status.started ? '股票行情快照同步已开始' : '股票行情快照同步正在执行',
     );
     const completed = await waitStockSyncCompleted();
-    await refreshQuotes();
     if (completed) {
-      ElMessage.success('股票行情同步完成，数据已刷新');
+      await refreshQuotes();
+      ElMessage.success('股票行情快照同步完成，数据已刷新');
+      if (selectedStockCode.value) {
+        await syncStockTrendForSelected();
+      }
     } else {
       ElMessage.warning('同步仍在后台执行，可稍后刷新查看');
     }
   } finally {
     loadingSync.value = false;
+  }
+}
+
+async function syncStockTrendForSelected() {
+  const code = selectedStockCode.value;
+  if (!code) return;
+  try {
+    await syncStockTrendData(code);
+    await refreshTrends();
+    ElMessage.success(`${code} 分时数据同步完成`);
+  } catch {
+    ElMessage.warning(`${code} 分时数据同步失败，可稍后重试`);
   }
 }
 

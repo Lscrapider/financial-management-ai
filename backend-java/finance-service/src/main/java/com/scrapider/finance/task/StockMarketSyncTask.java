@@ -85,6 +85,9 @@ public class StockMarketSyncTask {
         this.runSyncIfIdle();
     }
 
+    /**
+     * 手动触发行情快照全量同步（不含分时数据）。
+     */
     public boolean startManualSync() {
         if (!this.syncing.compareAndSet(false, true)) {
             return false;
@@ -97,6 +100,27 @@ public class StockMarketSyncTask {
             }
         });
         return true;
+    }
+
+    /**
+     * 手动触发单只股票的分时数据同步（同步执行）。
+     *
+     * @param stockCode 股票代码
+     * @return 是否成功同步（股票不存在返回 false）
+     */
+    public boolean syncStockTrend(String stockCode) {
+        StockConfigPO stock = this.stockConfigManage.getEnabledByStockCode(stockCode);
+        if (stock == null || StrUtil.isBlank(stock.getSecid())) {
+            log.warn("Cannot sync trend: stock not found or no secid, code: {}", stockCode);
+            return false;
+        }
+        try {
+            this.doSyncTrendsForStock(stock);
+            return true;
+        } catch (Exception ex) {
+            log.warn("Failed to sync trend for stock: {}", stockCode, ex);
+            return false;
+        }
     }
 
     public boolean isSyncing() {
@@ -122,10 +146,10 @@ public class StockMarketSyncTask {
             return;
         }
 
-        log.info("Start syncing stock market data, stock count: {}", stocks.size());
+        log.info("Start syncing stock quotes, stock count: {}", stocks.size());
         stocks.forEach(this::syncOneStock);
         this.stockAlertService.checkAlerts();
-        log.info("Finished syncing stock market data.");
+        log.info("Finished syncing stock quotes.");
     }
 
     private void syncOneStock(StockConfigPO stock) {
@@ -135,16 +159,26 @@ public class StockMarketSyncTask {
         }
 
         try {
-            String syncBatchNo = UUID.randomUUID().toString();
             StockMarketDataDTO quote = this.stockMarketApi.getQuote(stock.getSecid());
             this.stockQuoteSnapshotManage.saveLatest(StockQuoteSnapshotPO.fromApiResponse(stock, quote.data()));
             this.sleepForRateLimit();
-            StockMarketDataDTO trends = this.stockMarketApi.getTrends(stock.getSecid());
-            this.saveTrends(stock, trends.data(), syncBatchNo);
-            this.sleepForRateLimit();
         } catch (Exception ex) {
             log.warn(
-                    "Failed to sync stock market data, code: {}, name: {}",
+                    "Failed to sync stock quote, code: {}, name: {}",
+                    stock.getStockCode(),
+                    stock.getStockName(),
+                    ex);
+        }
+    }
+
+    private void doSyncTrendsForStock(StockConfigPO stock) {
+        try {
+            String syncBatchNo = UUID.randomUUID().toString();
+            StockMarketDataDTO trends = this.stockMarketApi.getTrends(stock.getSecid());
+            this.saveTrends(stock, trends.data(), syncBatchNo);
+        } catch (Exception ex) {
+            log.warn(
+                    "Failed to sync trend for stock, code: {}, name: {}",
                     stock.getStockCode(),
                     stock.getStockName(),
                     ex);

@@ -74,3 +74,11 @@ export function getStockMarketSyncStatus() {
     timeout: 60_000,
   });
 }
+
+export function syncStockTrendData(stockCode: string) {
+  return requestClient.post<MarketSyncStatus>(
+    `/stocks/sync/trends/${stockCode}`,
+    undefined,
+    { timeout: 60_000 },
+  );
+}

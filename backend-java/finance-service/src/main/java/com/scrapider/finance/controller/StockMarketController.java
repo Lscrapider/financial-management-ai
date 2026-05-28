@@ -1,5 +1,6 @@
 package com.scrapider.finance.controller;
 
+import cn.hutool.core.util.StrUtil;
 import com.scrapider.finance.domain.param.StockIntradayTrendParam;
 import com.scrapider.finance.domain.param.StockQuoteListParam;
 import com.scrapider.finance.domain.vo.ApiResponseVO;
@@ -12,6 +13,7 @@ import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -50,5 +52,20 @@ public class StockMarketController {
     @GetMapping("/sync/status")
     public ApiResponseVO<MarketSyncStatusVO> stockSyncStatus() {
         return ApiResponseVO.success(new MarketSyncStatusVO(false, this.stockMarketSyncTask.isSyncing()));
+    }
+
+    /**
+     * 按需同步单只股票的分时走势数据。
+     * 前端在行情总览选择某只股票后可调用，只拉取该股的分时数据。
+     */
+    @PostMapping("/sync/trends/{stockCode}")
+    public ApiResponseVO<MarketSyncStatusVO> syncStockTrend(@PathVariable String stockCode) {
+        if (StrUtil.isBlank(stockCode)) {
+            return ApiResponseVO.error(400, "stockCode must not be blank");
+        }
+        boolean submitted = this.stockMarketSyncTask.syncStockTrend(stockCode.trim());
+        return submitted
+                ? ApiResponseVO.success(new MarketSyncStatusVO(true, false))
+                : ApiResponseVO.error(404, "股票不存在或未启用: " + stockCode);
     }
 }
