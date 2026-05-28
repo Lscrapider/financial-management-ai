@@ -3,6 +3,7 @@ package com.scrapider.finance.service.impl;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.scrapider.finance.domain.enums.WatchTargetTypeEnum;
+import java.math.BigDecimal;
 import com.scrapider.finance.domain.param.WatchGroupItemSaveParam;
 import com.scrapider.finance.domain.param.WatchGroupSaveParam;
 import com.scrapider.finance.domain.po.BondQuoteSnapshotPO;
@@ -113,6 +114,8 @@ public class WatchPoolServiceImpl implements WatchPoolService {
         String targetName = this.requiredTrim(param.getTargetName(), "targetName must not be blank.");
         String secid = StrUtil.blankToDefault(StrUtil.trim(param.getSecid()), null);
         String remark = StrUtil.blankToDefault(StrUtil.trim(param.getRemark()), null);
+        BigDecimal buyPrice = param.getBuyPrice();
+        BigDecimal position = param.getPosition();
 
         WatchGroupItemPO duplicate = this.watchGroupItemManage.findDuplicate(group.getId(), targetType.name(), targetCode);
         WatchGroupItemPO item;
@@ -128,6 +131,8 @@ public class WatchPoolServiceImpl implements WatchPoolService {
                     targetName,
                     secid,
                     remark,
+                    buyPrice,
+                    position,
                     this.watchGroupItemManage.nextSortOrder(group.getId()));
             this.watchGroupItemManage.save(item);
         } else {
@@ -143,6 +148,8 @@ public class WatchPoolServiceImpl implements WatchPoolService {
             item.setTargetName(targetName);
             item.setSecid(secid);
             item.setRemark(remark);
+            item.setBuyPrice(buyPrice);
+            item.setPosition(position);
             this.watchGroupItemManage.updateItem(item);
         }
 

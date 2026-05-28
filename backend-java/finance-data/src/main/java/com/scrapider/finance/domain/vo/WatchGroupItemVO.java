@@ -18,6 +18,8 @@ public class WatchGroupItemVO {
     private String targetName;
     private String secid;
     private String remark;
+    private BigDecimal buyPrice;
+    private BigDecimal position;
     private Integer sortOrder;
     private BigDecimal latestPrice;
     private BigDecimal changePercent;
@@ -35,6 +37,8 @@ public class WatchGroupItemVO {
         vo.setTargetName(item.getTargetName());
         vo.setSecid(item.getSecid());
         vo.setRemark(item.getRemark());
+        vo.setBuyPrice(item.getBuyPrice());
+        vo.setPosition(item.getPosition());
         vo.setSortOrder(item.getSortOrder());
         vo.setCreatedAt(item.getCreatedAt());
         vo.setUpdatedAt(item.getUpdatedAt());

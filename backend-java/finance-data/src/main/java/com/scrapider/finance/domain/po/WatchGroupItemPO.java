@@ -1,6 +1,7 @@
 package com.scrapider.finance.domain.po;
 
 import com.baomidou.mybatisplus.annotation.TableName;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.Data;
 
@@ -16,6 +17,8 @@ public class WatchGroupItemPO {
     private String targetName;
     private String secid;
     private String remark;
+    private BigDecimal buyPrice;
+    private BigDecimal position;
     private Integer sortOrder;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -28,6 +31,8 @@ public class WatchGroupItemPO {
             String targetName,
             String secid,
             String remark,
+            BigDecimal buyPrice,
+            BigDecimal position,
             Integer sortOrder) {
         LocalDateTime now = LocalDateTime.now();
         WatchGroupItemPO item = new WatchGroupItemPO();
@@ -38,6 +43,8 @@ public class WatchGroupItemPO {
         item.setTargetName(targetName);
         item.setSecid(secid);
         item.setRemark(remark);
+        item.setBuyPrice(buyPrice);
+        item.setPosition(position);
         item.setSortOrder(sortOrder == null ? 0 : sortOrder);
         item.setCreatedAt(now);
         item.setUpdatedAt(now);

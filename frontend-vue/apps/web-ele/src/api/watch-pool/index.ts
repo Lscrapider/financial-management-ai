@@ -3,9 +3,11 @@ import { requestClient } from '#/api/request';
 export type WatchTargetType = 'BOND' | 'FUND' | 'INDEX' | 'SECTOR' | 'STOCK';
 
 export interface WatchItem {
+  buyPrice?: number | string;
   changePercent?: number | string;
   id: string;
   latestPrice?: number | string;
+  position?: number | string;
   remark: null | string;
   secid: null | string;
   syncedAt?: string;
@@ -33,8 +35,10 @@ export interface WatchGroupSaveParams {
 }
 
 export interface WatchItemSaveParams {
+  buyPrice?: number;
   groupId: string;
   id?: string;
+  position?: number;
   remark?: string;
   secid?: string;
   targetCode: string;

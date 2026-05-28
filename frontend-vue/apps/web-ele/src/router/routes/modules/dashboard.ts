@@ -44,7 +44,7 @@ const routes: RouteRecordRaw[] = [
         path: '/watch-pool',
         component: () => import('#/views/dashboard/watch-pool/index.vue'),
         meta: {
-          icon: 'lucide:folder-heart',
+          icon: 'lucide:spool',
           title: $t('page.dashboard.watchPool'),
         },
       },

@@ -32,7 +32,6 @@ public class BondQuoteSnapshotPO {
     private BigDecimal turnoverAmount;
     private BigDecimal turnoverRate;
     private BigDecimal amplitude;
-    private BigDecimal conversionPremiumRate;
     private String bondRating;
     private String rawResponse;
     private LocalDateTime syncedAt;
@@ -64,19 +63,9 @@ public class BondQuoteSnapshotPO {
         snapshot.setTurnoverAmount(StockMarketJsonParser.decimal(value(fields, 37, null)));
         snapshot.setTurnoverRate(StockMarketJsonParser.decimal(value(fields, 38, null)));
         snapshot.setAmplitude(StockMarketJsonParser.decimal(value(fields, 43, null)));
-        snapshot.setConversionPremiumRate(extractConversionPremiumRate(fields));
         snapshot.setRawResponse(response);
         snapshot.setSyncedAt(now);
         return snapshot;
-    }
-
-    private static BigDecimal extractConversionPremiumRate(String[] fields) {
-        for (int i = fields.length - 1; i >= 0; i--) {
-            if ("ZQ-KZZ".equals(fields[i].trim()) && i + 13 < fields.length) {
-                return StockMarketJsonParser.decimal(fields[i + 13]);
-            }
-        }
-        return null;
     }
 
     private static String[] extractTencentFields(String response) {

@@ -7,13 +7,18 @@ import com.scrapider.finance.ai.domain.vo.AiDataRequestVO;
 import com.scrapider.finance.ai.domain.vo.AiDatabaseContextVO;
 import com.scrapider.finance.ai.domain.vo.AiQueryRewriteVO;
 import com.scrapider.finance.ai.service.AiMarketDataQueryService;
+import com.scrapider.finance.domain.enums.BondQuoteSortFieldEnum;
 import com.scrapider.finance.domain.enums.IndexQuoteSortFieldEnum;
 import com.scrapider.finance.domain.enums.SortOrderEnum;
 import com.scrapider.finance.domain.enums.StockQuoteSortFieldEnum;
+import com.scrapider.finance.domain.po.BondDailyKlinePO;
+import com.scrapider.finance.domain.po.BondQuoteSnapshotPO;
 import com.scrapider.finance.domain.po.IndexDailyKlinePO;
 import com.scrapider.finance.domain.po.IndexQuoteSnapshotPO;
 import com.scrapider.finance.domain.po.StockIntradayTrendPO;
 import com.scrapider.finance.domain.po.StockQuoteSnapshotPO;
+import com.scrapider.finance.manage.BondDailyKlineManage;
+import com.scrapider.finance.manage.BondQuoteSnapshotManage;
 import com.scrapider.finance.manage.IndexDailyKlineManage;
 import com.scrapider.finance.manage.IndexQuoteSnapshotManage;
 import com.scrapider.finance.manage.StockIntradayTrendInfluxManage;
@@ -34,16 +39,22 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
     private final StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage;
     private final IndexQuoteSnapshotManage indexQuoteSnapshotManage;
     private final IndexDailyKlineManage indexDailyKlineManage;
+    private final BondQuoteSnapshotManage bondQuoteSnapshotManage;
+    private final BondDailyKlineManage bondDailyKlineManage;
 
     public AiMarketDataQueryServiceImpl(
             StockQuoteSnapshotManage stockQuoteSnapshotManage,
             StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage,
             IndexQuoteSnapshotManage indexQuoteSnapshotManage,
-            IndexDailyKlineManage indexDailyKlineManage) {
+            IndexDailyKlineManage indexDailyKlineManage,
+            BondQuoteSnapshotManage bondQuoteSnapshotManage,
+            BondDailyKlineManage bondDailyKlineManage) {
         this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
         this.stockIntradayTrendInfluxManage = stockIntradayTrendInfluxManage;
         this.indexQuoteSnapshotManage = indexQuoteSnapshotManage;
         this.indexDailyKlineManage = indexDailyKlineManage;
+        this.bondQuoteSnapshotManage = bondQuoteSnapshotManage;
+        this.bondDailyKlineManage = bondDailyKlineManage;
     }
 
     @Override
@@ -72,6 +83,9 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
             case "index_quote_by_code" -> this.queryIndexQuoteByCode(request);
             case "index_quote_list" -> this.queryIndexQuoteList(request);
             case "index_daily_kline_by_code" -> this.queryIndexDailyKlines(request);
+            case "bond_quote_by_code" -> this.queryBondQuoteByCode(request);
+            case "bond_quote_list" -> this.queryBondQuoteList(request);
+            case "bond_daily_kline_by_code" -> this.queryBondDailyKlines(request);
             default -> Map.of();
         };
     }
@@ -161,6 +175,47 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
         return this.result(request, rows);
     }
 
+    private Map<String, Object> queryBondQuoteByCode(AiDataRequestVO request) {
+        request = this.resolveBondRequest(request);
+        if (StrUtil.isBlank(request.targetCode())) {
+            return Map.of();
+        }
+        BondQuoteSnapshotPO quote = this.bondQuoteSnapshotManage.getOne(
+                new LambdaQueryWrapper<BondQuoteSnapshotPO>()
+                        .eq(BondQuoteSnapshotPO::getBondCode, request.targetCode())
+                        .last("LIMIT 1"));
+        return this.result(request, quote == null ? List.of() : List.of(this.bondQuoteToMap(quote)));
+    }
+
+    private Map<String, Object> queryBondQuoteList(AiDataRequestVO request) {
+        List<Map<String, Object>> rows = this.bondQuoteSnapshotManage.listSnapshots(
+                        null,
+                        this.normalizeLimit(request.limit()),
+                        BondQuoteSortFieldEnum.CHANGE_PERCENT,
+                        SortOrderEnum.DESC)
+                .stream()
+                .map(this::bondQuoteToMap)
+                .toList();
+        return this.result(request, rows);
+    }
+
+    private Map<String, Object> queryBondDailyKlines(AiDataRequestVO request) {
+        request = this.resolveBondRequest(request);
+        if (StrUtil.isBlank(request.targetCode())) {
+            return Map.of();
+        }
+        List<Map<String, Object>> rows = this.bondDailyKlineManage.listDailyKlines(
+                        request.targetCode(),
+                        null,
+                        null,
+                        null,
+                        this.normalizeLimit(request.limit()))
+                .stream()
+                .map(this::bondDailyKlineToMap)
+                .toList();
+        return this.result(request, rows);
+    }
+
     private Map<String, Object> result(AiDataRequestVO request, List<Map<String, Object>> rows) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("queryType", request.queryType());
@@ -231,6 +286,36 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
                         .last("LIMIT 1"));
     }
 
+    private AiDataRequestVO resolveBondRequest(AiDataRequestVO request) {
+        if (StrUtil.isNotBlank(request.targetCode()) || StrUtil.isBlank(request.targetName())) {
+            return request;
+        }
+        BondQuoteSnapshotPO quote = this.findBondQuoteByName(request.targetName());
+        if (quote == null || StrUtil.isBlank(quote.getBondCode())) {
+            return request;
+        }
+        return new AiDataRequestVO(
+                request.source(),
+                request.queryType(),
+                quote.getBondCode(),
+                request.targetName(),
+                request.limit());
+    }
+
+    private BondQuoteSnapshotPO findBondQuoteByName(String bondName) {
+        BondQuoteSnapshotPO quote = this.bondQuoteSnapshotManage.getOne(
+                new LambdaQueryWrapper<BondQuoteSnapshotPO>()
+                        .eq(BondQuoteSnapshotPO::getBondName, bondName)
+                        .last("LIMIT 1"));
+        if (quote != null) {
+            return quote;
+        }
+        return this.bondQuoteSnapshotManage.getOne(
+                new LambdaQueryWrapper<BondQuoteSnapshotPO>()
+                        .like(BondQuoteSnapshotPO::getBondName, bondName)
+                        .last("LIMIT 1"));
+    }
+
     private Map<String, Object> stockQuoteToMap(StockQuoteSnapshotPO quote) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("stockCode", quote.getStockCode());
@@ -276,6 +361,34 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("indexCode", kline.getIndexCode());
         row.put("indexName", kline.getIndexName());
+        row.put("tradeDate", kline.getTradeDate());
+        row.put("openPrice", kline.getOpenPrice());
+        row.put("closePrice", kline.getClosePrice());
+        row.put("highPrice", kline.getHighPrice());
+        row.put("lowPrice", kline.getLowPrice());
+        row.put("changePercent", kline.getChangePercent());
+        row.put("volume", kline.getVolume());
+        row.put("turnoverAmount", kline.getTurnoverAmount());
+        return row;
+    }
+
+    private Map<String, Object> bondQuoteToMap(BondQuoteSnapshotPO quote) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("bondCode", quote.getBondCode());
+        row.put("bondName", quote.getBondName());
+        row.put("latestPrice", quote.getLatestPrice());
+        row.put("changePercent", quote.getChangePercent());
+        row.put("volume", quote.getVolume());
+        row.put("turnoverAmount", quote.getTurnoverAmount());
+        row.put("bondRating", quote.getBondRating());
+        row.put("syncedAt", quote.getSyncedAt());
+        return row;
+    }
+
+    private Map<String, Object> bondDailyKlineToMap(BondDailyKlinePO kline) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("bondCode", kline.getBondCode());
+        row.put("bondName", kline.getBondName());
         row.put("tradeDate", kline.getTradeDate());
         row.put("openPrice", kline.getOpenPrice());
         row.put("closePrice", kline.getClosePrice());

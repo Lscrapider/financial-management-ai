@@ -17,7 +17,6 @@ export interface BondQuote {
   turnoverAmount?: number | string;
   amplitude?: number | string;
   turnoverRate?: number | string;
-  conversionPremiumRate?: number | string;
   bondRating?: string;
   syncedAt?: string;
 }

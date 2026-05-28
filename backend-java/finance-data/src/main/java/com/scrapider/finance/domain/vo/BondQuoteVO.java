@@ -24,7 +24,6 @@ public class BondQuoteVO {
     private BigDecimal turnoverAmount;
     private BigDecimal turnoverRate;
     private BigDecimal amplitude;
-    private BigDecimal conversionPremiumRate;
     private String bondRating;
     private LocalDateTime syncedAt;
 
@@ -46,7 +45,6 @@ public class BondQuoteVO {
         vo.setTurnoverAmount(po.getTurnoverAmount());
         vo.setTurnoverRate(po.getTurnoverRate());
         vo.setAmplitude(po.getAmplitude());
-        vo.setConversionPremiumRate(po.getConversionPremiumRate());
         vo.setBondRating(po.getBondRating());
         vo.setSyncedAt(po.getSyncedAt());
         return vo;

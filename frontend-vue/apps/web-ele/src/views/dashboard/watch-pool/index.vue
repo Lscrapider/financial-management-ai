@@ -2,7 +2,7 @@
 import type { BondQuote } from '#/api/bond';
 import type { IndexQuote } from '#/api/index-market';
 import type { StockQuote } from '#/api/stock';
-import type { WatchGroup, WatchTargetType } from '#/api/watch-pool';
+import type { WatchGroup, WatchItem, WatchTargetType } from '#/api/watch-pool';
 
 import { computed, onMounted, ref } from 'vue';
 
@@ -34,6 +34,7 @@ import {
   saveWatchGroup,
   saveWatchItem,
 } from '#/api/watch-pool';
+import { useColumnResize } from './useColumnResize';
 
 interface TargetOption {
   code: string;
@@ -43,6 +44,7 @@ interface TargetOption {
 
 const groups = ref<WatchGroup[]>([]);
 const selectedGroupId = ref('');
+const typeFilter = ref<WatchTargetType | 'ALL'>('ALL');
 const stockQuotes = ref<StockQuote[]>([]);
 const indexQuotes = ref<IndexQuote[]>([]);
 const bondQuotes = ref<BondQuote[]>([]);
@@ -57,6 +59,16 @@ const targetDialogVisible = ref(false);
 const targetType = ref<WatchTargetType>('STOCK');
 const selectedTargetKeys = ref<string[]>([]);
 const targetRemark = ref('');
+const targetBuyPrice = ref('');
+const targetPosition = ref('');
+
+const { onMouseDown, widths } = useColumnResize();
+
+const editDialogVisible = ref(false);
+const editingItem = ref<WatchItem | null>(null);
+const editBuyPrice = ref('');
+const editPosition = ref('');
+const editRemark = ref('');
 
 const selectedGroup = computed(() => {
   return groups.value.find((group) => group.id === selectedGroupId.value);
@@ -92,65 +104,42 @@ const currentTargetOptions = computed<TargetOption[]>(() => {
   return bondOptions.value;
 });
 
-const stocks = computed(() => {
-  return (selectedGroup.value?.items ?? [])
-    .filter((item) => item.targetType === 'STOCK')
-    .map((item) => ({
+const filteredItems = computed(() => {
+  const items = selectedGroup.value?.items ?? [];
+  const filtered =
+    typeFilter.value === 'ALL'
+      ? items
+      : items.filter((item) => item.targetType === typeFilter.value);
+  return filtered.map((item) => {
+    const stockQuote = stockQuotes.value.find(
+      (q) => q.stockCode === item.targetCode,
+    );
+    const indexQuote = indexQuotes.value.find(
+      (q) => q.indexCode === item.targetCode,
+    );
+    const bondQuote = bondQuotes.value.find(
+      (q) => q.bondCode === item.targetCode,
+    );
+    const quote = stockQuote ?? indexQuote ?? bondQuote;
+    return {
       ...item,
-      latestPrice:
-        item.latestPrice ??
-        stockQuotes.value.find((quote) => quote.stockCode === item.targetCode)
-          ?.latestPrice,
-      changePercent:
-        item.changePercent ??
-        stockQuotes.value.find((quote) => quote.stockCode === item.targetCode)
-          ?.changePercent,
-      turnoverAmount:
-        item.turnoverAmount ??
-        stockQuotes.value.find((quote) => quote.stockCode === item.targetCode)
-          ?.turnoverAmount,
-    }));
+      latestPrice: item.latestPrice ?? quote?.latestPrice,
+      changePercent: item.changePercent ?? quote?.changePercent,
+      turnoverAmount: item.turnoverAmount ?? quote?.turnoverAmount,
+    };
+  });
 });
 
-const indices = computed(() => {
-  return (selectedGroup.value?.items ?? [])
-    .filter((item) => item.targetType === 'INDEX')
-    .map((item) => ({
-      ...item,
-      latestPrice:
-        item.latestPrice ??
-        indexQuotes.value.find((quote) => quote.indexCode === item.targetCode)
-          ?.latestPrice,
-      changePercent:
-        item.changePercent ??
-        indexQuotes.value.find((quote) => quote.indexCode === item.targetCode)
-          ?.changePercent,
-      turnoverAmount:
-        item.turnoverAmount ??
-        indexQuotes.value.find((quote) => quote.indexCode === item.targetCode)
-          ?.turnoverAmount,
-    }));
-});
-
-const bonds = computed(() => {
-  return (selectedGroup.value?.items ?? [])
-    .filter((item) => item.targetType === 'BOND')
-    .map((item) => ({
-      ...item,
-      latestPrice:
-        item.latestPrice ??
-        bondQuotes.value.find((quote) => quote.bondCode === item.targetCode)
-          ?.latestPrice,
-      changePercent:
-        item.changePercent ??
-        bondQuotes.value.find((quote) => quote.bondCode === item.targetCode)
-          ?.changePercent,
-      turnoverAmount:
-        item.turnoverAmount ??
-        bondQuotes.value.find((quote) => quote.bondCode === item.targetCode)
-          ?.turnoverAmount,
-    }));
-});
+function typeLabel(type: WatchTargetType) {
+  const map: Record<WatchTargetType, string> = {
+    BOND: '债券',
+    FUND: '基金',
+    INDEX: '指数',
+    SECTOR: '板块',
+    STOCK: '股票',
+  };
+  return map[type] ?? type;
+}
 
 onMounted(async () => {
   await Promise.all([loadGroups(), loadQuotes()]);
@@ -249,6 +238,8 @@ function openAddTarget() {
 function resetTargetForm() {
   selectedTargetKeys.value = [];
   targetRemark.value = '';
+  targetBuyPrice.value = '';
+  targetPosition.value = '';
 }
 
 async function saveTarget() {
@@ -275,7 +266,13 @@ async function saveTarget() {
   await Promise.all(
     availableOptions.map((option) =>
       saveWatchItem({
+        buyPrice: targetBuyPrice.value
+          ? Number(targetBuyPrice.value)
+          : undefined,
         groupId: group.id,
+        position: targetPosition.value
+          ? Number(targetPosition.value)
+          : undefined,
         remark: targetRemark.value.trim(),
         secid: option.secid,
         targetCode: option.code,
@@ -303,14 +300,32 @@ async function removeTarget(itemId: string) {
   await loadGroups();
 }
 
-function optionKey(option: TargetOption) {
-  return `${option.code}::${option.secid}`;
+function openEditTarget(item: WatchItem) {
+  editingItem.value = item;
+  editBuyPrice.value = item.buyPrice !== null && item.buyPrice !== undefined ? String(item.buyPrice) : '';
+  editPosition.value = item.position !== null && item.position !== undefined ? String(item.position) : '';
+  editRemark.value = item.remark ?? '';
+  editDialogVisible.value = true;
 }
 
-function typeLabel(type: WatchTargetType) {
-  if (type === 'STOCK') return '股票';
-  if (type === 'INDEX') return '指数';
-  return '债券';
+async function saveEditTarget() {
+  if (!editingItem.value || !selectedGroup.value) return;
+  await saveWatchItem({
+    buyPrice: editBuyPrice.value ? Number(editBuyPrice.value) : undefined,
+    groupId: selectedGroup.value.id,
+    id: editingItem.value.id,
+    position: editPosition.value ? Number(editPosition.value) : undefined,
+    remark: editRemark.value.trim(),
+    targetCode: editingItem.value.targetCode,
+    targetName: editingItem.value.targetName,
+    targetType: editingItem.value.targetType,
+  });
+  await loadGroups();
+  editDialogVisible.value = false;
+}
+
+function optionKey(option: TargetOption) {
+  return `${option.code}::${option.secid}`;
 }
 
 function changeClass(value?: number | string) {
@@ -352,6 +367,38 @@ function toNullableNumber(value?: number | string | null) {
 function toNumber(value?: number | string | null) {
   return toNullableNumber(value) ?? 0;
 }
+
+function costReturnRate(
+  latestPrice?: number | string,
+  buyPrice?: number | string,
+) {
+  const lp = toNullableNumber(latestPrice);
+  const bp = toNullableNumber(buyPrice);
+  if (lp === null || bp === null || bp === 0) return null;
+  return ((lp - bp) / bp) * 100;
+}
+
+function positionMarketValue(
+  latestPrice?: number | string,
+  position?: number | string,
+) {
+  const lp = toNullableNumber(latestPrice);
+  const pos = toNullableNumber(position);
+  if (lp === null || pos === null) return null;
+  return lp * pos;
+}
+
+function positionPnL(
+  latestPrice?: number | string,
+  buyPrice?: number | string,
+  position?: number | string,
+) {
+  const lp = toNullableNumber(latestPrice);
+  const bp = toNullableNumber(buyPrice);
+  const pos = toNullableNumber(position);
+  if (lp === null || bp === null || pos === null) return null;
+  return (lp - bp) * pos;
+}
 </script>
 
 <template>
@@ -388,152 +435,178 @@ function toNumber(value?: number | string | null) {
       <section class="group-summary">
         <div>
           <h2>{{ selectedGroup?.name ?? '-' }}</h2>
-          <span
-            >股票 {{ stocks.length }} · 指数 {{ indices.length }} · 债券
-            {{ bonds.length }}</span
-          >
+          <span>共 {{ selectedGroup?.items.length ?? 0 }} 个标的</span>
         </div>
         <ElButton :loading="loadingQuotes" size="small" @click="loadQuotes">
           刷新行情
         </ElButton>
       </section>
 
-      <div class="asset-grid">
-        <ElCard class="asset-card" shadow="never">
-          <template #header>
-            <div class="asset-header">
-              <span>关注股票</span>
-              <ElTag effect="plain" size="small">{{ stocks.length }}</ElTag>
-            </div>
-          </template>
-          <ElTable v-if="stocks.length > 0" :data="stocks" height="300">
-            <ElTableColumn label="名称" min-width="150">
-              <template #default="{ row }">
-                <div class="target-name">
-                  <span>{{ row.targetName }}</span>
-                  <small>{{ row.targetCode }}</small>
-                </div>
-              </template>
-            </ElTableColumn>
-            <ElTableColumn label="最新" align="right" min-width="90">
-              <template #default="{ row }">
-                {{ formatPrice(row.latestPrice) }}
-              </template>
-            </ElTableColumn>
-            <ElTableColumn label="涨跌幅" align="right" min-width="90">
-              <template #default="{ row }">
-                <span :class="changeClass(row.changePercent)">
-                  {{ formatChangePercent(row.changePercent) }}
-                </span>
-              </template>
-            </ElTableColumn>
-            <ElTableColumn label="成交额" align="right" min-width="100">
-              <template #default="{ row }">
-                {{ formatMoney(row.turnoverAmount) }}
-              </template>
-            </ElTableColumn>
-            <ElTableColumn label="备注" min-width="120" prop="remark" />
-            <ElTableColumn label="操作" width="72" align="right">
-              <template #default="{ row }">
-                <ElButton link type="danger" @click="removeTarget(row.id)">
-                  移除
-                </ElButton>
-              </template>
-            </ElTableColumn>
-          </ElTable>
-          <ElEmpty v-else description="暂无关注股票" />
-        </ElCard>
-
-        <ElCard class="asset-card" shadow="never">
-          <template #header>
-            <div class="asset-header">
-              <span>关注指数</span>
-              <ElTag effect="plain" size="small">{{ indices.length }}</ElTag>
-            </div>
-          </template>
-          <ElTable v-if="indices.length > 0" :data="indices" height="300">
-            <ElTableColumn label="名称" min-width="150">
-              <template #default="{ row }">
-                <div class="target-name">
-                  <span>{{ row.targetName }}</span>
-                  <small>{{ row.targetCode }}</small>
-                </div>
-              </template>
-            </ElTableColumn>
-            <ElTableColumn label="最新" align="right" min-width="90">
-              <template #default="{ row }">
-                {{ formatPrice(row.latestPrice) }}
-              </template>
-            </ElTableColumn>
-            <ElTableColumn label="涨跌幅" align="right" min-width="90">
-              <template #default="{ row }">
-                <span :class="changeClass(row.changePercent)">
-                  {{ formatChangePercent(row.changePercent) }}
-                </span>
-              </template>
-            </ElTableColumn>
-            <ElTableColumn label="成交额" align="right" min-width="100">
-              <template #default="{ row }">
-                {{ formatMoney(row.turnoverAmount) }}
-              </template>
-            </ElTableColumn>
-            <ElTableColumn label="备注" min-width="120" prop="remark" />
-            <ElTableColumn label="操作" width="72" align="right">
-              <template #default="{ row }">
-                <ElButton link type="danger" @click="removeTarget(row.id)">
-                  移除
-                </ElButton>
-              </template>
-            </ElTableColumn>
-          </ElTable>
-          <ElEmpty v-else description="暂无关注指数" />
-        </ElCard>
-
-        <ElCard class="asset-card asset-card--wide" shadow="never">
-          <template #header>
-            <div class="asset-header">
-              <span>关注债券</span>
-              <ElTag effect="plain" size="small">{{ bonds.length }}</ElTag>
-            </div>
-          </template>
-          <ElTable v-if="bonds.length > 0" :data="bonds" height="300">
-            <ElTableColumn label="名称" min-width="150">
-              <template #default="{ row }">
-                <div class="target-name">
-                  <span>{{ row.targetName }}</span>
-                  <small>{{ row.targetCode }}</small>
-                </div>
-              </template>
-            </ElTableColumn>
-            <ElTableColumn label="最新" align="right" min-width="90">
-              <template #default="{ row }">
-                {{ formatPrice(row.latestPrice) }}
-              </template>
-            </ElTableColumn>
-            <ElTableColumn label="涨跌幅" align="right" min-width="90">
-              <template #default="{ row }">
-                <span :class="changeClass(row.changePercent)">
-                  {{ formatChangePercent(row.changePercent) }}
-                </span>
-              </template>
-            </ElTableColumn>
-            <ElTableColumn label="成交额" align="right" min-width="100">
-              <template #default="{ row }">
-                {{ formatMoney(row.turnoverAmount) }}
-              </template>
-            </ElTableColumn>
-            <ElTableColumn label="备注" min-width="120" prop="remark" />
-            <ElTableColumn label="操作" width="72" align="right">
-              <template #default="{ row }">
-                <ElButton link type="danger" @click="removeTarget(row.id)">
-                  移除
-                </ElButton>
-              </template>
-            </ElTableColumn>
-          </ElTable>
-          <ElEmpty v-else description="暂无关注债券" />
-        </ElCard>
+      <div class="filter-bar">
+        <ElRadioGroup v-model="typeFilter" size="small">
+          <ElRadioButton value="ALL">全部</ElRadioButton>
+          <ElRadioButton value="STOCK">股票</ElRadioButton>
+          <ElRadioButton value="INDEX">指数</ElRadioButton>
+          <ElRadioButton value="BOND">债券</ElRadioButton>
+        </ElRadioGroup>
       </div>
+
+      <ElCard shadow="never">
+        <ElTable
+          v-if="filteredItems.length > 0"
+          :data="filteredItems"
+          border
+          height="400"
+        >
+          <ElTableColumn :width="widths['col-type']" min-width="70">
+            <template #header>
+              <div class="resize-header">
+                <span>类型</span>
+                <span class="resize-handle" @mousedown="onMouseDown('col-type', $event)" />
+              </div>
+            </template>
+            <template #default="{ row }">
+              <ElTag effect="plain" size="small" type="info">
+                {{ typeLabel(row.targetType) }}
+              </ElTag>
+            </template>
+          </ElTableColumn>
+          <ElTableColumn :width="widths['col-name']" min-width="150">
+            <template #header>
+              <div class="resize-header">
+                <span>名称</span>
+                <span class="resize-handle" @mousedown="onMouseDown('col-name', $event)" />
+              </div>
+            </template>
+            <template #default="{ row }">
+              <div class="target-name">
+                <span>{{ row.targetName }}</span>
+                <small>{{ row.targetCode }}</small>
+              </div>
+            </template>
+          </ElTableColumn>
+          <ElTableColumn :width="widths['col-latest']" align="right" min-width="90">
+            <template #header>
+              <div class="resize-header">
+                <span>最新</span>
+                <span class="resize-handle" @mousedown="onMouseDown('col-latest', $event)" />
+              </div>
+            </template>
+            <template #default="{ row }">
+              {{ formatPrice(row.latestPrice) }}
+            </template>
+          </ElTableColumn>
+          <ElTableColumn :width="widths['col-change']" align="right" min-width="90">
+            <template #header>
+              <div class="resize-header">
+                <span>涨跌幅</span>
+                <span class="resize-handle" @mousedown="onMouseDown('col-change', $event)" />
+              </div>
+            </template>
+            <template #default="{ row }">
+              <span :class="changeClass(row.changePercent)">
+                {{ formatChangePercent(row.changePercent) }}
+              </span>
+            </template>
+          </ElTableColumn>
+          <ElTableColumn :width="widths['col-turnover']" align="right" min-width="100">
+            <template #header>
+              <div class="resize-header">
+                <span>成交额</span>
+                <span class="resize-handle" @mousedown="onMouseDown('col-turnover', $event)" />
+              </div>
+            </template>
+            <template #default="{ row }">
+              {{ formatMoney(row.turnoverAmount) }}
+            </template>
+          </ElTableColumn>
+          <ElTableColumn :width="widths['col-buy']" align="right" min-width="90">
+            <template #header>
+              <div class="resize-header">
+                <span>买入价</span>
+                <span class="resize-handle" @mousedown="onMouseDown('col-buy', $event)" />
+              </div>
+            </template>
+            <template #default="{ row }">
+              {{ formatPrice(row.buyPrice) }}
+            </template>
+          </ElTableColumn>
+          <ElTableColumn :width="widths['col-pos']" align="right" min-width="90">
+            <template #header>
+              <div class="resize-header">
+                <span>持仓数量</span>
+                <span class="resize-handle" @mousedown="onMouseDown('col-pos', $event)" />
+              </div>
+            </template>
+            <template #default="{ row }">
+              {{ row.position ?? '-' }}
+            </template>
+          </ElTableColumn>
+          <ElTableColumn :width="widths['col-mv']" align="right" min-width="100">
+            <template #header>
+              <div class="resize-header">
+                <span>持仓市值</span>
+                <span class="resize-handle" @mousedown="onMouseDown('col-mv', $event)" />
+              </div>
+            </template>
+            <template #default="{ row }">
+              {{ formatMoney(positionMarketValue(row.latestPrice, row.position)) }}
+            </template>
+          </ElTableColumn>
+          <ElTableColumn :width="widths['col-pnl']" align="right" min-width="100">
+            <template #header>
+              <div class="resize-header">
+                <span>浮动盈亏</span>
+                <span class="resize-handle" @mousedown="onMouseDown('col-pnl', $event)" />
+              </div>
+            </template>
+            <template #default="{ row }">
+              <span
+                :class="changeClass(positionPnL(row.latestPrice, row.buyPrice, row.position))"
+              >
+                {{ formatMoney(positionPnL(row.latestPrice, row.buyPrice, row.position)) }}
+              </span>
+            </template>
+          </ElTableColumn>
+          <ElTableColumn :width="widths['col-rate']" align="right" min-width="90">
+            <template #header>
+              <div class="resize-header">
+                <span>盈亏比例</span>
+                <span class="resize-handle" @mousedown="onMouseDown('col-rate', $event)" />
+              </div>
+            </template>
+            <template #default="{ row }">
+              <span
+                :class="changeClass(costReturnRate(row.latestPrice, row.buyPrice))"
+              >
+                {{ formatChangePercent(costReturnRate(row.latestPrice, row.buyPrice)) }}
+              </span>
+            </template>
+          </ElTableColumn>
+          <ElTableColumn :width="widths['col-remark']" min-width="120">
+            <template #header>
+              <div class="resize-header">
+                <span>备注</span>
+                <span class="resize-handle" @mousedown="onMouseDown('col-remark', $event)" />
+              </div>
+            </template>
+            <template #default="{ row }">
+              {{ row.remark }}
+            </template>
+          </ElTableColumn>
+          <ElTableColumn label="操作" width="130" align="right">
+            <template #default="{ row }">
+              <ElButton link size="small" type="primary" @click="openEditTarget(row)">
+                编辑
+              </ElButton>
+              <ElButton link size="small" type="danger" @click="removeTarget(row.id)">
+                移除
+              </ElButton>
+            </template>
+          </ElTableColumn>
+        </ElTable>
+        <ElEmpty v-else description="暂无标的" />
+      </ElCard>
 
       <ElDialog v-model="groupDialogVisible" title="分组设置" width="420px">
         <div class="dialog-form">
@@ -582,12 +655,49 @@ function toNumber(value?: number | string | null) {
           <ElInput
             v-model="targetRemark"
             maxlength="50"
-            placeholder="例如：观察转股溢价率"
+            placeholder="例如：观察价格走势"
+          />
+
+          <span>买入价（选填）</span>
+          <ElInput
+            v-model="targetBuyPrice"
+            placeholder="例如：12.50"
+            type="number"
+          />
+
+          <span>持仓数量（选填）</span>
+          <ElInput
+            v-model="targetPosition"
+            placeholder="例如：100"
+            type="number"
           />
         </div>
         <template #footer>
           <ElButton @click="targetDialogVisible = false">取消</ElButton>
           <ElButton type="primary" @click="saveTarget">添加</ElButton>
+        </template>
+      </ElDialog>
+
+      <ElDialog v-model="editDialogVisible" title="编辑标的" width="460px">
+        <div class="dialog-form">
+          <span>标的</span>
+          <div class="edit-target-info">
+            <span>{{ editingItem?.targetName }}</span>
+            <small>{{ editingItem?.targetCode }}</small>
+          </div>
+
+          <span>买入价</span>
+          <ElInput v-model="editBuyPrice" placeholder="买入价格" type="number" />
+
+          <span>持仓数量</span>
+          <ElInput v-model="editPosition" placeholder="持仓数量" type="number" />
+
+          <span>备注</span>
+          <ElInput v-model="editRemark" maxlength="50" placeholder="备注信息" />
+        </div>
+        <template #footer>
+          <ElButton @click="editDialogVisible = false">取消</ElButton>
+          <ElButton type="primary" @click="saveEditTarget">保存</ElButton>
         </template>
       </ElDialog>
     </div>
@@ -655,25 +765,8 @@ function toNumber(value?: number | string | null) {
   font-size: 13px;
 }
 
-.asset-grid {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.asset-card {
-  min-width: 0;
-}
-
-.asset-card--wide {
-  grid-column: 1 / -1;
-}
-
-.asset-header {
-  align-items: center;
-  display: flex;
-  font-weight: 600;
-  justify-content: space-between;
+.filter-bar {
+  margin-bottom: 0;
 }
 
 .target-name {
@@ -697,10 +790,37 @@ function toNumber(value?: number | string | null) {
   font-size: 13px;
 }
 
-@media (max-width: 1100px) {
-  .asset-grid {
-    grid-template-columns: 1fr;
-  }
+.resize-header {
+  position: relative;
+  word-break: keep-all;
+}
+
+.resize-handle {
+  bottom: -4px;
+  cursor: col-resize;
+  position: absolute;
+  right: -6px;
+  top: -4px;
+  width: 14px;
+  z-index: 1;
+}
+
+:deep(.el-table__header th) {
+  overflow: visible;
+}
+
+.edit-target-info {
+  align-items: baseline;
+  background: var(--el-fill-color-lighter);
+  border-radius: 4px;
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.edit-target-info small {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
 }
 
 @media (max-width: 768px) {

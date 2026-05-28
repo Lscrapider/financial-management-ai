@@ -12,7 +12,6 @@ public enum BondQuoteSortFieldEnum {
     VOLUME("volume", BondQuoteSnapshotPO::getVolume),
     TURNOVER_AMOUNT("turnoverAmount", BondQuoteSnapshotPO::getTurnoverAmount),
     AMPLITUDE("amplitude", BondQuoteSnapshotPO::getAmplitude),
-    CONVERSION_PREMIUM_RATE("conversionPremiumRate", BondQuoteSnapshotPO::getConversionPremiumRate),
     SYNCED_AT("syncedAt", BondQuoteSnapshotPO::getSyncedAt);
 
     private final String code;

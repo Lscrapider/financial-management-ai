@@ -472,13 +472,6 @@ function normalizeRouteSecid(value: unknown) {
                 {{ formatMoney(row.turnoverAmount) }}
               </template>
             </ElTableColumn>
-            <ElTableColumn align="right" label="转股溢价率" min-width="110">
-              <template #default="{ row }">
-                <span :class="changeClass(toNumber(row.conversionPremiumRate) > 0 ? 1 : -1)">
-                  {{ formatChangePercent(row.conversionPremiumRate) }}
-                </span>
-              </template>
-            </ElTableColumn>
             <ElTableColumn label="评级" min-width="80">
               <template #default="{ row }">
                 <ElTag v-if="row.bondRating" effect="plain" size="small">
@@ -546,12 +539,6 @@ function normalizeRouteSecid(value: unknown) {
                 <span>换手率</span>
                 <strong>{{
                   formatChangePercent(selectedQuote.turnoverRate)
-                }}</strong>
-              </div>
-              <div class="metric-item">
-                <span>转股溢价率</span>
-                <strong>{{
-                  formatChangePercent(selectedQuote.conversionPremiumRate)
                 }}</strong>
               </div>
               <div class="metric-item">
