@@ -54,7 +54,10 @@ public class AiQueryRewriteServiceImpl implements AiQueryRewriteService {
             如果用户询问个股趋势、盘中走势、封板、开板、量价变化，应同时请求 stock_quote_by_code 和 stock_intraday_by_code。
             如果用户询问可转债趋势、正股走势、转债K线，应请求 bond_quote_by_code。
             如果用户询问可转债历史K线、近期走势、支撑压力位，应请求 bond_daily_kline_by_code。
-            如果用户没有指定具体股票或指数或可转债，但询问市场概览，生成 stock_quote_list 和 index_quote_list，limit 不超过 100。
+            如果用户没有指定具体股票代码或股票名称，但询问股票整体、股票列表、股票排行或 A 股市场，生成 stock_quote_list，source=stock_quote_snapshot，limit 不超过 100。
+            如果用户没有指定具体指数代码或指数名称，但询问指数整体、指数列表或指数行情，生成 index_quote_list，source=index_quote_snapshot，limit 不超过 100。
+            如果用户没有指定具体可转债代码或可转债名称，但询问可转债整体、可转债列表、可转债排行或转债行情，生成 bond_quote_list，source=bond_quote_snapshot，limit 不超过 100。
+            如果用户泛泛询问市场概览且没有明确资产类型，生成 stock_quote_list 和 index_quote_list，limit 不超过 100。
             如果无法确定股票、指数或可转债代码，代码字段返回空字符串，不要猜代码；可以用 targetName 保留用户提到的名称。
             """;
 

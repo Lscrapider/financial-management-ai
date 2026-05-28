@@ -48,6 +48,7 @@
     "vue-router": "catalog:"
   },
   "devDependencies": {
-    "unplugin-element-plus": "catalog:"
+    "unplugin-element-plus": "catalog:",
+    "vite-plugin-pwa": "catalog:"
   }
 }

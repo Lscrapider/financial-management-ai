@@ -6,16 +6,15 @@ import { Page } from '@vben/common-ui';
 
 import {
   ElButton,
+  ElCard,
   ElMessage,
+  ElOption,
   ElPagination,
   ElPopconfirm,
   ElProgress,
-  ElOption,
   ElSelect,
-  ElTabPane,
   ElTable,
   ElTableColumn,
-  ElTabs,
   ElTag,
   ElTimeline,
   ElTimelineItem,
@@ -45,7 +44,6 @@ interface ProcessingTask {
   updatedAt: string;
 }
 
-const activeTab = ref('knowledgeProcessing');
 const router = useRouter();
 const selectedTaskId = ref('');
 const selectedFiles = ref<File[]>([]);
@@ -306,239 +304,237 @@ function formatDateTime(value?: string) {
 <template>
   <Page title="AI中心">
     <div class="ai-center-page">
-      <ElTabs v-model="activeTab">
-        <ElTabPane label="知识库处理进度" name="knowledgeProcessing">
-          <section class="submit-panel">
+      <section class="submit-panel">
+        <div class="panel-header">
+          <div>
+            <h2>提交识别任务</h2>
+            <span>上传 PDF 或图片后进入 OCR、清洗、切分和向量化队列</span>
+          </div>
+          <ElButton
+            :disabled="!canSubmit"
+            :loading="submitting"
+            type="primary"
+            @click="submitTask"
+          >
+            提交任务
+          </ElButton>
+        </div>
+
+        <ElUpload
+          ref="uploadRef"
+          :auto-upload="false"
+          :before-upload="beforeUpload"
+          accept=".pdf,.png,.jpg,.jpeg,.webp"
+          drag
+          multiple
+          @change="changeUploadFile"
+          @remove="removeUploadFile"
+        >
+          <div class="upload-content">
+            <strong>
+              {{
+                selectedFiles.length > 0
+                  ? `已选择 ${selectedFiles.length} 个文件`
+                  : '选择或拖入文件'
+              }}
+            </strong>
+            <span>支持 PDF、PNG、JPG、JPEG、WEBP，单个文件不超过50MB</span>
+          </div>
+        </ElUpload>
+      </section>
+
+      <section class="overview-band">
+        <div class="metric-item">
+          <span>处理中</span>
+          <strong>{{ runningCount }}</strong>
+        </div>
+        <div class="metric-item">
+          <span>已完成</span>
+          <strong>{{ finishedCount }}</strong>
+        </div>
+        <div class="metric-item">
+          <span>等待中</span>
+          <strong>{{ readyCount }}</strong>
+        </div>
+        <div class="metric-item">
+          <span>扫描页数</span>
+          <strong>{{ totalPages }}</strong>
+        </div>
+        <div class="metric-item">
+          <span>审核中</span>
+          <strong>{{ reviewingCount }}</strong>
+        </div>
+      </section>
+
+      <section class="pipeline-band">
+        <div
+          v-for="(stage, index) in pipelineStages"
+          :key="stage.key"
+          :class="['pipeline-step', stageClass(index)]"
+        >
+          <span class="step-index">{{ index + 1 }}</span>
+          <strong>{{ stage.label }}</strong>
+        </div>
+      </section>
+
+      <div class="content-grid">
+        <ElCard class="queue-panel" shadow="never">
+          <template #header>
             <div class="panel-header">
               <div>
-                <h2>提交识别任务</h2>
-                <span>上传 PDF 或图片后进入 OCR、清洗、切分和向量化队列</span>
+                <h2>处理队列</h2>
+                <span>{{ selectedTask?.updatedAt ?? '-' }}</span>
               </div>
-              <ElButton
-                :disabled="!canSubmit"
-                :loading="submitting"
-                type="primary"
-                @click="submitTask"
-              >
-                提交任务
-              </ElButton>
+              <div class="queue-tools">
+                <ElSelect
+                  v-model="statusFilter"
+                  size="small"
+                  @change="changeStatusFilter"
+                >
+                  <ElOption
+                    v-for="option in statusFilterOptions"
+                    :key="option.value"
+                    :label="option.label"
+                    :value="option.value"
+                  />
+                </ElSelect>
+              </div>
             </div>
+          </template>
 
-            <ElUpload
-              ref="uploadRef"
-              :auto-upload="false"
-              :before-upload="beforeUpload"
-              accept=".pdf,.png,.jpg,.jpeg,.webp"
-              drag
-              multiple
-              @change="changeUploadFile"
-              @remove="removeUploadFile"
+          <ElTable
+            :data="processingTasks"
+            v-loading="loadingTasks"
+            border
+            height="560"
+            highlight-current-row
+            row-key="id"
+            @row-click="selectTask"
+          >
+            <ElTableColumn
+              label="文件"
+              min-width="220"
+              prop="fileName"
+              resizable
+              show-overflow-tooltip
+            />
+            <ElTableColumn label="阶段" min-width="120" resizable>
+              <template #default="{ row }">
+                {{ stageLabel(row.currentStage) }}
+              </template>
+            </ElTableColumn>
+            <ElTableColumn label="状态" resizable width="132">
+              <template #default="{ row }">
+                <ElTag :type="statusType(row.status)" effect="plain">
+                  {{ statusLabel(row.status) }}
+                </ElTag>
+              </template>
+            </ElTableColumn>
+            <ElTableColumn label="进度" min-width="190" resizable>
+              <template #default="{ row }">
+                <ElProgress
+                  :percentage="row.progress"
+                  :status="row.status === 'finished' ? 'success' : undefined"
+                />
+              </template>
+            </ElTableColumn>
+            <ElTableColumn
+              align="right"
+              label="页数"
+              prop="pages"
+              resizable
+              width="80"
+            />
+            <ElTableColumn
+              align="right"
+              label="分段"
+              prop="segments"
+              resizable
+              width="90"
+            />
+            <ElTableColumn
+              align="right"
+              fixed="right"
+              label="操作"
+              resizable
+              width="150"
             >
-              <div class="upload-content">
-                <strong>
-                  {{
-                    selectedFiles.length > 0
-                      ? `已选择 ${selectedFiles.length} 个文件`
-                      : '选择或拖入文件'
-                  }}
-                </strong>
-                <span>支持 PDF、PNG、JPG、JPEG、WEBP，单个文件不超过50MB</span>
-              </div>
-            </ElUpload>
-          </section>
+              <template #default="{ row }">
+                <div class="table-actions" @click.stop>
+                  <ElButton
+                    v-if="row.status === 'manual_review_required'"
+                    link
+                    type="primary"
+                    @click="openReview(row)"
+                  >
+                    复核
+                  </ElButton>
+                  <ElPopconfirm
+                    title="确认删除该任务？"
+                    @confirm="removeTask(row)"
+                  >
+                    <template #reference>
+                      <ElButton
+                        :loading="deletingTaskNo === row.id"
+                        link
+                        type="danger"
+                      >
+                        删除
+                      </ElButton>
+                    </template>
+                  </ElPopconfirm>
+                </div>
+              </template>
+            </ElTableColumn>
+          </ElTable>
 
-          <section class="overview-band">
-            <div class="metric-item">
-              <span>处理中</span>
-              <strong>{{ runningCount }}</strong>
-            </div>
-            <div class="metric-item">
-              <span>已完成</span>
-              <strong>{{ finishedCount }}</strong>
-            </div>
-            <div class="metric-item">
-              <span>等待中</span>
-              <strong>{{ readyCount }}</strong>
-            </div>
-            <div class="metric-item">
-              <span>扫描页数</span>
-              <strong>{{ totalPages }}</strong>
-            </div>
-            <div class="metric-item">
-              <span>审核中</span>
-              <strong>{{ reviewingCount }}</strong>
-            </div>
-          </section>
+          <div class="queue-pagination">
+            <ElPagination
+              :current-page="pageNum"
+              :page-size="pageSize"
+              :page-sizes="[10, 20, 50, 100]"
+              :total="totalTasks"
+              background
+              layout="total, sizes, prev, pager, next, jumper"
+              @current-change="changePageNum"
+              @size-change="changePageSize"
+            />
+          </div>
+        </ElCard>
 
-          <section class="pipeline-band">
-            <div
+        <aside class="detail-panel">
+          <div class="panel-header">
+            <div>
+              <h2>{{ selectedTask?.fileName ?? '-' }}</h2>
+              <span>{{ selectedTask?.id ?? '-' }}</span>
+            </div>
+            <ElTag
+              v-if="selectedTask"
+              :type="statusType(selectedTask.status)"
+              effect="plain"
+            >
+              {{ statusLabel(selectedTask.status) }}
+            </ElTag>
+          </div>
+
+          <div class="detail-progress">
+            <ElProgress
+              :percentage="selectedTask?.progress ?? 0"
+              :stroke-width="10"
+            />
+          </div>
+
+          <ElTimeline>
+            <ElTimelineItem
               v-for="(stage, index) in pipelineStages"
               :key="stage.key"
-              :class="['pipeline-step', stageClass(index)]"
+              :type="stageClass(index) === 'is-done' ? 'success' : undefined"
             >
-              <span class="step-index">{{ index + 1 }}</span>
-              <strong>{{ stage.label }}</strong>
-            </div>
-          </section>
-
-          <div class="content-grid">
-            <section class="queue-panel">
-              <div class="panel-header">
-                <div>
-                  <h2>处理队列</h2>
-                  <span>{{ selectedTask?.updatedAt ?? '-' }}</span>
-                </div>
-                <div class="queue-tools">
-                  <ElSelect
-                    v-model="statusFilter"
-                    size="small"
-                    @change="changeStatusFilter"
-                  >
-                    <ElOption
-                      v-for="option in statusFilterOptions"
-                      :key="option.value"
-                      :label="option.label"
-                      :value="option.value"
-                    />
-                  </ElSelect>
-                </div>
-              </div>
-
-              <ElTable
-                :data="processingTasks"
-                v-loading="loadingTasks"
-                border
-                height="560"
-                highlight-current-row
-                row-key="id"
-                @row-click="selectTask"
-              >
-                <ElTableColumn
-                  label="文件"
-                  min-width="220"
-                  prop="fileName"
-                  resizable
-                  show-overflow-tooltip
-                />
-                <ElTableColumn label="阶段" min-width="120" resizable>
-                  <template #default="{ row }">
-                    {{ stageLabel(row.currentStage) }}
-                  </template>
-                </ElTableColumn>
-                <ElTableColumn label="状态" resizable width="132">
-                  <template #default="{ row }">
-                    <ElTag :type="statusType(row.status)" effect="plain">
-                      {{ statusLabel(row.status) }}
-                    </ElTag>
-                  </template>
-                </ElTableColumn>
-                <ElTableColumn label="进度" min-width="190" resizable>
-                  <template #default="{ row }">
-                    <ElProgress
-                      :percentage="row.progress"
-                      :status="row.status === 'finished' ? 'success' : undefined"
-                    />
-                  </template>
-                </ElTableColumn>
-                <ElTableColumn
-                  align="right"
-                  label="页数"
-                  prop="pages"
-                  resizable
-                  width="80"
-                />
-                <ElTableColumn
-                  align="right"
-                  label="分段"
-                  prop="segments"
-                  resizable
-                  width="90"
-                />
-                <ElTableColumn
-                  align="right"
-                  fixed="right"
-                  label="操作"
-                  resizable
-                  width="150"
-                >
-                  <template #default="{ row }">
-                    <div class="table-actions" @click.stop>
-                      <ElButton
-                        v-if="row.status === 'manual_review_required'"
-                        link
-                        type="primary"
-                        @click="openReview(row)"
-                      >
-                        复核
-                      </ElButton>
-                      <ElPopconfirm
-                        title="确认删除该任务？"
-                        @confirm="removeTask(row)"
-                      >
-                        <template #reference>
-                          <ElButton
-                            :loading="deletingTaskNo === row.id"
-                            link
-                            type="danger"
-                          >
-                            删除
-                          </ElButton>
-                        </template>
-                      </ElPopconfirm>
-                    </div>
-                  </template>
-                </ElTableColumn>
-              </ElTable>
-
-              <div class="queue-pagination">
-                <ElPagination
-                  :current-page="pageNum"
-                  :page-size="pageSize"
-                  :page-sizes="[10, 20, 50, 100]"
-                  :total="totalTasks"
-                  background
-                  layout="total, sizes, prev, pager, next, jumper"
-                  @current-change="changePageNum"
-                  @size-change="changePageSize"
-                />
-              </div>
-            </section>
-
-            <aside class="detail-panel">
-              <div class="panel-header">
-                <div>
-                  <h2>{{ selectedTask?.fileName ?? '-' }}</h2>
-                  <span>{{ selectedTask?.id ?? '-' }}</span>
-                </div>
-                <ElTag
-                  v-if="selectedTask"
-                  :type="statusType(selectedTask.status)"
-                  effect="plain"
-                >
-                  {{ statusLabel(selectedTask.status) }}
-                </ElTag>
-              </div>
-
-              <div class="detail-progress">
-                <ElProgress
-                  :percentage="selectedTask?.progress ?? 0"
-                  :stroke-width="10"
-                />
-              </div>
-
-              <ElTimeline>
-                <ElTimelineItem
-                  v-for="(stage, index) in pipelineStages"
-                  :key="stage.key"
-                  :type="stageClass(index) === 'is-done' ? 'success' : undefined"
-                >
-                  {{ stage.label }}
-                </ElTimelineItem>
-              </ElTimeline>
-            </aside>
-          </div>
-        </ElTabPane>
-      </ElTabs>
+              {{ stage.label }}
+            </ElTimelineItem>
+          </ElTimeline>
+        </aside>
+      </div>
     </div>
   </Page>
 </template>
@@ -556,7 +552,6 @@ function formatDateTime(value?: string) {
 }
 
 .metric-item,
-.queue-panel,
 .detail-panel,
 .submit-panel,
 .pipeline-band {
@@ -650,7 +645,14 @@ function formatDateTime(value?: string) {
   gap: 16px;
 }
 
-.queue-panel,
+.queue-panel {
+  padding: 0;
+}
+
+.queue-panel :deep(.el-card__body) {
+  padding: 0;
+}
+
 .detail-panel {
   padding: 16px;
 }
@@ -660,13 +662,17 @@ function formatDateTime(value?: string) {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 0;
 }
 
 .panel-header h2 {
   margin: 0 0 4px;
   font-size: 18px;
   font-weight: 700;
+}
+
+.detail-panel .panel-header {
+  margin-bottom: 16px;
 }
 
 .detail-progress {
@@ -693,7 +699,7 @@ function formatDateTime(value?: string) {
 .queue-pagination {
   display: flex;
   justify-content: flex-end;
-  padding-top: 14px;
+  padding: 12px;
 }
 
 @media (max-width: 1200px) {
