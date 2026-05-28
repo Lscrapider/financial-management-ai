@@ -1,12 +1,9 @@
 <script lang="ts" setup>
 import type { FormInstance, FormRules } from 'element-plus';
 
-import type {
-  StockAlertConfig,
-  StockAlertStockOption,
-} from '#/api/stock-alert';
+import type { AlertTargetOption, StockAlertConfig } from '#/api/stock-alert';
 
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import { Page } from '@vben/common-ui';
 import { IconifyIcon } from '@vben/icons';
@@ -34,8 +31,8 @@ import {
 import {
   checkStockAlerts,
   deleteStockAlert,
+  listAlertTargetOptions,
   listStockAlerts,
-  listStockAlertStockOptions,
   saveStockAlert,
 } from '#/api/stock-alert';
 
@@ -43,25 +40,35 @@ interface AlertFormState {
   enabled: boolean;
   id?: string;
   stockCode: string;
+  targetType: string;
   thresholdPercent: number;
 }
 
+const TARGET_TYPES = [
+  { label: '股票', value: 'STOCK' },
+  { label: '指数', value: 'INDEX' },
+  { label: '可转债', value: 'BOND' },
+];
+
 const userStore = useUserStore();
 const alerts = ref<StockAlertConfig[]>([]);
-const stockOptions = ref<StockAlertStockOption[]>([]);
+const targetOptions = ref<AlertTargetOption[]>([]);
 const loading = ref(false);
 const saving = ref(false);
 const checking = ref(false);
 const dialogVisible = ref(false);
+const filterTargetType = ref('');
 const formRef = ref<FormInstance>();
 const formState = reactive<AlertFormState>({
   enabled: true,
   stockCode: '',
+  targetType: 'STOCK',
   thresholdPercent: 5,
 });
 
 const formRules: FormRules<AlertFormState> = {
-  stockCode: [{ message: '请选择股票', required: true, trigger: 'change' }],
+  targetType: [{ message: '请选择类型', required: true, trigger: 'change' }],
+  stockCode: [{ message: '请选择目标', required: true, trigger: 'change' }],
   thresholdPercent: [
     { message: '请输入涨跌幅阈值', required: true, trigger: 'blur' },
   ],
@@ -88,10 +95,10 @@ const notificationTip = computed(() => {
   return '';
 });
 
-const stockOptionList = computed(() =>
-  stockOptions.value.map((item) => ({
-    label: `${item.stockName}(${item.stockCode})`,
-    value: item.stockCode,
+const targetOptionList = computed(() =>
+  targetOptions.value.map((item) => ({
+    label: `${item.targetName}(${item.targetCode})`,
+    value: item.targetCode,
   })),
 );
 
@@ -99,18 +106,30 @@ onMounted(() => {
   refreshData();
 });
 
+watch(filterTargetType, () => {
+  refreshData();
+});
+
 async function refreshData() {
   loading.value = true;
   try {
-    const [alertRows, options] = await Promise.all([
-      listStockAlerts(),
-      listStockAlertStockOptions(),
-    ]);
-    alerts.value = alertRows;
-    stockOptions.value = options;
+    alerts.value = await listStockAlerts(filterTargetType.value || undefined);
   } finally {
     loading.value = false;
   }
+}
+
+async function loadTargetOptions(targetType: string) {
+  if (!targetType) {
+    targetOptions.value = [];
+    return;
+  }
+  targetOptions.value = await listAlertTargetOptions(targetType);
+}
+
+function onFormTypeChange(type: string) {
+  formState.stockCode = '';
+  loadTargetOptions(type);
 }
 
 function openCreateDialog() {
@@ -118,8 +137,10 @@ function openCreateDialog() {
     enabled: true,
     id: undefined,
     stockCode: '',
+    targetType: 'STOCK',
     thresholdPercent: 5,
   });
+  loadTargetOptions('STOCK');
   dialogVisible.value = true;
 }
 
@@ -128,8 +149,10 @@ function openEditDialog(row: StockAlertConfig) {
     enabled: row.enabled,
     id: row.id,
     stockCode: row.stockCode,
+    targetType: row.targetType,
     thresholdPercent: toNumber(row.thresholdPercent),
   });
+  loadTargetOptions(row.targetType);
   dialogVisible.value = true;
 }
 
@@ -140,10 +163,11 @@ async function submitForm() {
     await saveStockAlert({
       enabled: formState.enabled,
       id: formState.id,
+      targetType: formState.targetType,
       stockCode: formState.stockCode,
       thresholdPercent: formState.thresholdPercent,
     });
-    ElMessage.success('股票提醒配置已保存');
+    ElMessage.success('提醒配置已保存');
     dialogVisible.value = false;
     await refreshData();
   } finally {
@@ -153,7 +177,7 @@ async function submitForm() {
 
 async function removeAlert(row: StockAlertConfig) {
   await ElMessageBox.confirm(
-    `确定删除 ${row.stockName}(${row.stockCode}) 的提醒配置吗？`,
+    `确定删除 ${typeLabel(row.targetType)} ${row.stockName}(${row.stockCode}) 的提醒配置吗？`,
     '删除确认',
     {
       confirmButtonText: '删除',
@@ -161,7 +185,7 @@ async function removeAlert(row: StockAlertConfig) {
     },
   );
   await deleteStockAlert(row.id);
-  ElMessage.success('股票提醒配置已删除');
+  ElMessage.success('提醒配置已删除');
   await refreshData();
 }
 
@@ -169,7 +193,7 @@ async function triggerCheck() {
   checking.value = true;
   try {
     await checkStockAlerts();
-    ElMessage.success('已触发股票提醒检查');
+    ElMessage.success('已触发提醒检查');
     await refreshData();
   } finally {
     checking.value = false;
@@ -205,6 +229,24 @@ function changeTagType(value?: number | string) {
     return 'success';
   }
   return 'info';
+}
+
+function typeLabel(targetType?: string) {
+  const found = TARGET_TYPES.find((t) => t.value === targetType);
+  return found?.label ?? targetType ?? '-';
+}
+
+function typeTagType(targetType?: string) {
+  switch (targetType) {
+    case 'STOCK':
+      return 'primary';
+    case 'INDEX':
+      return 'warning';
+    case 'BOND':
+      return 'success';
+    default:
+      return 'info';
+  }
 }
 
 function formatPercent(value?: number | string) {
@@ -246,13 +288,13 @@ function toNumber(value?: number | string | null) {
 </script>
 
 <template>
-  <Page title="股票提醒">
+  <Page title="涨跌幅提醒">
     <div class="stock-alert-page">
       <section class="overview-band">
         <div>
-          <div class="page-title">股票涨跌幅提醒</div>
+          <div class="page-title">涨跌幅提醒</div>
           <div class="page-meta">
-            关注股票并配置阈值，越界时按用户邮箱通知设置发送提醒。
+            关注股票/指数/可转债并配置阈值，越界时按用户邮箱通知发送提醒。
           </div>
         </div>
         <div class="overview-stats">
@@ -287,7 +329,24 @@ function toNumber(value?: number | string | null) {
       <ElCard shadow="never">
         <template #header>
           <div class="panel-header">
-            <span>关注配置</span>
+            <div class="header-left">
+              <span>关注配置</span>
+              <ElSelect
+                v-model="filterTargetType"
+                class="type-filter"
+                clearable
+                placeholder="全部类型"
+                size="small"
+              >
+                <ElOption label="全部" value="" />
+                <ElOption
+                  v-for="item in TARGET_TYPES"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                />
+              </ElSelect>
+            </div>
             <ElSpace>
               <ElButton :loading="loading" @click="refreshData">
                 <IconifyIcon icon="lucide:refresh-cw" />
@@ -346,7 +405,19 @@ function toNumber(value?: number | string | null) {
             </template>
           </ElTableColumn>
 
-          <ElTableColumn label="股票" min-width="170" prop="stockName">
+          <ElTableColumn label="类型" min-width="90" prop="targetType">
+            <template #default="{ row }">
+              <ElTag
+                :type="typeTagType(row.targetType)"
+                effect="plain"
+                size="small"
+              >
+                {{ typeLabel(row.targetType) }}
+              </ElTag>
+            </template>
+          </ElTableColumn>
+
+          <ElTableColumn label="名称" min-width="170" prop="stockName">
             <template #default="{ row }">
               <div class="stack-cell">
                 <span>{{ row.stockName }}</span>
@@ -425,16 +496,32 @@ function toNumber(value?: number | string | null) {
         :rules="formRules"
         label-position="top"
       >
-        <ElFormItem label="股票" prop="stockCode">
+        <ElFormItem label="类型" prop="targetType">
+          <ElSelect
+            v-model="formState.targetType"
+            :disabled="!!formState.id"
+            class="w-full"
+            @change="onFormTypeChange"
+          >
+            <ElOption
+              v-for="item in TARGET_TYPES"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </ElSelect>
+        </ElFormItem>
+
+        <ElFormItem label="目标" prop="stockCode">
           <ElSelect
             v-model="formState.stockCode"
             :disabled="!!formState.id"
             filterable
-            placeholder="请选择股票"
+            placeholder="请选择目标"
             class="w-full"
           >
             <ElOption
-              v-for="item in stockOptionList"
+              v-for="item in targetOptionList"
               :key="item.value"
               :label="item.label"
               :value="item.value"
@@ -527,6 +614,16 @@ function toNumber(value?: number | string | null) {
   font-weight: 600;
   gap: 12px;
   justify-content: space-between;
+}
+
+.header-left {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.type-filter {
+  width: 120px;
 }
 
 .stack-cell {

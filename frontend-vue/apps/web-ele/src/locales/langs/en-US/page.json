@@ -13,7 +13,8 @@
     "workspace": "Market Overview",
     "watchPool": "Investment Watch Pool",
     "indexMarket": "Index Market",
-    "stockAlert": "Stock Alerts"
+    "stockAlert": "Stock Alerts",
+    "bondMarket": "Bond Market"
   },
   "aiCenter": {
     "title": "AI Center",

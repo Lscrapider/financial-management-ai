@@ -1,7 +1,6 @@
 package com.scrapider.finance.domain.vo;
 
 import com.scrapider.finance.domain.po.StockAlertConfigPO;
-import com.scrapider.finance.domain.po.StockQuoteSnapshotPO;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.Data;
@@ -15,6 +14,7 @@ public class StockAlertConfigVO {
     private String realName;
     private String email;
     private Boolean emailNotification;
+    private String targetType;
     private String stockCode;
     private String stockName;
     private BigDecimal thresholdPercent;
@@ -25,22 +25,24 @@ public class StockAlertConfigVO {
     private LocalDateTime syncedAt;
     private LocalDateTime lastAlertedAt;
 
-    public static StockAlertConfigVO fromPO(StockAlertConfigPO config, StockQuoteSnapshotPO quote) {
+    public static StockAlertConfigVO fromPO(StockAlertConfigPO config) {
         StockAlertConfigVO vo = new StockAlertConfigVO();
         vo.setId(String.valueOf(config.getId()));
         vo.setUserId(String.valueOf(config.getUserId()));
+        vo.setTargetType(config.getTargetType());
         vo.setStockCode(config.getStockCode());
         vo.setStockName(config.getStockName());
         vo.setThresholdPercent(config.getThresholdPercent());
         vo.setEnabled(config.getEnabled());
         vo.setLastAlertedAt(config.getLastAlertedAt());
-        if (quote != null) {
-            vo.setLatestPrice(quote.getLatestPrice());
-            vo.setChangePercent(quote.getChangePercent());
-            vo.setSyncedAt(quote.getSyncedAt());
-        }
-        vo.setOutOfThreshold(isOutOfThreshold(vo.getChangePercent(), vo.getThresholdPercent()));
         return vo;
+    }
+
+    public void fillQuote(BigDecimal latestPrice, BigDecimal changePercent, LocalDateTime syncedAt) {
+        this.latestPrice = latestPrice;
+        this.changePercent = changePercent;
+        this.syncedAt = syncedAt;
+        this.outOfThreshold = isOutOfThreshold(changePercent, thresholdPercent);
     }
 
     public void fillUser(String username, String realName, String email, Boolean emailNotification) {

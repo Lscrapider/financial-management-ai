@@ -12,6 +12,7 @@ public class StockAlertConfigPO {
 
     private Long id;
     private Long userId;
+    private String targetType;
     private String stockCode;
     private String stockName;
     private BigDecimal thresholdPercent;
@@ -24,12 +25,14 @@ public class StockAlertConfigPO {
 
     public static StockAlertConfigPO fromSaveParam(
             Long userId,
-            StockConfigPO stock,
+            String targetCode,
+            String targetName,
             StockAlertConfigSaveParam param) {
         StockAlertConfigPO config = new StockAlertConfigPO();
         config.setUserId(userId);
-        config.setStockCode(stock.getStockCode());
-        config.setStockName(stock.getStockName());
+        config.setTargetType(param.getTargetType());
+        config.setStockCode(targetCode);
+        config.setStockName(targetName);
         config.setThresholdPercent(param.getThresholdPercent());
         config.setEnabled(param.getEnabled() == null || Boolean.TRUE.equals(param.getEnabled()));
         config.setAlertActive(false);

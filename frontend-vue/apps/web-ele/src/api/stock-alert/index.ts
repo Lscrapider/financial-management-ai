@@ -7,6 +7,7 @@ export interface StockAlertConfig {
   realName?: string;
   email?: string;
   emailNotification?: boolean;
+  targetType: string;
   stockCode: string;
   stockName: string;
   thresholdPercent: number | string;
@@ -18,9 +19,10 @@ export interface StockAlertConfig {
   lastAlertedAt?: string;
 }
 
-export interface StockAlertStockOption {
-  stockCode: string;
-  stockName: string;
+export interface AlertTargetOption {
+  targetType: string;
+  targetCode: string;
+  targetName: string;
   marketCode: string;
   exchangeCode: string;
 }
@@ -28,17 +30,21 @@ export interface StockAlertStockOption {
 export interface SaveStockAlertParams {
   enabled?: boolean;
   id?: string;
+  targetType: string;
   stockCode: string;
   thresholdPercent: number;
 }
 
-export function listStockAlerts() {
-  return requestClient.get<StockAlertConfig[]>('/stock-alerts');
+export function listStockAlerts(targetType?: string) {
+  return requestClient.get<StockAlertConfig[]>('/stock-alerts', {
+    params: targetType ? { targetType } : undefined,
+  });
 }
 
-export function listStockAlertStockOptions() {
-  return requestClient.get<StockAlertStockOption[]>(
-    '/stock-alerts/stock-options',
+export function listAlertTargetOptions(targetType: string) {
+  return requestClient.get<AlertTargetOption[]>(
+    '/stock-alerts/target-options',
+    { params: { targetType } },
   );
 }
 

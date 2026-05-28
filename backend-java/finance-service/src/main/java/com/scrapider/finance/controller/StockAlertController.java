@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -27,13 +28,16 @@ public class StockAlertController {
     }
 
     @GetMapping
-    public ApiResponseVO<List<StockAlertConfigVO>> listAlerts(@AuthenticationPrincipal LoginUser loginUser) {
-        return ApiResponseVO.success(this.stockAlertService.listAlerts(loginUser));
+    public ApiResponseVO<List<StockAlertConfigVO>> listAlerts(
+            @AuthenticationPrincipal LoginUser loginUser,
+            @RequestParam(required = false) String targetType) {
+        return ApiResponseVO.success(this.stockAlertService.listAlerts(loginUser, targetType));
     }
 
-    @GetMapping("/stock-options")
-    public ApiResponseVO<List<StockAlertStockOptionVO>> listStockOptions() {
-        return ApiResponseVO.success(this.stockAlertService.listStockOptions());
+    @GetMapping("/target-options")
+    public ApiResponseVO<List<StockAlertStockOptionVO>> listTargetOptions(
+            @RequestParam String targetType) {
+        return ApiResponseVO.success(this.stockAlertService.listTargetOptions(targetType));
     }
 
     @PostMapping
@@ -54,7 +58,7 @@ public class StockAlertController {
     @PostMapping("/check")
     public ApiResponseVO<Void> checkAlerts(@AuthenticationPrincipal LoginUser loginUser) {
         if (loginUser == null || !"admin".equals(loginUser.getRoleCode())) {
-            throw new IllegalArgumentException("Only admin can trigger stock alert check.");
+            throw new IllegalArgumentException("Only admin can trigger alert check.");
         }
         this.stockAlertService.checkAlerts();
         return ApiResponseVO.success(null);

@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import type { BondQuote } from '#/api/bond';
 import type { IndexQuote } from '#/api/index-market';
 import type { StockQuote } from '#/api/stock';
 import type { WatchGroup, WatchTargetType } from '#/api/watch-pool';
@@ -23,6 +24,7 @@ import {
   ElTag,
 } from 'element-plus';
 
+import { listBondQuotes } from '#/api/bond';
 import { listIndexQuotes } from '#/api/index-market';
 import { listStockQuotes } from '#/api/stock';
 import {
@@ -43,6 +45,7 @@ const groups = ref<WatchGroup[]>([]);
 const selectedGroupId = ref('');
 const stockQuotes = ref<StockQuote[]>([]);
 const indexQuotes = ref<IndexQuote[]>([]);
+const bondQuotes = ref<BondQuote[]>([]);
 const loadingGroups = ref(false);
 const loadingQuotes = ref(false);
 
@@ -53,9 +56,6 @@ const groupName = ref('');
 const targetDialogVisible = ref(false);
 const targetType = ref<WatchTargetType>('STOCK');
 const selectedTargetKeys = ref<string[]>([]);
-const manualTargetCode = ref('');
-const manualTargetName = ref('');
-const manualSecid = ref('');
 const targetRemark = ref('');
 
 const selectedGroup = computed(() => {
@@ -78,8 +78,18 @@ const indexOptions = computed<TargetOption[]>(() => {
   }));
 });
 
+const bondOptions = computed<TargetOption[]>(() => {
+  return bondQuotes.value.map((item) => ({
+    code: item.bondCode,
+    name: item.bondName,
+    secid: item.secid,
+  }));
+});
+
 const currentTargetOptions = computed<TargetOption[]>(() => {
-  return targetType.value === 'STOCK' ? stockOptions.value : indexOptions.value;
+  if (targetType.value === 'STOCK') return stockOptions.value;
+  if (targetType.value === 'INDEX') return indexOptions.value;
+  return bondOptions.value;
 });
 
 const stocks = computed(() => {
@@ -123,9 +133,23 @@ const indices = computed(() => {
 });
 
 const bonds = computed(() => {
-  return (selectedGroup.value?.items ?? []).filter(
-    (item) => item.targetType === 'BOND',
-  );
+  return (selectedGroup.value?.items ?? [])
+    .filter((item) => item.targetType === 'BOND')
+    .map((item) => ({
+      ...item,
+      latestPrice:
+        item.latestPrice ??
+        bondQuotes.value.find((quote) => quote.bondCode === item.targetCode)
+          ?.latestPrice,
+      changePercent:
+        item.changePercent ??
+        bondQuotes.value.find((quote) => quote.bondCode === item.targetCode)
+          ?.changePercent,
+      turnoverAmount:
+        item.turnoverAmount ??
+        bondQuotes.value.find((quote) => quote.bondCode === item.targetCode)
+          ?.turnoverAmount,
+    }));
 });
 
 onMounted(async () => {
@@ -150,7 +174,7 @@ async function loadGroups() {
 async function loadQuotes() {
   loadingQuotes.value = true;
   try {
-    const [stocksData, indicesData] = await Promise.all([
+    const [stocksData, indicesData, bondsData] = await Promise.all([
       listStockQuotes({
         limit: 200,
         sortField: 'changePercent',
@@ -162,9 +186,15 @@ async function loadQuotes() {
         sortField: 'indexCode',
         sortOrder: 'asc',
       }),
+      listBondQuotes({
+        limit: 100,
+        sortField: 'changePercent',
+        sortOrder: 'desc',
+      }),
     ]);
     stockQuotes.value = stocksData;
     indexQuotes.value = indicesData;
+    bondQuotes.value = bondsData;
   } finally {
     loadingQuotes.value = false;
   }
@@ -218,9 +248,6 @@ function openAddTarget() {
 
 function resetTargetForm() {
   selectedTargetKeys.value = [];
-  manualTargetCode.value = '';
-  manualTargetName.value = '';
-  manualSecid.value = '';
   targetRemark.value = '';
 }
 
@@ -262,21 +289,6 @@ async function saveTarget() {
 }
 
 function selectedOptions(): TargetOption[] {
-  if (targetType.value === 'BOND') {
-    const code = manualTargetCode.value.trim();
-    const name = manualTargetName.value.trim();
-    if (!code || !name) {
-      return [];
-    }
-    return [
-      {
-        code,
-        name,
-        secid: manualSecid.value.trim(),
-      },
-    ];
-  }
-
   return currentTargetOptions.value.filter((item) =>
     selectedTargetKeys.value.includes(optionKey(item)),
   );
@@ -484,8 +496,8 @@ function toNumber(value?: number | string | null) {
               <ElTag effect="plain" size="small">{{ bonds.length }}</ElTag>
             </div>
           </template>
-          <ElTable v-if="bonds.length > 0" :data="bonds" height="260">
-            <ElTableColumn label="名称" min-width="180">
+          <ElTable v-if="bonds.length > 0" :data="bonds" height="300">
+            <ElTableColumn label="名称" min-width="150">
               <template #default="{ row }">
                 <div class="target-name">
                   <span>{{ row.targetName }}</span>
@@ -493,18 +505,24 @@ function toNumber(value?: number | string | null) {
                 </div>
               </template>
             </ElTableColumn>
-            <ElTableColumn label="类型" width="90">
+            <ElTableColumn label="最新" align="right" min-width="90">
               <template #default="{ row }">
-                <ElTag size="small" type="warning">{{
-                  typeLabel(row.targetType)
-                }}</ElTag>
+                {{ formatPrice(row.latestPrice) }}
               </template>
             </ElTableColumn>
-            <ElTableColumn label="正股/备注" min-width="180">
+            <ElTableColumn label="涨跌幅" align="right" min-width="90">
               <template #default="{ row }">
-                {{ row.remark || '-' }}
+                <span :class="changeClass(row.changePercent)">
+                  {{ formatChangePercent(row.changePercent) }}
+                </span>
               </template>
             </ElTableColumn>
+            <ElTableColumn label="成交额" align="right" min-width="100">
+              <template #default="{ row }">
+                {{ formatMoney(row.turnoverAmount) }}
+              </template>
+            </ElTableColumn>
+            <ElTableColumn label="备注" min-width="120" prop="remark" />
             <ElTableColumn label="操作" width="72" align="right">
               <template #default="{ row }">
                 <ElButton link type="danger" @click="removeTarget(row.id)">
@@ -541,38 +559,24 @@ function toNumber(value?: number | string | null) {
             <ElRadioButton value="BOND">债券</ElRadioButton>
           </ElRadioGroup>
 
-          <template v-if="targetType !== 'BOND'">
-            <span>选择标的</span>
-            <ElSelect
-              :key="targetType"
-              v-model="selectedTargetKeys"
-              collapse-tags
-              collapse-tags-tooltip
-              filterable
-              multiple
-              placeholder="可多选，输入代码或名称搜索"
-              style="width: 100%"
-            >
-              <ElOption
-                v-for="option in currentTargetOptions"
-                :key="optionKey(option)"
-                :label="`${option.name} ${option.code}`"
-                :value="optionKey(option)"
-              />
-            </ElSelect>
-          </template>
-
-          <template v-else>
-            <span>债券代码</span>
-            <ElInput v-model="manualTargetCode" placeholder="例如：110xxx" />
-            <span>债券名称</span>
-            <ElInput v-model="manualTargetName" placeholder="例如：汇通转债" />
-            <span>Secid</span>
-            <ElInput
-              v-model="manualSecid"
-              placeholder="债券接口接入后可自动回填"
+          <span>选择标的</span>
+          <ElSelect
+            :key="targetType"
+            v-model="selectedTargetKeys"
+            collapse-tags
+            collapse-tags-tooltip
+            filterable
+            multiple
+            placeholder="可多选，输入代码或名称搜索"
+            style="width: 100%"
+          >
+            <ElOption
+              v-for="option in currentTargetOptions"
+              :key="optionKey(option)"
+              :label="`${option.name} ${option.code}`"
+              :value="optionKey(option)"
             />
-          </template>
+          </ElSelect>
 
           <span>备注</span>
           <ElInput

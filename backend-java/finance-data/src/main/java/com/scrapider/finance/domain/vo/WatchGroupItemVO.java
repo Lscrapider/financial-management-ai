@@ -1,5 +1,6 @@
 package com.scrapider.finance.domain.vo;
 
+import com.scrapider.finance.domain.po.BondQuoteSnapshotPO;
 import com.scrapider.finance.domain.po.IndexQuoteSnapshotPO;
 import com.scrapider.finance.domain.po.StockQuoteSnapshotPO;
 import com.scrapider.finance.domain.po.WatchGroupItemPO;
@@ -51,6 +52,16 @@ public class WatchGroupItemVO {
     }
 
     public void fillIndexQuote(IndexQuoteSnapshotPO quote) {
+        if (quote == null) {
+            return;
+        }
+        this.latestPrice = quote.getLatestPrice();
+        this.changePercent = quote.getChangePercent();
+        this.turnoverAmount = quote.getTurnoverAmount();
+        this.syncedAt = quote.getSyncedAt();
+    }
+
+    public void fillBondQuote(BondQuoteSnapshotPO quote) {
         if (quote == null) {
             return;
         }

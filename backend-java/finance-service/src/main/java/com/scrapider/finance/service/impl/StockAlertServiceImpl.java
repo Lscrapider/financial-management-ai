@@ -4,12 +4,20 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.scrapider.finance.domain.param.StockAlertConfigSaveParam;
 import com.scrapider.finance.domain.po.AppUserPO;
+import com.scrapider.finance.domain.po.BondConfigPO;
+import com.scrapider.finance.domain.po.BondQuoteSnapshotPO;
+import com.scrapider.finance.domain.po.IndexConfigPO;
+import com.scrapider.finance.domain.po.IndexQuoteSnapshotPO;
 import com.scrapider.finance.domain.po.StockAlertConfigPO;
 import com.scrapider.finance.domain.po.StockConfigPO;
 import com.scrapider.finance.domain.po.StockQuoteSnapshotPO;
 import com.scrapider.finance.domain.vo.StockAlertConfigVO;
 import com.scrapider.finance.domain.vo.StockAlertStockOptionVO;
 import com.scrapider.finance.manage.AppUserManage;
+import com.scrapider.finance.manage.BondConfigManage;
+import com.scrapider.finance.manage.BondQuoteSnapshotManage;
+import com.scrapider.finance.manage.IndexConfigManage;
+import com.scrapider.finance.manage.IndexQuoteSnapshotManage;
 import com.scrapider.finance.manage.StockAlertConfigManage;
 import com.scrapider.finance.manage.StockConfigManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
@@ -31,10 +39,17 @@ import org.springframework.stereotype.Service;
 public class StockAlertServiceImpl implements StockAlertService {
 
     private static final String ADMIN_ROLE_CODE = "admin";
+    private static final String TYPE_STOCK = "STOCK";
+    private static final String TYPE_INDEX = "INDEX";
+    private static final String TYPE_BOND = "BOND";
 
     private final StockAlertConfigManage stockAlertConfigManage;
     private final StockConfigManage stockConfigManage;
     private final StockQuoteSnapshotManage stockQuoteSnapshotManage;
+    private final IndexConfigManage indexConfigManage;
+    private final IndexQuoteSnapshotManage indexQuoteSnapshotManage;
+    private final BondConfigManage bondConfigManage;
+    private final BondQuoteSnapshotManage bondQuoteSnapshotManage;
     private final AppUserManage appUserManage;
     private final StockAlertMailService stockAlertMailService;
 
@@ -42,41 +57,62 @@ public class StockAlertServiceImpl implements StockAlertService {
             StockAlertConfigManage stockAlertConfigManage,
             StockConfigManage stockConfigManage,
             StockQuoteSnapshotManage stockQuoteSnapshotManage,
+            IndexConfigManage indexConfigManage,
+            IndexQuoteSnapshotManage indexQuoteSnapshotManage,
+            BondConfigManage bondConfigManage,
+            BondQuoteSnapshotManage bondQuoteSnapshotManage,
             AppUserManage appUserManage,
             StockAlertMailService stockAlertMailService) {
         this.stockAlertConfigManage = stockAlertConfigManage;
         this.stockConfigManage = stockConfigManage;
         this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
+        this.indexConfigManage = indexConfigManage;
+        this.indexQuoteSnapshotManage = indexQuoteSnapshotManage;
+        this.bondConfigManage = bondConfigManage;
+        this.bondQuoteSnapshotManage = bondQuoteSnapshotManage;
         this.appUserManage = appUserManage;
         this.stockAlertMailService = stockAlertMailService;
     }
 
+    private record QuoteSnapshot(BigDecimal latestPrice, BigDecimal changePercent, LocalDateTime syncedAt) {}
+
     @Override
-    public List<StockAlertConfigVO> listAlerts(LoginUser loginUser) {
+    public List<StockAlertConfigVO> listAlerts(LoginUser loginUser, String targetType) {
         Long currentUserId = this.currentUserId(loginUser);
         List<StockAlertConfigPO> configs = this.isAdmin(loginUser)
-                ? this.stockAlertConfigManage.listAll()
-                : this.stockAlertConfigManage.listByUserId(currentUserId);
+                ? this.stockAlertConfigManage.listAll(targetType)
+                : this.stockAlertConfigManage.listByUserId(currentUserId, targetType);
         return this.toVOList(configs);
     }
 
     @Override
-    public List<StockAlertStockOptionVO> listStockOptions() {
-        return this.stockConfigManage.listEnabledStocks().stream()
-                .map(StockAlertStockOptionVO::fromPO)
-                .toList();
+    public List<StockAlertStockOptionVO> listTargetOptions(String targetType) {
+        if (StrUtil.isBlank(targetType)) {
+            return List.of();
+        }
+        return switch (targetType.toUpperCase()) {
+            case TYPE_STOCK -> this.stockConfigManage.listEnabledStocks().stream()
+                    .map(StockAlertStockOptionVO::fromStockPO)
+                    .toList();
+            case TYPE_INDEX -> this.indexConfigManage.listEnabledIndices().stream()
+                    .map(StockAlertStockOptionVO::fromIndexPO)
+                    .toList();
+            case TYPE_BOND -> this.bondConfigManage.listEnabledBonds().stream()
+                    .map(StockAlertStockOptionVO::fromBondPO)
+                    .toList();
+            default -> List.of();
+        };
     }
 
     @Override
     public StockAlertConfigVO saveAlert(LoginUser loginUser, StockAlertConfigSaveParam param) {
         this.validateSaveParam(param);
         Long userId = this.currentUserId(loginUser);
-        StockConfigPO stock = this.stockConfigManage.getEnabledByStockCode(param.getStockCode().trim());
-        if (stock == null) {
-            throw new IllegalArgumentException("Stock config not found or disabled.");
-        }
+        String targetType = param.getTargetType().trim().toUpperCase();
+        String targetCode = param.getStockCode().trim();
+        String targetName = this.resolveTargetName(targetType, targetCode);
 
-        StockAlertConfigPO config = this.resolveSaveConfig(loginUser, userId, stock, param);
+        StockAlertConfigPO config = this.resolveSaveConfig(loginUser, userId, targetType, targetCode, targetName, param);
         this.stockAlertConfigManage.saveOrUpdate(config);
         StockAlertConfigPO saved = this.stockAlertConfigManage.getById(config.getId());
         return this.toVOList(List.of(saved)).get(0);
@@ -89,7 +125,7 @@ public class StockAlertServiceImpl implements StockAlertService {
         }
         StockAlertConfigPO config = this.stockAlertConfigManage.getById(id);
         if (config == null) {
-            throw new IllegalArgumentException("Stock alert config not found.");
+            throw new IllegalArgumentException("Alert config not found.");
         }
         this.validateEditable(loginUser, this.currentUserId(loginUser), config);
         this.stockAlertConfigManage.removeById(config.getId());
@@ -102,27 +138,86 @@ public class StockAlertServiceImpl implements StockAlertService {
             return;
         }
         Map<Long, AppUserPO> userMap = this.loadUsers(configs);
-        Map<String, StockQuoteSnapshotPO> quoteMap = this.loadQuotes(configs);
-        configs.forEach(config -> this.checkOneAlert(config, userMap.get(config.getUserId()), quoteMap.get(config.getStockCode())));
+        Map<String, StockQuoteSnapshotPO> stockQuoteMap = this.loadStockQuotes(configs);
+        Map<String, IndexQuoteSnapshotPO> indexQuoteMap = this.loadIndexQuotes(configs);
+        Map<String, BondQuoteSnapshotPO> bondQuoteMap = this.loadBondQuotes(configs);
+        configs.forEach(config -> {
+            AppUserPO user = userMap.get(config.getUserId());
+            QuoteSnapshot snapshot = this.getSnapshot(config, stockQuoteMap, indexQuoteMap, bondQuoteMap);
+            this.checkOneAlert(config, user, snapshot);
+        });
+    }
+
+    private String resolveTargetName(String targetType, String targetCode) {
+        return switch (targetType) {
+            case TYPE_STOCK -> {
+                StockConfigPO stock = this.stockConfigManage.getEnabledByStockCode(targetCode);
+                if (stock == null) {
+                    throw new IllegalArgumentException("Stock config not found or disabled: " + targetCode);
+                }
+                yield stock.getStockName();
+            }
+            case TYPE_INDEX -> {
+                List<IndexConfigPO> indices = this.indexConfigManage.listEnabledIndices();
+                IndexConfigPO index = indices.stream()
+                        .filter(i -> i.getIndexCode().equals(targetCode))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("Index config not found or disabled: " + targetCode));
+                yield index.getIndexName();
+            }
+            case TYPE_BOND -> {
+                List<BondConfigPO> bonds = this.bondConfigManage.listEnabledBonds();
+                BondConfigPO bond = bonds.stream()
+                        .filter(b -> b.getBondCode().equals(targetCode))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("Bond config not found or disabled: " + targetCode));
+                yield bond.getBondName();
+            }
+            default -> throw new IllegalArgumentException("Unknown targetType: " + targetType);
+        };
+    }
+
+    private QuoteSnapshot getSnapshot(
+            StockAlertConfigPO config,
+            Map<String, StockQuoteSnapshotPO> stockQuoteMap,
+            Map<String, IndexQuoteSnapshotPO> indexQuoteMap,
+            Map<String, BondQuoteSnapshotPO> bondQuoteMap) {
+        return switch (config.getTargetType()) {
+            case TYPE_STOCK -> {
+                StockQuoteSnapshotPO q = stockQuoteMap.get(config.getStockCode());
+                yield q != null ? new QuoteSnapshot(q.getLatestPrice(), q.getChangePercent(), q.getSyncedAt()) : null;
+            }
+            case TYPE_INDEX -> {
+                IndexQuoteSnapshotPO q = indexQuoteMap.get(config.getStockCode());
+                yield q != null ? new QuoteSnapshot(q.getLatestPrice(), q.getChangePercent(), q.getSyncedAt()) : null;
+            }
+            case TYPE_BOND -> {
+                BondQuoteSnapshotPO q = bondQuoteMap.get(config.getStockCode());
+                yield q != null ? new QuoteSnapshot(q.getLatestPrice(), q.getChangePercent(), q.getSyncedAt()) : null;
+            }
+            default -> null;
+        };
     }
 
     private StockAlertConfigPO resolveSaveConfig(
             LoginUser loginUser,
             Long currentUserId,
-            StockConfigPO stock,
+            String targetType,
+            String targetCode,
+            String targetName,
             StockAlertConfigSaveParam param) {
         StockAlertConfigPO existing = param.getId() == null
-                ? this.stockAlertConfigManage.getByUserIdAndStockCode(currentUserId, stock.getStockCode())
+                ? this.stockAlertConfigManage.getByUserIdAndTarget(currentUserId, targetType, targetCode)
                 : this.resolveEditableConfig(loginUser, currentUserId, param.getId());
         if (param.getId() != null && existing == null) {
-            throw new IllegalArgumentException("Stock alert config not found.");
+            throw new IllegalArgumentException("Alert config not found.");
         }
         Long targetUserId = existing == null ? currentUserId : existing.getUserId();
-        StockAlertConfigPO config = StockAlertConfigPO.fromSaveParam(targetUserId, stock, param);
-        StockAlertConfigPO sameStockConfig =
-                this.stockAlertConfigManage.getByUserIdAndStockCode(targetUserId, stock.getStockCode());
-        if (sameStockConfig != null && (existing == null || !sameStockConfig.getId().equals(existing.getId()))) {
-            throw new IllegalArgumentException("Stock alert config already exists.");
+        StockAlertConfigPO config = StockAlertConfigPO.fromSaveParam(targetUserId, targetCode, targetName, param);
+        StockAlertConfigPO sameConfig =
+                this.stockAlertConfigManage.getByUserIdAndTarget(targetUserId, targetType, targetCode);
+        if (sameConfig != null && (existing == null || !sameConfig.getId().equals(existing.getId()))) {
+            throw new IllegalArgumentException("Alert config already exists for this target.");
         }
         if (existing != null) {
             config.setId(existing.getId());
@@ -148,7 +243,7 @@ public class StockAlertServiceImpl implements StockAlertService {
         if (this.isAdmin(loginUser) || Objects.equals(config.getUserId(), currentUserId)) {
             return;
         }
-        throw new IllegalArgumentException("No permission to edit this stock alert config.");
+        throw new IllegalArgumentException("No permission to edit this alert config.");
     }
 
     private List<StockAlertConfigVO> toVOList(List<StockAlertConfigPO> configs) {
@@ -156,10 +251,16 @@ public class StockAlertServiceImpl implements StockAlertService {
             return List.of();
         }
         Map<Long, AppUserPO> userMap = this.loadUsers(configs);
-        Map<String, StockQuoteSnapshotPO> quoteMap = this.loadQuotes(configs);
+        Map<String, StockQuoteSnapshotPO> stockQuoteMap = this.loadStockQuotes(configs);
+        Map<String, IndexQuoteSnapshotPO> indexQuoteMap = this.loadIndexQuotes(configs);
+        Map<String, BondQuoteSnapshotPO> bondQuoteMap = this.loadBondQuotes(configs);
         return configs.stream()
                 .map(config -> {
-                    StockAlertConfigVO vo = StockAlertConfigVO.fromPO(config, quoteMap.get(config.getStockCode()));
+                    StockAlertConfigVO vo = StockAlertConfigVO.fromPO(config);
+                    QuoteSnapshot snapshot = this.getSnapshot(config, stockQuoteMap, indexQuoteMap, bondQuoteMap);
+                    if (snapshot != null) {
+                        vo.fillQuote(snapshot.latestPrice(), snapshot.changePercent(), snapshot.syncedAt());
+                    }
                     AppUserPO user = userMap.get(config.getUserId());
                     if (user != null) {
                         vo.fillUser(user.getUsername(), user.getRealName(), user.getEmail(), user.getEmailNotification());
@@ -179,21 +280,53 @@ public class StockAlertServiceImpl implements StockAlertService {
                 .collect(Collectors.toMap(AppUserPO::getId, Function.identity()));
     }
 
-    private Map<String, StockQuoteSnapshotPO> loadQuotes(List<StockAlertConfigPO> configs) {
-        List<String> stockCodes = configs.stream()
+    private Map<String, StockQuoteSnapshotPO> loadStockQuotes(List<StockAlertConfigPO> configs) {
+        List<String> codes = configs.stream()
+                .filter(c -> TYPE_STOCK.equals(c.getTargetType()))
                 .map(StockAlertConfigPO::getStockCode)
                 .filter(StrUtil::isNotBlank)
                 .distinct()
                 .toList();
-        return this.stockQuoteSnapshotManage.listByStockCodes(stockCodes).stream()
+        if (codes.isEmpty()) {
+            return Map.of();
+        }
+        return this.stockQuoteSnapshotManage.listByStockCodes(codes).stream()
                 .collect(Collectors.toMap(StockQuoteSnapshotPO::getStockCode, Function.identity()));
     }
 
-    private void checkOneAlert(StockAlertConfigPO config, AppUserPO user, StockQuoteSnapshotPO quote) {
-        if (quote == null || quote.getChangePercent() == null || user == null) {
+    private Map<String, IndexQuoteSnapshotPO> loadIndexQuotes(List<StockAlertConfigPO> configs) {
+        List<String> codes = configs.stream()
+                .filter(c -> TYPE_INDEX.equals(c.getTargetType()))
+                .map(StockAlertConfigPO::getStockCode)
+                .filter(StrUtil::isNotBlank)
+                .distinct()
+                .toList();
+        if (codes.isEmpty()) {
+            return Map.of();
+        }
+        return this.indexQuoteSnapshotManage.listByIndexCodes(codes).stream()
+                .collect(Collectors.toMap(IndexQuoteSnapshotPO::getIndexCode, Function.identity()));
+    }
+
+    private Map<String, BondQuoteSnapshotPO> loadBondQuotes(List<StockAlertConfigPO> configs) {
+        List<String> codes = configs.stream()
+                .filter(c -> TYPE_BOND.equals(c.getTargetType()))
+                .map(StockAlertConfigPO::getStockCode)
+                .filter(StrUtil::isNotBlank)
+                .distinct()
+                .toList();
+        if (codes.isEmpty()) {
+            return Map.of();
+        }
+        return this.bondQuoteSnapshotManage.listByBondCodes(codes).stream()
+                .collect(Collectors.toMap(BondQuoteSnapshotPO::getBondCode, Function.identity()));
+    }
+
+    private void checkOneAlert(StockAlertConfigPO config, AppUserPO user, QuoteSnapshot snapshot) {
+        if (snapshot == null || snapshot.changePercent() == null || user == null) {
             return;
         }
-        boolean outOfThreshold = this.isOutOfThreshold(quote.getChangePercent(), config.getThresholdPercent());
+        boolean outOfThreshold = this.isOutOfThreshold(snapshot.changePercent(), config.getThresholdPercent());
         if (!outOfThreshold) {
             this.resetAlertActiveIfNeeded(config);
             return;
@@ -202,14 +335,18 @@ public class StockAlertServiceImpl implements StockAlertService {
             return;
         }
         try {
-            this.stockAlertMailService.sendAlert(user, config, quote);
+            this.stockAlertMailService.sendAlert(
+                    user, config,
+                    snapshot.latestPrice(),
+                    snapshot.changePercent(),
+                    snapshot.syncedAt() != null ? snapshot.syncedAt().toString() : null);
             config.setAlertActive(true);
-            config.setLastAlertChangePercent(quote.getChangePercent());
+            config.setLastAlertChangePercent(snapshot.changePercent());
             config.setLastAlertedAt(LocalDateTime.now());
             this.stockAlertConfigManage.updateById(config);
         } catch (Exception ex) {
             log.warn(
-                    "Failed to send stock alert email, userId: {}, stockCode: {}",
+                    "Failed to send alert email, userId: {}, targetCode: {}",
                     config.getUserId(),
                     config.getStockCode(),
                     ex);
@@ -239,7 +376,14 @@ public class StockAlertServiceImpl implements StockAlertService {
     }
 
     private void validateSaveParam(StockAlertConfigSaveParam param) {
-        if (param == null || StrUtil.isBlank(param.getStockCode())) {
+        if (param == null || StrUtil.isBlank(param.getTargetType())) {
+            throw new IllegalArgumentException("targetType must not be blank.");
+        }
+        String type = param.getTargetType().trim().toUpperCase();
+        if (!List.of(TYPE_STOCK, TYPE_INDEX, TYPE_BOND).contains(type)) {
+            throw new IllegalArgumentException("targetType must be one of STOCK, INDEX, BOND.");
+        }
+        if (StrUtil.isBlank(param.getStockCode())) {
             throw new IllegalArgumentException("stockCode must not be blank.");
         }
         if (param.getThresholdPercent() == null || param.getThresholdPercent().compareTo(BigDecimal.ZERO) <= 0) {

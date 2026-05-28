@@ -8,9 +8,9 @@ import java.util.List;
 
 public interface StockAlertService {
 
-    List<StockAlertConfigVO> listAlerts(LoginUser loginUser);
+    List<StockAlertConfigVO> listAlerts(LoginUser loginUser, String targetType);
 
-    List<StockAlertStockOptionVO> listStockOptions();
+    List<StockAlertStockOptionVO> listTargetOptions(String targetType);
 
     StockAlertConfigVO saveAlert(LoginUser loginUser, StockAlertConfigSaveParam param);
 

@@ -3,7 +3,6 @@ package com.scrapider.finance.service.impl;
 import cn.hutool.core.util.StrUtil;
 import com.scrapider.finance.domain.po.AppUserPO;
 import com.scrapider.finance.domain.po.StockAlertConfigPO;
-import com.scrapider.finance.domain.po.StockQuoteSnapshotPO;
 import com.scrapider.finance.service.StockAlertMailService;
 import java.math.BigDecimal;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,43 +23,52 @@ public class StockAlertMailServiceImpl implements StockAlertMailService {
     }
 
     @Override
-    public void sendAlert(AppUserPO user, StockAlertConfigPO config, StockQuoteSnapshotPO quote) {
+    public void sendAlert(AppUserPO user, StockAlertConfigPO config, BigDecimal latestPrice, BigDecimal changePercent, String syncedAt) {
         if (StrUtil.isBlank(this.from)) {
             throw new IllegalStateException("spring.mail.username must not be blank.");
         }
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(this.from);
         message.setTo(user.getEmail());
-        message.setSubject(this.subject(config, quote));
-        message.setText(this.content(config, quote));
+        message.setSubject(this.subject(config, changePercent));
+        message.setText(this.content(config, latestPrice, changePercent, syncedAt));
         this.mailSender.send(message);
     }
 
-    private String subject(StockAlertConfigPO config, StockQuoteSnapshotPO quote) {
+    private String subject(StockAlertConfigPO config, BigDecimal changePercent) {
         return String.format(
-                "股票涨跌幅提醒：%s(%s) %s%%",
+                "%s涨跌幅提醒：%s(%s) %s%%",
+                this.typeLabel(config.getTargetType()),
                 config.getStockName(),
                 config.getStockCode(),
-                this.format(quote.getChangePercent()));
+                this.format(changePercent));
     }
 
-    private String content(StockAlertConfigPO config, StockQuoteSnapshotPO quote) {
+    private String content(StockAlertConfigPO config, BigDecimal latestPrice, BigDecimal changePercent, String syncedAt) {
         return String.format(
                 """
-                您关注的股票已超过涨跌幅提醒阈值。
+                您关注的%s已超过涨跌幅提醒阈值。
 
-                股票：%s(%s)
+                目标：%s(%s)
                 当前价格：%s
                 当前涨跌幅：%s%%
                 配置阈值：%s%%
-                行情同步时间：%s
                 """,
+                this.typeLabel(config.getTargetType()),
                 config.getStockName(),
                 config.getStockCode(),
-                this.format(quote.getLatestPrice()),
-                this.format(quote.getChangePercent()),
-                this.format(config.getThresholdPercent()),
-                quote.getSyncedAt());
+                this.format(latestPrice),
+                this.format(changePercent),
+                this.format(config.getThresholdPercent()));
+    }
+
+    private String typeLabel(String targetType) {
+        return switch (targetType) {
+            case "STOCK" -> "股票";
+            case "INDEX" -> "指数";
+            case "BOND" -> "可转债";
+            default -> "目标";
+        };
     }
 
     private String format(BigDecimal value) {

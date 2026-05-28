@@ -31,6 +31,15 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
+        name: 'BondMarket',
+        path: '/bond-market',
+        component: () => import('#/views/dashboard/bond-market/index.vue'),
+        meta: {
+          icon: 'lucide:landmark',
+          title: $t('page.dashboard.bondMarket'),
+        },
+      },
+      {
         name: 'WatchPool',
         path: '/watch-pool',
         component: () => import('#/views/dashboard/watch-pool/index.vue'),

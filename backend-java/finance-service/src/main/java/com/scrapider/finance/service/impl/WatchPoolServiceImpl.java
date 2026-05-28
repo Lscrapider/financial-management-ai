@@ -5,12 +5,14 @@ import cn.hutool.core.util.StrUtil;
 import com.scrapider.finance.domain.enums.WatchTargetTypeEnum;
 import com.scrapider.finance.domain.param.WatchGroupItemSaveParam;
 import com.scrapider.finance.domain.param.WatchGroupSaveParam;
+import com.scrapider.finance.domain.po.BondQuoteSnapshotPO;
 import com.scrapider.finance.domain.po.IndexQuoteSnapshotPO;
 import com.scrapider.finance.domain.po.StockQuoteSnapshotPO;
 import com.scrapider.finance.domain.po.WatchGroupItemPO;
 import com.scrapider.finance.domain.po.WatchGroupPO;
 import com.scrapider.finance.domain.vo.WatchGroupItemVO;
 import com.scrapider.finance.domain.vo.WatchGroupVO;
+import com.scrapider.finance.manage.BondQuoteSnapshotManage;
 import com.scrapider.finance.manage.IndexQuoteSnapshotManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
 import com.scrapider.finance.manage.WatchGroupItemManage;
@@ -34,16 +36,19 @@ public class WatchPoolServiceImpl implements WatchPoolService {
     private final WatchGroupItemManage watchGroupItemManage;
     private final StockQuoteSnapshotManage stockQuoteSnapshotManage;
     private final IndexQuoteSnapshotManage indexQuoteSnapshotManage;
+    private final BondQuoteSnapshotManage bondQuoteSnapshotManage;
 
     public WatchPoolServiceImpl(
             WatchGroupManage watchGroupManage,
             WatchGroupItemManage watchGroupItemManage,
             StockQuoteSnapshotManage stockQuoteSnapshotManage,
-            IndexQuoteSnapshotManage indexQuoteSnapshotManage) {
+            IndexQuoteSnapshotManage indexQuoteSnapshotManage,
+            BondQuoteSnapshotManage bondQuoteSnapshotManage) {
         this.watchGroupManage = watchGroupManage;
         this.watchGroupItemManage = watchGroupItemManage;
         this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
         this.indexQuoteSnapshotManage = indexQuoteSnapshotManage;
+        this.bondQuoteSnapshotManage = bondQuoteSnapshotManage;
     }
 
     @Override
@@ -176,6 +181,7 @@ public class WatchPoolServiceImpl implements WatchPoolService {
         }
         Map<String, StockQuoteSnapshotPO> stockQuoteMap = this.stockQuoteMap(items);
         Map<String, IndexQuoteSnapshotPO> indexQuoteMap = this.indexQuoteMap(items);
+        Map<String, BondQuoteSnapshotPO> bondQuoteMap = this.bondQuoteMap(items);
         return items.stream()
                 .map(item -> {
                     WatchGroupItemVO vo = WatchGroupItemVO.fromPO(item);
@@ -184,6 +190,9 @@ public class WatchPoolServiceImpl implements WatchPoolService {
                     }
                     if (WatchTargetTypeEnum.INDEX.name().equals(item.getTargetType())) {
                         vo.fillIndexQuote(indexQuoteMap.get(item.getTargetCode()));
+                    }
+                    if (WatchTargetTypeEnum.BOND.name().equals(item.getTargetType())) {
+                        vo.fillBondQuote(bondQuoteMap.get(item.getTargetCode()));
                     }
                     return vo;
                 })
@@ -208,6 +217,19 @@ public class WatchPoolServiceImpl implements WatchPoolService {
                 .toList();
         return this.indexQuoteSnapshotManage.listByIndexCodes(indexCodes).stream()
                 .collect(Collectors.toMap(IndexQuoteSnapshotPO::getIndexCode, Function.identity()));
+    }
+
+    private Map<String, BondQuoteSnapshotPO> bondQuoteMap(List<WatchGroupItemPO> items) {
+        List<String> bondCodes = items.stream()
+                .filter(item -> WatchTargetTypeEnum.BOND.name().equals(item.getTargetType()))
+                .map(WatchGroupItemPO::getTargetCode)
+                .distinct()
+                .toList();
+        if (bondCodes.isEmpty()) {
+            return Map.of();
+        }
+        return this.bondQuoteSnapshotManage.listByBondCodes(bondCodes).stream()
+                .collect(Collectors.toMap(BondQuoteSnapshotPO::getBondCode, Function.identity()));
     }
 
     private WatchGroupPO requireGroup(Long groupId, Long userId) {
