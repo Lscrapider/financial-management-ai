@@ -50,7 +50,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     @Override
     public KnowledgeChunkPageVO pageChunks(int pageNum, int pageSize) {
         int pn = Math.max(pageNum, DEFAULT_PAGE_NUM);
-        int ps = Math.min(Math.max(pageSize, DEFAULT_PAGE_SIZE), MAX_PAGE_SIZE);
+        int ps = Math.max(1, Math.min(pageSize, MAX_PAGE_SIZE));
         Page<KnowledgeVectorPO> page = this.knowledgeVectorManage.pageChunks(pn, ps);
         Map<String, String> filenameMap = this.filenameMap(page);
         return KnowledgeChunkPageVO.fromPage(page, filenameMap);
