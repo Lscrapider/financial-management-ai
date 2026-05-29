@@ -74,4 +74,11 @@ public final class StockMarketJsonParser {
         }
         return value.asInt();
     }
+
+    public static Integer intValue(String value) {
+        if (StrUtil.isBlank(value) || "-".equals(value.trim())) {
+            return null;
+        }
+        return NumberUtil.toBigDecimal(value.trim()).intValue();
+    }
 }

@@ -56,6 +56,9 @@ public class StockMarketSyncTask {
     @Value("${stock.sync.timezone:Asia/Shanghai}")
     private String timezone;
 
+    @Value("${stock.sync.trend-enabled:true}")
+    private boolean trendEnabled;
+
     public StockMarketSyncTask(
             StockMarketApi stockMarketApi,
             StockConfigManage stockConfigManage,
@@ -162,6 +165,10 @@ public class StockMarketSyncTask {
             StockMarketDataDTO quote = this.stockMarketApi.getQuote(stock.getSecid());
             this.stockQuoteSnapshotManage.saveLatest(StockQuoteSnapshotPO.fromApiResponse(stock, quote.data()));
             this.sleepForRateLimit();
+            if (this.trendEnabled) {
+                this.doSyncTrendsForStock(stock);
+                this.sleepForRateLimit();
+            }
         } catch (Exception ex) {
             log.warn(
                     "Failed to sync stock quote, code: {}, name: {}",

@@ -69,6 +69,9 @@ const editingItem = ref<WatchItem | null>(null);
 const editBuyPrice = ref('');
 const editPosition = ref('');
 const editRemark = ref('');
+const quoteDetailVisible = ref(false);
+const quoteDetailTitle = ref('');
+const quoteDetailRows = ref<StockQuote['quoteDetails']>([]);
 
 const selectedGroup = computed(() => {
   return groups.value.find((group) => group.id === selectedGroupId.value);
@@ -104,6 +107,10 @@ const currentTargetOptions = computed<TargetOption[]>(() => {
   return bondOptions.value;
 });
 
+function supportsDetailQuote(targetType: WatchTargetType): boolean {
+  return targetType === 'STOCK' || targetType === 'BOND';
+}
+
 const filteredItems = computed(() => {
   const items = selectedGroup.value?.items ?? [];
   const filtered =
@@ -123,6 +130,29 @@ const filteredItems = computed(() => {
     const quote = stockQuote ?? indexQuote ?? bondQuote;
     return {
       ...item,
+      ...(stockQuote
+        ? {
+            amplitude: item.amplitude ?? stockQuote.amplitude,
+            averagePrice: item.averagePrice ?? stockQuote.averagePrice,
+            currentVolume: item.currentVolume ?? stockQuote.currentVolume,
+            externalVolume: item.externalVolume ?? stockQuote.externalVolume,
+            floatMarketValue:
+              item.floatMarketValue ?? stockQuote.floatMarketValue,
+            internalVolume: item.internalVolume ?? stockQuote.internalVolume,
+            limitDownPrice: item.limitDownPrice ?? stockQuote.limitDownPrice,
+            limitUpPrice: item.limitUpPrice ?? stockQuote.limitUpPrice,
+            pbRatio: item.pbRatio ?? stockQuote.pbRatio,
+            peDynamic: item.peDynamic ?? stockQuote.peDynamic,
+            peStatic: item.peStatic ?? stockQuote.peStatic,
+            peTtm: item.peTtm ?? stockQuote.peTtm,
+            quoteDetails: item.quoteDetails ?? stockQuote.quoteDetails,
+            totalMarketValue:
+              item.totalMarketValue ?? stockQuote.totalMarketValue,
+            turnoverRate: item.turnoverRate ?? stockQuote.turnoverRate,
+            volume: item.volume ?? stockQuote.volume,
+            volumeRatio: item.volumeRatio ?? stockQuote.volumeRatio,
+          }
+        : {}),
       latestPrice: item.latestPrice ?? quote?.latestPrice,
       changePercent: item.changePercent ?? quote?.changePercent,
       turnoverAmount: item.turnoverAmount ?? quote?.turnoverAmount,
@@ -302,10 +332,22 @@ async function removeTarget(itemId: string) {
 
 function openEditTarget(item: WatchItem) {
   editingItem.value = item;
-  editBuyPrice.value = item.buyPrice !== null && item.buyPrice !== undefined ? String(item.buyPrice) : '';
-  editPosition.value = item.position !== null && item.position !== undefined ? String(item.position) : '';
+  editBuyPrice.value =
+    item.buyPrice !== null && item.buyPrice !== undefined
+      ? String(item.buyPrice)
+      : '';
+  editPosition.value =
+    item.position !== null && item.position !== undefined
+      ? String(item.position)
+      : '';
   editRemark.value = item.remark ?? '';
   editDialogVisible.value = true;
+}
+
+function openQuoteDetails(item: WatchItem) {
+  quoteDetailTitle.value = `${item.targetName} ${item.targetCode}`;
+  quoteDetailRows.value = item.quoteDetails ?? [];
+  quoteDetailVisible.value = true;
 }
 
 async function saveEditTarget() {
@@ -328,34 +370,34 @@ function optionKey(option: TargetOption) {
   return `${option.code}::${option.secid}`;
 }
 
-function changeClass(value?: number | string) {
+function changeClass(value?: null | number | string) {
   const numberValue = toNumber(value);
   if (numberValue > 0) return 'text-red-500';
   if (numberValue < 0) return 'text-emerald-500';
   return '';
 }
 
-function formatChangePercent(value?: number | string) {
+function formatChangePercent(value?: null | number | string) {
   const numberValue = toNullableNumber(value);
   if (numberValue === null) return '-';
-  return `${numberValue > 0 ? '+' : ''}${numberValue.toFixed(2)}%`;
+  return `${numberValue > 0 ? '+' : ''}${numberValue.toFixed(3)}%`;
 }
 
-function formatMoney(value?: number | string) {
+function formatMoney(value?: null | number | string) {
   const numberValue = toNullableNumber(value);
   if (numberValue === null) return '-';
   if (Math.abs(numberValue) >= 100_000_000) {
-    return `${(numberValue / 100_000_000).toFixed(2)}亿`;
+    return `${(numberValue / 100_000_000).toFixed(3)}亿`;
   }
   if (Math.abs(numberValue) >= 10_000) {
-    return `${(numberValue / 10_000).toFixed(2)}万`;
+    return `${(numberValue / 10_000).toFixed(3)}万`;
   }
-  return numberValue.toFixed(2);
+  return numberValue.toFixed(3);
 }
 
-function formatPrice(value?: number | string) {
+function formatPrice(value?: null | number | string) {
   const numberValue = toNullableNumber(value);
-  return numberValue === null ? '-' : numberValue.toFixed(2);
+  return numberValue === null ? '-' : numberValue.toFixed(3);
 }
 
 function toNullableNumber(value?: number | string | null) {
@@ -462,7 +504,10 @@ function positionPnL(
             <template #header>
               <div class="resize-header">
                 <span>类型</span>
-                <span class="resize-handle" @mousedown="onMouseDown('col-type', $event)" />
+                <span
+                  class="resize-handle"
+                  @mousedown="onMouseDown('col-type', $event)"
+                />
               </div>
             </template>
             <template #default="{ row }">
@@ -475,7 +520,10 @@ function positionPnL(
             <template #header>
               <div class="resize-header">
                 <span>名称</span>
-                <span class="resize-handle" @mousedown="onMouseDown('col-name', $event)" />
+                <span
+                  class="resize-handle"
+                  @mousedown="onMouseDown('col-name', $event)"
+                />
               </div>
             </template>
             <template #default="{ row }">
@@ -485,22 +533,36 @@ function positionPnL(
               </div>
             </template>
           </ElTableColumn>
-          <ElTableColumn :width="widths['col-latest']" align="right" min-width="90">
+          <ElTableColumn
+            :width="widths['col-latest']"
+            align="right"
+            min-width="90"
+          >
             <template #header>
               <div class="resize-header">
                 <span>最新</span>
-                <span class="resize-handle" @mousedown="onMouseDown('col-latest', $event)" />
+                <span
+                  class="resize-handle"
+                  @mousedown="onMouseDown('col-latest', $event)"
+                />
               </div>
             </template>
             <template #default="{ row }">
               {{ formatPrice(row.latestPrice) }}
             </template>
           </ElTableColumn>
-          <ElTableColumn :width="widths['col-change']" align="right" min-width="90">
+          <ElTableColumn
+            :width="widths['col-change']"
+            align="right"
+            min-width="90"
+          >
             <template #header>
               <div class="resize-header">
                 <span>涨跌幅</span>
-                <span class="resize-handle" @mousedown="onMouseDown('col-change', $event)" />
+                <span
+                  class="resize-handle"
+                  @mousedown="onMouseDown('col-change', $event)"
+                />
               </div>
             </template>
             <template #default="{ row }">
@@ -509,77 +571,159 @@ function positionPnL(
               </span>
             </template>
           </ElTableColumn>
-          <ElTableColumn :width="widths['col-turnover']" align="right" min-width="100">
+          <ElTableColumn
+            :width="widths['col-turnover']"
+            align="right"
+            min-width="100"
+          >
             <template #header>
               <div class="resize-header">
                 <span>成交额</span>
-                <span class="resize-handle" @mousedown="onMouseDown('col-turnover', $event)" />
+                <span
+                  class="resize-handle"
+                  @mousedown="onMouseDown('col-turnover', $event)"
+                />
               </div>
             </template>
             <template #default="{ row }">
               {{ formatMoney(row.turnoverAmount) }}
             </template>
           </ElTableColumn>
-          <ElTableColumn :width="widths['col-buy']" align="right" min-width="90">
+          <ElTableColumn align="right" min-width="90">
+            <template #header>
+              <div class="resize-header">
+                <span>均价</span>
+              </div>
+            </template>
+            <template #default="{ row }">
+              {{
+                supportsDetailQuote(row.targetType) ? formatPrice(row.averagePrice) : '-'
+              }}
+            </template>
+          </ElTableColumn>
+          <ElTableColumn align="right" min-width="90">
+            <template #header>
+              <div class="resize-header">
+                <span>现手</span>
+              </div>
+            </template>
+            <template #default="{ row }">
+              {{
+                supportsDetailQuote(row.targetType) ? (row.currentVolume ?? '-') : '-'
+              }}
+            </template>
+          </ElTableColumn>
+          <ElTableColumn
+            :width="widths['col-buy']"
+            align="right"
+            min-width="90"
+          >
             <template #header>
               <div class="resize-header">
                 <span>买入价</span>
-                <span class="resize-handle" @mousedown="onMouseDown('col-buy', $event)" />
+                <span
+                  class="resize-handle"
+                  @mousedown="onMouseDown('col-buy', $event)"
+                />
               </div>
             </template>
             <template #default="{ row }">
               {{ formatPrice(row.buyPrice) }}
             </template>
           </ElTableColumn>
-          <ElTableColumn :width="widths['col-pos']" align="right" min-width="90">
+          <ElTableColumn
+            :width="widths['col-pos']"
+            align="right"
+            min-width="90"
+          >
             <template #header>
               <div class="resize-header">
                 <span>持仓数量</span>
-                <span class="resize-handle" @mousedown="onMouseDown('col-pos', $event)" />
+                <span
+                  class="resize-handle"
+                  @mousedown="onMouseDown('col-pos', $event)"
+                />
               </div>
             </template>
             <template #default="{ row }">
               {{ row.position ?? '-' }}
             </template>
           </ElTableColumn>
-          <ElTableColumn :width="widths['col-mv']" align="right" min-width="100">
+          <ElTableColumn
+            :width="widths['col-mv']"
+            align="right"
+            min-width="100"
+          >
             <template #header>
               <div class="resize-header">
                 <span>持仓市值</span>
-                <span class="resize-handle" @mousedown="onMouseDown('col-mv', $event)" />
+                <span
+                  class="resize-handle"
+                  @mousedown="onMouseDown('col-mv', $event)"
+                />
               </div>
             </template>
             <template #default="{ row }">
-              {{ formatMoney(positionMarketValue(row.latestPrice, row.position)) }}
+              {{
+                formatMoney(positionMarketValue(row.latestPrice, row.position))
+              }}
             </template>
           </ElTableColumn>
-          <ElTableColumn :width="widths['col-pnl']" align="right" min-width="100">
+          <ElTableColumn
+            :width="widths['col-pnl']"
+            align="right"
+            min-width="100"
+          >
             <template #header>
               <div class="resize-header">
                 <span>浮动盈亏</span>
-                <span class="resize-handle" @mousedown="onMouseDown('col-pnl', $event)" />
+                <span
+                  class="resize-handle"
+                  @mousedown="onMouseDown('col-pnl', $event)"
+                />
               </div>
             </template>
             <template #default="{ row }">
               <span
-                :class="changeClass(positionPnL(row.latestPrice, row.buyPrice, row.position))"
+                :class="
+                  changeClass(
+                    positionPnL(row.latestPrice, row.buyPrice, row.position),
+                  )
+                "
               >
-                {{ formatMoney(positionPnL(row.latestPrice, row.buyPrice, row.position)) }}
+                {{
+                  formatMoney(
+                    positionPnL(row.latestPrice, row.buyPrice, row.position),
+                  )
+                }}
               </span>
             </template>
           </ElTableColumn>
-          <ElTableColumn :width="widths['col-rate']" align="right" min-width="90">
+          <ElTableColumn
+            :width="widths['col-rate']"
+            align="right"
+            min-width="90"
+          >
             <template #header>
               <div class="resize-header">
                 <span>盈亏比例</span>
-                <span class="resize-handle" @mousedown="onMouseDown('col-rate', $event)" />
+                <span
+                  class="resize-handle"
+                  @mousedown="onMouseDown('col-rate', $event)"
+                />
               </div>
             </template>
             <template #default="{ row }">
               <span
-                :class="changeClass(costReturnRate(row.latestPrice, row.buyPrice))"
+                :class="
+                  changeClass(costReturnRate(row.latestPrice, row.buyPrice))
+                "
               >
-                {{ formatChangePercent(costReturnRate(row.latestPrice, row.buyPrice)) }}
+                {{
+                  formatChangePercent(
+                    costReturnRate(row.latestPrice, row.buyPrice),
+                  )
+                }}
               </span>
             </template>
           </ElTableColumn>
@@ -587,19 +731,41 @@ function positionPnL(
             <template #header>
               <div class="resize-header">
                 <span>备注</span>
-                <span class="resize-handle" @mousedown="onMouseDown('col-remark', $event)" />
+                <span
+                  class="resize-handle"
+                  @mousedown="onMouseDown('col-remark', $event)"
+                />
               </div>
             </template>
             <template #default="{ row }">
               {{ row.remark }}
             </template>
           </ElTableColumn>
-          <ElTableColumn label="操作" width="130" align="right">
+          <ElTableColumn label="操作" width="180" align="right">
             <template #default="{ row }">
-              <ElButton link size="small" type="primary" @click="openEditTarget(row)">
+              <ElButton
+                :disabled="!supportsDetailQuote(row.targetType)"
+                link
+                size="small"
+                type="primary"
+                @click="openQuoteDetails(row)"
+              >
+                更多
+              </ElButton>
+              <ElButton
+                link
+                size="small"
+                type="primary"
+                @click="openEditTarget(row)"
+              >
                 编辑
               </ElButton>
-              <ElButton link size="small" type="danger" @click="removeTarget(row.id)">
+              <ElButton
+                link
+                size="small"
+                type="danger"
+                @click="removeTarget(row.id)"
+              >
                 移除
               </ElButton>
             </template>
@@ -687,10 +853,18 @@ function positionPnL(
           </div>
 
           <span>买入价</span>
-          <ElInput v-model="editBuyPrice" placeholder="买入价格" type="number" />
+          <ElInput
+            v-model="editBuyPrice"
+            placeholder="买入价格"
+            type="number"
+          />
 
           <span>持仓数量</span>
-          <ElInput v-model="editPosition" placeholder="持仓数量" type="number" />
+          <ElInput
+            v-model="editPosition"
+            placeholder="持仓数量"
+            type="number"
+          />
 
           <span>备注</span>
           <ElInput v-model="editRemark" maxlength="50" placeholder="备注信息" />
@@ -699,6 +873,27 @@ function positionPnL(
           <ElButton @click="editDialogVisible = false">取消</ElButton>
           <ElButton type="primary" @click="saveEditTarget">保存</ElButton>
         </template>
+      </ElDialog>
+
+      <ElDialog
+        v-model="quoteDetailVisible"
+        :title="`${quoteDetailTitle} 更多行情`"
+        width="720px"
+      >
+        <div
+          v-if="quoteDetailRows && quoteDetailRows.length > 0"
+          class="quote-detail-grid"
+        >
+          <div
+            v-for="item in quoteDetailRows"
+            :key="item.fieldIndex"
+            class="quote-detail-cell"
+          >
+            <span class="detail-label">{{ item.fieldName }}</span>
+            <span class="detail-value">{{ item.fieldValue || '-' }}</span>
+          </div>
+        </div>
+        <ElEmpty v-else description="暂无更多行情数据" />
       </ElDialog>
     </div>
   </Page>
@@ -821,6 +1016,37 @@ function positionPnL(
 .edit-target-info small {
   color: var(--el-text-color-secondary);
   font-size: 12px;
+}
+
+.quote-detail-grid {
+  display: grid;
+  gap: 0 32px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-height: 520px;
+  overflow: auto;
+}
+
+.quote-detail-cell {
+  align-items: baseline;
+  border-bottom: 1px dashed var(--el-border-color-lighter);
+  display: flex;
+  justify-content: space-between;
+  padding: 9px 0;
+}
+
+.quote-detail-cell .detail-label {
+  color: var(--el-text-color-secondary);
+  flex-shrink: 0;
+  font-size: 13px;
+  margin-right: 8px;
+}
+
+.quote-detail-cell .detail-value {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  text-align: right;
 }
 
 @media (max-width: 768px) {

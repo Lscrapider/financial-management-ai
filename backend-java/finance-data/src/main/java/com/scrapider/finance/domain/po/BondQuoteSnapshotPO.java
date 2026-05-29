@@ -32,6 +32,8 @@ public class BondQuoteSnapshotPO {
     private BigDecimal turnoverAmount;
     private BigDecimal turnoverRate;
     private BigDecimal amplitude;
+    private BigDecimal averagePrice;
+    private Long currentVolume;
     private String bondRating;
     private String rawResponse;
     private LocalDateTime syncedAt;
@@ -63,6 +65,8 @@ public class BondQuoteSnapshotPO {
         snapshot.setTurnoverAmount(StockMarketJsonParser.decimal(value(fields, 37, null)));
         snapshot.setTurnoverRate(StockMarketJsonParser.decimal(value(fields, 38, null)));
         snapshot.setAmplitude(StockMarketJsonParser.decimal(value(fields, 43, null)));
+        snapshot.setAveragePrice(StockMarketJsonParser.decimal(value(fields, 51, null)));
+        snapshot.setCurrentVolume(StockMarketJsonParser.longValue(value(fields, 50, null)));
         snapshot.setRawResponse(response);
         snapshot.setSyncedAt(now);
         return snapshot;

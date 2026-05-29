@@ -1,5 +1,11 @@
 import { requestClient } from '#/api/request';
 
+export interface StockQuoteDetail {
+  fieldIndex: number;
+  fieldName: string;
+  fieldValue: string;
+}
+
 export interface StockQuote {
   stockCode: string;
   stockName: string;
@@ -11,14 +17,26 @@ export interface StockQuote {
   highPrice?: number | string;
   lowPrice?: number | string;
   previousClosePrice?: number | string;
+  averagePrice?: number | string;
   changeAmount?: number | string;
   changePercent?: number | string;
   volume?: number;
+  externalVolume?: number;
+  internalVolume?: number;
+  currentVolume?: number;
   turnoverAmount?: number | string;
   turnoverRate?: number | string;
   amplitude?: number | string;
+  volumeRatio?: number | string;
+  limitUpPrice?: number | string;
+  limitDownPrice?: number | string;
   totalMarketValue?: number | string;
   floatMarketValue?: number | string;
+  peTtm?: number | string;
+  peDynamic?: number | string;
+  peStatic?: number | string;
+  pbRatio?: number | string;
+  quoteDetails?: StockQuoteDetail[];
   syncedAt?: string;
 }
 

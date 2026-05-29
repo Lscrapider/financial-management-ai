@@ -37,14 +37,26 @@ GET /api/stocks/quotes?marketCode=CHINEXT&limit=50&sortField=changePercent&sortO
 | `highPrice` | 最高价 |
 | `lowPrice` | 最低价 |
 | `previousClosePrice` | 昨收 |
+| `averagePrice` | 均价 |
 | `changeAmount` | 涨跌额 |
 | `changePercent` | 涨跌幅 |
 | `volume` | 成交量 |
+| `externalVolume` | 外盘 |
+| `internalVolume` | 内盘 |
+| `currentVolume` | 现手 |
 | `turnoverAmount` | 成交额 |
 | `turnoverRate` | 换手率 |
 | `amplitude` | 振幅 |
+| `volumeRatio` | 量比 |
+| `limitUpPrice` | 涨停价 |
+| `limitDownPrice` | 跌停价 |
 | `totalMarketValue` | 总市值 |
 | `floatMarketValue` | 流通市值 |
+| `peTtm` | TTM 市盈率 |
+| `peDynamic` | 动态市盈率 |
+| `peStatic` | 静态市盈率 |
+| `pbRatio` | 市净率 |
+| `quoteDetails` | 腾讯接口原始字段明细，用于前端“更多”弹窗 |
 | `syncedAt` | 数据同步时间 |
 
 ## 股票分时走势

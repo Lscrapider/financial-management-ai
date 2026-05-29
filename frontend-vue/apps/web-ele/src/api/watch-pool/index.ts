@@ -1,4 +1,5 @@
 import { requestClient } from '#/api/request';
+import type { StockQuoteDetail } from '#/api/stock';
 
 export type WatchTargetType = 'BOND' | 'FUND' | 'INDEX' | 'SECTOR' | 'STOCK';
 
@@ -7,6 +8,7 @@ export interface WatchItem {
   changePercent?: number | string;
   id: string;
   latestPrice?: number | string;
+  averagePrice?: number | string;
   position?: number | string;
   remark: null | string;
   secid: null | string;
@@ -14,7 +16,23 @@ export interface WatchItem {
   targetCode: string;
   targetName: string;
   targetType: WatchTargetType;
+  volume?: number;
+  externalVolume?: number;
+  internalVolume?: number;
+  currentVolume?: number;
   turnoverAmount?: number | string;
+  turnoverRate?: number | string;
+  amplitude?: number | string;
+  volumeRatio?: number | string;
+  limitUpPrice?: number | string;
+  limitDownPrice?: number | string;
+  totalMarketValue?: number | string;
+  floatMarketValue?: number | string;
+  peTtm?: number | string;
+  peDynamic?: number | string;
+  peStatic?: number | string;
+  pbRatio?: number | string;
+  quoteDetails?: StockQuoteDetail[];
 }
 
 export interface WatchGroup {

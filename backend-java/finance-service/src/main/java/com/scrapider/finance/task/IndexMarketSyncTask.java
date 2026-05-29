@@ -72,10 +72,10 @@ public class IndexMarketSyncTask {
             log.debug("Index market sync task is disabled.");
             return;
         }
-//        if (!this.isInSyncWindow()) {
-//            log.debug("Index market sync task is outside sync window.");
-//            return;
-//        }
+        if (!this.isInSyncWindow()) {
+            log.debug("Index market sync task is outside sync window.");
+            return;
+        }
 
         this.runSyncIfIdle();
     }

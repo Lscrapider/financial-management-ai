@@ -136,7 +136,7 @@
 
 核心字段：
 
-`stockCode`、`stockName`、`secid`、`marketCode`、`exchangeCode`、`latestPrice`、`openPrice`、`highPrice`、`lowPrice`、`previousClosePrice`、`changeAmount`、`changePercent`、`volume`、`turnoverAmount`、`turnoverRate`、`amplitude`、`totalMarketValue`、`floatMarketValue`、`syncedAt`。
+`stockCode`、`stockName`、`secid`、`marketCode`、`exchangeCode`、`latestPrice`、`openPrice`、`highPrice`、`lowPrice`、`previousClosePrice`、`averagePrice`、`changeAmount`、`changePercent`、`volume`、`externalVolume`、`internalVolume`、`currentVolume`、`turnoverAmount`、`turnoverRate`、`amplitude`、`volumeRatio`、`limitUpPrice`、`limitDownPrice`、`totalMarketValue`、`floatMarketValue`、`peTtm`、`peDynamic`、`peStatic`、`pbRatio`、`quoteDetails`、`syncedAt`。
 
 ### 股票分时走势
 

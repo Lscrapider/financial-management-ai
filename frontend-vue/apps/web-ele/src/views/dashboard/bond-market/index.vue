@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import type { EchartsUIType } from '@vben/plugins/echarts';
 
+import type { StockQuoteDetail } from '#/api/stock';
 import type { BondDailyKline, BondQuote } from '#/api/bond';
 
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
@@ -12,6 +13,7 @@ import { EchartsUI, useEcharts } from '@vben/plugins/echarts';
 import {
   ElButton,
   ElCard,
+  ElDialog,
   ElEmpty,
   ElMessage,
   ElOption,
@@ -49,6 +51,9 @@ const quotes = ref<BondQuote[]>([]);
 const selectedSecid = ref('');
 const sortField = ref('bondCode');
 const sortOrder = ref<'asc' | 'desc'>('asc');
+const quoteDetailVisible = ref(false);
+const quoteDetailTitle = ref('');
+const quoteDetailRows = ref<StockQuoteDetail[]>([]);
 
 const selectedQuote = computed(() => {
   return quotes.value.find((item) => item.secid === selectedSecid.value);
@@ -160,6 +165,12 @@ function sortQuotes(sort: Sort) {
   sortField.value = String(sort.prop || 'bondCode');
   sortOrder.value = sort.order === 'descending' ? 'desc' : 'asc';
   refreshQuotes();
+}
+
+function openQuoteDetails(row: BondQuote) {
+  quoteDetailTitle.value = `${row.bondName} ${row.bondCode}`;
+  quoteDetailRows.value = row.quoteDetails ?? [];
+  quoteDetailVisible.value = true;
 }
 
 watch(
@@ -487,6 +498,18 @@ function normalizeRouteSecid(value: unknown) {
                 </ElTag>
               </template>
             </ElTableColumn>
+            <ElTableColumn label="操作" width="80" align="right">
+              <template #default="{ row }">
+                <ElButton
+                  link
+                  size="small"
+                  type="primary"
+                  @click="openQuoteDetails(row)"
+                >
+                  更多
+                </ElButton>
+              </template>
+            </ElTableColumn>
           </ElTable>
         </ElCard>
 
@@ -597,11 +620,63 @@ function normalizeRouteSecid(value: unknown) {
           </ElCard>
         </div>
       </div>
+
+      <ElDialog
+        v-model="quoteDetailVisible"
+        :title="`${quoteDetailTitle} 更多行情`"
+        width="720px"
+      >
+        <div
+          v-if="quoteDetailRows && quoteDetailRows.length > 0"
+          class="quote-detail-grid"
+        >
+          <div
+            v-for="item in quoteDetailRows"
+            :key="item.fieldIndex"
+            class="quote-detail-cell"
+          >
+            <span class="detail-label">{{ item.fieldName }}</span>
+            <span class="detail-value">{{ item.fieldValue || '-' }}</span>
+          </div>
+        </div>
+        <ElEmpty v-else description="暂无更多行情数据" />
+      </ElDialog>
     </div>
   </Page>
 </template>
 
 <style scoped>
+.quote-detail-grid {
+  display: grid;
+  gap: 0 32px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-height: 520px;
+  overflow: auto;
+}
+
+.quote-detail-cell {
+  align-items: baseline;
+  border-bottom: 1px dashed var(--el-border-color-lighter);
+  display: flex;
+  justify-content: space-between;
+  padding: 9px 0;
+}
+
+.quote-detail-cell .detail-label {
+  color: var(--el-text-color-secondary);
+  flex-shrink: 0;
+  font-size: 13px;
+  margin-right: 8px;
+}
+
+.quote-detail-cell .detail-value {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
 .bond-market-page {
   display: flex;
   flex-direction: column;

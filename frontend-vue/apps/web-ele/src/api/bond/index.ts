@@ -1,4 +1,5 @@
 import { requestClient } from '#/api/request';
+import type { StockQuoteDetail } from '#/api/stock';
 
 export interface BondQuote {
   bondCode: string;
@@ -14,10 +15,13 @@ export interface BondQuote {
   changeAmount?: number | string;
   changePercent?: number | string;
   volume?: number;
+  averagePrice?: number | string;
+  currentVolume?: number;
   turnoverAmount?: number | string;
   amplitude?: number | string;
   turnoverRate?: number | string;
   bondRating?: string;
+  quoteDetails?: StockQuoteDetail[];
   syncedAt?: string;
 }
 

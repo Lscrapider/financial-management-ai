@@ -13,6 +13,7 @@ import { EchartsUI, useEcharts } from '@vben/plugins/echarts';
 import {
   ElButton,
   ElCard,
+  ElDialog,
   ElEmpty,
   ElMessage,
   ElOption,
@@ -59,6 +60,9 @@ const sortField = ref('changePercent');
 const sortOrder = ref<'asc' | 'desc'>('desc');
 const trends = ref<StockIntradayTrend[]>([]);
 const selectedStockCode = ref('');
+const quoteDetailVisible = ref(false);
+const quoteDetailTitle = ref('');
+const quoteDetailRows = ref<StockQuote['quoteDetails']>([]);
 
 const selectedQuote = computed(() => {
   return quotes.value.find(
@@ -224,6 +228,12 @@ function selectQuote(row: StockQuote) {
   refreshTrends();
 }
 
+function openQuoteDetails(row: StockQuote) {
+  quoteDetailTitle.value = `${row.stockName} ${row.stockCode}`;
+  quoteDetailRows.value = row.quoteDetails ?? [];
+  quoteDetailVisible.value = true;
+}
+
 function sortQuotes(sort: Sort) {
   sortField.value = String(sort.prop || 'changePercent');
   sortOrder.value = sort.order === 'ascending' ? 'asc' : 'desc';
@@ -328,7 +338,7 @@ function formatChangePercent(value?: number | string) {
   if (numberValue === null) {
     return '-';
   }
-  return `${numberValue > 0 ? '+' : ''}${numberValue.toFixed(2)}%`;
+  return `${numberValue > 0 ? '+' : ''}${numberValue.toFixed(3)}%`;
 }
 
 function formatDateTime(value?: string) {
@@ -350,17 +360,17 @@ function formatMoney(value?: number | string) {
     return '-';
   }
   if (Math.abs(numberValue) >= 100_000_000) {
-    return `${(numberValue / 100_000_000).toFixed(2)}亿`;
+    return `${(numberValue / 100_000_000).toFixed(3)}亿`;
   }
   if (Math.abs(numberValue) >= 10_000) {
-    return `${(numberValue / 10_000).toFixed(2)}万`;
+    return `${(numberValue / 10_000).toFixed(3)}万`;
   }
-  return numberValue.toFixed(2);
+  return numberValue.toFixed(3);
 }
 
 function formatPrice(value?: number | string) {
   const numberValue = toNullableNumber(value);
-  return numberValue === null ? '-' : numberValue.toFixed(2);
+  return numberValue === null ? '-' : numberValue.toFixed(3);
 }
 
 function formatTime(value?: string) {
@@ -375,7 +385,7 @@ function formatVolume(value?: number) {
     return '-';
   }
   if (value >= 10_000) {
-    return `${(value / 10_000).toFixed(2)}万`;
+    return `${(value / 10_000).toFixed(3)}万`;
   }
   return String(value);
 }
@@ -564,6 +574,28 @@ function toNumber(value?: number | string | null) {
                 {{ formatVolume(row.volume) }}
               </template>
             </ElTableColumn>
+            <ElTableColumn
+              label="均价"
+              min-width="100"
+              align="right"
+              prop="averagePrice"
+            >
+              <template #default="{ row }">
+                {{ formatPrice(row.averagePrice) }}
+              </template>
+            </ElTableColumn>
+            <ElTableColumn label="更多" width="90" align="right">
+              <template #default="{ row }">
+                <ElButton
+                  link
+                  size="small"
+                  type="primary"
+                  @click.stop="openQuoteDetails(row)"
+                >
+                  更多
+                </ElButton>
+              </template>
+            </ElTableColumn>
             <ElTableColumn label="市场" min-width="110">
               <template #default="{ row }">
                 <ElTag effect="plain" size="small">
@@ -614,6 +646,14 @@ function toNumber(value?: number | string | null) {
                 }}</strong>
               </div>
               <div class="metric-item">
+                <span>均价</span>
+                <strong>{{ formatPrice(selectedQuote.averagePrice) }}</strong>
+              </div>
+              <div class="metric-item">
+                <span>现手</span>
+                <strong>{{ formatVolume(selectedQuote.currentVolume) }}</strong>
+              </div>
+              <div class="metric-item">
                 <span>振幅</span>
                 <strong>{{
                   formatChangePercent(selectedQuote.amplitude)
@@ -628,6 +668,22 @@ function toNumber(value?: number | string | null) {
                 <strong>{{
                   formatMoney(selectedQuote.totalMarketValue)
                 }}</strong>
+              </div>
+              <div class="metric-item">
+                <span>TTM市盈率</span>
+                <strong>{{ formatPrice(selectedQuote.peTtm) }}</strong>
+              </div>
+              <div class="metric-item">
+                <span>动态市盈率</span>
+                <strong>{{ formatPrice(selectedQuote.peDynamic) }}</strong>
+              </div>
+              <div class="metric-item">
+                <span>静态市盈率</span>
+                <strong>{{ formatPrice(selectedQuote.peStatic) }}</strong>
+              </div>
+              <div class="metric-item">
+                <span>量比</span>
+                <strong>{{ formatPrice(selectedQuote.volumeRatio) }}</strong>
               </div>
             </div>
             <ElEmpty v-else description="暂无行情数据" />
@@ -659,6 +715,27 @@ function toNumber(value?: number | string | null) {
           </ElCard>
         </div>
       </div>
+
+      <ElDialog
+        v-model="quoteDetailVisible"
+        :title="`${quoteDetailTitle} 更多行情`"
+        width="720px"
+      >
+        <div
+          v-if="quoteDetailRows && quoteDetailRows.length > 0"
+          class="quote-detail-grid"
+        >
+          <div
+            v-for="item in quoteDetailRows"
+            :key="item.fieldIndex"
+            class="quote-detail-cell"
+          >
+            <span class="detail-label">{{ item.fieldName }}</span>
+            <span class="detail-value">{{ item.fieldValue || '-' }}</span>
+          </div>
+        </div>
+        <ElEmpty v-else description="暂无更多行情数据" />
+      </ElDialog>
     </div>
   </Page>
 </template>
@@ -859,6 +936,37 @@ function toNumber(value?: number | string | null) {
 
 .stock-name-cell small {
   color: var(--el-text-color-secondary);
+}
+
+.quote-detail-grid {
+  display: grid;
+  gap: 0 32px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-height: 520px;
+  overflow: auto;
+}
+
+.quote-detail-cell {
+  align-items: baseline;
+  border-bottom: 1px dashed var(--el-border-color-lighter);
+  display: flex;
+  justify-content: space-between;
+  padding: 9px 0;
+}
+
+.quote-detail-cell .detail-label {
+  color: var(--el-text-color-secondary);
+  flex-shrink: 0;
+  font-size: 13px;
+  margin-right: 8px;
+}
+
+.quote-detail-cell .detail-value {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  text-align: right;
 }
 
 .metric-grid {

@@ -50,10 +50,13 @@ public class StockMarketQueryServiceImpl implements StockMarketQueryService {
         String stockCode = param.getStockCode().trim();
         String latestBatchNo = this.stockIntradayTrendInfluxManage.getLatestTodayBatchNo(stockCode);
         if (StrUtil.isBlank(latestBatchNo)) {
+            latestBatchNo = this.stockIntradayTrendInfluxManage.getLatestBatchNo(stockCode);
+        }
+        if (StrUtil.isBlank(latestBatchNo)) {
             return List.of();
         }
         return this.stockIntradayTrendInfluxManage
-                .listTodayByBatchNo(stockCode, latestBatchNo)
+                .listByBatchNo(stockCode, latestBatchNo)
                 .stream()
                 .map(StockIntradayTrendVO::fromPO)
                 .toList();
