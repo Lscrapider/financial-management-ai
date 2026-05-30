@@ -71,7 +71,7 @@ docker compose -f docker/docker-compose.yml up --build finance-service  # 构建
 
 - **Java `finance-service`**（端口 8081）：主应用，Spring Boot 3.x + Spring Security + MyBatis-Plus + Spring AI。对外暴露 `/api/**` 接口，包含认证、行情查询、AI Chat、OCR 任务、Token 用量、控制台指标。
 - **Java `finance-data`**：公共数据层，PO/VO/Param/Mapper/Manage/InfluxDB 配置，不独立启动。
-- **Java `finance-ai`**：AI 编排层，Chat/Query Rewrite/行情上下文查询/Token 统计/OCR 复核，不独立启动。
+- **Java `finance-ai`**：AI 编排层，Chat/Query Rewrite/行情上下文查询/Token 统计/OCR 复核/知识库浏览，不独立启动。
 - **Python worker**：独立进程，消费 RabbitMQ 执行 OCR 全链路（文档标准化 → OCR 识别 → 文本清洗 → 向量索引）。也处理 embedding 生成和 pgvector 写入。
 - **前端**：Vben Admin v5 monorepo（Turborepo + pnpm），Element Plus 版本。`apps/web-ele/` 为主应用。
 
@@ -89,27 +89,28 @@ docker compose -f docker/docker-compose.yml up --build finance-service  # 构建
 - Controller 只调用 Service，不直接调 Mapper
 - `JsonNode`/第三方响应构建 PO 的逻辑放到 PO 的静态方法中（如 `StockQuoteSnapshotPO.fromApiResponse(...)`）
 - 判空、字符串、集合、数字、日期等通用操作优先用 Hutool
-- 分页接口使用 `pageSize`/`pageNum`，类型为 POST
+- 分页接口使用 `pageSize`/`pageNum`
+- MyBatis-Plus 分页依赖 `MybatisPlusInterceptor` + `PaginationInnerInterceptor(DbType.POSTGRE_SQL)`，配置在 `MybatisPlusConfig`
 - Controller 不写局部 `@ExceptionHandler`，由全局 `@RestControllerAdvice` 统一处理
 
 ### 接口权限
 
 - `POST /api/auth/login`、`POST /api/auth/register`：匿名
-- `/api/ai/**`：需登录
-- 其他接口：需 `admin` 角色
+- `/api/ai/ocr/reviews/*/pages/*/image`：匿名（页面图片代理）
+- `/api/**`：需登录认证
 - Token 通过 `Authorization: Bearer <accessToken>` 传递
 
 ### 数据存储分工
 
-- PostgreSQL：业务数据、行情快照、指数日 K、用户、OCR 任务、Token 日志、访问日志
+- PostgreSQL：业务数据、行情快照（股票/指数/可转债）、日K线（指数/可转债）、用户、OCR 任务、Token 日志、访问日志
 - pgvector：知识库向量表 `knowledge_vector`
-- InfluxDB：股票分钟级分时走势
+- InfluxDB：股票/可转债分钟级分时走势
 - MinIO：OCR 原始文件和各阶段产物
 - RabbitMQ：OCR 阶段消息传递（topic exchange `finance.ocr.topic`）
 
 ### 行情数据流
 
-腾讯行情 API → Java 定时任务（`task/` 目录）→ PostgreSQL（快照）/ InfluxDB（分时走势）→ Java 接口 → 前端
+腾讯行情 API → Java 定时任务（`task/` 目录，三个市场：`StockMarketSyncTask`/`IndexMarketSyncTask`/`BondMarketSyncTask`）→ PostgreSQL（快照，批量拉取批量 upsert）/ InfluxDB（分时走势）→ Java 接口 → 前端
 
 ### AI Chat 流程
 
@@ -129,7 +130,8 @@ docker compose -f docker/docker-compose.yml up --build finance-service  # 构建
 - `MINIO_*`：MinIO 连接（OCR 文件存储）
 - `DEEPSEEK_*`：DeepSeek API 配置（AI Chat 模型）
 - `DASHSCOPE_*`：阿里云 DashScope（OCR 识别模型 `qwen-vl-ocr-latest`）
-- `STOCK_SYNC_*`、`INDEX_SYNC_*`：行情同步任务配置
+- `STOCK_SYNC_*`、`INDEX_SYNC_*`、`BOND_SYNC_*`：行情同步任务配置
+- `stock.sync.trend-enabled`：定时任务是否同步分时数据（默认 true）
 
 Java 主配置文件：`backend-java/finance-service/src/main/resources/application.yml`（被 .gitignore 排除，需从模板生成）。
 

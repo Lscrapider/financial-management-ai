@@ -51,43 +51,39 @@
 ### 后端服务
 
 - Java 17+
-- Spring Boot
-- Spring Web
-- MyBatis-Plus
-- Spring Scheduling
-- Lombok
-- PostgreSQL
+- Spring Boot 3.x + Spring Security + Spring Scheduling + Spring AI
+- MyBatis-Plus 3.5 + PostgreSQL + pgvector
+- InfluxDB（分时走势）
+- RabbitMQ（OCR 消息队列）
+- MinIO（OCR 文件存储）
+- Lombok + Hutool + Jackson
 
 ### AI 服务
 
 - Python 3.11+
-- FastAPI
-- Uvicorn
-- LangChain / LlamaIndex（可选）
-- PyTorch / Transformers（按模型需要引入）
+- FastAPI + Uvicorn
+- RabbitMQ worker（消息队列消费者）
 - Sentence Transformers / Embedding 模型
-- OCR 大模型接口，例如 `qwen-vl-ocr-latest`
+- OCR 大模型接口（阿里云 DashScope `qwen-vl-ocr-latest`）
 
 ### 前端
 
-- Vue 3
-- TypeScript
-- Vite
-- Pinia
-- Vue Router
-- Vben Admin
-- ECharts / AntV / TradingView Lightweight Charts
+- Vue 3 + TypeScript + Vite
+- Vben Admin v5 (Element Plus)
+- Pinia + Vue Router
+- ECharts / TradingView Lightweight Charts
 
 ### 数据库与存储
 
-- PostgreSQL
-- pgvector（用于向量检索）
-- 本地文件存储或对象存储（用于保存扫描件、OCR 原文、处理后的文本）
+- PostgreSQL（业务数据、行情快照、日K线）
+- pgvector（向量检索）
+- InfluxDB（分时走势）
+- MinIO（OCR 文件存储）
+- RabbitMQ（OCR 阶段消息）
 
 ### 部署方式
 
-- Docker
-- Docker Compose
+- Docker + Docker Compose
 
 ## 前端启动
 
@@ -184,31 +180,37 @@ financial-management-ai/
 
 ### 行情数据模块
 
-- 对接股票、指数、行业板块等外部 API。
-- 支持定时拉取、手动同步和失败重试。
+- 对接股票、指数、可转债等外部行情 API。
+- 支持定时拉取（批量）、手动同步和失败重试。
 - 保存原始响应和清洗后的结构化数据。
-- 提供历史行情查询和趋势展示接口。
+- 提供历史行情查询和分时走势展示接口。
 
 ### 知识库模块
 
 - 管理手写副本扫描件和识别后的文本。
-- 对扫描件执行 OCR 识别。
+- 对扫描件执行 OCR 识别（5 阶段 RabbitMQ 串联）。
 - 对识别文本进行清洗、分段和元数据标注。
+- 支持人工复核修改、合并、删除段落。
 - 生成向量并写入 PostgreSQL pgvector 表。
 
 ### AI 分析模块
 
-- 接收 Java 后端传入的股票数据、指标数据和用户分析请求。
-- 基于向量检索召回相关知识库片段。
-- 将市场数据与知识库内容进行对比分析。
-- 输出结构化建议，包含结论、依据、风险点、关注指标和置信度。
+- 接收用户分析请求，Query Rewrite 拆解意图。
+- 查询行情上下文（股票/指数行情、分时、日K）。
+- 向量检索召回相关知识库片段。
+- 通过 DeepSeek ChatClient 输出结构化回答。
+
+### 交易辅助模块
+
+- 投资观察池：多分组、多类型标的（股票/指数/可转债）管理，实时行情刷新。
+- 股票预警：按目标价/涨跌幅条件设置预警，定时检查触发提醒。
 
 ### 前端展示模块
 
-- 展示市场行情、个股详情、指标走势和行业信息。
-- 展示 AI 分析结果和引用的知识库依据。
-- 支持知识库文件上传、处理状态查看和检索测试。
-- 支持分析任务列表、任务详情和历史结果回看。
+- 行情总览、指数行情、可转债行情页面。
+- AI 中心：知识库处理队列、人工复核。
+- 知识库浏览、股票预警管理、控制台指标。
+- AI Chat 对话页面。
 
 ## 初步数据流
 
@@ -293,12 +295,17 @@ OCR 详细阶段、消息体、产物目录和人工复核规则见 [OCR_PIPELIN
 
 ## 后续建设计划
 
-1. 初始化 Java Spring Boot 项目。
-2. 初始化 Python FastAPI 项目。
-3. 初始化 Vue 3 前端项目。
-4. 配置 PostgreSQL 和 pgvector。
-5. 设计行情数据表、知识库表、向量表和分析结果表。
-6. 接入第一版股市数据 API。
-7. 完成扫描件 OCR 到向量库的处理链路。
-8. 完成第一版 AI 结构化分析接口。
-9. 完成前端行情展示和分析结果展示页面。
+1. ✅ 初始化 Java Spring Boot 项目。
+2. ✅ 初始化 Python FastAPI / RabbitMQ Worker 项目。
+3. ✅ 初始化 Vue 3 前端项目。
+4. ✅ 配置 PostgreSQL 和 pgvector。
+5. ✅ 设计行情数据表、知识库表、向量表和分析结果表。
+6. ✅ 接入股票/指数/可转债行情 API。
+7. ✅ 完成扫描件 OCR 到向量库的全链路处理。
+8. ✅ 完成 AI Chat 结构化分析接口。
+9. ✅ 完成前端行情展示（行情总览/指数行情/可转债行情/投资观察池）。
+10. ✅ 完成 AI 中心（知识库处理队列 + 人工复核）。
+11. ✅ 完成知识库浏览、股票预警、控制台指标。
+12. 完成投资分析建议生成与展示。
+13. 增加更多财务指标数据源。
+14. 优化 AI Chat 上下文策略和反问能力。

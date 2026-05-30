@@ -496,6 +496,9 @@ Python embedding.index
 | `POST /api/ai/ocr/tasks` | 上传 OCR 文件，创建任务并发布第一阶段消息 |
 | `POST /api/ai/ocr/tasks/page` | 分页查询任务，支持 `pageNum`、`pageSize`、`status` |
 | `POST /api/ai/ocr/tasks/delete` | 软删除任务，并删除对应知识库向量 |
+| `GET /api/knowledge/chunks?pageNum=1&pageSize=20` | 分页查询知识库 chunk |
+| `GET /api/knowledge/stats` | 知识库统计 |
+| `PUT /api/knowledge/chunks/{id}` | 编辑 chunk 文本 |
 
 分页查询请求：
 
@@ -527,6 +530,7 @@ Python embedding.index
 | `GET /api/knowledge/stats` | 知识库统计 |
 | `GET /api/knowledge/chunks?pageNum=1&pageSize=20` | 分页查询 chunk |
 | `GET /api/knowledge/chunks/{id}` | 查询 chunk 详情 |
+| `PUT /api/knowledge/chunks/{id}` | 编辑 chunk 文本，更新向量索引 |
 
 知识库统计在数据库层聚合，不把全表数据查到 Java 内存里计算。
 

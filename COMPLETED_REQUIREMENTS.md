@@ -15,10 +15,15 @@
 - 已创建用户表 `app_user`，并初始化默认管理员 `admin / 123456`。
 - 已创建股票配置表 `stock_config` 和股票行情快照表 `stock_quote_snapshot`。
 - 已创建指数配置表 `index_config`、指数行情快照表 `index_quote_snapshot`、指数日 K 表 `index_daily_kline`。
+- 已创建可转债配置表 `bond_config`、可转债行情快照表 `bond_quote_snapshot`、可转债日 K 表 `bond_daily_kline`。
+- 已创建投资观察池分组表 `watch_group` 和标的表 `watch_group_item`。
+- 已创建股票预警配置表 `stock_alert_config`。
 - 已创建 AI Token 用量日志表 `ai_token_usage_log`。
 - 已创建应用访问日志表 `app_visit_log`。
-- 已创建 OCR 识别任务表 `ocr_task`。
+- 已创建 OCR 识别任务表 `ocr_task`、阶段记录表 `ocr_task_stage`、复核表 `ocr_review`。
+- 已创建知识库向量表 `knowledge_vector`。
 - 已提供默认关注股票和核心指数种子数据。
+- 已注册 MyBatis-Plus 分页插件 `MybatisPlusConfig`。
 
 ## 认证与权限
 
@@ -69,13 +74,55 @@
 - 已实现 AI 控制台概览接口，汇总用户、访问和 Token 用量。
 - 已实现应用访问趋势接口，支持最近 N 小时统计。
 
+## 可转债行情
+
+- 已接入腾讯行情接口，支持可转债最新行情查询。
+- 已实现可转债同步任务，批量同步最新行情快照。
+- 已实现可转债分钟级分时同步，写入 InfluxDB。
+- 已实现可转债日 K 同步能力。
+- 已实现可转债行情列表接口、分时走势接口、日 K 查询接口。
+- 已实现可转债手动同步和同步状态查询接口。
+
+## 投资观察池
+
+- 已实现多分组管理（新增/更新/删除分组）。
+- 已支持多类型标的：股票（STOCK）、指数（INDEX）、可转债（BOND）。
+- 已实现标的新增/删除、排序。
+- 已实现分组内标的实时行情刷新（批量查询）。
+- 已支持标的"更多"详情弹窗（确认字段白名单）。
+
+## 股票预警
+
+- 已实现预警配置新增/删除/列表查询。
+- 已支持按目标价、涨跌幅设置预警条件。
+- 已实现定时任务自动检查预警。
+- 已实现手动触发预警检查接口。
+
+## 知识库浏览
+
+- 已实现知识库分页查询接口 `GET /api/knowledge/chunks`。
+- 已实现知识库统计接口 `GET /api/knowledge/stats`。
+- 已实现单条文本编辑接口 `PUT /api/knowledge/chunks/{id}`。
+- 已实现前端知识库浏览页面（分页列表 + 详情 + 编辑）。
+- 已支持 chunk 按 taskNo/chunkIndex 排序展示。
+
+## 批量同步优化
+
+- 已实现行情快照批量接口 `StockMarketApi.getQuotes(List<String> secids)`。
+- 已实现 PO 层批量解析方法 `fromBatchApiResponse`（按 Tencent symbol 匹配回 stock/bond/index config）。
+- 已实现 Manage 层批量 upsert 方法 `saveQuotesBatch`。
+- 已改造三个同步任务（股票/指数/可转债）为批量快照 + 单只 K 线/分时模式。
+- 已新增 `mybatis-plus-jsqlparser` 依赖支持物理分页。
+
 ## OCR 任务
 
 - 已实现 OCR 文件上传任务接口 `POST /api/ai/ocr/tasks`。
 - 已支持上传 PDF、PNG、JPG、JPEG、WEBP 文件。
 - 已限制单文件最大 50MB。
-- 已支持将上传文件保存到本地存储目录，默认 `../data/scans`。
-- 已支持创建 `pending` 状态 OCR 任务，并记录文件名、存储名、路径、类型、大小、阶段和进度。
+- 已支持将上传文件保存到 MinIO 对象存储。
+- 已支持创建 `ready` 状态 OCR 任务，发布第一阶段 RabbitMQ 消息。
+- 已实现 OCR 任务分页查询、软删除。
+- 已实现 5 阶段 RabbitMQ 串联：文档标准化 → OCR 识别 → 文本清洗 → 人工复核 → 向量入库。
 
 ## 本地运行与配置
 

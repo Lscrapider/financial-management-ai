@@ -203,6 +203,126 @@
 
 `indexCode`、`indexName`、`secid`、`marketCode`、`exchangeCode`、`tradeDate`、`openPrice`、`closePrice`、`highPrice`、`lowPrice`、`changeAmount`、`changePercent`、`volume`、`turnoverAmount`、`amplitude`、`turnoverRate`、`syncedAt`。
 
+## 可转债行情
+
+### 可转债列表
+
+`GET /api/bonds/quotes`
+
+需要 Token 和 `admin` 角色。
+
+查询参数：
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+| --- | --- | --- | --- | --- |
+| `limit` | number | 否 | `100` | 返回条数，最大 `500` |
+| `sortField` | string | 否 | `changePercent` | 排序字段 |
+| `sortOrder` | string | 否 | `desc` | `asc` 或 `desc` |
+
+返回：`BondQuoteVO[]`
+
+核心字段：
+
+`bondCode`、`bondName`、`secid`、`marketCode`、`exchangeCode`、`latestPrice`、`openPrice`、`highPrice`、`lowPrice`、`previousClosePrice`、`changeAmount`、`changePercent`、`volume`、`averagePrice`、`currentVolume`、`turnoverAmount`、`amplitude`、`turnoverRate`、`bondRating`、`quoteDetails`、`syncedAt`。
+
+### 可转债分时走势
+
+`GET /api/bonds/intraday-trends?bondCode=xxx`
+
+需要 Token。返回：`BondIntradayTrendVO[]`。
+
+### 可转债日 K
+
+`GET /api/bonds/daily-klines`
+
+查询参数：`bondCode` 或 `secid`、`startDate`、`endDate`、`limit`。
+
+## 行情同步
+
+### 触发手动全量同步
+
+`POST /api/stocks/sync`、`POST /api/indices/sync`、`POST /api/bonds/sync`
+
+需要 Token。返回：`{ "running": true/false, "started": true/false }`。
+
+### 同步状态查询
+
+`GET /api/stocks/sync/status`、`GET /api/indices/sync/status`、`GET /api/bonds/sync/status`
+
+返回同步任务是否正在运行。
+
+### 单只股票分时手动同步
+
+`POST /api/stocks/sync/trends/{stockCode}`
+
+返回 `MarketSyncStatusVO`。
+
+### 单只可转债分时手动同步
+
+`POST /api/bonds/sync/trends/{bondCode}`
+
+## 股票预警
+
+### 预警列表
+
+`GET /api/stock-alerts?targetType=STOCK`
+
+需要 Token。返回 `StockAlertConfigVO[]`。
+
+### 新增预警
+
+`POST /api/stock-alerts`
+
+### 删除预警
+
+`POST /api/stock-alerts/delete`
+
+### 手动触发预警检查
+
+`POST /api/stock-alerts/check`
+
+## 投资观察池
+
+### 分组列表
+
+`GET /api/watch-pool/groups`
+
+### 新增/更新分组
+
+`POST /api/watch-pool/groups`
+
+### 删除分组
+
+`POST /api/watch-pool/groups/delete`
+
+### 新增/更新标的
+
+`POST /api/watch-pool/items`
+
+### 删除标的
+
+`POST /api/watch-pool/items/delete`
+
+## 知识库
+
+### 分页查询
+
+`GET /api/knowledge/chunks?pageNum=1&pageSize=20`
+
+返回 `KnowledgeChunkPageVO`。
+
+### 统计
+
+`GET /api/knowledge/stats`
+
+返回：`taskCount`、`chunkCount`、`totalTextLength`、`latestCreatedAt`。
+
+### 更新文本
+
+`PUT /api/knowledge/chunks/{id}`
+
+请求体：`{ "text": "新文本内容" }`，返回更新后的 `KnowledgeChunkVO`。
+
 ## AI Chat
 
 ### 理财分析对话
@@ -239,19 +359,35 @@
 
 ## OCR 任务
 
-### 查询 OCR 任务列表
+### 分页查询 OCR 任务
 
-`GET /api/ai/ocr/tasks`
+`POST /api/ai/ocr/tasks/page`
 
 需要 Token。
 
-请求参数：
+请求体：
 
-| 参数 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `limit` | number | 否 | 返回最近任务数量，默认 `50`，最大 `200` |
+| 字段 | 类型 | 必填 | 默认值 | 说明 |
+| --- | --- | --- | --- | --- |
+| `pageNum` | number | 否 | `1` | 页码 |
+| `pageSize` | number | 否 | `20` | 每页条数，最大 `200` |
+| `status` | string | 否 | 无 | 状态过滤，可选值：`ready`、`running`、`manual_review_required`、`finished`、`failed`，不传则返回全部 |
 
-返回：`OcrTaskVO[]`，按提交时间倒序排列。
+返回：`OcrTaskPageVO`
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `records` | OcrTaskVO[] | 任务列表 |
+| `total` | number | 总数 |
+| `pageNum` | number | 当前页码 |
+| `pageSize` | number | 每页条数 |
+| `pages` | number | 总页数 |
+
+### 软删除任务
+
+`POST /api/ai/ocr/tasks/delete`
+
+需要 Token。请求体：`{ "taskNo": "ocr-xxx" }`。删除任务并同步删除对应知识库向量。
 
 ### 提交 OCR 文件
 
