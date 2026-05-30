@@ -20,6 +20,9 @@
 
 | 文档 | 说明 |
 | --- | --- |
+| [REPORT_PIPELINE.md](./REPORT_PIPELINE.md) | AI 分析报告全链路实现说明。 |
+| [架构图.png](./架构图.png) | 系统架构图。 |
+| [report流程图.png](./report流程图.png) | 分析报告流程图。 |
 | [OCR_PIPELINE.md](./OCR_PIPELINE.md) | OCR 全链路实现说明，包括 Java/Python 边界、RabbitMQ 队列、阶段消息、MinIO 产物、人工复核、chunk 规则、软删除和向量入库。 |
 | [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) | 后端接口文档，记录主要 API 的请求方式、请求参数和响应结构。 |
 | [COMPLETED_REQUIREMENTS.md](./COMPLETED_REQUIREMENTS.md) | 已完成需求记录，用于追踪阶段性功能交付情况。 |
