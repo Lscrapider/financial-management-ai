@@ -6,6 +6,9 @@ import com.scrapider.finance.domain.util.StockMarketJsonParser;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.Data;
@@ -14,7 +17,7 @@ import lombok.Data;
 @TableName("stock_quote_snapshot")
 public class StockQuoteSnapshotPO {
 
-    private static final Pattern TENCENT_QUOTE_PATTERN = Pattern.compile("v_\\w+=\"(.*)\";");
+    private static final Pattern TENCENT_QUOTE_PATTERN = Pattern.compile("v_(\\w+)=\"(.*)\";");
 
     private Long id;
     private String stockCode;
@@ -58,6 +61,10 @@ public class StockQuoteSnapshotPO {
 
     private static StockQuoteSnapshotPO fromTencentQuote(StockConfigPO stock, String response) {
         String[] fields = extractTencentFields(response);
+        return populateFromFields(stock, fields, response);
+    }
+
+    private static StockQuoteSnapshotPO populateFromFields(StockConfigPO stock, String[] fields, String rawResponse) {
         LocalDateTime now = LocalDateTime.now();
 
         StockQuoteSnapshotPO snapshot = new StockQuoteSnapshotPO();
@@ -91,7 +98,7 @@ public class StockQuoteSnapshotPO {
         snapshot.setPeDynamic(StockMarketJsonParser.decimal(value(fields, 52, null)));
         snapshot.setPeStatic(StockMarketJsonParser.decimal(value(fields, 53, null)));
         snapshot.setTradeStatus(StockMarketJsonParser.intValue(value(fields, 59, null)));
-        snapshot.setRawResponse(response);
+        snapshot.setRawResponse(rawResponse);
         snapshot.setSyncedAt(now);
         snapshot.roundDecimals();
         return snapshot;
@@ -105,7 +112,42 @@ public class StockQuoteSnapshotPO {
         if (!matcher.find()) {
             return new String[0];
         }
-        return matcher.group(1).split("~", -1);
+        return matcher.group(2).split("~", -1);
+    }
+
+    public static String extractTencentSymbol(String response) {
+        if (response == null) {
+            return null;
+        }
+        Matcher matcher = TENCENT_QUOTE_PATTERN.matcher(response);
+        return matcher.find() ? matcher.group(1) : null;
+    }
+
+    public static List<StockQuoteSnapshotPO> fromBatchApiResponse(
+            String response, Map<String, StockConfigPO> symbolToStock) {
+        List<StockQuoteSnapshotPO> results = new ArrayList<>();
+        if (response == null || response.isBlank()) {
+            return results;
+        }
+        for (String line : response.split("\\R")) {
+            if (line.isBlank()) {
+                continue;
+            }
+            String symbol = extractTencentSymbol(line);
+            if (symbol == null) {
+                continue;
+            }
+            StockConfigPO stock = symbolToStock.get(symbol);
+            if (stock == null) {
+                continue;
+            }
+            String[] fields = extractTencentFields(line);
+            if (fields.length == 0) {
+                continue;
+            }
+            results.add(populateFromFields(stock, fields, line));
+        }
+        return results;
     }
 
     private static String value(String[] fields, int index, String defaultValue) {

@@ -17,7 +17,10 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -150,31 +153,49 @@ public class StockMarketSyncTask {
         }
 
         log.info("Start syncing stock quotes, stock count: {}", stocks.size());
-        stocks.forEach(this::syncOneStock);
+        this.batchSyncQuotes(stocks);
         this.stockAlertService.checkAlerts();
         log.info("Finished syncing stock quotes.");
     }
 
-    private void syncOneStock(StockConfigPO stock) {
-        if (StrUtil.isBlank(stock.getSecid())) {
-            log.warn("Skip stock without secid, code: {}", stock.getStockCode());
+    private void batchSyncQuotes(List<StockConfigPO> stocks) {
+        List<StockConfigPO> valid = stocks.stream()
+                .filter(s -> StrUtil.isNotBlank(s.getSecid()))
+                .toList();
+        if (valid.isEmpty()) {
             return;
         }
 
+        Map<String, StockConfigPO> symbolToStock = new LinkedHashMap<>();
+        for (StockConfigPO stock : valid) {
+            symbolToStock.put(this.toTencentSymbol(stock.getSecid()), stock);
+        }
+
         try {
-            StockMarketDataDTO quote = this.stockMarketApi.getQuote(stock.getSecid());
-            this.stockQuoteSnapshotManage.saveLatest(StockQuoteSnapshotPO.fromApiResponse(stock, quote.data()));
-            this.sleepForRateLimit();
-            if (this.trendEnabled) {
-                this.doSyncTrendsForStock(stock);
-                this.sleepForRateLimit();
+            List<String> secids = new ArrayList<>(valid.size());
+            for (StockConfigPO stock : valid) {
+                secids.add(stock.getSecid());
             }
+            StockMarketDataDTO quote = this.stockMarketApi.getQuotes(secids);
+            List<StockQuoteSnapshotPO> snapshots = StockQuoteSnapshotPO
+                    .fromBatchApiResponse(quote.data().asText(), symbolToStock);
+            if (CollUtil.isNotEmpty(snapshots)) {
+                this.stockQuoteSnapshotManage.saveQuotesBatch(snapshots);
+            }
+            log.info("Batch synced {} stock quotes", snapshots.size());
         } catch (Exception ex) {
-            log.warn(
-                    "Failed to sync stock quote, code: {}, name: {}",
-                    stock.getStockCode(),
-                    stock.getStockName(),
-                    ex);
+            log.warn("Failed to batch sync stock quotes, count: {}", valid.size(), ex);
+        }
+
+        if (this.trendEnabled) {
+            for (StockConfigPO stock : valid) {
+                try {
+                    this.doSyncTrendsForStock(stock);
+                    this.sleepForRateLimit();
+                } catch (Exception ex) {
+                    log.warn("Failed to sync trend for stock: {}", stock.getStockCode(), ex);
+                }
+            }
         }
     }
 

@@ -12,7 +12,10 @@ import com.scrapider.finance.manage.BondDailyKlineManage;
 import com.scrapider.finance.manage.BondQuoteSnapshotManage;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -118,33 +121,51 @@ public class BondMarketSyncTask {
         }
 
         log.info("Start syncing bond market data, bond count: {}", bonds.size());
-        bonds.forEach(this::syncOneBond);
+        this.batchSyncQuotes(bonds);
         log.info("Finished syncing bond market data.");
     }
 
-    private void syncOneBond(BondConfigPO bondConfig) {
-        if (StrUtil.isBlank(bondConfig.getSecid())) {
-            log.warn("Skip bond without secid, code: {}", bondConfig.getBondCode());
+    private void batchSyncQuotes(List<BondConfigPO> bonds) {
+        List<BondConfigPO> valid = bonds.stream()
+                .filter(s -> StrUtil.isNotBlank(s.getSecid()))
+                .toList();
+        if (valid.isEmpty()) {
             return;
         }
 
+        Map<String, BondConfigPO> symbolToBond = new LinkedHashMap<>();
+        for (BondConfigPO bond : valid) {
+            symbolToBond.put(this.toTencentSymbol(bond.getSecid()), bond);
+        }
+
         try {
-            StockMarketDataDTO quote = this.stockMarketApi.getQuote(bondConfig.getSecid());
-            this.bondQuoteSnapshotManage.saveLatest(BondQuoteSnapshotPO.fromApiResponse(bondConfig, quote.data()));
-            this.sleepForRateLimit();
-            if (this.dailyKlineEnabled) {
-                StockMarketDataDTO dailyKlines =
-                        this.stockMarketApi.getDailyKlines(bondConfig.getSecid(), this.dailyKlineLimit);
-                this.bondDailyKlineManage.saveDailyKlines(
-                        BondDailyKlinePO.fromApiResponse(bondConfig, dailyKlines.data()));
-                this.sleepForRateLimit();
+            List<String> secids = new ArrayList<>(valid.size());
+            for (BondConfigPO bond : valid) {
+                secids.add(bond.getSecid());
             }
+            StockMarketDataDTO quote = this.stockMarketApi.getQuotes(secids);
+            List<BondQuoteSnapshotPO> snapshots = BondQuoteSnapshotPO
+                    .fromBatchApiResponse(quote.data().asText(), symbolToBond);
+            if (CollUtil.isNotEmpty(snapshots)) {
+                this.bondQuoteSnapshotManage.saveQuotesBatch(snapshots);
+            }
+            log.info("Batch synced {} bond quotes", snapshots.size());
         } catch (Exception ex) {
-            log.warn(
-                    "Failed to sync bond market data, code: {}, name: {}",
-                    bondConfig.getBondCode(),
-                    bondConfig.getBondName(),
-                    ex);
+            log.warn("Failed to batch sync bond quotes, count: {}", valid.size(), ex);
+        }
+
+        if (this.dailyKlineEnabled) {
+            for (BondConfigPO bond : valid) {
+                try {
+                    StockMarketDataDTO dailyKlines =
+                            this.stockMarketApi.getDailyKlines(bond.getSecid(), this.dailyKlineLimit);
+                    this.bondDailyKlineManage.saveDailyKlines(
+                            BondDailyKlinePO.fromApiResponse(bond, dailyKlines.data()));
+                    this.sleepForRateLimit();
+                } catch (Exception ex) {
+                    log.warn("Failed to sync daily kline for bond: {}", bond.getBondCode(), ex);
+                }
+            }
         }
     }
 
@@ -159,5 +180,13 @@ public class BondMarketSyncTask {
         LocalTime start = LocalTime.parse(this.startTime);
         LocalTime end = LocalTime.parse(this.endTime);
         return !now.isBefore(start) && !now.isAfter(end);
+    }
+
+    private String toTencentSymbol(String secid) {
+        String[] parts = secid.split("\\.");
+        if (parts.length != 2) {
+            throw new IllegalArgumentException("invalid secid: " + secid);
+        }
+        return "1".equals(parts[0]) ? "sh" + parts[1] : "sz" + parts[1];
     }
 }

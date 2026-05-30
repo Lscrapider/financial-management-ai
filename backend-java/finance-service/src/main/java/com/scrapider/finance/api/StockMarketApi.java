@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scrapider.finance.domain.dto.StockMarketDataDTO;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -31,6 +33,16 @@ public class StockMarketApi {
     public StockMarketDataDTO getQuote(String secid) {
         String symbol = this.toTencentSymbol(secid);
         String url = TENCENT_QUOTE_URL.replace("{symbol}", symbol);
+        byte[] bytes = this.restTemplate.getForObject(url, byte[].class);
+        String body = bytes == null ? "" : new String(bytes, GBK);
+        return new StockMarketDataDTO(SOURCE, url, this.textNode(body));
+    }
+
+    public StockMarketDataDTO getQuotes(List<String> secids) {
+        String symbolParam = secids.stream()
+                .map(this::toTencentSymbol)
+                .collect(Collectors.joining(","));
+        String url = TENCENT_QUOTE_URL.replace("{symbol}", symbolParam);
         byte[] bytes = this.restTemplate.getForObject(url, byte[].class);
         String body = bytes == null ? "" : new String(bytes, GBK);
         return new StockMarketDataDTO(SOURCE, url, this.textNode(body));

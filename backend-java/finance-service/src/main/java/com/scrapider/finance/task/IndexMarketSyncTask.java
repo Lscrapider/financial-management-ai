@@ -12,7 +12,10 @@ import com.scrapider.finance.manage.IndexDailyKlineManage;
 import com.scrapider.finance.manage.IndexQuoteSnapshotManage;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -118,33 +121,51 @@ public class IndexMarketSyncTask {
         }
 
         log.info("Start syncing index market data, index count: {}", indices.size());
-        indices.forEach(this::syncOneIndex);
+        this.batchSyncQuotes(indices);
         log.info("Finished syncing index market data.");
     }
 
-    private void syncOneIndex(IndexConfigPO indexConfig) {
-        if (StrUtil.isBlank(indexConfig.getSecid())) {
-            log.warn("Skip index without secid, code: {}", indexConfig.getIndexCode());
+    private void batchSyncQuotes(List<IndexConfigPO> indices) {
+        List<IndexConfigPO> valid = indices.stream()
+                .filter(s -> StrUtil.isNotBlank(s.getSecid()))
+                .toList();
+        if (valid.isEmpty()) {
             return;
         }
 
+        Map<String, IndexConfigPO> symbolToIndex = new LinkedHashMap<>();
+        for (IndexConfigPO index : valid) {
+            symbolToIndex.put(this.toTencentSymbol(index.getSecid()), index);
+        }
+
         try {
-            StockMarketDataDTO quote = this.stockMarketApi.getQuote(indexConfig.getSecid());
-            this.indexQuoteSnapshotManage.saveLatest(IndexQuoteSnapshotPO.fromApiResponse(indexConfig, quote.data()));
-            this.sleepForRateLimit();
-            if (this.dailyKlineEnabled) {
-                StockMarketDataDTO dailyKlines =
-                        this.stockMarketApi.getDailyKlines(indexConfig.getSecid(), this.dailyKlineLimit);
-                this.indexDailyKlineManage.saveDailyKlines(
-                        IndexDailyKlinePO.fromApiResponse(indexConfig, dailyKlines.data()));
-                this.sleepForRateLimit();
+            List<String> secids = new ArrayList<>(valid.size());
+            for (IndexConfigPO index : valid) {
+                secids.add(index.getSecid());
             }
+            StockMarketDataDTO quote = this.stockMarketApi.getQuotes(secids);
+            List<IndexQuoteSnapshotPO> snapshots = IndexQuoteSnapshotPO
+                    .fromBatchApiResponse(quote.data().asText(), symbolToIndex);
+            if (CollUtil.isNotEmpty(snapshots)) {
+                this.indexQuoteSnapshotManage.saveQuotesBatch(snapshots);
+            }
+            log.info("Batch synced {} index quotes", snapshots.size());
         } catch (Exception ex) {
-            log.warn(
-                    "Failed to sync index market data, code: {}, name: {}",
-                    indexConfig.getIndexCode(),
-                    indexConfig.getIndexName(),
-                    ex);
+            log.warn("Failed to batch sync index quotes, count: {}", valid.size(), ex);
+        }
+
+        if (this.dailyKlineEnabled) {
+            for (IndexConfigPO index : valid) {
+                try {
+                    StockMarketDataDTO dailyKlines =
+                            this.stockMarketApi.getDailyKlines(index.getSecid(), this.dailyKlineLimit);
+                    this.indexDailyKlineManage.saveDailyKlines(
+                            IndexDailyKlinePO.fromApiResponse(index, dailyKlines.data()));
+                    this.sleepForRateLimit();
+                } catch (Exception ex) {
+                    log.warn("Failed to sync daily kline for index: {}", index.getIndexCode(), ex);
+                }
+            }
         }
     }
 
@@ -159,5 +180,13 @@ public class IndexMarketSyncTask {
         LocalTime start = LocalTime.parse(this.startTime);
         LocalTime end = LocalTime.parse(this.endTime);
         return !now.isBefore(start) && !now.isAfter(end);
+    }
+
+    private String toTencentSymbol(String secid) {
+        String[] parts = secid.split("\\.");
+        if (parts.length != 2) {
+            throw new IllegalArgumentException("invalid secid: " + secid);
+        }
+        return "1".equals(parts[0]) ? "sh" + parts[1] : "sz" + parts[1];
     }
 }

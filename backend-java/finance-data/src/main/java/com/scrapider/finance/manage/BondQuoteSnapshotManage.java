@@ -1,5 +1,6 @@
 package com.scrapider.finance.manage;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -9,6 +10,10 @@ import com.scrapider.finance.domain.po.BondQuoteSnapshotPO;
 import com.scrapider.finance.mapper.BondQuoteSnapshotMapper;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -22,6 +27,26 @@ public class BondQuoteSnapshotManage extends ServiceImpl<BondQuoteSnapshotMapper
             snapshot.setId(existing.getId());
         }
         this.saveOrUpdate(snapshot);
+    }
+
+    public void saveQuotesBatch(List<BondQuoteSnapshotPO> snapshots) {
+        if (CollUtil.isEmpty(snapshots)) {
+            return;
+        }
+        Set<String> secids = snapshots.stream()
+                .map(BondQuoteSnapshotPO::getSecid)
+                .collect(Collectors.toSet());
+        Map<String, BondQuoteSnapshotPO> existingMap = this.list(new LambdaQueryWrapper<BondQuoteSnapshotPO>()
+                        .in(BondQuoteSnapshotPO::getSecid, secids))
+                .stream()
+                .collect(Collectors.toMap(BondQuoteSnapshotPO::getSecid, Function.identity(), (a, b) -> a));
+        for (BondQuoteSnapshotPO snapshot : snapshots) {
+            BondQuoteSnapshotPO existing = existingMap.get(snapshot.getSecid());
+            if (existing != null) {
+                snapshot.setId(existing.getId());
+            }
+        }
+        this.saveOrUpdateBatch(snapshots);
     }
 
     public List<BondQuoteSnapshotPO> listSnapshots(
