@@ -1,577 +1,2112 @@
-# 投资分析报告知识库检索设计文档
+# 投资分析报告动态检索系统设计文档
 
-## 1. 设计目标
+## 1. 设计目标与核心思路
 
-本项目中的投资分析报告不应只是简单地把行情数据、知识库片段和用户问题直接交给 LLM 生成答案。
+### 1.1 设计背景
 
-报告生成的核心目标是：
+本项目中的投资分析报告不应只是简单地把行情数据、知识库内容和用户问题交给 LLM 生成答案。
 
-```text
-先由系统分析当前标的的市场场景，
-再根据场景决定应该检索哪些知识，
-最后由 LLM 基于事实数据、场景信号和知识库依据组织成结构化报告。
-```
-
-因此，本系统的检索重点不是单纯寻找“语义最相似”的文本，而是寻找：
+普通 RAG 通常是：
 
 ```text
-对当前市场场景最有参考价值的经验内容。
+用户问题
+  ↓
+Embedding 检索 TopK 知识库内容
+  ↓
+行情数据 + 检索结果 + LLM
+  ↓
+生成报告
 ```
 
-最终检索逻辑应结合：
+这种方式适合普通文档问答，但不适合个人投资研究场景。
+
+投资分析报告真正需要解决的问题不是：
 
 ```text
-1. 内容相似度 semantic_score
-2. 场景相似度 scene_score
-3. 召回后的综合重排序 rerank
+哪段文本和用户问题最相似？
 ```
 
-第一版暂不单独引入质量权重，因为未经过人工复核的 OCR 数据不会进入知识库。
+而是：
+
+```text
+当前标的处于什么市场场景？
+这个场景下应该参考哪些经验？
+哪些知识应该重点召回？
+哪些知识只是辅助背景？
+```
+
+因此，本系统需要一套基于场景标签、模块得分和动态召回比例的检索机制。
 
 ---
 
-## 2. 整体报告生成流程
+### 1.2 普通 RAG 的问题
 
-推荐报告生成流程如下：
+普通 RAG 在本项目中主要存在以下问题：
+
+```text
+1. 只依赖内容相似度，无法理解当前标的的市场状态。
+2. 不知道报告当前应该重点关注成交量、价格、趋势、风险、估值还是情绪。
+3. 不同类型的 chunk 在报告中的召回比例固定，无法根据行情状态动态变化。
+4. 容易检索到语义相似但场景不匹配的内容。
+5. LLM 承担了过多判断，系统自身缺少可解释的分析过程。
+```
+
+例如用户选择某只股票生成报告时，系统不应该直接搜索：
+
+```text
+青农商行 怎么看
+```
+
+而应先分析该股票当前是否存在：
+
+```text
+放量上涨
+高换手
+接近近期高位
+低 PB
+短线情绪升温
+追高风险
+```
+
+然后再决定应该重点检索哪些知识。
+
+---
+
+### 1.3 本系统的核心思路
+
+本系统的核心思路是：
+
+```text
+知识入库时，给 chunk 打 7 大类场景标签；
+报告生成时，给当前标的也打 7 大类场景标签和得分；
+根据 7 大类得分动态计算每类 chunk 的召回比例；
+按类别分别检索、分别重排、分别取 TopN；
+最后把分组后的 knowledgeContext 交给 LLM 生成报告。
+```
+
+也就是说：
+
+```text
+先分类配额，
+再类内检索，
+再类内重排，
+最后按类别组织知识上下文。
+```
+
+这比一次性全库检索 TopK 更稳定，也更符合投资分析报告的结构。
+
+---
+
+### 1.4 核心流程概览
+
+整体流程如下：
+
+```text
+Chunk 入库阶段：
+人工复核文本
+  ↓
+切分 chunk
+  ↓
+给 chunk 打 7 大类标签
+  ↓
+生成 embedding
+  ↓
+写入 knowledge_vector
+
+报告生成阶段：
+用户选择标的
+  ↓
+查询行情 / K 线 / 分时 / 估值数据
+  ↓
+根据数据生成当前标的 7 大类标签和得分
+  ↓
+用指数函数计算每类 chunk 召回比例
+  ↓
+按类别分别检索对应 chunk
+  ↓
+每类内部重排序
+  ↓
+构建 knowledgeContext
+  ↓
+LLM 生成结构化报告
+```
+
+---
+
+## 2. 整体流程设计
+
+### 2.1 Chunk 入库流程
+
+Chunk 入库流程负责把人工复核后的知识文本变成可检索的结构化知识。
+
+推荐流程：
+
+```text
+OCR 识别
+  ↓
+文本清洗
+  ↓
+人工复核
+  ↓
+确认提交 reviewed.json
+  ↓
+按最终 paragraphs 生成 chunk
+  ↓
+为每个 chunk 生成 7 大类场景标签
+  ↓
+生成 keywords / summary
+  ↓
+生成 embedding
+  ↓
+写入 knowledge_vector
+```
+
+入库后的 chunk 不仅有文本和向量，还应有结构化 metadata。
+
+---
+
+### 2.2 报告生成流程
+
+报告生成流程负责根据当前标的数据生成分析报告。
+
+推荐流程：
 
 ```text
 用户选择标的
   ↓
-后端查询行情数据
+查询行情数据
   ↓
-后端计算指标和信号
+查询 K 线 / 分时 / 估值等上下文
   ↓
-生成当前标的 currentScenes
+7 个场景模块分别打标签和打分
   ↓
-根据 reportType + currentScenes 生成检索计划
+生成 currentScenes
   ↓
-多路召回知识库 chunk
+计算每类 chunk 召回数量
   ↓
-计算 semantic_score 和 scene_score
+按类别检索知识库
   ↓
-综合 rerank
+构建 knowledgeContext
   ↓
-取 TopK 知识片段作为 knowledgeContext
+LLM 生成结构化报告
   ↓
-LLM 基于 marketContext + signalContext + knowledgeContext 生成结构化报告
-  ↓
-保存报告、上下文和引用依据
-```
-
-关键思想：
-
-```text
-不要做“LLM 直接生成报告”；
-而是做“系统生成分析上下文，LLM 负责解释和组织报告”。
+保存报告和引用依据
 ```
 
 ---
 
-## 3. 检索评分设计
+### 2.3 检索召回流程
 
-第一版推荐使用两个核心分数：
+检索召回流程是本设计的核心。
 
-```text
-semantic_score：内容相似度
-scene_score：场景相似度
-```
-
-综合分：
+推荐流程：
 
 ```text
-final_score = semantic_score * 0.4 + scene_score * 0.6
-```
-
-如果后续发现场景标签质量不够稳定，可以调整为：
-
-```text
-final_score = semantic_score * 0.5 + scene_score * 0.5
-```
-
-如果场景标签体系成熟，可以调整为：
-
-```text
-final_score = semantic_score * 0.35 + scene_score * 0.65
+currentScenes
+  ↓
+获取 7 大类总分
+  ↓
+指数函数计算 chunk 分配比例
+  ↓
+每一类生成独立检索任务
+  ↓
+每一类用 Jaccard 标签相似度过滤候选 chunk
+  ↓
+每一类生成 queryText
+  ↓
+每一类计算 semantic_score
+  ↓
+每一类内部 rerank
+  ↓
+每一类取 TopN
+  ↓
+按类别构建 knowledgeContext
 ```
 
 ---
 
-## 4. 内容相似度 semantic_score
+### 2.4 三个流程之间的关系
 
-内容相似度使用 embedding cosine similarity 或 pgvector 向量距离计算。
-
-它回答的问题是：
+三者关系如下：
 
 ```text
-当前 query 和 chunk 文本内容在语义上像不像？
+Chunk 入库流程
+负责让知识库中的 chunk 带有 7 大类标签。
+
+报告生成流程
+负责让当前标的也带有 7 大类标签和得分。
+
+检索召回流程
+负责比较当前标的标签与 chunk 标签，
+并根据得分动态决定各类 chunk 召回比例。
 ```
 
-例如：
+核心是：
 
 ```text
-query:
-放量上涨 高换手 追高风险
-
-chunk:
-低价股突然放量时，不要只看涨幅，要观察成交量持续性和换手率。
+chunk 有 scenes；
+当前标的也有 currentScenes；
+检索就是比较这两者。
 ```
-
-这类内容会有较高 semantic_score。
-
-但是 semantic_score 不能解决以下问题：
-
-```text
-当前标的是股票、指数还是可转债？
-当前是低位反弹还是高位放量？
-当前是趋势突破还是情绪异动？
-当前更需要风险控制经验还是估值判断经验？
-```
-
-因此 semantic_score 只作为基础分，不应单独决定检索结果。
 
 ---
 
-## 5. 场景相似度 scene_score
+## 3. Chunk 入库设计
 
-场景相似度是本系统检索的核心。
+### 3.1 入库时机
 
-每个知识库 chunk 入库时，需要被分析出 scenes 标签；生成某个标的报告时，系统也会根据行情数据分析出 currentScenes。
+Chunk 入库发生在 OCR 人工复核确认之后。
 
-然后比较：
+未经过人工复核的 OCR 内容不进入知识库。
 
-```text
-当前标的 currentScenes
-和
-知识库 chunk scenes
-```
-
-匹配程度越高，说明该 chunk 越适合当前报告。
+因此第一版不需要单独引入质量权重，因为进入数据库的文本默认已经人工确认。
 
 ---
 
-## 6. Scene 分类体系
+### 3.2 Chunk 生成规则
 
-第一版建议将 scene 分成 7 大类：
+推荐规则：
 
 ```text
-1. asset_scene：资产类型场景
-2. price_scene：价格位置场景
-3. volume_scene：成交量 / 换手场景
-4. trend_scene：趋势结构场景
-5. valuation_scene：估值 / 基本面场景
-6. sentiment_scene：情绪 / 异动场景
-7. risk_strategy_scene：风险 / 策略场景
+1. 一个最终 paragraph 对应一个 chunk。
+2. chunk 文本使用人工复核后的最终文本。
+3. chunk_index 从 1 开始递增。
+4. 同一个 taskNo 重新入库时，可以先删除旧 chunk，再写入新 chunk。
+5. chunk 需要保存 taskNo、chunkIndex、text、embedding、metadata。
 ```
-
-这 7 类基本可以覆盖股票、指数、可转债的第一版分析报告。
 
 ---
 
-## 7. asset_scene：资产类型场景
+### 3.3 Chunk 的 7 大类标签结构
 
-### 作用
-
-asset_scene 用来判断知识片段是否适合当前标的类型。
-
-它主要解决：
-
-```text
-这段知识是不是适用于当前资产？
-```
-
-例如：
-
-```text
-分析股票时，不应大量召回可转债专用知识。
-分析可转债时，不应只召回普通股票技术分析知识。
-```
-
-### 推荐标签
-
-```text
-stock                  股票
-index                  指数
-bond                   可转债
-bank_stock             银行股
-low_price_stock        低价股
-large_cap_stock        大盘股
-small_cap_stock        小盘股
-convertible_bond       可转债
-```
-
-### 示例
-
-分析青农商行时：
+每个 chunk 的 metadata 中应包含 7 大类 scenes：
 
 ```json
 {
-  "asset_scene": ["stock", "bank_stock", "low_price_stock"]
+  "scenes": {
+    "asset": [],
+    "price": [],
+    "volume": [],
+    "trend": [],
+    "valuation": [],
+    "sentiment": [],
+    "risk_strategy": []
+  }
 }
 ```
 
-### 设计理解
+7 大类分别是：
 
-asset_scene 更多是过滤和基础匹配，不是最终观点来源。
-
-它适合低权重参与 scene_score。
+```text
+asset：资产类型
+price：价格位置
+volume：成交量 / 换手
+trend：趋势结构
+valuation：估值 / 基本面
+sentiment：情绪 / 异动
+risk_strategy：风险 / 策略
+```
 
 ---
 
-## 8. price_scene：价格位置场景
+### 3.4 小标签生成规则
 
-### 作用
+每个大类下面可以有多个小标签。
 
-price_scene 描述当前价格状态。
-
-它回答：
+例如一段文本：
 
 ```text
-当前价格是在涨、跌、横盘、高位、低位、突破还是回调？
-```
-
-### 推荐标签
-
-```text
-price_rise              明显上涨
-price_drop              明显下跌
-sideways                横盘
-near_recent_high        接近近期高位
-near_recent_low         接近近期低位
-breakout                突破
-pullback                回调
-gap_up                  跳空高开
-gap_down                跳空低开
-limit_up                涨停
-limit_down              跌停
-```
-
-### 示例
-
-```json
-{
-  "price_scene": ["price_rise", "near_recent_high"]
-}
-```
-
-### 可检索知识方向
-
-```text
-上涨后是否追高
-接近高位如何处理
-突破后的确认条件
-回调是否健康
-低位反弹是否可靠
-```
-
-### 设计理解
-
-price_scene 很重要，但不能单独判断。价格必须结合成交量、趋势和风险策略一起分析。
-
----
-
-## 9. volume_scene：成交量 / 换手场景
-
-### 作用
-
-volume_scene 描述资金活跃度和交易强度。
-
-它回答：
-
-```text
-当前成交量是否异常？
-换手率是否过高？
-量价是否配合？
-```
-
-### 推荐标签
-
-```text
-volume_expand            放量
-volume_shrink            缩量
-high_turnover            高换手
-low_turnover             低换手
-volume_price_confirm     量价配合
-volume_price_divergence  量价背离
-volume_spike             成交量突然放大
-volume_dry_up            成交枯竭
-```
-
-### 示例
-
-```json
-{
-  "volume_scene": ["volume_expand", "high_turnover"]
-}
-```
-
-### 可检索知识方向
-
-```text
-放量上涨怎么看
-高换手是否有风险
-量价配合是否说明趋势有效
-放量后第二天如何观察
-放量滞涨是否危险
-```
-
-### 设计理解
-
-volume_scene 在短线异动、观察池、风险检查中非常重要。
-
-对于股票和可转债报告，volume_scene 应该是高权重类别之一。
-
----
-
-## 10. trend_scene：趋势结构场景
-
-### 作用
-
-trend_scene 描述最近一段时间的走势结构。
-
-它和 price_scene 不同：
-
-```text
-price_scene 看当前价格位置；
-trend_scene 看一段时间内的结构。
-```
-
-例如，今天上涨 3% 是 price_rise；但最近 20 天可能是横盘突破、下跌反弹或趋势加速，这属于 trend_scene。
-
-### 推荐标签
-
-```text
-uptrend                  上升趋势
-downtrend                下降趋势
-range_bound              区间震荡
-trend_reversal           趋势反转
-rebound                  反弹
-breakout_from_range      横盘突破
-failed_breakout          突破失败
-higher_high              创阶段新高
-lower_low                创阶段新低
-```
-
-### 示例
-
-```json
-{
-  "trend_scene": ["range_bound", "breakout_from_range"]
-}
-```
-
-### 可检索知识方向
-
-```text
-横盘突破后的确认
-突破失败风险
-趋势反转是否成立
-下跌反弹和真正反转的区别
-区间震荡中的观察纪律
-```
-
-### 设计理解
-
-trend_scene 可以让报告不只看当天行情，而是具备结构分析能力。
-
-对于复盘报告和观察池报告，trend_scene 权重可以更高。
-
----
-
-## 11. valuation_scene：估值 / 基本面场景
-
-### 作用
-
-valuation_scene 用于描述估值和基础财务特征。
-
-它适合股票、银行股、低价股、指数类分析，也适合中长期观察。
-
-### 推荐标签
-
-```text
-low_pe                   低 PE
-high_pe                  高 PE
-low_pb                   低 PB
-high_pb                  高 PB
-valuation_repair         估值修复
-valuation_trap           低估值陷阱
-profit_pressure          盈利压力
-high_dividend            高股息
-fundamental_uncertain    基本面不确定
-```
-
-### 示例
-
-分析银行股时：
-
-```json
-{
-  "valuation_scene": ["low_pb", "low_pe"]
-}
-```
-
-### 可检索知识方向
-
-```text
-低 PB 银行股怎么看
-低估值是否一定安全
-低估值修复需要什么条件
-低估值陷阱如何判断
-高股息策略的风险
-```
-
-### 设计理解
-
-valuation_scene 不适合单独决定短线判断，但适合为报告提供估值背景。
-
-如果当前系统财务数据不完整，第一版可以只使用 PE、PB、股息率等简单字段。
-
----
-
-## 12. sentiment_scene：情绪 / 异动场景
-
-### 作用
-
-sentiment_scene 描述市场关注度、情绪热度和消息驱动特征。
-
-它不完全来自财务数据，可以来自：
-
-```text
-涨跌幅
-成交量变化
-换手率
-涨停/大跌
-新闻/公告
-板块联动
-观察池热度
-```
-
-### 推荐标签
-
-```text
-market_attention_rise    关注度上升
-short_term_emotion       短线情绪升温
-panic_selling            恐慌抛售
-speculation_heat         投机热度
-weak_sentiment           情绪偏弱
-news_driven              消息驱动
-policy_driven            政策驱动
-sector_rotation          板块轮动
-```
-
-### 示例
-
-```json
-{
-  "sentiment_scene": ["short_term_emotion", "market_attention_rise"]
-}
-```
-
-### 可检索知识方向
-
-```text
-情绪上来时如何避免追高
-消息驱动行情是否持续
-短线热度和真实趋势的区别
-大跌时如何区分恐慌和趋势破坏
-板块轮动时个股是否有持续性
-```
-
-### 设计理解
-
-sentiment_scene 是比较软的分类，但对个人投资系统非常重要。
-
-很多错误并不是因为数据没看到，而是情绪影响了判断。
-
-第一版可以用规则粗略生成：
-
-```text
-涨幅较大 + 放量 + 高换手 = short_term_emotion
-涨停 / 大涨 = market_attention_rise
-大跌 + 放量 = panic_selling
-```
-
-后续可以接新闻和公告增强判断。
-
----
-
-## 13. risk_strategy_scene：风险 / 策略场景
-
-### 作用
-
-risk_strategy_scene 是个人知识库最有价值的一类。
-
-前面几类更多描述“市场状态”，而 risk_strategy_scene 描述：
-
-```text
-当前应该注意什么风险？
-当前应该采取什么观察或处理策略？
-```
-
-### 推荐标签：风险类
-
-```text
-chase_high_risk          追高风险
-false_breakout_risk      假突破风险
-liquidity_risk           流动性风险
-drawdown_risk            回撤风险
-valuation_trap_risk      估值陷阱风险
-overheated_risk          过热风险
-```
-
-### 推荐标签：策略类
-
-```text
-risk_control             风险控制
-position_control         仓位控制
-wait_confirm             等待确认
-observe_next_day         观察次日表现
-avoid_emotional_trade    避免情绪交易
-take_profit_plan         止盈计划
-stop_loss_plan           止损计划
-```
-
-### 示例
-
-当前标的是：
-
-```text
-放量上涨 + 高换手 + 接近近期高位
+放量上涨后不能马上判断趋势成立，要看第二天是否继续放量并站稳关键位置。
 ```
 
 可以生成：
 
 ```json
 {
-  "risk_strategy_scene": [
-    "chase_high_risk",
-    "wait_confirm",
-    "observe_next_day"
+  "scenes": {
+    "price": ["price_rise"],
+    "volume": ["volume_expand"],
+    "trend": ["breakout_from_range"],
+    "risk_strategy": ["wait_confirm", "observe_next_day"]
+  }
+}
+```
+
+这些小标签用于后续检索时的标签过滤和 tag_match_score 计算。
+
+---
+
+### 3.5 Chunk Embedding 生成
+
+Embedding 只基于最终 chunk text 生成。
+
+推荐流程：
+
+```text
+chunk.text
+  ↓
+embedding model
+  ↓
+embedding vector
+  ↓
+knowledge_vector.embedding
+```
+
+Embedding 用于内容相似度计算：
+
+```text
+semantic_score = cosine(query_embedding, chunk_embedding)
+```
+
+---
+
+### 3.6 knowledge_vector.metadata 结构
+
+推荐 metadata 结构：
+
+```json
+{
+  "sourceType": "ocr_note",
+  "reviewed": true,
+  "taskNo": "ocr-xxx",
+  "chunkIndex": 1,
+  "scenes": {
+    "asset": ["stock"],
+    "price": ["price_rise"],
+    "volume": ["volume_expand"],
+    "trend": ["breakout_from_range"],
+    "valuation": [],
+    "sentiment": [],
+    "risk_strategy": ["wait_confirm", "observe_next_day"]
+  },
+  "keywords": ["放量", "上涨", "站稳", "第二天观察"],
+  "summary": "放量上涨后需要观察次日是否继续放量并站稳。"
+}
+```
+
+---
+
+### 3.7 Chunk 入库示例
+
+原始复核文本：
+
+```text
+低价股突然放量上涨时，不要只看当天涨幅。需要观察换手率是否过高，以及第二天是否继续放量并站稳。
+```
+
+入库 metadata：
+
+```json
+{
+  "sourceType": "ocr_note",
+  "reviewed": true,
+  "scenes": {
+    "asset": ["stock", "low_price_stock"],
+    "price": ["price_rise"],
+    "volume": ["volume_expand", "high_turnover"],
+    "trend": ["breakout_from_range"],
+    "valuation": [],
+    "sentiment": ["short_term_emotion"],
+    "risk_strategy": ["chase_high_risk", "wait_confirm", "observe_next_day"]
+  },
+  "keywords": ["低价股", "放量上涨", "换手率", "追高", "观察次日"],
+  "summary": "低价股放量上涨后，需要关注换手率和次日确认。"
+}
+```
+
+---
+
+## 4. 七个场景模块设计
+
+### 4.1 模块统一输出结构
+
+报告生成时，系统会根据当前标的数据运行 7 个场景模块。
+
+每个模块输出统一结构：
+
+```json
+{
+  "module": "volume",
+  "score": 0.82,
+  "level": "high",
+  "direction": "active",
+  "tags": {
+    "volume_expand": 0.90,
+    "high_turnover": 0.80
+  },
+  "evidence": [
+    "成交量高于近 20 日均量",
+    "换手率处于较高水平"
   ]
 }
 ```
 
-### 可检索知识方向
-
-```text
-追高风险如何处理
-高位放量后怎么观察
-突破后是否需要等待确认
-如何设置观察条件
-如何避免情绪交易
-什么时候需要控制仓位
-```
-
-### 设计理解
-
-risk_strategy_scene 适合报告的风险提示、后续观察点和非买卖建议结论。
-
-如果报告目标是帮助用户少犯错，这一类应该是高权重。
+注意：当前标的的小标签建议带 score，而 chunk 入库时的小标签可以先只存标签，不一定存分数。
 
 ---
 
-## 14. Scene Metadata 存储结构
+### 4.2 AssetSceneModule：资产类型模块
 
-建议在 `knowledge_vector.metadata` 中存储 scenes。
+#### 4.2.1 模块作用
+
+判断当前标的属于什么资产类型。
+
+它主要用于控制检索方向，避免股票报告召回过多可转债知识，或可转债报告召回过多普通股票知识。
+
+#### 4.2.2 推荐小标签
+
+```text
+stock
+index
+bond
+bank_stock
+low_price_stock
+large_cap_stock
+small_cap_stock
+convertible_bond
+```
+
+#### 4.2.3 输出示例
+
+```json
+{
+  "module": "asset",
+  "score": 1.0,
+  "level": "high",
+  "direction": "neutral",
+  "tags": {
+    "stock": 1.0,
+    "bank_stock": 1.0,
+    "low_price_stock": 0.8
+  },
+  "evidence": [
+    "标的类型为股票",
+    "行业属于银行",
+    "价格区间属于低价股"
+  ]
+}
+```
+
+---
+
+### 4.3 PriceSceneModule：价格位置模块
+
+#### 4.3.1 模块作用
+
+描述当前价格行为和价格位置。
+
+它回答：
+
+```text
+当前价格是在上涨、下跌、横盘、高位、低位、突破还是回调？
+```
+
+#### 4.3.2 推荐小标签
+
+```text
+price_rise
+price_drop
+sideways
+near_recent_high
+near_recent_low
+breakout
+pullback
+gap_up
+gap_down
+limit_up
+limit_down
+```
+
+#### 4.3.3 输出示例
+
+```json
+{
+  "module": "price",
+  "score": 0.74,
+  "level": "high",
+  "direction": "positive",
+  "tags": {
+    "price_rise": 0.80,
+    "near_recent_high": 0.75
+  },
+  "evidence": [
+    "当日涨幅较明显",
+    "当前价格接近近期高位"
+  ]
+}
+```
+
+---
+
+### 4.4 VolumeSceneModule：成交量 / 换手模块
+
+#### 4.4.1 模块作用
+
+描述成交量、换手率和资金活跃度。
+
+它回答：
+
+```text
+成交量是否异常？
+换手率是否过高？
+当前量价是否配合？
+```
+
+#### 4.4.2 推荐小标签
+
+```text
+volume_expand
+volume_shrink
+high_turnover
+low_turnover
+volume_price_confirm
+volume_price_divergence
+volume_spike
+volume_dry_up
+```
+
+#### 4.4.3 输出示例
+
+```json
+{
+  "module": "volume",
+  "score": 0.82,
+  "level": "high",
+  "direction": "active",
+  "tags": {
+    "volume_expand": 0.90,
+    "high_turnover": 0.80
+  },
+  "evidence": [
+    "成交量高于近 20 日均量",
+    "换手率处于较高水平"
+  ]
+}
+```
+
+---
+
+### 4.5 TrendSceneModule：趋势结构模块
+
+#### 4.5.1 模块作用
+
+描述最近一段时间的趋势结构。
+
+它和价格模块的区别是：
+
+```text
+PriceSceneModule 看当前价格状态；
+TrendSceneModule 看最近一段时间走势结构。
+```
+
+#### 4.5.2 推荐小标签
+
+```text
+uptrend
+downtrend
+range_bound
+trend_reversal
+rebound
+breakout_from_range
+failed_breakout
+higher_high
+lower_low
+```
+
+#### 4.5.3 输出示例
+
+```json
+{
+  "module": "trend",
+  "score": 0.65,
+  "level": "medium",
+  "direction": "positive",
+  "tags": {
+    "breakout_from_range": 0.70
+  },
+  "evidence": [
+    "近期价格从震荡区间上沿突破"
+  ]
+}
+```
+
+---
+
+### 4.6 ValuationSceneModule：估值 / 基本面模块
+
+#### 4.6.1 模块作用
+
+描述估值水平和基础财务特征。
+
+适合用于：
+
+```text
+银行股
+低价股
+蓝筹股
+指数
+中长期观察
+```
+
+#### 4.6.2 推荐小标签
+
+```text
+low_pe
+high_pe
+low_pb
+high_pb
+valuation_repair
+valuation_trap
+profit_pressure
+high_dividend
+fundamental_uncertain
+```
+
+#### 4.6.3 输出示例
+
+```json
+{
+  "module": "valuation",
+  "score": 0.71,
+  "level": "medium_high",
+  "direction": "positive",
+  "tags": {
+    "low_pb": 0.80,
+    "low_pe": 0.65
+  },
+  "evidence": [
+    "PB 小于 1",
+    "PE 处于较低区间"
+  ]
+}
+```
+
+---
+
+### 4.7 SentimentSceneModule：情绪 / 异动模块
+
+#### 4.7.1 模块作用
+
+描述市场关注度、情绪热度和消息驱动特征。
+
+它可以来自：
+
+```text
+涨跌幅
+成交量变化
+换手率
+涨停 / 大跌
+新闻 / 公告
+板块联动
+观察池热度
+```
+
+#### 4.7.2 推荐小标签
+
+```text
+market_attention_rise
+short_term_emotion
+panic_selling
+speculation_heat
+weak_sentiment
+news_driven
+policy_driven
+sector_rotation
+```
+
+#### 4.7.3 输出示例
+
+```json
+{
+  "module": "sentiment",
+  "score": 0.68,
+  "level": "medium_high",
+  "direction": "active",
+  "tags": {
+    "short_term_emotion": 0.72,
+    "market_attention_rise": 0.65
+  },
+  "evidence": [
+    "价格和成交活跃度同步上升",
+    "短线关注度可能提高"
+  ]
+}
+```
+
+---
+
+### 4.8 RiskStrategySceneModule：风险 / 策略模块
+
+#### 4.8.1 模块作用
+
+描述当前需要关注的风险和处理策略。
+
+它回答：
+
+```text
+当前应该注意什么风险？
+当前应该采取什么观察或处理策略？
+```
+
+#### 4.8.2 推荐小标签
+
+风险类：
+
+```text
+chase_high_risk
+false_breakout_risk
+liquidity_risk
+drawdown_risk
+valuation_trap_risk
+overheated_risk
+```
+
+策略类：
+
+```text
+risk_control
+position_control
+wait_confirm
+observe_next_day
+avoid_emotional_trade
+take_profit_plan
+stop_loss_plan
+```
+
+#### 4.8.3 输出示例
+
+```json
+{
+  "module": "risk_strategy",
+  "score": 0.76,
+  "level": "high",
+  "direction": "risk",
+  "tags": {
+    "chase_high_risk": 0.85,
+    "wait_confirm": 0.70
+  },
+  "evidence": [
+    "价格上涨后接近近期高位",
+    "成交活跃度较高",
+    "存在追高和短线情绪过热风险"
+  ]
+}
+```
+
+---
+
+## 5. 当前标的场景分析设计
+
+### 5.1 数据查询范围
+
+用户选择标的后，系统先查询数据。
+
+根据资产类型不同，查询内容不同。
+
+股票可以查询：
+
+```text
+最新行情
+涨跌幅
+成交量
+换手率
+PE / PB
+分时走势
+日 K 线
+近期高低点
+观察池状态
+预警状态
+```
+
+可转债可以查询：
+
+```text
+转债价格
+涨跌幅
+成交量
+换手率
+溢价率
+评级
+剩余规模
+正股表现
+强赎相关信息
+```
+
+指数可以查询：
+
+```text
+指数最新点位
+涨跌幅
+成交额
+日 K 线
+近期趋势
+关联市场表现
+```
+
+---
+
+### 5.2 7 大类标签生成
+
+查询数据后，系统运行 7 个场景模块：
+
+```text
+AssetSceneModule
+PriceSceneModule
+VolumeSceneModule
+TrendSceneModule
+ValuationSceneModule
+SentimentSceneModule
+RiskStrategySceneModule
+```
+
+每个模块生成：
+
+```text
+大类 score
+小标签 tags
+证据 evidence
+```
+
+---
+
+### 5.3 小标签得分计算
+
+每个小标签可以有独立得分。
+
+例如 volume 类：
+
+```json
+{
+  "volume_expand": 0.90,
+  "high_turnover": 0.80
+}
+```
+
+这说明：
+
+```text
+放量信号较强；
+高换手信号也较明显。
+```
+
+小标签得分可以来自规则计算，也可以后续引入模型判断。
+
+第一版建议优先使用规则。
+
+---
+
+### 5.4 大类总分计算
+
+每个大类总分由小标签聚合得到。
+
+简单版本：
+
+```text
+category_score = max(tag_scores)
+```
+
+或：
+
+```text
+category_score = weighted_avg(tag_scores)
+```
+
+推荐第一版：
+
+```text
+category_score = weighted_avg(tag_scores)
+```
+
+因为一个类别中多个小标签同时命中时，总分应更稳定。
+
+例如：
+
+```text
+volume_expand = 0.90
+high_turnover = 0.80
+
+volume_score = 0.85
+```
+
+---
+
+### 5.5 currentScenes 输出结构
+
+推荐 currentScenes 结构：
+
+```json
+{
+  "asset": {
+    "score": 1.0,
+    "tags": {
+      "stock": 1.0,
+      "bank_stock": 1.0,
+      "low_price_stock": 0.8
+    }
+  },
+  "price": {
+    "score": 0.74,
+    "tags": {
+      "price_rise": 0.80,
+      "near_recent_high": 0.75
+    }
+  },
+  "volume": {
+    "score": 0.82,
+    "tags": {
+      "volume_expand": 0.90,
+      "high_turnover": 0.80
+    }
+  },
+  "risk_strategy": {
+    "score": 0.76,
+    "tags": {
+      "chase_high_risk": 0.85,
+      "wait_confirm": 0.70
+    }
+  }
+}
+```
+
+---
+
+### 5.6 场景分析示例
+
+假设当前标的是低价银行股，出现放量上涨。
+
+场景分析结果可能是：
+
+```json
+{
+  "asset": {
+    "score": 1.0,
+    "tags": {
+      "stock": 1.0,
+      "bank_stock": 1.0,
+      "low_price_stock": 0.8
+    }
+  },
+  "price": {
+    "score": 0.74,
+    "tags": {
+      "price_rise": 0.80,
+      "near_recent_high": 0.75
+    }
+  },
+  "volume": {
+    "score": 0.82,
+    "tags": {
+      "volume_expand": 0.90,
+      "high_turnover": 0.80
+    }
+  },
+  "trend": {
+    "score": 0.65,
+    "tags": {
+      "breakout_from_range": 0.70
+    }
+  },
+  "valuation": {
+    "score": 0.71,
+    "tags": {
+      "low_pb": 0.80,
+      "low_pe": 0.65
+    }
+  },
+  "sentiment": {
+    "score": 0.68,
+    "tags": {
+      "short_term_emotion": 0.72
+    }
+  },
+  "risk_strategy": {
+    "score": 0.76,
+    "tags": {
+      "chase_high_risk": 0.85,
+      "wait_confirm": 0.70
+    }
+  }
+}
+```
+
+---
+
+## 6. 检索召回设计
+
+### 6.1 检索输入
+
+检索召回模块输入包括：
+
+```text
+1. target：当前分析标的
+2. reportType：报告类型
+3. marketContext：行情数据
+4. currentScenes：当前标的 7 大类标签和得分
+5. totalChunks：本次报告希望召回的总 chunk 数
+```
+
+示例：
+
+```json
+{
+  "target": {
+    "type": "STOCK",
+    "code": "002958",
+    "name": "青农商行"
+  },
+  "reportType": "quick_analysis",
+  "totalChunks": 10,
+  "currentScenes": {
+    "volume": {
+      "score": 0.82,
+      "tags": {
+        "volume_expand": 0.90,
+        "high_turnover": 0.80
+      }
+    },
+    "risk_strategy": {
+      "score": 0.76,
+      "tags": {
+        "chase_high_risk": 0.85,
+        "wait_confirm": 0.70
+      }
+    }
+  }
+}
+```
+
+---
+
+### 6.2 根据 7 大类得分计算 Chunk 分配比例
+
+系统先根据 7 大类得分计算每一类应该召回多少 chunk。
+
+例如：
+
+```text
+volume      0.82
+risk        0.76
+price       0.74
+valuation   0.71
+sentiment   0.68
+trend       0.65
+```
+
+如果总共希望召回 10 个 chunk，系统可能分配为：
+
+```json
+{
+  "volume": 3,
+  "risk_strategy": 2,
+  "price": 2,
+  "valuation": 1,
+  "sentiment": 1,
+  "trend": 1
+}
+```
+
+---
+
+#### 6.2.1 指数函数分配公式
+
+推荐使用指数函数放大高分模块占比。
+
+公式：
+
+```text
+effective_score_i = category_score_i * report_type_weight_i
+
+allocation_score_i = exp(effective_score_i * alpha)
+
+allocation_ratio_i = allocation_score_i / Σ allocation_score_j
+
+chunk_count_i = round(allocation_ratio_i * total_chunks)
+```
+
+---
+
+#### 6.2.2 alpha 放大系数
+
+`alpha` 控制高分模块的放大程度。
+
+```text
+alpha 越大，高分模块占比越高。
+```
+
+推荐第一版：
+
+```json
+{
+  "alpha": 6.0
+}
+```
+
+调参建议：
+
+```text
+alpha = 4：较平滑
+alpha = 6：推荐起点
+alpha = 8：高分模块更突出
+alpha > 10：可能过于激进
+```
+
+---
+
+#### 6.2.3 reportType 权重
+
+不同报告类型应有不同模块权重。
+
+quick_analysis：
+
+```json
+{
+  "asset": 1.0,
+  "price": 1.0,
+  "volume": 1.0,
+  "trend": 0.9,
+  "valuation": 0.8,
+  "sentiment": 0.9,
+  "risk_strategy": 1.0
+}
+```
+
+risk_check：
+
+```json
+{
+  "asset": 1.0,
+  "price": 0.9,
+  "volume": 1.0,
+  "trend": 0.8,
+  "valuation": 0.7,
+  "sentiment": 1.1,
+  "risk_strategy": 1.3
+}
+```
+
+valuation_report：
+
+```json
+{
+  "asset": 1.0,
+  "price": 0.7,
+  "volume": 0.7,
+  "trend": 0.7,
+  "valuation": 1.5,
+  "sentiment": 0.6,
+  "risk_strategy": 1.0
+}
+```
+
+---
+
+#### 6.2.4 min / max 分配限制
+
+为了避免指数函数过度放大，需要设置保护规则。
+
+推荐配置：
+
+```json
+{
+  "totalChunks": 10,
+  "alpha": 6.0,
+  "categoryScoreThreshold": 0.35,
+  "minPerActiveCategory": 1,
+  "maxPerCategory": 4
+}
+```
+
+规则：
+
+```text
+1. category_score < categoryScoreThreshold 的类别不参与召回。
+2. active category 至少分配 1 个 chunk。
+3. 单个类别最多不超过 maxPerCategory。
+4. 如果最终总数不足或超出 totalChunks，再进行修正。
+```
+
+---
+
+#### 6.2.5 Chunk 分配示例
+
+输入：
+
+```text
+volume      0.82
+risk        0.76
+price       0.74
+valuation   0.71
+sentiment   0.68
+trend       0.65
+```
+
+输出：
+
+```json
+{
+  "volume": 3,
+  "risk_strategy": 2,
+  "price": 2,
+  "valuation": 1,
+  "sentiment": 1,
+  "trend": 1
+}
+```
+
+含义：
+
+```text
+本次报告主要召回成交量、风险策略、价格位置相关 chunk。
+估值、情绪、趋势作为补充。
+```
+
+---
+
+### 6.3 按类别生成检索任务
+
+得到 chunk 分配后，每一类生成一个检索任务。
+
+例如：
+
+```json
+[
+  {
+    "category": "volume",
+    "chunkCount": 3,
+    "currentTags": {
+      "volume_expand": 0.90,
+      "high_turnover": 0.80
+    }
+  },
+  {
+    "category": "risk_strategy",
+    "chunkCount": 2,
+    "currentTags": {
+      "chase_high_risk": 0.85,
+      "wait_confirm": 0.70
+    }
+  }
+]
+```
+
+---
+
+### 6.4 每类检索的标签查询与候选过滤
+
+每类检索时，系统先根据当前类别需要的标签 `requiredTags`，与 chunk 入库时保存在 `metadata.scenes` 中的同类别标签 `chunkTags` 进行标签匹配。
+
+这里的核心思想是：
+
+```text
+当前需要什么标签，就去知识库 chunk 的 metadata.scenes 对应类别下查什么标签。
+```
+
+例如 volume 类检索：
+
+```text
+requiredTags = [volume_expand, high_turnover]
+chunkTags = chunk.metadata.scenes.volume
+```
+
+risk_strategy 类检索：
+
+```text
+requiredTags = [chase_high_risk, wait_confirm]
+chunkTags = chunk.metadata.scenes.risk_strategy
+```
+
+系统使用 Jaccard similarity 计算当前需要标签和 chunk 已有标签之间的匹配程度：
+
+```text
+jaccard_score = |requiredTags ∩ chunkTags| / |requiredTags ∪ chunkTags|
+```
+
+只有当：
+
+```text
+jaccard_score >= jaccardThreshold
+```
+
+该 chunk 才会进入当前类别的候选集合。
+
+推荐第一版配置：
+
+```json
+{
+  "jaccardThreshold": 0.2
+}
+```
+
+示例一：
+
+```text
+requiredTags = [volume_expand, high_turnover]
+chunkTags = [volume_expand, volume_price_confirm]
+
+intersection = [volume_expand]
+union = [volume_expand, high_turnover, volume_price_confirm]
+
+jaccard_score = 1 / 3 = 0.33
+```
+
+如果 `jaccardThreshold = 0.2`，则该 chunk 可以进入 volume 类候选集合。
+
+示例二：
+
+```text
+requiredTags = [volume_expand, high_turnover]
+chunkTags = [low_pb, valuation_trap]
+
+intersection = []
+union = [volume_expand, high_turnover, low_pb, valuation_trap]
+
+jaccard_score = 0
+```
+
+该 chunk 不进入 volume 类候选集合。
+
+这一层只负责候选过滤，不负责最终排序。进入候选集合后，还需要继续计算内容相似度和跨场景加分，并在当前类别内部进行重排序。
+
+---
+
+### 6.5 每类语义检索 Query 生成
+
+完成标签过滤后，系统需要为当前类别生成 `queryText`，用于后续计算内容相似度 `semantic_score`。
+
+`queryText` 不是给 LLM 看的，也不是最终报告内容。它的作用是：
+
+```text
+把当前类别的小标签转换成适合 embedding 检索的语义查询文本。
+```
+
+也就是说：
+
+```text
+requiredTags
+  ↓
+queryText
+  ↓
+queryEmbedding
+  ↓
+与候选 chunk.embedding 计算 semantic_score
+```
+
+`queryText` 不直接使用用户原始问题，而是根据当前类别的 `requiredTags`、标的类型和报告类型生成。
+
+例如 volume 类：
+
+```text
+requiredTags = [volume_expand, high_turnover]
+
+queryText = 放量上涨 高换手 成交量持续性 量价关系
+```
+
+risk_strategy 类：
+
+```text
+requiredTags = [chase_high_risk, wait_confirm]
+
+queryText = 追高风险 等待确认 风险控制 高位放量
+```
+
+price 类：
+
+```text
+requiredTags = [price_rise, near_recent_high]
+
+queryText = 价格上涨 接近近期高位 突破 回调
+```
+
+valuation 类：
+
+```text
+requiredTags = [low_pb, low_pe]
+
+queryText = 低 PB 低 PE 银行股 估值修复 低估值陷阱
+```
+
+queryText 生成后，系统会调用 embedding 模型生成向量：
+
+```text
+queryEmbedding = embedding(queryText)
+```
+
+然后用于计算候选 chunk 的内容相似度：
+
+```text
+semantic_score = cosine(queryEmbedding, chunkEmbedding)
+```
+
+---
+
+### 6.6 每类候选集合生成与语义相似度计算
+
+每个类别会根据前面动态分配得到的 `chunkCount`，独立执行召回。
+
+例如动态分配结果为：
+
+```json
+{
+  "volume": 3,
+  "risk_strategy": 2,
+  "price": 2,
+  "valuation": 1,
+  "sentiment": 1,
+  "trend": 1
+}
+```
+
+则每类分别执行：
+
+```text
+volume 类最终取 3 个 chunk
+risk_strategy 类最终取 2 个 chunk
+price 类最终取 2 个 chunk
+valuation 类最终取 1 个 chunk
+sentiment 类最终取 1 个 chunk
+trend 类最终取 1 个 chunk
+```
+
+每一类内部召回流程如下：
+
+```text
+当前类别 requiredTags
+  ↓
+读取 chunk.metadata.scenes 对应类别的 chunkTags
+  ↓
+计算 jaccard_score
+  ↓
+只保留 jaccard_score >= jaccardThreshold 的候选 chunk
+  ↓
+生成当前类别 queryText
+  ↓
+计算 queryEmbedding
+  ↓
+计算每个候选 chunk 的 semantic_score
+  ↓
+进入类内重排序
+```
+
+注意：每类内部召回不是直接取最终结果，而是先形成候选集合，再交给 6.7 进行综合评分和排序。
+
+如果某一类候选数量过少，可以采用降级策略：
+
+```text
+1. 降低 jaccardThreshold
+2. 放宽 requiredTags，只保留核心标签
+3. 使用同类别下所有 chunk 做语义召回
+4. 最后仍不足时，该类别返回空列表
+```
+
+第一版可以先只实现前两种降级策略。
+
+---
+
+### 6.7 候选 Chunk 综合评分与类内重排序
+
+类内重排序用于决定当前类别中哪些候选 chunk 最终进入报告。
+
+6.4 只负责判断 chunk 能不能进入候选集合；  
+6.5 只负责生成 embedding 检索用的 queryText；  
+6.6 只负责得到候选集合和计算 semantic_score；  
+6.7 才负责综合评分和排序。
+
+每个候选 chunk 需要计算三个分数：
+
+```text
+semantic_score
+tag_match_score
+cross_scene_score
+```
+
+最终类内排序公式推荐为：
+
+```text
+final_score =
+0.45 * semantic_score
++ 0.45 * tag_match_score
++ 0.10 * cross_scene_score
+```
+
+#### 6.7.1 semantic_score 内容相似度
+
+`semantic_score` 用于衡量 `queryText` 和 chunk 文本内容的语义相似度。
+
+计算方式：
+
+```text
+semantic_score = cosine(queryEmbedding, chunkEmbedding)
+```
+
+其中：
+
+```text
+queryEmbedding = embedding(queryText)
+chunkEmbedding = chunk.embedding
+```
+
+它回答的问题是：
+
+```text
+当前类别的语义查询文本和这个 chunk 的正文内容是否相似？
+```
+
+例如 volume 类：
+
+```text
+queryText = 放量上涨 高换手 成交量持续性 量价关系
+```
+
+如果某个 chunk 内容是：
+
+```text
+放量上涨后要观察成交量是否持续，不能只看当天涨幅。
+```
+
+则它通常会有较高的 `semantic_score`。
+
+#### 6.7.2 tag_match_score 标签匹配度
+
+`tag_match_score` 用于衡量当前类别下，候选 chunk 的标签与当前检索需求标签的匹配程度。
+
+第一版中，`tag_match_score` 可以直接复用 6.4 中计算得到的 Jaccard similarity：
+
+```text
+tag_match_score = jaccard_score
+```
+
+也就是：
+
+```text
+tag_match_score = |requiredTags ∩ chunkTags| / |requiredTags ∪ chunkTags|
+```
+
+示例：
+
+```text
+requiredTags = [volume_expand, high_turnover]
+chunkTags = [volume_expand, volume_price_confirm]
+
+intersection = [volume_expand]
+union = [volume_expand, high_turnover, volume_price_confirm]
+
+tag_match_score = 1 / 3 = 0.33
+```
+
+如果完全匹配：
+
+```text
+requiredTags = [volume_expand, high_turnover]
+chunkTags = [volume_expand, high_turnover]
+
+intersection = [volume_expand, high_turnover]
+union = [volume_expand, high_turnover]
+
+tag_match_score = 2 / 2 = 1.0
+```
+
+`tag_match_score` 和 `semantic_score` 的作用不同：
+
+```text
+semantic_score 判断文本内容是否相似；
+tag_match_score 判断场景标签是否匹配。
+```
+
+一个 chunk 可能文本很相似，但标签不够匹配；也可能标签很匹配，但文本表达不够接近。
+
+因此两个分数需要同时参与最终排序。
+
+#### 6.7.3 cross_scene_score 跨场景加分
+
+`cross_scene_score` 用于奖励同时命中其他高分场景的 chunk。
+
+例如当前正在检索 volume 类，但某个 chunk 不仅命中了 volume 标签，还命中了 risk_strategy 标签：
+
+```json
+{
+  "scenes": {
+    "volume": ["volume_expand"],
+    "risk_strategy": ["chase_high_risk", "wait_confirm"]
+  }
+}
+```
+
+如果当前报告中 `risk_strategy` 的分数也很高，那么这个 chunk 更有价值。
+
+原因是它不仅能解释放量，还能连接到风险判断。
+
+`cross_scene_score` 可以根据当前其他高分类别的匹配情况计算。
+
+第一版可以简单处理：
+
+```text
+如果 chunk 同时命中其他 primary categories 中的任意标签，则给予 0.1 ~ 0.3 的加分。
+```
+
+例如：
+
+```text
+当前 primary categories = [volume, risk_strategy, price]
+
+当前检索类别 = volume
+
+chunk 同时命中：
+volume.volume_expand
+risk_strategy.chase_high_risk
+
+则 cross_scene_score 可以设为 0.3。
+```
+
+如果 chunk 只命中当前类别，没有命中其他高分类别：
+
+```text
+cross_scene_score = 0
+```
+
+#### 6.7.4 final_score 最终分数
+
+最终类内排序使用：
+
+```text
+final_score =
+0.45 * semantic_score
++ 0.45 * tag_match_score
++ 0.10 * cross_scene_score
+```
+
+示例：
+
+候选 A：
+
+```text
+semantic_score = 0.82
+tag_match_score = 1.00
+cross_scene_score = 0.30
+```
+
+计算：
+
+```text
+final_score =
+0.45 * 0.82
++ 0.45 * 1.00
++ 0.10 * 0.30
+= 0.849
+```
+
+候选 B：
+
+```text
+semantic_score = 0.88
+tag_match_score = 0.50
+cross_scene_score = 0.10
+```
+
+计算：
+
+```text
+final_score =
+0.45 * 0.88
++ 0.45 * 0.50
++ 0.10 * 0.10
+= 0.631
+```
+
+虽然候选 B 的文本相似度更高，但候选 A 的标签匹配度和跨场景价值更高，因此候选 A 排名更靠前。
+
+每一类候选 chunk 按照 `final_score` 从高到低排序。排序结果不会直接混合成一个全局 TopK，而是先保留在各自类别中，后续由 6.8 按照该类别分配到的 `chunkCount` 取 TopN。
+
+---
+
+### 6.8 每类取 TopN
+
+完成类内重排序后，每一类根据前面动态分配得到的 `chunkCount` 取 TopN。
+
+例如动态分配结果为：
+
+```json
+{
+  "volume": 3,
+  "risk_strategy": 2,
+  "price": 2,
+  "valuation": 1,
+  "sentiment": 1,
+  "trend": 1
+}
+```
+
+则最终截断规则为：
+
+```text
+volume 类按 final_score 排序后取 Top 3
+risk_strategy 类按 final_score 排序后取 Top 2
+price 类按 final_score 排序后取 Top 2
+valuation 类按 final_score 排序后取 Top 1
+sentiment 类按 final_score 排序后取 Top 1
+trend 类按 final_score 排序后取 Top 1
+```
+
+这一层的作用是把前面计算出来的召回比例真正落实到最终结果中。
+
+也就是说：
+
+```text
+动态 Chunk 分配决定每类要几个；
+类内重排序决定每类谁排前面；
+每类取 TopN 决定最终进入报告的 chunk。
+```
+
+如果某一类候选 chunk 数量少于分配数量，则该类返回已有候选即可，不需要强行用其他类别补齐。
+
+---
+
+### 6.9 构建 knowledgeContext
+
+每类取 TopN 后，系统需要把最终 chunk 按类别组织成 `knowledgeContext`。
+
+不要把所有 chunk 混成一个全局列表，而应保持类别结构：
+
+```json
+{
+  "knowledgeContext": {
+    "volume": [],
+    "risk_strategy": [],
+    "price": [],
+    "valuation": [],
+    "sentiment": [],
+    "trend": []
+  }
+}
+```
+
+每个进入 `knowledgeContext` 的 chunk 建议保留以下字段：
+
+```json
+{
+  "chunkId": 123,
+  "taskNo": "ocr-xxx",
+  "chunkIndex": 4,
+  "category": "risk_strategy",
+  "text": "接近高位时不要只看涨幅，需要等待确认。",
+  "matchedTags": ["chase_high_risk", "wait_confirm"],
+  "semanticScore": 0.82,
+  "tagMatchScore": 1.0,
+  "crossSceneScore": 0.3,
+  "finalScore": 0.849
+}
+```
+
+这样设计的好处是：
+
+```text
+1. LLM 可以清楚知道每段知识属于哪个分析维度。
+2. 前端可以按成交量、风险、价格、估值等类别展示引用依据。
+3. 报告不会变成一堆无结构的知识片段拼接。
+4. 后续复盘时可以知道当时报告主要依赖哪些类别的知识。
+```
+
+`knowledgeContext` 是报告生成阶段交给 LLM 的主要知识输入。
+
+---
+
+### 6.10 检索召回完整示例
+
+假设当前标的是一只低价银行股，系统根据行情数据分析得到：
+
+```json
+{
+  "volume": {
+    "score": 0.82,
+    "tags": {
+      "volume_expand": 0.90,
+      "high_turnover": 0.80
+    }
+  },
+  "risk_strategy": {
+    "score": 0.76,
+    "tags": {
+      "chase_high_risk": 0.85,
+      "wait_confirm": 0.70
+    }
+  },
+  "price": {
+    "score": 0.74,
+    "tags": {
+      "price_rise": 0.80,
+      "near_recent_high": 0.75
+    }
+  }
+}
+```
+
+系统根据指数函数计算 chunk 分配结果：
+
+```json
+{
+  "volume": 3,
+  "risk_strategy": 2,
+  "price": 2,
+  "valuation": 1,
+  "sentiment": 1,
+  "trend": 1
+}
+```
+
+以 volume 类为例，检索流程如下：
+
+```text
+category = volume
+chunkCount = 3
+requiredTags = [volume_expand, high_turnover]
+chunkTags = chunk.metadata.scenes.volume
+
+1. 计算 requiredTags 与 chunkTags 的 jaccard_score
+2. 只保留 jaccard_score >= jaccardThreshold 的候选 chunk
+3. 生成 queryText = 放量上涨 高换手 成交量持续性 量价关系
+4. 计算 queryEmbedding
+5. 计算候选 chunk 的 semantic_score
+6. 计算 tag_match_score 和 cross_scene_score
+7. 计算 final_score
+8. 按 final_score 排序
+9. 取 Top 3
+```
+
+以 risk_strategy 类为例，检索流程如下：
+
+```text
+category = risk_strategy
+chunkCount = 2
+requiredTags = [chase_high_risk, wait_confirm]
+chunkTags = chunk.metadata.scenes.risk_strategy
+
+1. 计算 requiredTags 与 chunkTags 的 jaccard_score
+2. 只保留 jaccard_score >= jaccardThreshold 的候选 chunk
+3. 生成 queryText = 追高风险 等待确认 风险控制 高位放量
+4. 计算 queryEmbedding
+5. 计算候选 chunk 的 semantic_score
+6. 计算 tag_match_score 和 cross_scene_score
+7. 计算 final_score
+8. 按 final_score 排序
+9. 取 Top 2
+```
+
+最终构建出的 `knowledgeContext` 可能是：
+
+```json
+{
+  "knowledgeContext": {
+    "volume": [
+      {
+        "chunkId": 101,
+        "category": "volume",
+        "matchedTags": ["volume_expand"],
+        "semanticScore": 0.86,
+        "tagMatchScore": 0.33,
+        "crossSceneScore": 0.30,
+        "finalScore": 0.597,
+        "text": "放量上涨后需要观察成交量是否持续，不能只看当天涨幅。"
+      }
+    ],
+    "risk_strategy": [
+      {
+        "chunkId": 205,
+        "category": "risk_strategy",
+        "matchedTags": ["chase_high_risk", "wait_confirm"],
+        "semanticScore": 0.82,
+        "tagMatchScore": 1.00,
+        "crossSceneScore": 0.30,
+        "finalScore": 0.849,
+        "text": "接近高位时不要只看涨幅，需要等待确认。"
+      }
+    ]
+  }
+}
+```
+
+这个结果会作为结构化知识上下文传给 LLM，用于生成最终报告。
+
+---
+
+
+## 7. 报告生成设计
+
+### 7.1 报告生成输入
+
+LLM 输入不应只是用户问题，而应包含完整结构化上下文：
+
+```text
+target
+marketContext
+currentScenes
+knowledgeContext
+outputRequirement
+```
+
+---
+
+### 7.2 marketContext 结构
+
+示例：
+
+```json
+{
+  "latestPrice": 3.21,
+  "changePercent": 4.8,
+  "turnoverRate": 6.2,
+  "volume": 12345678,
+  "pe": 6.8,
+  "pb": 0.55,
+  "syncedAt": "2026-05-31 10:30:00"
+}
+```
+
+---
+
+### 7.3 currentScenes 结构
+
+示例：
+
+```json
+{
+  "price": {
+    "score": 0.74,
+    "tags": {
+      "price_rise": 0.80,
+      "near_recent_high": 0.75
+    }
+  },
+  "volume": {
+    "score": 0.82,
+    "tags": {
+      "volume_expand": 0.90,
+      "high_turnover": 0.80
+    }
+  },
+  "risk_strategy": {
+    "score": 0.76,
+    "tags": {
+      "chase_high_risk": 0.85,
+      "wait_confirm": 0.70
+    }
+  }
+}
+```
+
+---
+
+### 7.4 knowledgeContext 结构
+
+示例：
+
+```json
+{
+  "volume": [],
+  "risk_strategy": [],
+  "price": [],
+  "valuation": [],
+  "sentiment": [],
+  "trend": []
+}
+```
+
+---
+
+### 7.5 LLM Prompt 设计
+
+Prompt 要求：
+
+```text
+你是个人投资研究助手。
+请基于 marketContext、currentScenes 和 knowledgeContext 生成结构化分析报告。
+不要提供确定性买卖建议。
+不要编造缺失数据。
+必须区分事实、推断和风险提示。
+引用知识库内容时必须带 chunkId。
+```
+
+---
+
+### 7.6 LLM 输出 JSON 结构
+
+推荐结构：
+
+```json
+{
+  "summary": "",
+  "marketFacts": [],
+  "sceneInterpretation": [],
+  "knowledgeBasedAnalysis": [],
+  "riskWarnings": [],
+  "watchPoints": [],
+  "missingData": [],
+  "conclusion": ""
+}
+```
+
+---
+
+### 7.7 报告引用依据设计
+
+每条知识引用建议保留：
+
+```json
+{
+  "chunkId": 123,
+  "category": "risk_strategy",
+  "text": "接近高位时不要只看涨幅，需要等待确认。",
+  "usedInSection": "riskWarnings"
+}
+```
+
+---
+
+### 7.8 报告保存内容
+
+报告保存时建议保存：
+
+```text
+marketContext
+currentScenes
+chunkAllocation
+knowledgeContext
+reportContent
+model
+createdAt
+```
+
+这样后续可以复盘：
+
+```text
+当时基于什么行情数据生成？
+当时哪些模块分数最高？
+当时引用了哪些知识？
+```
+
+---
+
+## 8. 数据库设计
+
+### 8.1 knowledge_vector 表设计
+
+推荐字段：
+
+```sql
+CREATE TABLE knowledge_vector (
+    id BIGSERIAL PRIMARY KEY,
+    task_no VARCHAR(64),
+    chunk_index INTEGER,
+    text TEXT NOT NULL,
+    embedding VECTOR(384),
+    metadata JSONB,
+    enabled BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+---
+
+### 8.2 knowledge_vector.metadata 设计
 
 示例：
 
@@ -579,393 +2114,292 @@ risk_strategy_scene 适合报告的风险提示、后续观察点和非买卖建
 {
   "sourceType": "ocr_note",
   "reviewed": true,
+  "taskNo": "ocr-xxx",
+  "chunkIndex": 1,
   "scenes": {
-    "asset": ["stock", "bank_stock"],
+    "asset": ["stock"],
     "price": ["price_rise"],
-    "volume": ["volume_expand", "high_turnover"],
+    "volume": ["volume_expand"],
     "trend": ["breakout_from_range"],
-    "valuation": ["low_pb"],
-    "sentiment": ["short_term_emotion"],
-    "risk_strategy": ["chase_high_risk", "wait_confirm"]
+    "valuation": [],
+    "sentiment": [],
+    "risk_strategy": ["wait_confirm", "observe_next_day"]
   },
-  "keywords": ["放量", "换手率", "追高", "风险控制"]
-}
-```
-
-生成报告时，系统也生成同样结构的 `currentScenes`：
-
-```json
-{
-  "asset": ["stock", "bank_stock", "low_price_stock"],
-  "price": ["price_rise", "near_recent_high"],
-  "volume": ["volume_expand", "high_turnover"],
-  "trend": ["breakout_from_range"],
-  "valuation": ["low_pb"],
-  "sentiment": ["short_term_emotion"],
-  "risk_strategy": ["chase_high_risk", "wait_confirm"]
+  "keywords": ["放量", "上涨", "站稳", "第二天观察"],
+  "summary": "放量上涨后需要观察次日是否继续放量并站稳。"
 }
 ```
 
 ---
 
-## 15. scene_score 计算方式
+### 8.3 ai_analysis_report 表设计
 
-每个大类分别计算匹配分，然后按报告类型加权。
-
-### 单类匹配分
-
-简单版本：
-
-```text
-category_score = 当前类别 scenes 与 chunk 类别 scenes 的交集数量 / 当前类别 scenes 数量
-```
-
-例如：
-
-```text
-current volume_scene:
-volume_expand, high_turnover
-
-chunk volume_scene:
-volume_expand, volume_price_confirm
-
-交集：
-volume_expand
-
-volume_score = 1 / 2 = 0.5
-```
-
-### 加权版本
-
-如果不同 scene 重要性不同，可以给 scene 设置权重。
-
-例如：
-
-```json
-{
-  "volume_expand": 1.0,
-  "high_turnover": 0.8,
-  "volume_price_divergence": 1.2
-}
-```
-
-则：
-
-```text
-category_score =
-匹配到的 scene 权重之和 / 当前类别 scene 权重之和
-```
-
-第一版可以先用简单版本。
-
----
-
-## 16. 普通快速报告权重
-
-普通 quick_analysis 报告推荐权重：
-
-```json
-{
-  "asset_scene": 0.10,
-  "price_scene": 0.15,
-  "volume_scene": 0.20,
-  "trend_scene": 0.15,
-  "valuation_scene": 0.10,
-  "sentiment_scene": 0.10,
-  "risk_strategy_scene": 0.20
-}
-```
-
-解释：
-
-```text
-成交量 / 换手：20%
-风险 / 策略：20%
-价格位置：15%
-趋势结构：15%
-资产类型：10%
-估值基本面：10%
-情绪异动：10%
-```
-
-适合大多数股票和指数快速分析。
-
----
-
-## 17. 风险检查报告权重
-
-risk_check 报告推荐权重：
-
-```json
-{
-  "asset_scene": 0.10,
-  "price_scene": 0.10,
-  "volume_scene": 0.20,
-  "trend_scene": 0.10,
-  "valuation_scene": 0.10,
-  "sentiment_scene": 0.15,
-  "risk_strategy_scene": 0.25
-}
-```
-
-解释：
-
-```text
-风险 / 策略权重最高；
-成交量 / 换手和情绪异动也较高；
-价格、趋势、估值作为辅助。
-```
-
-适合判断：
-
-```text
-是否追高
-是否情绪过热
-是否放量滞涨
-是否需要等待确认
-是否应该控制仓位
+```sql
+CREATE TABLE ai_analysis_report (
+    id BIGSERIAL PRIMARY KEY,
+    report_no VARCHAR(64) NOT NULL UNIQUE,
+    target_type VARCHAR(32) NOT NULL,
+    target_code VARCHAR(32),
+    target_name VARCHAR(128),
+    report_type VARCHAR(32) NOT NULL,
+    market_context JSONB,
+    current_scenes JSONB,
+    chunk_allocation JSONB,
+    knowledge_context JSONB,
+    report_content JSONB NOT NULL,
+    model VARCHAR(128),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 ```
 
 ---
 
-## 18. 观察池复盘报告权重
+### 8.4 报告引用关系存储
 
-watch_review 报告推荐权重：
+可以将引用关系直接存入 `knowledge_context`。
 
-```json
-{
-  "asset_scene": 0.10,
-  "price_scene": 0.15,
-  "volume_scene": 0.15,
-  "trend_scene": 0.20,
-  "valuation_scene": 0.10,
-  "sentiment_scene": 0.10,
-  "risk_strategy_scene": 0.20
-}
-```
+如果后续需要单独统计引用频率，可以新增：
 
-解释：
-
-```text
-复盘类报告更关注趋势结构和风险策略；
-需要判断加入观察池后是否符合原来的观察逻辑。
-```
-
-适合分析：
-
-```text
-加入观察池后是否继续走强
-是否触发过预警
-是否符合最初观察理由
-是否需要继续观察或移出观察池
+```sql
+CREATE TABLE ai_analysis_report_reference (
+    id BIGSERIAL PRIMARY KEY,
+    report_no VARCHAR(64) NOT NULL,
+    chunk_id BIGINT NOT NULL,
+    category VARCHAR(64),
+    final_score NUMERIC(10, 6),
+    used_in_section VARCHAR(64),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 ```
 
 ---
 
-## 19. 可转债报告扩展
+### 8.5 索引设计建议
 
-可转债建议后续单独增加 `bond_scene`。
+metadata 可以加 GIN 索引：
 
-推荐标签：
-
-```text
-high_premium             高溢价率
-low_premium              低溢价率
-high_bond_price          转债价格较高
-low_bond_price           转债价格较低
-redemption_risk          强赎风险
-stock_bond_linkage       正股联动
-rating_risk              评级风险
-small_remaining_size     剩余规模较小
+```sql
+CREATE INDEX idx_knowledge_vector_metadata
+ON knowledge_vector USING GIN (metadata);
 ```
 
-可转债报告权重示例：
+如果按 scenes 高频检索，可以考虑额外拆字段或建立表达式索引。
 
-```json
-{
-  "asset_scene": 0.10,
-  "bond_scene": 0.25,
-  "price_scene": 0.10,
-  "volume_scene": 0.15,
-  "sentiment_scene": 0.10,
-  "risk_strategy_scene": 0.30
-}
-```
+---
 
-解释：
+## 9. 服务类设计
+
+### 9.1 Chunk 入库相关服务
 
 ```text
-可转债报告中，风险 / 策略和 bond_scene 权重最高。
-因为可转债不仅要看价格和成交量，还要看溢价率、强赎、正股联动等专有因素。
+ChunkBuildService
+负责根据人工复核后的 paragraphs 构建 chunk。
+
+ChunkSceneTaggingService
+负责为 chunk 生成 7 大类 scenes、keywords、summary。
+
+ChunkEmbeddingService
+负责生成 embedding。
+
+KnowledgeVectorManage
+负责 knowledge_vector 的保存、删除、查询。
 ```
 
 ---
 
-## 20. 多路召回设计
-
-报告生成时不要只执行一次 embedding 检索。
-
-推荐使用多路召回：
+### 9.2 七个场景模块服务
 
 ```text
-1. 内容相似召回
-2. 风险召回
-3. 策略召回
-4. 资产类型召回
-```
-
-示例：
-
-当前标的：
-
-```json
-{
-  "asset": ["stock", "bank_stock"],
-  "price": ["price_rise", "near_recent_high"],
-  "volume": ["volume_expand", "high_turnover"],
-  "risk_strategy": ["chase_high_risk", "wait_confirm"]
-}
-```
-
-可以生成以下 query：
-
-```text
-内容相似召回：
-银行股 放量上涨 高换手 低估值
-
-风险召回：
-放量上涨 接近高位 追高风险 高换手
-
-策略召回：
-放量后 如何观察 是否等待确认 风险控制
-
-资产类型召回：
-低价银行股 低 PB 估值修复 风险
-```
-
-每路召回 topK，例如 top 10，合并去重后进入 rerank。
-
----
-
-## 21. Rerank 设计
-
-召回后对所有候选 chunk 计算：
-
-```text
-semantic_score
-scene_score
-final_score
-```
-
-推荐第一版公式：
-
-```text
-final_score = semantic_score * 0.4 + scene_score * 0.6
-```
-
-然后按 final_score 排序。
-
-最终取：
-
-```text
-Top 5 ～ Top 8
-```
-
-进入报告的 knowledgeContext。
-
----
-
-## 22. 报告中知识引用的组织方式
-
-不要把所有知识片段混在一起。
-
-推荐按引用目的分类：
-
-```json
-{
-  "knowledgeContext": {
-    "supportingEvidence": [],
-    "riskWarnings": [],
-    "watchPoints": [],
-    "strategyReferences": []
-  }
-}
-```
-
-对应报告展示：
-
-```text
-1. 知识库支持点
-2. 知识库风险提醒
-3. 后续观察点
-4. 策略参考
-```
-
-这样可以避免报告只引用支持当前观点的内容，而忽略反向风险。
-
----
-
-## 23. 第一版落地建议
-
-第一版不要追求复杂，可以按以下步骤实现：
-
-```text
-1. 给 knowledge_vector.metadata 增加 scenes 字段
-2. OCR 人工复核入库时，为每个 chunk 生成 scenes
-3. 报告生成前，根据行情数据生成 currentScenes
-4. 根据 reportType 设置 scene 类别权重
-5. 用多路 query 召回候选 chunk
-6. 对候选 chunk 计算 semantic_score 和 scene_score
-7. 用 final_score rerank
-8. 将 TopK chunk 写入 report.knowledgeContext
-9. LLM 基于 marketContext + signalContext + knowledgeContext 生成结构化报告
+AssetSceneModule
+PriceSceneModule
+VolumeSceneModule
+TrendSceneModule
+ValuationSceneModule
+SentimentSceneModule
+RiskStrategySceneModule
 ```
 
 ---
 
-## 24. 推荐类设计
-
-可以增加以下服务类：
+### 9.3 场景分析服务
 
 ```text
-AnalysisSignalService
-负责从行情、K 线、分时数据中计算基础信号。
+CurrentSceneAnalysisService
+负责调用七个场景模块，生成 currentScenes。
 
-AnalysisSceneService
-负责把基础信号转换成 currentScenes。
+CategoryScoreService
+负责根据小标签得分聚合大类总分。
+```
 
-KnowledgeRetrievalPlanService
-负责根据 reportType 和 currentScenes 生成多路检索计划。
+---
+
+### 9.4 检索召回服务
+
+```text
+ChunkAllocationService
+根据七大类得分和指数函数计算每类 chunkCount。
+
+CategoryRetrievalTaskService
+根据 chunkAllocation 生成每类检索任务。
 
 KnowledgeHybridRetrievalService
-负责执行 embedding 召回、场景相似度计算和 rerank。
+按类别执行标签过滤、embedding 相似度计算和类内重排。
 
-AnalysisReportService
-负责组装 marketContext、signalContext、knowledgeContext，并调用 LLM 生成报告。
+KnowledgeContextBuilder
+按类别组织最终 knowledgeContext。
 ```
 
 ---
 
-## 25. 最终设计总结
-
-本系统的报告生成不应是普通 RAG，而应是：
+### 9.5 报告生成服务
 
 ```text
-Hybrid Retrieval + Scenario Reranking
+AnalysisReportService
+组装 marketContext、currentScenes、knowledgeContext，并调用 LLM 生成报告。
+
+AnalysisReportManage
+负责报告存储和查询。
+
+AnalysisReportController
+提供报告生成、列表、详情接口。
 ```
 
-核心逻辑：
+---
 
-```text
-内容相似度：文本语义像不像？
-场景相似度：这段经验适不适合当前行情场景？
-重排序：综合内容和场景，选出真正有参考价值的知识。
+### 9.6 Controller 接口设计
+
+推荐接口：
+
+```http
+POST /api/ai/reports/generate
+GET /api/ai/reports
+GET /api/ai/reports/{reportNo}
+POST /api/ai/reports/{reportNo}/regenerate
 ```
 
-最终目标：
+---
+
+## 10. 分阶段落地计划
+
+### 10.1 第一阶段：Chunk 入库标签化
 
 ```text
-让报告不是简单引用几段相似文本，
-而是基于当前标的的市场状态，
-主动寻找对应的经验、风险和观察策略。
+1. 为 knowledge_vector.metadata 增加 scenes。
+2. OCR 复核入库时生成 chunk scenes。
+3. 保存 keywords 和 summary。
+4. 保证每个 chunk 有完整 metadata。
+```
+
+---
+
+### 10.2 第二阶段：七个场景模块打分
+
+```text
+1. 实现七个场景模块。
+2. 每个模块输出 score、tags、evidence。
+3. 实现 currentScenes 结构。
+4. 将 currentScenes 保存到报告表。
+```
+
+---
+
+### 10.3 第三阶段：动态 Chunk 分配
+
+```text
+1. 实现指数函数分配公式。
+2. 支持 alpha 配置。
+3. 支持 reportType 权重。
+4. 支持categoryScoreThreshold、min、max 限制。
+5. 输出每类 chunkCount。
+```
+
+---
+
+### 10.4 第四阶段：分类检索与类内重排
+
+```text
+1. 按类别生成检索任务。
+2. 根据 requiredTags 和 chunk.metadata.scenes 中对应类别的 chunkTags 计算 Jaccard similarity。
+3. 只保留 jaccard_score >= jaccardThreshold 的候选 chunk。
+4. 按类别生成 queryText。
+5. 计算 semantic_score。
+6. 计算 tag_match_score 和 cross_scene_score。
+7. 每类按 final_score 排序后取 TopN。
+```
+
+---
+
+### 10.5 第五阶段：结构化报告生成
+
+```text
+1. 构建 marketContext。
+2. 构建 currentScenes。
+3. 构建 knowledgeContext。
+4. 调用 LLM 输出 JSON 报告。
+5. 保存报告和引用依据。
+```
+
+---
+
+### 10.6 第六阶段：前端展示与引用溯源
+
+```text
+1. 展示报告内容。
+2. 展示各模块 score。
+3. 展示 chunkAllocation。
+4. 展示知识库引用。
+5. 支持点击 chunk 查看原始 OCR 复核内容。
+```
+
+---
+
+## 11. 最终总结
+
+本设计的核心不是：
+
+```text
+把知识库内容塞给 LLM。
+```
+
+而是：
+
+```text
+知识入库时先打标签；
+报告生成时当前标的也打标签和得分；
+根据 7 大类得分动态分配每类 chunk 数量；
+按类别检索；
+按类别重排；
+按类别组织知识上下文；
+最后让 LLM 生成结构化报告。
+```
+
+最终链路是：
+
+```text
+Chunk 入库标签化
+  ↓
+当前标的场景分析
+  ↓
+7 大类得分
+  ↓
+指数函数动态分配 chunk 数量
+  ↓
+分类检索
+  ↓
+类内重排
+  ↓
+Grouped Knowledge Context
+  ↓
+结构化报告生成
+```
+
+相比普通 RAG，这种方式的优势是：
+
+```text
+1. 检索更贴合当前行情状态。
+2. 高分场景能获得更多知识引用比例。
+3. 报告重点会随市场场景动态变化。
+4. 可以清晰区分成交量、风险、价格、估值、情绪等不同知识来源。
+5. 后续可以自然扩展到复盘、预警和个人投资记忆系统。
 ```
