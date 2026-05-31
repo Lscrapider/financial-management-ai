@@ -414,6 +414,184 @@ semantic_score = cosine(query_embedding, chunk_embedding)
 }
 ```
 
+### 3.8 Chunk 入库标签白名单与判断规则
+
+Chunk 入库打标签时，需要先区分两种场景：
+
+```text
+chunk 入库打标签：
+判断“这段知识以后适合在哪些场景下被检索出来”。
+
+当前标的打标签：
+判断“这只股票 / 转债 / 指数现在处于什么场景”。
+```
+
+本节主要定义 chunk 入库时使用的标签白名单和判断规则。
+
+Chunk 入库时，推荐 metadata 结构如下：
+
+```json
+{
+  "scenes": {
+    "asset": [],
+    "price": [],
+    "volume": [],
+    "trend": [],
+    "valuation": [],
+    "sentiment": [],
+    "risk_strategy": []
+  },
+  "keywords": [],
+  "summary": ""
+}
+```
+
+注意：chunk 入库标签不需要 7 类都填满。如果某个 chunk 只适用于风险控制场景，则只填写 `risk_strategy` 即可，其他类别可以为空数组。
+
+#### 3.8.1 asset：资产类型标签
+
+| 标签 | 中文含义 | chunk 入库时如何判断 |
+|---|---|---|
+| `general` | 通用投资经验 | 文本没有限定股票、指数、可转债、基金等具体资产，适用于通用投资行为、风险控制、学习复盘等。 |
+| `stock` | 股票 | 文本明确讨论股票、个股、股价、买股、卖股、个股走势等。 |
+| `index` | 指数 | 文本明确讨论大盘、指数、上证、深成指、创业板、科创板、板块指数等。 |
+| `convertible_bond` | 可转债 | 文本出现可转债、转债、溢价率、强赎、正股联动、转股价值等内容。 |
+| `fund` | 基金 | 文本明确讨论基金、ETF、场内基金、基金定投、基金配置等。 |
+| `bank_stock` | 银行股 | 文本明确讨论银行股、银行板块、低 PB 银行、息差、分红等银行相关内容。 |
+| `low_price_stock` | 低价股 | 文本明确提到低价股，或讨论几元股、低价小票、低价补涨等。 |
+| `large_cap_stock` | 大盘股 | 文本讨论大市值、权重股、蓝筹、大盘股、机构重仓等。 |
+| `small_cap_stock` | 小盘股 | 文本讨论小市值、小盘股、题材小票、弹性较大等。 |
+
+#### 3.8.2 price：价格位置标签
+
+| 标签 | 中文含义 | chunk 入库时如何判断 |
+|---|---|---|
+| `price_rise` | 价格上涨 | 文本讨论上涨、拉升、涨幅扩大、上涨过程中如何判断等。 |
+| `price_drop` | 价格下跌 | 文本讨论下跌、杀跌、回落、跌幅扩大、下跌后的处理等。 |
+| `sideways` | 横盘 | 文本讨论横盘、震荡、长期不涨、窄幅波动、区间整理等。 |
+| `near_recent_high` | 接近近期高位 | 文本讨论高位、阶段高点、接近前高、涨到高位后的风险等。 |
+| `near_recent_low` | 接近近期低位 | 文本讨论低位、阶段低点、跌到底部区域、低位观察等。 |
+| `breakout` | 突破 | 文本讨论突破压力位、突破平台、突破前高、突破后的确认等。 |
+| `pullback` | 回调 | 文本讨论上涨后的回调、回踩、调整、短线回落、回调买点等。 |
+| `gap_up` | 跳空高开 | 文本讨论跳空高开、高开缺口、高开后的风险或机会。 |
+| `gap_down` | 跳空低开 | 文本讨论跳空低开、低开缺口、低开后的观察或风险。 |
+
+#### 3.8.3 volume：成交量 / 换手标签
+
+| 标签 | 中文含义 | chunk 入库时如何判断 |
+|---|---|---|
+| `volume_expand` | 放量 | 文本讨论放量、成交量放大、量能增加、资金明显活跃等。 |
+| `volume_shrink` | 缩量 | 文本讨论缩量、成交量减少、量能不足、无人关注等。 |
+| `high_turnover` | 高换手 | 文本讨论换手率高、交易活跃、筹码交换剧烈、分歧加大等。 |
+| `low_turnover` | 低换手 | 文本讨论换手低、交易清淡、流动性不足、没人买卖等。 |
+| `volume_price_confirm` | 量价配合 | 文本讨论上涨有量、下跌缩量、价格和成交量互相验证等。 |
+| `volume_price_divergence` | 量价背离 | 文本讨论价格上涨但量没跟上、放量但价格不涨、量价不一致等。 |
+| `volume_spike` | 成交量突然放大 | 文本讨论突然爆量、异常放量、某天成交量明显突增等。 |
+| `volume_dry_up` | 成交枯竭 | 文本讨论成交极低、量能枯竭、没人交易、流动性很差等。 |
+
+#### 3.8.4 trend：趋势结构标签
+
+| 标签 | 中文含义 | chunk 入库时如何判断 |
+|---|---|---|
+| `uptrend` | 上升趋势 | 文本讨论连续上涨、趋势向上、均线多头、逐步抬高等。 |
+| `downtrend` | 下降趋势 | 文本讨论连续下跌、趋势向下、弱势下行、反弹无力等。 |
+| `range_bound` | 区间震荡 | 文本讨论箱体震荡、区间波动、上下沿、震荡整理等。 |
+| `rebound` | 反弹 | 文本讨论下跌后的反弹、超跌反弹、短线修复等。 |
+| `trend_reversal` | 趋势反转 | 文本讨论趋势由弱转强、由强转弱、反转信号、拐点等。 |
+| `breakout_from_range` | 横盘突破 | 文本讨论长期横盘后突破、箱体突破、平台突破等。 |
+| `failed_breakout` | 突破失败 | 文本讨论假突破、突破后回落、站不上去、冲高失败等。 |
+
+#### 3.8.5 valuation：估值 / 基本面标签
+
+| 标签 | 中文含义 | chunk 入库时如何判断 |
+|---|---|---|
+| `low_pe` | 低 PE | 文本讨论低市盈率、PE 较低、盈利估值便宜等。 |
+| `high_pe` | 高 PE | 文本讨论高市盈率、估值过高、盈利无法支撑估值等。 |
+| `low_pb` | 低 PB | 文本讨论低市净率、破净、PB 小于 1、银行股低 PB 等。 |
+| `high_pb` | 高 PB | 文本讨论高市净率、净资产估值偏高等。 |
+| `high_dividend` | 高股息 | 文本讨论分红率、股息率、高股息策略、稳定分红等。 |
+| `valuation_repair` | 估值修复 | 文本讨论低估值修复、估值回归、估值提升、补涨修复等。 |
+| `valuation_trap` | 低估值陷阱 | 文本讨论低估值不一定安全、便宜有原因、低 PE / 低 PB 陷阱等。 |
+| `fundamental_risk` | 基本面风险 | 文本讨论业绩变差、盈利压力、资产质量问题、基本面不确定等。 |
+
+#### 3.8.6 sentiment：情绪 / 异动标签
+
+| 标签 | 中文含义 | chunk 入库时如何判断 |
+|---|---|---|
+| `market_attention_rise` | 关注度上升 | 文本讨论市场开始关注、热度提高、人气变强、资金关注度上升等。 |
+| `short_term_emotion` | 短线情绪升温 | 文本讨论短线情绪、短线资金活跃、情绪推动上涨等。 |
+| `panic_selling` | 恐慌抛售 | 文本讨论恐慌杀跌、情绪性卖出、踩踏、急跌恐慌等。 |
+| `news_driven` | 消息驱动 | 文本讨论新闻、公告、传闻、利好利空消息推动行情。 |
+| `policy_driven` | 政策驱动 | 文本讨论政策影响、监管政策、宏观政策、行业政策刺激等。 |
+| `sector_rotation` | 板块轮动 | 文本讨论板块切换、资金从一个板块转向另一个板块、轮动行情等。 |
+| `weak_sentiment` | 情绪偏弱 | 文本讨论市场情绪弱、没人接力、上涨无力、关注度低等。 |
+
+#### 3.8.7 risk_strategy：风险 / 策略标签
+
+| 标签 | 中文含义 | chunk 入库时如何判断 |
+|---|---|---|
+| `chase_high_risk` | 追高风险 | 文本提醒上涨后不要盲目追、接近高位要谨慎、涨多了风险变大等。 |
+| `false_breakout_risk` | 假突破风险 | 文本讨论突破后可能失败、冲高回落、站不稳、骗线等。 |
+| `liquidity_risk` | 流动性风险 | 文本讨论成交差、买卖困难、流动性不足、小票无法及时退出等。 |
+| `drawdown_risk` | 回撤风险 | 文本讨论可能回撤、下跌空间、亏损扩大、短线回落风险等。 |
+| `valuation_trap_risk` | 估值陷阱风险 | 文本讨论低估值可能是陷阱、低 PB / PE 背后有问题等。 |
+| `overheated_risk` | 过热风险 | 文本讨论涨得太快、情绪过热、短线拥挤、炒作过度等。 |
+| `risk_control` | 风险控制 | 文本讨论控制风险、先看风险、不要重仓冒险、避免大亏等。 |
+| `position_control` | 仓位控制 | 文本讨论轻仓、分批、控制仓位、不要满仓、仓位管理等。 |
+| `wait_confirm` | 等待确认 | 文本讨论不要马上判断、等确认、等站稳、等第二天走势验证等。 |
+| `observe_next_day` | 观察次日表现 | 文本明确提到第二天观察、次日是否继续放量、次日是否站稳等。 |
+| `avoid_emotional_trade` | 避免情绪交易 | 文本提醒不要冲动、不要被情绪影响、不要因为涨跌而乱操作等。 |
+| `take_profit_plan` | 止盈计划 | 文本讨论涨到目标后减仓、止盈、分批卖出、落袋为安等。 |
+| `stop_loss_plan` | 止损计划 | 文本讨论跌破条件止损、亏损控制、设置退出条件等。 |
+
+#### 3.8.8 入库判断规则
+
+| 规则 | 说明 |
+|---|---|
+| 只从白名单选 | LLM 不能自己创造新标签，否则后面检索会混乱。 |
+| 不相关就空数组 | 不要为了填满 7 类而强行打标签。 |
+| 每类最多 3 个标签 | 防止一个 chunk 标签过多，导致后续检索噪声变大。 |
+| 优先打“适用场景” | 不是问这段话表面讲了什么，而是问它以后适合在哪些投资场景下被检索出来。 |
+| 风险和策略优先保留 | 如果文本包含操作提醒、风险提醒、观察条件，优先给 `risk_strategy` 打标签。 |
+| `general` 用于通用经验 | 如果文本不是特定股票 / 转债 / 指数场景，但适合投资通用经验，就打 `asset.general`。 |
+
+#### 3.8.9 完整标注示例
+
+chunk 文本：
+
+```text
+低价股突然放量上涨时，不要只看当天涨幅。需要观察换手率是否过高，以及第二天是否继续放量并站稳。
+```
+
+推荐标签：
+
+```json
+{
+  "summary": "低价股放量上涨后，需要关注换手率和次日确认。",
+  "keywords": ["低价股", "放量上涨", "换手率", "追高", "次日确认"],
+  "scenes": {
+    "asset": ["stock", "low_price_stock"],
+    "price": ["price_rise", "breakout"],
+    "volume": ["volume_expand", "high_turnover"],
+    "trend": ["breakout_from_range"],
+    "valuation": [],
+    "sentiment": ["short_term_emotion"],
+    "risk_strategy": ["chase_high_risk", "wait_confirm", "observe_next_day"]
+  }
+}
+```
+
+这段的核心不是“它提到了上涨”，而是它以后适合在以下场景下被检索出来：
+
+```text
+低价股
+放量上涨
+高换手
+突破确认
+追高风险
+次日观察
+```
+
 ---
 
 ## 4. 七个场景模块设计
@@ -456,14 +634,15 @@ semantic_score = cosine(query_embedding, chunk_embedding)
 #### 4.2.2 推荐小标签
 
 ```text
+general
 stock
 index
-bond
+convertible_bond
+fund
 bank_stock
 low_price_stock
 large_cap_stock
 small_cap_stock
-convertible_bond
 ```
 
 #### 4.2.3 输出示例
@@ -513,8 +692,6 @@ breakout
 pullback
 gap_up
 gap_down
-limit_up
-limit_down
 ```
 
 #### 4.3.3 输出示例
@@ -605,12 +782,10 @@ TrendSceneModule 看最近一段时间走势结构。
 uptrend
 downtrend
 range_bound
-trend_reversal
 rebound
+trend_reversal
 breakout_from_range
 failed_breakout
-higher_high
-lower_low
 ```
 
 #### 4.5.3 输出示例
@@ -655,11 +830,10 @@ low_pe
 high_pe
 low_pb
 high_pb
+high_dividend
 valuation_repair
 valuation_trap
-profit_pressure
-high_dividend
-fundamental_uncertain
+fundamental_risk
 ```
 
 #### 4.6.3 输出示例
@@ -707,11 +881,10 @@ fundamental_uncertain
 market_attention_rise
 short_term_emotion
 panic_selling
-speculation_heat
-weak_sentiment
 news_driven
 policy_driven
 sector_rotation
+weak_sentiment
 ```
 
 #### 4.7.3 输出示例
@@ -750,8 +923,6 @@ sector_rotation
 
 #### 4.8.2 推荐小标签
 
-风险类：
-
 ```text
 chase_high_risk
 false_breakout_risk
@@ -759,11 +930,6 @@ liquidity_risk
 drawdown_risk
 valuation_trap_risk
 overheated_risk
-```
-
-策略类：
-
-```text
 risk_control
 position_control
 wait_confirm
@@ -1519,7 +1685,7 @@ tag_match_score
 cross_scene_score
 ```
 
-最终类内排序公式推荐为：
+最终类内排序公式推荐为(也可以基于alpha，beta和gama系数)：
 
 ```text
 final_score =
