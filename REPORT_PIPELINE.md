@@ -525,6 +525,8 @@ Chunk 入库时，推荐 metadata 结构如下：
 | `policy_driven` | 政策驱动 | 文本讨论政策影响、监管政策、宏观政策、行业政策刺激等。 |
 | `sector_rotation` | 板块轮动 | 文本讨论板块切换、资金从一个板块转向另一个板块、轮动行情等。 |
 | `weak_sentiment` | 情绪偏弱 | 文本讨论市场情绪弱、没人接力、上涨无力、关注度低等。 |
+| `herding_effect` | 羊群效应 / 从众行为 | 文本讨论羊群效应、羊群行为、从众行为、趋同性、交易行为趋同、只买不卖、只卖不买、既买又卖、净买基金、净卖基金等。 |
+| `institutional_behavior` | 机构 / 基金行为 | 文本讨论机构投资者、证券投资基金、投资基金行为、基金交易行为、基金投资行为、基金持仓、基金中报、基金年报、基金家数、互助基金等。 |
 
 #### 3.8.7 risk_strategy：风险 / 策略标签
 
@@ -885,6 +887,8 @@ news_driven
 policy_driven
 sector_rotation
 weak_sentiment
+herding_effect
+institutional_behavior
 ```
 
 #### 4.7.3 输出示例
