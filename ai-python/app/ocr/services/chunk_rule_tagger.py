@@ -83,13 +83,27 @@ class ChunkRuleTagger:
                 }
             )
 
+        llm_chunks = [chunk for chunk in chunks if chunk["qualityGate"]["needLlm"]]
+        rule_only_chunks = [chunk for chunk in chunks if not chunk["qualityGate"]["needLlm"]]
+        all_chunk_ids = [chunk["chunkId"] for chunk in chunks]
+        llm_chunk_ids = [chunk["chunkId"] for chunk in llm_chunks]
+        rule_only_chunk_ids = [chunk["chunkId"] for chunk in rule_only_chunks]
+
         return {
             "taskNo": task_no,
             "tagVersion": "rule-v1.1",
             "confidenceThreshold": self._confidence_threshold,
             "minCoveredCategories": self._min_covered_categories,
             "chunkCount": len(chunks),
-            "needLlm": any(chunk["qualityGate"]["needLlm"] for chunk in chunks),
+            "totalChunkCount": len(chunks),
+            "allChunkIds": all_chunk_ids,
+            "needLlm": bool(llm_chunks),
+            "llmChunkCount": len(llm_chunks),
+            "ruleOnlyChunkCount": len(rule_only_chunks),
+            "llmChunkIds": llm_chunk_ids,
+            "ruleOnlyChunkIds": rule_only_chunk_ids,
+            "llmChunks": llm_chunks,
+            "ruleOnlyChunks": rule_only_chunks,
             "chunks": chunks,
         }
 

@@ -75,39 +75,46 @@ class ChunkRuleTagHandler(MessageHandler):
             raise
 
         output_ref = self._write_result(message, bucket, rule_result)
-        next_stage = STAGE_CHUNK_TAG_LLM if rule_result["needLlm"] else STAGE_CHUNK_TAG_CORRECT
-        next_routing_key = ROUTING_KEY_CHUNK_TAG_LLM if rule_result["needLlm"] else ROUTING_KEY_CHUNK_TAG_CORRECT
-        next_message = self._build_next_message(message, output_ref, next_stage)
+        outgoing_messages = self._build_chunk_messages(rule_result)
+        output_message = {
+            "eventId": str(uuid.uuid4()),
+            "taskNo": message.task_no,
+            "stage": STAGE_CHUNK_TAG_RULE,
+            "inputRef": output_ref,
+            "totalChunkCount": rule_result["totalChunkCount"],
+            "llmChunkCount": rule_result["llmChunkCount"],
+            "ruleOnlyChunkCount": rule_result["ruleOnlyChunkCount"],
+            "publishedMessageCount": len(outgoing_messages),
+            "createdAt": datetime.now().isoformat(timespec="seconds"),
+        }
         self._repository.finish_stage(
             task_no=message.task_no,
             stage=STAGE_CHUNK_TAG_RULE,
-            next_stage=next_stage,
+            next_stage=STAGE_CHUNK_TAG_LLM if rule_result["needLlm"] else STAGE_CHUNK_TAG_CORRECT,
             progress=78,
             page_count=int(message.body.get("pageCount") or 0),
             segment_count=int(rule_result["chunkCount"]),
             output_ref=output_ref,
-            output_message=next_message,
+            output_message=output_message,
             metrics={
                 "chunkCount": rule_result["chunkCount"],
+                "totalChunkCount": rule_result["totalChunkCount"],
                 "needLlm": rule_result["needLlm"],
+                "llmChunkCount": rule_result["llmChunkCount"],
+                "ruleOnlyChunkCount": rule_result["ruleOnlyChunkCount"],
                 "tagVersion": rule_result["tagVersion"],
             },
         )
         logger.info(
-            "chunk rule tag finished task_no=%s chunk_count=%s need_llm=%s output_ref=%s",
+            "chunk rule tag finished task_no=%s chunk_count=%s llm_chunk_count=%s rule_only_chunk_count=%s output_ref=%s",
             message.task_no,
             rule_result["chunkCount"],
-            rule_result["needLlm"],
+            rule_result["llmChunkCount"],
+            rule_result["ruleOnlyChunkCount"],
             output_ref,
         )
         return HandlerResult(
-            outgoing_messages=[
-                OutgoingMessage(
-                    exchange=OCR_TOPIC_EXCHANGE,
-                    routing_key=next_routing_key,
-                    body=next_message,
-                )
-            ]
+            outgoing_messages=outgoing_messages
         )
 
     def _write_result(self, message: IncomingMessage, fallback_bucket: str, rule_result: dict) -> dict:
@@ -125,13 +132,49 @@ class ChunkRuleTagHandler(MessageHandler):
         self._storage.put_json(output_bucket, result_key, payload)
         return {"storageType": "minio", "bucket": output_bucket, "objectKey": result_key}
 
-    def _build_next_message(self, message: IncomingMessage, output_ref: dict, next_stage: str) -> dict:
+    def _build_chunk_messages(self, rule_result: dict) -> list[OutgoingMessage]:
+        messages = []
+        for chunk in rule_result["chunks"]:
+            need_llm = chunk["qualityGate"]["needLlm"]
+            stage = STAGE_CHUNK_TAG_LLM if need_llm else STAGE_CHUNK_TAG_CORRECT
+            routing_key = ROUTING_KEY_CHUNK_TAG_LLM if need_llm else ROUTING_KEY_CHUNK_TAG_CORRECT
+            messages.append(
+                OutgoingMessage(
+                    exchange=OCR_TOPIC_EXCHANGE,
+                    routing_key=routing_key,
+                    body=self._build_chunk_message_body(rule_result, chunk, stage),
+                )
+            )
+        return messages
+
+    def _build_chunk_message_body(self, rule_result: dict, chunk: dict, stage: str) -> dict:
         return {
             "eventId": str(uuid.uuid4()),
-            "taskNo": message.task_no,
-            "stage": next_stage,
+            "taskNo": rule_result["taskNo"],
+            "stage": stage,
             "attempt": 1,
-            "inputRef": output_ref,
-            "outputPrefix": message.body.get("outputPrefix") or {},
+            "tagPipeline": {
+                "version": "v1.0",
+                "sourceStage": STAGE_CHUNK_TAG_RULE,
+                "targetStage": stage,
+            },
+            "taskChunkSummary": {
+                "totalChunkCount": rule_result["totalChunkCount"],
+                "llmChunkCount": rule_result["llmChunkCount"],
+                "ruleOnlyChunkCount": rule_result["ruleOnlyChunkCount"],
+            },
+            "chunk": {
+                "chunkId": chunk["chunkId"],
+                "chunkIndex": chunk["chunkIndex"],
+                "text": chunk["text"],
+                "pageNos": chunk["pageNos"],
+                "paragraphNos": chunk["paragraphNos"],
+            },
+            "ruleTagging": {
+                "ruleScenes": chunk["ruleScenes"],
+                "ruleScenesWithConfidence": chunk["ruleScenesWithConfidence"],
+                "qualityGate": chunk["qualityGate"],
+                "tagVersion": rule_result["tagVersion"],
+            },
             "createdAt": datetime.now().isoformat(timespec="seconds"),
         }
