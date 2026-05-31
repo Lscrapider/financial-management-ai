@@ -61,6 +61,9 @@ const pipelineStages = [
   { key: 'ocr.recognize', label: 'OCR识别' },
   { key: 'text.clean', label: '文本清洗' },
   { key: 'quality.validate', label: '质量校验' },
+  { key: 'chunk.tag.rule', label: '规则打标' },
+  { key: 'chunk.tag.llm', label: 'LLM打标' },
+  { key: 'chunk.tag.correct', label: '标签回正' },
   { key: 'embedding.index', label: '向量入库' },
 ];
 
