@@ -63,4 +63,14 @@ public class OcrTaskManage extends ServiceImpl<OcrTaskMapper, OcrTaskPO> {
                 .set(OcrTaskPO::getUpdatedAt, LocalDateTime.now())
                 .update();
     }
+
+    public void markChunkTagRuleRunning(String taskNo, int segmentCount) {
+        this.lambdaUpdate()
+                .eq(OcrTaskPO::getTaskNo, taskNo)
+                .set(OcrTaskPO::getStatus, OcrTaskStatusEnum.RUNNING.getCode())
+                .set(OcrTaskPO::getCurrentStage, OcrTaskStageEnum.CHUNK_TAG_RULE.getCode())
+                .set(OcrTaskPO::getSegmentCount, segmentCount)
+                .set(OcrTaskPO::getUpdatedAt, LocalDateTime.now())
+                .update();
+    }
 }

@@ -94,6 +94,36 @@
       }
     },
     {
+      "name": "finance.ocr.chunk.tag.rule",
+      "vhost": "finance",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "finance.ocr.dlx",
+        "x-dead-letter-routing-key": "ocr.chunk.tag.rule.dead"
+      }
+    },
+    {
+      "name": "finance.ocr.chunk.tag.llm",
+      "vhost": "finance",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "finance.ocr.dlx",
+        "x-dead-letter-routing-key": "ocr.chunk.tag.llm.dead"
+      }
+    },
+    {
+      "name": "finance.ocr.chunk.tag.correct",
+      "vhost": "finance",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "finance.ocr.dlx",
+        "x-dead-letter-routing-key": "ocr.chunk.tag.correct.dead"
+      }
+    },
+    {
       "name": "finance.ocr.embedding.index",
       "vhost": "finance",
       "durable": true,
@@ -145,6 +175,39 @@
         "x-message-ttl": 30000,
         "x-dead-letter-exchange": "finance.ocr.topic",
         "x-dead-letter-routing-key": "ocr.quality.validate"
+      }
+    },
+    {
+      "name": "finance.ocr.chunk.tag.rule.retry",
+      "vhost": "finance",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 30000,
+        "x-dead-letter-exchange": "finance.ocr.topic",
+        "x-dead-letter-routing-key": "ocr.chunk.tag.rule"
+      }
+    },
+    {
+      "name": "finance.ocr.chunk.tag.llm.retry",
+      "vhost": "finance",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 30000,
+        "x-dead-letter-exchange": "finance.ocr.topic",
+        "x-dead-letter-routing-key": "ocr.chunk.tag.llm"
+      }
+    },
+    {
+      "name": "finance.ocr.chunk.tag.correct.retry",
+      "vhost": "finance",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 30000,
+        "x-dead-letter-exchange": "finance.ocr.topic",
+        "x-dead-letter-routing-key": "ocr.chunk.tag.correct"
       }
     },
     {
@@ -212,6 +275,30 @@
     {
       "source": "finance.ocr.topic",
       "vhost": "finance",
+      "destination": "finance.ocr.chunk.tag.rule",
+      "destination_type": "queue",
+      "routing_key": "ocr.chunk.tag.rule",
+      "arguments": {}
+    },
+    {
+      "source": "finance.ocr.topic",
+      "vhost": "finance",
+      "destination": "finance.ocr.chunk.tag.llm",
+      "destination_type": "queue",
+      "routing_key": "ocr.chunk.tag.llm",
+      "arguments": {}
+    },
+    {
+      "source": "finance.ocr.topic",
+      "vhost": "finance",
+      "destination": "finance.ocr.chunk.tag.correct",
+      "destination_type": "queue",
+      "routing_key": "ocr.chunk.tag.correct",
+      "arguments": {}
+    },
+    {
+      "source": "finance.ocr.topic",
+      "vhost": "finance",
       "destination": "finance.ocr.embedding.index",
       "destination_type": "queue",
       "routing_key": "ocr.embedding.index",
@@ -263,6 +350,30 @@
       "destination": "finance.ocr.quality.validate.retry",
       "destination_type": "queue",
       "routing_key": "ocr.quality.validate.retry",
+      "arguments": {}
+    },
+    {
+      "source": "finance.ocr.retry.topic",
+      "vhost": "finance",
+      "destination": "finance.ocr.chunk.tag.rule.retry",
+      "destination_type": "queue",
+      "routing_key": "ocr.chunk.tag.rule.retry",
+      "arguments": {}
+    },
+    {
+      "source": "finance.ocr.retry.topic",
+      "vhost": "finance",
+      "destination": "finance.ocr.chunk.tag.llm.retry",
+      "destination_type": "queue",
+      "routing_key": "ocr.chunk.tag.llm.retry",
+      "arguments": {}
+    },
+    {
+      "source": "finance.ocr.retry.topic",
+      "vhost": "finance",
+      "destination": "finance.ocr.chunk.tag.correct.retry",
+      "destination_type": "queue",
+      "routing_key": "ocr.chunk.tag.correct.retry",
       "arguments": {}
     },
     {

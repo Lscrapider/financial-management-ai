@@ -3,7 +3,7 @@ package com.scrapider.finance.ai.service.impl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.scrapider.finance.ai.domain.dto.OcrEmbeddingIndexMessageDTO;
+import com.scrapider.finance.ai.domain.dto.OcrChunkTagRuleMessageDTO;
 import com.scrapider.finance.ai.domain.dto.OcrStorageRefDTO;
 import com.scrapider.finance.ai.domain.param.OcrReviewDraftParam;
 import com.scrapider.finance.ai.domain.vo.OcrReviewPageVO;
@@ -91,14 +91,14 @@ public class OcrReviewServiceImpl implements OcrReviewService {
         this.ocrFileStorageService.writeJson(bucket, reviewedObjectKey, reviewedContent);
 
         OcrStorageRefDTO reviewedRef = new OcrStorageRefDTO("minio", bucket, reviewedObjectKey);
-        OcrStorageRefDTO embeddingOutputPrefix = new OcrStorageRefDTO(
+        OcrStorageRefDTO chunkTagOutputPrefix = new OcrStorageRefDTO(
                 "minio",
                 bucket,
-                this.stageOutputPrefix(taskNo, 5) + "/embedding/");
+                this.stageOutputPrefix(taskNo, 5) + "/chunk-tag/");
         this.ocrReviewManage.approve(taskNo, this.objectMapper.valueToTree(reviewedRef));
-        this.ocrTaskManage.markEmbeddingIndexRunning(taskNo, reviewedParagraphCount);
-        this.ocrTaskMessagePublisher.publishEmbeddingIndexMessage(
-                OcrEmbeddingIndexMessageDTO.create(taskNo, reviewedRef, embeddingOutputPrefix));
+        this.ocrTaskManage.markChunkTagRuleRunning(taskNo, reviewedParagraphCount);
+        this.ocrTaskMessagePublisher.publishChunkTagRuleMessage(
+                OcrChunkTagRuleMessageDTO.create(taskNo, reviewedRef, chunkTagOutputPrefix));
     }
 
     @Override
