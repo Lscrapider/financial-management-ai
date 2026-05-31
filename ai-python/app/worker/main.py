@@ -5,6 +5,7 @@ from app.messaging.rabbit_worker import RabbitMqWorker
 from app.messaging.registry import HandlerRegistry
 from app.ocr.constants import (
     QUEUE_CHUNK_REEMBED,
+    QUEUE_CHUNK_TAG_CORRECT,
     QUEUE_CHUNK_TAG_LLM,
     QUEUE_CHUNK_TAG_RULE,
     QUEUE_DOCUMENT_NORMALIZE,
@@ -12,6 +13,7 @@ from app.ocr.constants import (
     QUEUE_OCR_RECOGNIZE,
     QUEUE_TEXT_CLEAN,
     ROUTING_KEY_CHUNK_REEMBED,
+    ROUTING_KEY_CHUNK_TAG_CORRECT,
     ROUTING_KEY_CHUNK_TAG_LLM,
     ROUTING_KEY_CHUNK_TAG_RULE,
     ROUTING_KEY_DOCUMENT_NORMALIZE,
@@ -25,11 +27,14 @@ from app.ocr.engines.qwen_vl_ocr_engine import QwenVlOcrEngine
 from app.ocr.handlers.chunk_llm_tag_handler import ChunkLlmTagHandler
 from app.ocr.handlers.chunk_reembed_handler import ChunkReembedHandler
 from app.ocr.handlers.chunk_rule_tag_handler import ChunkRuleTagHandler
+from app.ocr.handlers.chunk_tag_correct_handler import ChunkTagCorrectHandler
 from app.ocr.handlers.document_normalize_handler import DocumentNormalizeHandler
 from app.ocr.handlers.embedding_index_handler import EmbeddingIndexHandler
 from app.ocr.handlers.ocr_recognize_handler import OcrRecognizeHandler
 from app.ocr.handlers.text_clean_handler import TextCleanHandler
 from app.ocr.services.chunk_rule_tagger import ChunkRuleTagger
+from app.ocr.services.chunk_tag_aggregation import InMemoryChunkTagAggregator
+from app.ocr.services.chunk_tag_corrector import ChunkTagCorrector
 from app.ocr.repository import OcrTaskRepository
 from app.ocr.services.document_normalizer import DocumentNormalizer
 from app.ocr.services.embedding_service import EmbeddingService
@@ -71,6 +76,17 @@ def build_worker() -> RabbitMqWorker:
             repository,
             deepseek_engine,
             settings.deepseek,
+            settings.rabbitmq.max_attempts,
+        ),
+    )
+    registry.register(
+        ROUTING_KEY_CHUNK_TAG_CORRECT,
+        ChunkTagCorrectHandler(
+            repository,
+            ChunkTagCorrector(),
+            InMemoryChunkTagAggregator(),
+            storage,
+            settings.minio.artifact_bucket,
             settings.rabbitmq.max_attempts,
         ),
     )
@@ -120,6 +136,11 @@ def build_worker() -> RabbitMqWorker:
             queue=QUEUE_CHUNK_TAG_LLM,
             routing_key=ROUTING_KEY_CHUNK_TAG_LLM,
             handler_key=ROUTING_KEY_CHUNK_TAG_LLM,
+        ),
+        HandlerRoute(
+            queue=QUEUE_CHUNK_TAG_CORRECT,
+            routing_key=ROUTING_KEY_CHUNK_TAG_CORRECT,
+            handler_key=ROUTING_KEY_CHUNK_TAG_CORRECT,
         ),
         HandlerRoute(
             queue=QUEUE_EMBEDDING_INDEX,

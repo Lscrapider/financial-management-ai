@@ -1,11 +1,25 @@
 import { requestClient } from '#/api/request';
 
+export interface ScenesData {
+  asset: string[];
+  price: string[];
+  volume: string[];
+  trend: string[];
+  valuation: string[];
+  sentiment: string[];
+  risk_strategy: string[];
+  [key: string]: string[];
+}
+
 export interface KnowledgeChunk {
   avgConfidence: number | null;
   chunkIndex: number;
   createdAt: string;
   id: number;
-  metadata: Record<string, unknown>;
+  metadata: {
+    scenes?: ScenesData;
+    [key: string]: unknown;
+  };
   originalFilename: null | string;
   pageNos: number[];
   paragraphNos: number[];

@@ -148,10 +148,24 @@ class RabbitMqWorker:
                 delivery_mode=pika.DeliveryMode.Persistent,
             ),
         )
+        logger.info(
+            "message published to retry task_no=%s stage=%s routing_key=%s next_attempt=%s",
+            message.task_no,
+            message.stage,
+            f"{message.routing_key}.retry",
+            retry_body["attempt"],
+        )
         self._ack(message.delivery_tag)
 
     def _reject_to_dead_letter(self, message: IncomingMessage) -> None:
         # requeue=False 会触发当前队列的 x-dead-letter-exchange，最终进入 DLQ。
+        logger.info(
+            "message rejected to dead letter task_no=%s stage=%s routing_key=%s attempt=%s",
+            message.task_no,
+            message.stage,
+            message.routing_key,
+            message.attempt,
+        )
         self._reject(message.delivery_tag, requeue=False)
 
     def _ack(self, delivery_tag: int) -> None:

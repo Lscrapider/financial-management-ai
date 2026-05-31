@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
 
+from app.ocr.services.chunk_tag_schema import empty_scenes
+
 
 @dataclass
 class VectorChunk:
@@ -32,24 +34,35 @@ class EmbeddingService:
             if not text.strip():
                 continue
             chunk_index = i + 1
+            paragraph_metadata = paragraph.get("metadata") or {}
+            metadata = {
+                "taskNo": task_no,
+                "documentId": task_no,
+                "chunkId": f"{task_no}:chunk:{chunk_index:04d}",
+                "pageNos": paragraph.get("sourcePages") or [],
+                "paragraphNos": [paragraph.get("paragraphNo") or chunk_index],
+                "sourceType": "ocr_reviewed",
+                "avgConfidence": paragraph.get("avgConfidence"),
+                "warnings": paragraph.get("warnings") or [],
+                "version": 1,
+                "deleted": False,
+                "scenes": empty_scenes(),
+                "keywords": [],
+                "summary": "",
+                "tagging": {},
+            }
+            if isinstance(paragraph_metadata, dict):
+                metadata["scenes"] = paragraph_metadata.get("scenes") or {}
+                metadata["keywords"] = paragraph_metadata.get("keywords") or []
+                metadata["summary"] = paragraph_metadata.get("summary") or ""
+                metadata["tagging"] = paragraph_metadata.get("tagging") or {}
             chunks.append(
                 VectorChunk(
                     chunk_id=f"{task_no}:chunk:{chunk_index:04d}",
                     chunk_index=chunk_index,
                     text=text,
                     embedding=embeddings[i],
-                    metadata={
-                        "taskNo": task_no,
-                        "documentId": task_no,
-                        "chunkId": f"{task_no}:chunk:{chunk_index:04d}",
-                        "pageNos": paragraph.get("sourcePages") or [],
-                        "paragraphNos": [paragraph.get("paragraphNo") or chunk_index],
-                        "sourceType": "ocr_reviewed",
-                        "avgConfidence": paragraph.get("avgConfidence"),
-                        "warnings": paragraph.get("warnings") or [],
-                        "version": 1,
-                        "deleted": False,
-                    },
+                    metadata=metadata,
                 )
             )
         return chunks

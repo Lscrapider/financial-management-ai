@@ -3,16 +3,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-
-SCENE_CATEGORIES = (
-    "asset",
-    "price",
-    "volume",
-    "trend",
-    "valuation",
-    "sentiment",
-    "risk_strategy",
-)
+from app.ocr.services.chunk_tag_schema import SCENE_CATEGORIES
 
 NEGATION_WORDS = ("不是", "不能", "不要", "别", "不宜", "避免", "无法", "没有", "未能", "并非")
 
@@ -115,7 +106,7 @@ class ChunkRuleTagger:
                 continue
             result[rule.category][rule.tag] = score
         return {
-            category: dict(sorted(tags.items(), key=lambda item: item[1], reverse=True)[:3])
+            category: dict(sorted(tags.items(), key=lambda item: item[1], reverse=True))
             for category, tags in result.items()
         }
 

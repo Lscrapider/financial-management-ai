@@ -75,7 +75,8 @@ class ChunkRuleTagHandler(MessageHandler):
             raise
 
         output_ref = self._write_result(message, bucket, rule_result)
-        outgoing_messages = self._build_chunk_messages(rule_result)
+        output_prefix = self._message_output_prefix(message, output_ref)
+        outgoing_messages = self._build_chunk_messages(rule_result, output_prefix)
         output_message = {
             "eventId": str(uuid.uuid4()),
             "taskNo": message.task_no,
@@ -120,8 +121,8 @@ class ChunkRuleTagHandler(MessageHandler):
     def _write_result(self, message: IncomingMessage, fallback_bucket: str, rule_result: dict) -> dict:
         output_prefix = message.body.get("outputPrefix") or {}
         output_bucket = output_prefix.get("bucket") or fallback_bucket
-        output_key = output_prefix.get("objectKey") or ""
-        result_key = f"{output_key.rstrip('/')}/rule_tag_result.json" if output_key else "rule_tag_result.json"
+        output_key = output_prefix.get("objectKey") or self._default_output_prefix(message.task_no)
+        result_key = f"{output_key.rstrip('/')}/rule_tag_result.json"
         payload = {
             "taskNo": message.task_no,
             "stage": STAGE_CHUNK_TAG_RULE,
@@ -132,7 +133,7 @@ class ChunkRuleTagHandler(MessageHandler):
         self._storage.put_json(output_bucket, result_key, payload)
         return {"storageType": "minio", "bucket": output_bucket, "objectKey": result_key}
 
-    def _build_chunk_messages(self, rule_result: dict) -> list[OutgoingMessage]:
+    def _build_chunk_messages(self, rule_result: dict, output_prefix: dict) -> list[OutgoingMessage]:
         messages = []
         for chunk in rule_result["chunks"]:
             need_llm = chunk["qualityGate"]["needLlm"]
@@ -142,12 +143,12 @@ class ChunkRuleTagHandler(MessageHandler):
                 OutgoingMessage(
                     exchange=OCR_TOPIC_EXCHANGE,
                     routing_key=routing_key,
-                    body=self._build_chunk_message_body(rule_result, chunk, stage),
+                    body=self._build_chunk_message_body(rule_result, chunk, stage, output_prefix),
                 )
             )
         return messages
 
-    def _build_chunk_message_body(self, rule_result: dict, chunk: dict, stage: str) -> dict:
+    def _build_chunk_message_body(self, rule_result: dict, chunk: dict, stage: str, output_prefix: dict) -> dict:
         return {
             "eventId": str(uuid.uuid4()),
             "taskNo": rule_result["taskNo"],
@@ -163,6 +164,7 @@ class ChunkRuleTagHandler(MessageHandler):
                 "llmChunkCount": rule_result["llmChunkCount"],
                 "ruleOnlyChunkCount": rule_result["ruleOnlyChunkCount"],
             },
+            "outputPrefix": output_prefix,
             "chunk": {
                 "chunkId": chunk["chunkId"],
                 "chunkIndex": chunk["chunkIndex"],
@@ -178,3 +180,19 @@ class ChunkRuleTagHandler(MessageHandler):
             },
             "createdAt": datetime.now().isoformat(timespec="seconds"),
         }
+
+    def _message_output_prefix(self, message: IncomingMessage, output_ref: dict) -> dict:
+        output_prefix = message.body.get("outputPrefix") or {}
+        return {
+            "storageType": "minio",
+            "bucket": output_prefix.get("bucket") or output_ref.get("bucket") or "",
+            "objectKey": output_prefix.get("objectKey") or self._default_output_prefix(message.task_no),
+        }
+
+    @staticmethod
+    def _default_output_prefix(task_no: str) -> str:
+        today = datetime.now()
+        return (
+            f"stage-5-output/{today.year}/{today.month:02d}/{today.day:02d}/"
+            f"{task_no}/chunk-tag/"
+        )

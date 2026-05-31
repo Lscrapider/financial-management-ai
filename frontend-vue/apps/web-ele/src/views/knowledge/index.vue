@@ -23,7 +23,11 @@ import {
   getKnowledgeStats,
   updateKnowledgeChunk,
 } from '#/api/knowledge';
-import type { KnowledgeChunk, KnowledgeStats } from '#/api/knowledge';
+import type {
+  KnowledgeChunk,
+  KnowledgeStats,
+  ScenesData,
+} from '#/api/knowledge';
 
 const stats = ref<KnowledgeStats>({
   chunkCount: 0,
@@ -106,6 +110,112 @@ function sourcePageLabel(chunk: KnowledgeChunk) {
   return chunk.pageNos?.length
     ? `来源页 ${chunk.pageNos.join(', ')}`
     : '来源页 -';
+}
+
+const SCENE_CATEGORY_LABELS: Record<string, string> = {
+  asset: '资产类型',
+  price: '价格位置',
+  volume: '成交量/换手',
+  trend: '趋势结构',
+  valuation: '估值/基本面',
+  sentiment: '情绪/异动',
+  risk_strategy: '风险/策略',
+};
+
+const TAG_LABELS: Record<string, string> = {
+  general: '通用',
+  stock: '股票',
+  index: '指数',
+  convertible_bond: '可转债',
+  fund: '基金',
+  bank_stock: '银行股',
+  low_price_stock: '低价股',
+  large_cap_stock: '大盘股',
+  small_cap_stock: '小盘股',
+  price_rise: '上涨',
+  price_drop: '下跌',
+  sideways: '横盘',
+  near_recent_high: '接近高位',
+  near_recent_low: '接近低位',
+  breakout: '突破',
+  pullback: '回调',
+  gap_up: '跳空高开',
+  gap_down: '跳空低开',
+  volume_expand: '放量',
+  volume_shrink: '缩量',
+  high_turnover: '高换手',
+  low_turnover: '低换手',
+  volume_price_confirm: '量价配合',
+  volume_price_divergence: '量价背离',
+  volume_spike: '成交量突增',
+  volume_dry_up: '成交枯竭',
+  uptrend: '上升趋势',
+  downtrend: '下降趋势',
+  range_bound: '区间震荡',
+  rebound: '反弹',
+  trend_reversal: '趋势反转',
+  breakout_from_range: '横盘突破',
+  failed_breakout: '突破失败',
+  low_pe: '低PE',
+  high_pe: '高PE',
+  low_pb: '低PB',
+  high_pb: '高PB',
+  high_dividend: '高股息',
+  valuation_repair: '估值修复',
+  valuation_trap: '低估值陷阱',
+  fundamental_risk: '基本面风险',
+  market_attention_rise: '关注度上升',
+  short_term_emotion: '短线情绪',
+  panic_selling: '恐慌抛售',
+  news_driven: '消息驱动',
+  policy_driven: '政策驱动',
+  sector_rotation: '板块轮动',
+  weak_sentiment: '情绪偏弱',
+  herding_effect: '羊群效应',
+  institutional_behavior: '机构行为',
+  chase_high_risk: '追高风险',
+  false_breakout_risk: '假突破风险',
+  liquidity_risk: '流动性风险',
+  drawdown_risk: '回撤风险',
+  valuation_trap_risk: '估值陷阱风险',
+  overheated_risk: '过热风险',
+  risk_control: '风险控制',
+  position_control: '仓位控制',
+  wait_confirm: '等待确认',
+  observe_next_day: '观察次日',
+  avoid_emotional_trade: '避免情绪交易',
+  take_profit_plan: '止盈计划',
+  stop_loss_plan: '止损计划',
+};
+
+const CATEGORY_TAG_TYPES: Record<string, 'danger' | 'info' | 'primary' | 'success' | 'warning'> = {
+  asset: 'primary',
+  price: 'success',
+  volume: 'warning',
+  valuation: 'info',
+  sentiment: 'danger',
+  risk_strategy: 'danger',
+};
+
+function currentScenes(chunk: KnowledgeChunk): ScenesData | null {
+  const scenes = chunk.metadata?.scenes;
+  if (!scenes || typeof scenes !== 'object') return null;
+  const hasAny = Object.values(scenes).some(
+    (v) => Array.isArray(v) && v.length > 0,
+  );
+  return hasAny ? (scenes as ScenesData) : null;
+}
+
+function categoryLabel(category: string) {
+  return SCENE_CATEGORY_LABELS[category] ?? category;
+}
+
+function tagLabel(tag: string) {
+  return TAG_LABELS[tag] ?? tag;
+}
+
+function categoryTagType(category: string) {
+  return CATEGORY_TAG_TYPES[category];
 }
 
 const editing = ref(false);
@@ -286,6 +396,35 @@ onMounted(async () => {
               class="chunk-editor"
             />
             <div v-else class="chunk-text">{{ selectedChunk.text }}</div>
+
+            <div v-if="currentScenes(selectedChunk)" class="scenes-section">
+              <div class="scenes-title">场景标签</div>
+              <div
+                v-for="category in Object.keys(SCENE_CATEGORY_LABELS)"
+                :key="category"
+                class="scene-category"
+              >
+                <template
+                  v-if="
+                    currentScenes(selectedChunk)?.[category]?.length
+                  "
+                >
+                  <span class="scene-category-label">
+                    {{ categoryLabel(category) }}
+                  </span>
+                  <ElTag
+                    v-for="tag in currentScenes(selectedChunk)?.[category]"
+                    :key="tag"
+                    size="small"
+                    :type="categoryTagType(category)"
+                    effect="plain"
+                    class="scene-tag"
+                  >
+                    {{ tagLabel(tag) }}
+                  </ElTag>
+                </template>
+              </div>
+            </div>
 
             <ElDescriptions :column="2" border size="small" class="chunk-meta">
               <ElDescriptionsItem label="上传文件名">
@@ -506,6 +645,43 @@ onMounted(async () => {
   flex: 1;
   overflow-y: auto;
   min-height: 300px;
+}
+
+.scenes-section {
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: var(--el-fill-color-lighter);
+  border-radius: 6px;
+}
+
+.scenes-title {
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.scene-category {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.scene-category:last-child {
+  margin-bottom: 0;
+}
+
+.scene-category-label {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  min-width: 80px;
+  flex: none;
+}
+
+.scene-tag {
+  margin: 0;
 }
 
 .chunk-meta {

@@ -1,17 +1,28 @@
 import importlib.util
 import json
 from pathlib import Path
+import sys
+import types
 
 
 def load_tagger_class():
     project_root = Path(__file__).resolve().parents[2]
-    module_path = project_root / "ai-python/app/ocr/services/chunk_rule_tagger.py"
-    spec = importlib.util.spec_from_file_location("chunk_rule_tagger", module_path)
+    service_root = project_root / "ai-python/app/ocr/services"
+    for module_name in ("app", "app.ocr", "app.ocr.services"):
+        sys.modules[module_name] = types.ModuleType(module_name)
+    load_module("app.ocr.services.chunk_tag_schema", service_root / "chunk_tag_schema.py")
+    module = load_module("chunk_rule_tagger", service_root / "chunk_rule_tagger.py")
+    return module.ChunkRuleTagger
+
+
+def load_module(module_name, module_path):
+    spec = importlib.util.spec_from_file_location(module_name, module_path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"cannot load module: {module_path}")
     module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
     spec.loader.exec_module(module)
-    return module.ChunkRuleTagger
+    return module
 
 
 def build_reviewed_json(texts):

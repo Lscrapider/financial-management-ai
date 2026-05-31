@@ -19,4 +19,4 @@ COMMENT ON COLUMN knowledge_vector.task_no IS '关联的 OCR 任务编号';
 COMMENT ON COLUMN knowledge_vector.chunk_index IS '同一任务内的分段序号';
 COMMENT ON COLUMN knowledge_vector.text IS '分段文本内容';
 COMMENT ON COLUMN knowledge_vector.embedding IS '文本向量，维度 512';
-COMMENT ON COLUMN knowledge_vector.metadata IS '包含 taskNo/documentId/chunkId/pageNos/paragraphNos/sourceType/version/deleted 等元数据';
+COMMENT ON COLUMN knowledge_vector.metadata IS '包含 taskNo/documentId/chunkId/pageNos/paragraphNos/sourceType/scenes/keywords/summary/tagging/version/deleted 等元数据';
