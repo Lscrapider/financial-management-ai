@@ -5,20 +5,24 @@ from app.messaging.rabbit_worker import RabbitMqWorker
 from app.messaging.registry import HandlerRegistry
 from app.ocr.constants import (
     QUEUE_CHUNK_REEMBED,
+    QUEUE_CHUNK_TAG_LLM,
     QUEUE_CHUNK_TAG_RULE,
     QUEUE_DOCUMENT_NORMALIZE,
     QUEUE_EMBEDDING_INDEX,
     QUEUE_OCR_RECOGNIZE,
     QUEUE_TEXT_CLEAN,
     ROUTING_KEY_CHUNK_REEMBED,
+    ROUTING_KEY_CHUNK_TAG_LLM,
     ROUTING_KEY_CHUNK_TAG_RULE,
     ROUTING_KEY_DOCUMENT_NORMALIZE,
     ROUTING_KEY_EMBEDDING_INDEX,
     ROUTING_KEY_OCR_RECOGNIZE,
     ROUTING_KEY_TEXT_CLEAN,
 )
+from app.ocr.engines.deepseek_chat_engine import DeepSeekChatEngine
 from app.ocr.engines.embedding_engine import SentenceTransformersEngine
 from app.ocr.engines.qwen_vl_ocr_engine import QwenVlOcrEngine
+from app.ocr.handlers.chunk_llm_tag_handler import ChunkLlmTagHandler
 from app.ocr.handlers.chunk_reembed_handler import ChunkReembedHandler
 from app.ocr.handlers.chunk_rule_tag_handler import ChunkRuleTagHandler
 from app.ocr.handlers.document_normalize_handler import DocumentNormalizeHandler
@@ -59,6 +63,16 @@ def build_worker() -> RabbitMqWorker:
     registry.register(
         ROUTING_KEY_CHUNK_TAG_RULE,
         ChunkRuleTagHandler(repository, rule_tagger, storage, settings.rabbitmq.max_attempts),
+    )
+    deepseek_engine = DeepSeekChatEngine(settings.deepseek)
+    registry.register(
+        ROUTING_KEY_CHUNK_TAG_LLM,
+        ChunkLlmTagHandler(
+            repository,
+            deepseek_engine,
+            settings.deepseek,
+            settings.rabbitmq.max_attempts,
+        ),
     )
     embedding_engine = SentenceTransformersEngine(
         settings.embedding.model_name,
@@ -101,6 +115,11 @@ def build_worker() -> RabbitMqWorker:
             queue=QUEUE_CHUNK_TAG_RULE,
             routing_key=ROUTING_KEY_CHUNK_TAG_RULE,
             handler_key=ROUTING_KEY_CHUNK_TAG_RULE,
+        ),
+        HandlerRoute(
+            queue=QUEUE_CHUNK_TAG_LLM,
+            routing_key=ROUTING_KEY_CHUNK_TAG_LLM,
+            handler_key=ROUTING_KEY_CHUNK_TAG_LLM,
         ),
         HandlerRoute(
             queue=QUEUE_EMBEDDING_INDEX,

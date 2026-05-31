@@ -245,7 +245,7 @@ risk_strategy 置信度 = max(0.88, 0.82) = 0.88
 ```text
 如果满足以下两个条件，则不调用 LLM，直接进入标签回正：
 
-1. 覆盖率满足要求：7 个大类中至少 3 个大类被打上标签。
+1. 覆盖率满足要求：7 个大类中至少 2 个大类被打上标签。
 2. 置信度满足要求：所有被打上标签的大类置信度都不低于设定阈值。
 
 否则，调用 LLM 标签。
@@ -257,7 +257,7 @@ risk_strategy 置信度 = max(0.88, 0.82) = 0.88
 boolean needLlm(RuleTagResult ruleTagResult) {
     int coveredCategoryCount = countNonEmptyCategories(ruleTagResult);
 
-    if (coveredCategoryCount < 3) {
+    if (coveredCategoryCount < 2) {
         return true;
     }
 
