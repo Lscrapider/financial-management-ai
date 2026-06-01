@@ -13,21 +13,21 @@ const routes: RouteRecordRaw[] = [
     path: '/knowledge',
     children: [
       {
-        name: 'KnowledgeBase',
-        path: '/knowledge/base',
-        component: () => import('#/views/knowledge/index.vue'),
-        meta: {
-          icon: 'lucide:database',
-          title: $t('page.knowledge.base'),
-        },
-      },
-      {
         name: 'KnowledgeOverview',
         path: '/knowledge/overview',
         component: () => import('#/views/knowledge/overview.vue'),
         meta: {
           icon: 'lucide:bar-chart-3',
           title: $t('page.knowledge.overview'),
+        },
+      },
+      {
+        name: 'KnowledgeBase',
+        path: '/knowledge/base',
+        component: () => import('#/views/knowledge/index.vue'),
+        meta: {
+          icon: 'lucide:database',
+          title: $t('page.knowledge.base'),
         },
       },
     ],

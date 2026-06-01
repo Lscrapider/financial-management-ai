@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
 
@@ -12,7 +12,7 @@ import {
 } from 'element-plus';
 
 import { getKnowledgeOverview } from '#/api/knowledge';
-import type { KnowledgeOverview } from '#/api/knowledge';
+import type { CategoryTagDistribution, KnowledgeOverview } from '#/api/knowledge';
 import {
   CATEGORY_TAG_TYPES,
   SCENE_CATEGORY_LABELS,
@@ -72,7 +72,60 @@ interface FlatRow {
   totalPercentage: number;
 }
 
-const flatRows = ref<FlatRow[]>([]);
+const rawDistributions = ref<CategoryTagDistribution[]>([]);
+
+const sortField = ref<string>('totalPercentage');
+const sortDir = ref<'asc' | 'desc'>('desc');
+
+type SortKey = 'count' | 'categoryPercentage' | 'totalPercentage';
+
+function sortLabel(field: string): string {
+  const map: Record<string, string> = {
+    count: '条数',
+    categoryPercentage: '同类占比',
+    totalPercentage: '全局占比',
+  };
+  return map[field] ?? field;
+}
+
+function handleSort(field: string) {
+  if (sortField.value === field) {
+    sortDir.value = sortDir.value === 'desc' ? 'asc' : 'desc';
+  } else {
+    sortField.value = field;
+    sortDir.value = 'desc';
+  }
+}
+
+const flatRows = computed<FlatRow[]>(() => {
+  const key = sortField.value as SortKey | '';
+  const dir = sortDir.value;
+
+  return rawDistributions.value.flatMap((dist) => {
+    const tags = [...dist.tags];
+    if (key) {
+      tags.sort((a, b) => {
+        const va = a[key];
+        const vb = b[key];
+        if (va === vb) {
+          return b.totalPercentage - a.totalPercentage;
+        }
+        return dir === 'desc' ? vb - va : va - vb;
+      });
+    } else {
+      tags.sort((a, b) => b.totalPercentage - a.totalPercentage);
+    }
+    return tags.map((tag) => ({
+      categoryKey: dist.categoryKey,
+      categoryLabel: categoryLabel(dist.categoryKey),
+      tagKey: tag.tagKey,
+      tagLabel: tagLabel(tag.tagKey),
+      count: tag.count,
+      categoryPercentage: tag.categoryPercentage,
+      totalPercentage: tag.totalPercentage,
+    }));
+  });
+});
 
 async function fetchOverview() {
   loading.value = true;
@@ -80,17 +133,7 @@ async function fetchOverview() {
     const data = await getKnowledgeOverview();
     if (data) {
       overview.value = data;
-      flatRows.value = data.tagDistributions.flatMap((dist) =>
-        dist.tags.map((tag) => ({
-          categoryKey: dist.categoryKey,
-          categoryLabel: categoryLabel(dist.categoryKey),
-          tagKey: tag.tagKey,
-          tagLabel: tagLabel(tag.tagKey),
-          count: tag.count,
-          categoryPercentage: tag.categoryPercentage,
-          totalPercentage: tag.totalPercentage,
-        })),
-      );
+      rawDistributions.value = data.tagDistributions;
     }
   } finally {
     loading.value = false;
@@ -116,6 +159,11 @@ function categorySpanMethod({ row, column, rowIndex }: {
     return { rowspan: span, colspan: 1 };
   }
   return { rowspan: 0, colspan: 0 };
+}
+
+function sortIndicator(field: string): string {
+  if (sortField.value !== field) return '';
+  return sortDir.value === 'desc' ? ' ▼' : ' ▲';
 }
 
 onMounted(() => {
@@ -177,27 +225,32 @@ onMounted(() => {
             width="140"
           />
           <ElTableColumn prop="tagLabel" label="标签" width="140" />
-          <ElTableColumn prop="count" label="条数" width="100" sortable>
+          <ElTableColumn prop="count" width="110">
+            <template #header>
+              <span class="sort-header" @click="handleSort('count')">
+                条数{{ sortIndicator('count') }}
+              </span>
+            </template>
             <template #default="{ row }">
               {{ formatNumber(row.count) }}
             </template>
           </ElTableColumn>
-          <ElTableColumn
-            prop="categoryPercentage"
-            label="同类占比"
-            width="100"
-            sortable
-          >
+          <ElTableColumn prop="categoryPercentage" width="110">
+            <template #header>
+              <span class="sort-header" @click="handleSort('categoryPercentage')">
+                同类占比{{ sortIndicator('categoryPercentage') }}
+              </span>
+            </template>
             <template #default="{ row }">
               {{ row.categoryPercentage }}%
             </template>
           </ElTableColumn>
-          <ElTableColumn
-            prop="totalPercentage"
-            label="全局占比"
-            width="100"
-            sortable
-          >
+          <ElTableColumn prop="totalPercentage" width="110">
+            <template #header>
+              <span class="sort-header" @click="handleSort('totalPercentage')">
+                全局占比{{ sortIndicator('totalPercentage') }}
+              </span>
+            </template>
             <template #default="{ row }">
               {{ row.totalPercentage }}%
             </template>
@@ -291,5 +344,14 @@ onMounted(() => {
   color: var(--el-text-color-secondary);
   min-width: 48px;
   text-align: right;
+}
+
+.sort-header {
+  cursor: pointer;
+  user-select: none;
+}
+
+.sort-header:hover {
+  color: var(--el-color-primary);
 }
 </style>

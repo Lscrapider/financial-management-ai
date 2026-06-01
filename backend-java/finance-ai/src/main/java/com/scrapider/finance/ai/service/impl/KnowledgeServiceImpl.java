@@ -96,41 +96,32 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
         List<Map<String, Object>> rawRows = this.knowledgeVectorManage.tagDistribution();
 
-        Map<String, List<Map<String, Object>>> grouped = rawRows.stream()
-                .collect(Collectors.groupingBy(
-                        row -> (String) row.get("category"),
-                        LinkedHashMap::new,
-                        Collectors.toList()));
-
-        Map<String, Long> categoryTotals = new HashMap<>();
-        for (var entry : grouped.entrySet()) {
-            long sum = entry.getValue().stream()
-                    .mapToLong(row -> ((Number) row.get("cnt")).longValue())
-                    .sum();
-            categoryTotals.put(entry.getKey(), sum);
+        Map<String, Map<String, Long>> lookup = new LinkedHashMap<>();
+        for (var row : rawRows) {
+            String cat = (String) row.get("category");
+            String tag = (String) row.get("tag");
+            long cnt = ((Number) row.get("cnt")).longValue();
+            lookup.computeIfAbsent(cat, k -> new LinkedHashMap<>()).put(tag, cnt);
         }
 
         List<CategoryTagDistribution> distributions = new ArrayList<>();
-        for (var entry : grouped.entrySet()) {
-            String categoryKey = entry.getKey();
-            long categoryTotal = categoryTotals.get(categoryKey);
-            List<TagCount> tagCounts = entry.getValue().stream()
-                    .map(row -> {
-                        long count = ((Number) row.get("cnt")).longValue();
-                        double catPct = categoryTotal > 0
-                                ? Math.round(count * 10000.0 / categoryTotal) / 100.0
-                                : 0.0;
-                        double totalPct = chunkCount > 0
-                                ? Math.round(count * 10000.0 / chunkCount) / 100.0
-                                : 0.0;
-                        return new TagCount(
-                                categoryKey,
-                                (String) row.get("tag"),
-                                count,
-                                catPct,
-                                totalPct);
-                    })
-                    .toList();
+        for (var catEntry : VALID_TAGS.entrySet()) {
+            String categoryKey = catEntry.getKey();
+            Set<String> allTags = catEntry.getValue();
+            Map<String, Long> existing = lookup.getOrDefault(categoryKey, Map.of());
+            long categoryTotal = existing.values().stream().mapToLong(Long::longValue).sum();
+
+            List<TagCount> tagCounts = new ArrayList<>();
+            for (String tagKey : allTags) {
+                long count = existing.getOrDefault(tagKey, 0L);
+                double catPct = categoryTotal > 0
+                        ? Math.round(count * 10000.0 / categoryTotal) / 100.0
+                        : 0.0;
+                double totalPct = chunkCount > 0
+                        ? Math.round(count * 10000.0 / chunkCount) / 100.0
+                        : 0.0;
+                tagCounts.add(new TagCount(categoryKey, tagKey, count, catPct, totalPct));
+            }
             distributions.add(new CategoryTagDistribution(categoryKey, tagCounts));
         }
 
