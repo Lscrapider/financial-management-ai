@@ -4,7 +4,7 @@ import com.scrapider.finance.ai.domain.vo.KnowledgeChunkPageVO;
 import com.scrapider.finance.ai.domain.vo.KnowledgeChunkVO;
 import com.scrapider.finance.ai.domain.vo.KnowledgeStatsVO;
 import com.scrapider.finance.ai.service.KnowledgeService;
-import java.util.Map;
+import com.scrapider.finance.domain.param.KnowledgeChunkUpdateParam;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -44,8 +44,7 @@ public class KnowledgeController {
     @PutMapping("/chunks/{id}")
     public ResponseEntity<KnowledgeChunkVO> updateChunk(
             @PathVariable Long id,
-            @RequestBody Map<String, String> body) {
-        String text = body.get("text");
-        return ResponseEntity.ok(this.knowledgeService.updateChunk(id, text));
+            @RequestBody KnowledgeChunkUpdateParam param) {
+        return ResponseEntity.ok(this.knowledgeService.updateChunk(id, param));
     }
 }

@@ -14,6 +14,8 @@ public class OcrTaskStagePO {
     private Long id;
     private String taskNo;
     private String stage;
+    private String chunkId;
+    private Integer chunkIndex;
     private String status;
     private Integer attemptCount;
     private Integer maxAttempts;

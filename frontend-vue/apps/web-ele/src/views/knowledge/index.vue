@@ -11,8 +11,10 @@ import {
   ElDescriptionsItem,
   ElEmpty,
   ElInput,
+  ElOption,
   ElPagination,
   ElRow,
+  ElSelect,
   ElTable,
   ElTableColumn,
   ElTag,
@@ -25,6 +27,7 @@ import {
 } from '#/api/knowledge';
 import type {
   KnowledgeChunk,
+  KnowledgeChunkUpdateParam,
   KnowledgeStats,
   ScenesData,
 } from '#/api/knowledge';
@@ -78,6 +81,8 @@ function selectChunk(chunk: KnowledgeChunk | undefined) {
   if (!chunk) return;
   editing.value = false;
   editText.value = '';
+  editingTags.value = false;
+  draftScenes.value = null;
   selectedChunk.value = chunk;
 }
 
@@ -197,6 +202,23 @@ const CATEGORY_TAG_TYPES: Record<string, 'danger' | 'info' | 'primary' | 'succes
   risk_strategy: 'danger',
 };
 
+const VALID_TAGS_BY_CATEGORY: Record<string, string[]> = {
+  asset: ['general', 'stock', 'index', 'convertible_bond', 'fund', 'bank_stock', 'low_price_stock', 'large_cap_stock', 'small_cap_stock'],
+  price: ['price_rise', 'price_drop', 'sideways', 'near_recent_high', 'near_recent_low', 'breakout', 'pullback', 'gap_up', 'gap_down'],
+  volume: ['volume_expand', 'volume_shrink', 'high_turnover', 'low_turnover', 'volume_price_confirm', 'volume_price_divergence', 'volume_spike', 'volume_dry_up'],
+  trend: ['uptrend', 'downtrend', 'range_bound', 'rebound', 'trend_reversal', 'breakout_from_range', 'failed_breakout'],
+  valuation: ['low_pe', 'high_pe', 'low_pb', 'high_pb', 'high_dividend', 'valuation_repair', 'valuation_trap', 'fundamental_risk'],
+  sentiment: ['market_attention_rise', 'short_term_emotion', 'panic_selling', 'news_driven', 'policy_driven', 'sector_rotation', 'weak_sentiment', 'herding_effect', 'institutional_behavior'],
+  risk_strategy: ['chase_high_risk', 'false_breakout_risk', 'liquidity_risk', 'drawdown_risk', 'valuation_trap_risk', 'overheated_risk', 'risk_control', 'position_control', 'wait_confirm', 'observe_next_day', 'avoid_emotional_trade', 'take_profit_plan', 'stop_loss_plan'],
+};
+
+function emptyScenes(): ScenesData {
+  return {
+    asset: [], price: [], volume: [], trend: [],
+    valuation: [], sentiment: [], risk_strategy: [],
+  };
+}
+
 function currentScenes(chunk: KnowledgeChunk): ScenesData | null {
   const scenes = chunk.metadata?.scenes;
   if (!scenes || typeof scenes !== 'object') return null;
@@ -237,9 +259,14 @@ async function saveEdit() {
   if (!selectedChunk.value || saving.value) return;
   saving.value = true;
   try {
+    const reembed = editText.value !== selectedChunk.value.text;
+    const param: KnowledgeChunkUpdateParam = {
+      text: editText.value,
+      reembed,
+    };
     const updated = await updateKnowledgeChunk(
       selectedChunk.value.id,
-      editText.value,
+      param,
     );
     if (updated) {
       selectedChunk.value = updated;
@@ -250,6 +277,73 @@ async function saveEdit() {
     editText.value = '';
   } finally {
     saving.value = false;
+  }
+}
+
+// ---- 标签编辑 ----
+const editingTags = ref(false);
+const draftScenes = ref<ScenesData | null>(null);
+const savingTags = ref(false);
+
+function startEditTags() {
+  if (!selectedChunk.value) return;
+  const scenes = currentScenes(selectedChunk.value);
+  draftScenes.value = scenes
+    ? JSON.parse(JSON.stringify(scenes))
+    : emptyScenes();
+  editingTags.value = true;
+}
+
+function cancelEditTags() {
+  editingTags.value = false;
+  draftScenes.value = null;
+}
+
+function removeTag(category: string, tag: string) {
+  if (!draftScenes.value) return;
+  const arr = draftScenes.value[category];
+  if (arr) {
+    draftScenes.value[category] = arr.filter((t) => t !== tag);
+  }
+}
+
+function addTag(category: string, tag: string) {
+  if (!draftScenes.value || !tag) return;
+  const arr = draftScenes.value[category];
+  if (arr && !arr.includes(tag)) {
+    arr.push(tag);
+  }
+}
+
+function availableTags(category: string): string[] {
+  if (!draftScenes.value) return [];
+  const existing = draftScenes.value[category] ?? [];
+  return (VALID_TAGS_BY_CATEGORY[category] ?? []).filter(
+    (t) => !existing.includes(t),
+  );
+}
+
+async function saveEditTags() {
+  if (!selectedChunk.value || savingTags.value || !draftScenes.value) return;
+  savingTags.value = true;
+  try {
+    const param: KnowledgeChunkUpdateParam = {
+      scenes: draftScenes.value,
+      reembed: false,
+    };
+    const updated = await updateKnowledgeChunk(
+      selectedChunk.value.id,
+      param,
+    );
+    if (updated) {
+      selectedChunk.value = updated;
+      const idx = chunks.value.findIndex((c) => c.id === updated.id);
+      if (idx !== -1) chunks.value[idx] = updated;
+    }
+    editingTags.value = false;
+    draftScenes.value = null;
+  } finally {
+    savingTags.value = false;
   }
 }
 
@@ -397,33 +491,95 @@ onMounted(async () => {
             />
             <div v-else class="chunk-text">{{ selectedChunk.text }}</div>
 
-            <div v-if="currentScenes(selectedChunk)" class="scenes-section">
-              <div class="scenes-title">场景标签</div>
-              <div
-                v-for="category in Object.keys(SCENE_CATEGORY_LABELS)"
-                :key="category"
-                class="scene-category"
-              >
-                <template
-                  v-if="
-                    currentScenes(selectedChunk)?.[category]?.length
-                  "
+            <div v-if="currentScenes(selectedChunk) || editingTags" class="scenes-section">
+              <div class="scenes-header">
+                <span class="scenes-title">场景标签</span>
+                <template v-if="!editingTags">
+                  <ElButton size="small" type="primary" plain @click="startEditTags">
+                    编辑标签
+                  </ElButton>
+                </template>
+                <template v-else>
+                  <div class="scenes-header-actions">
+                    <ElButton
+                      size="small"
+                      type="success"
+                      :loading="savingTags"
+                      @click="saveEditTags"
+                    >
+                      保存
+                    </ElButton>
+                    <ElButton size="small" @click="cancelEditTags"> 取消 </ElButton>
+                  </div>
+                </template>
+              </div>
+
+              <!-- View mode -->
+              <template v-if="!editingTags">
+                <div
+                  v-for="category in Object.keys(SCENE_CATEGORY_LABELS)"
+                  :key="category"
+                  class="scene-category"
+                >
+                  <template v-if="currentScenes(selectedChunk)?.[category]?.length">
+                    <span class="scene-category-label">
+                      {{ categoryLabel(category) }}
+                    </span>
+                    <ElTag
+                      v-for="tag in currentScenes(selectedChunk)?.[category]"
+                      :key="tag"
+                      size="small"
+                      :type="categoryTagType(category)"
+                      effect="plain"
+                      class="scene-tag"
+                    >
+                      {{ tagLabel(tag) }}
+                    </ElTag>
+                  </template>
+                </div>
+              </template>
+
+              <!-- Edit mode -->
+              <template v-else>
+                <div
+                  v-for="category in Object.keys(VALID_TAGS_BY_CATEGORY)"
+                  :key="category"
+                  class="scene-category scene-category--edit"
                 >
                   <span class="scene-category-label">
                     {{ categoryLabel(category) }}
                   </span>
-                  <ElTag
-                    v-for="tag in currentScenes(selectedChunk)?.[category]"
-                    :key="tag"
-                    size="small"
-                    :type="categoryTagType(category)"
-                    effect="plain"
-                    class="scene-tag"
-                  >
-                    {{ tagLabel(tag) }}
-                  </ElTag>
-                </template>
-              </div>
+                  <div class="scene-tags-row">
+                    <ElTag
+                      v-for="tag in draftScenes?.[category]"
+                      :key="tag"
+                      size="small"
+                      :type="categoryTagType(category)"
+                      effect="plain"
+                      closable
+                      class="scene-tag"
+                      @close="removeTag(category, tag)"
+                    >
+                      {{ tagLabel(tag) }}
+                    </ElTag>
+                    <ElSelect
+                      v-if="availableTags(category).length > 0"
+                      :model-value="''"
+                      size="small"
+                      placeholder="添加标签"
+                      class="scene-tag-select"
+                      @change="(val: string) => addTag(category, val)"
+                    >
+                      <ElOption
+                        v-for="tag in availableTags(category)"
+                        :key="tag"
+                        :label="tagLabel(tag)"
+                        :value="tag"
+                      />
+                    </ElSelect>
+                  </div>
+                </div>
+              </template>
             </div>
 
             <ElDescriptions :column="2" border size="small" class="chunk-meta">
@@ -654,11 +810,23 @@ onMounted(async () => {
   border-radius: 6px;
 }
 
-.scenes-title {
+.scenes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 10px;
+}
+
+.scenes-title {
+  margin-bottom: 0;
   font-size: 14px;
   font-weight: 600;
   color: var(--el-text-color-primary);
+}
+
+.scenes-header-actions {
+  display: flex;
+  gap: 6px;
 }
 
 .scene-category {
@@ -673,15 +841,32 @@ onMounted(async () => {
   margin-bottom: 0;
 }
 
+.scene-category--edit {
+  align-items: flex-start;
+}
+
 .scene-category-label {
   font-size: 12px;
   color: var(--el-text-color-secondary);
   min-width: 80px;
   flex: none;
+  line-height: 24px;
+}
+
+.scene-tags-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
 }
 
 .scene-tag {
   margin: 0;
+}
+
+.scene-tag-select {
+  width: 140px;
 }
 
 .chunk-meta {

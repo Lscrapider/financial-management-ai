@@ -151,6 +151,26 @@ function mergeWithNext(index: number) {
   selectedParagraphNo.value = current.paragraphNo;
 }
 
+function copyParagraph(index: number) {
+  const content = draft.value;
+  if (!content) {
+    return;
+  }
+  const original = content.paragraphs[index];
+  if (!original) {
+    return;
+  }
+  const clone: OcrReviewParagraph = {
+    ...original,
+    sourcePages: [...original.sourcePages],
+    sourceSegments: original.sourceSegments.map((seg) => ({ ...seg })),
+    warnings: original.warnings.map((w) => ({ ...w })),
+  };
+  content.paragraphs.splice(index + 1, 0, clone);
+  renumberParagraphs(content);
+  selectedParagraphNo.value = clone.paragraphNo;
+}
+
 function moveParagraph(index: number, offset: -1 | 1) {
   const content = draft.value;
   if (!content) {
@@ -273,6 +293,7 @@ async function goBack() {
                     {{ Math.round(paragraph.avgConfidence * 100) }}%
                   </ElTag>
                   <span>第 {{ paragraph.sourcePages.join(', ') }} 页</span>
+                  <span>{{ paragraph.text.length }} 字</span>
                 </div>
                 <ElInput
                   v-model="paragraph.text"
@@ -315,6 +336,13 @@ async function goBack() {
                       @click.stop="mergeWithNext(index)"
                     >
                       合并
+                    </ElButton>
+                    <ElButton
+                      link
+                      type="primary"
+                      @click.stop="copyParagraph(index)"
+                    >
+                      复制
                     </ElButton>
                     <ElButton link type="danger" @click.stop="removeParagraph(index)">
                       删除

@@ -2,6 +2,7 @@ package com.scrapider.finance.manage;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.scrapider.finance.domain.po.KnowledgeVectorPO;
 import com.scrapider.finance.mapper.KnowledgeVectorMapper;
 import java.time.OffsetDateTime;
@@ -35,6 +36,13 @@ public class KnowledgeVectorManage extends ServiceImpl<KnowledgeVectorMapper, Kn
         this.lambdaUpdate()
                 .eq(KnowledgeVectorPO::getId, id)
                 .set(KnowledgeVectorPO::getText, newText)
+                .update();
+    }
+
+    public void updateMetadata(Long id, JsonNode metadata) {
+        this.lambdaUpdate()
+                .eq(KnowledgeVectorPO::getId, id)
+                .set(KnowledgeVectorPO::getMetadata, metadata)
                 .update();
     }
 

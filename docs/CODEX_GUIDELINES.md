@@ -79,3 +79,4 @@ Controller -> Service -> Manage / API / Mapper -> Domain
 16. 未使用到的代码要及时删除，包括未使用的类、方法、字段、局部变量、import、配置项和依赖；不要为“以后可能用到”保留死代码。
 17. 分页查询接口使用 `pageSize` 和 `pageNum`，查询类接口使用 GET，提交类接口使用 POST。
 18. `Controller` 中不要编写局部 `@ExceptionHandler`。异常必须由模块级或全局 `@RestControllerAdvice` 统一处理，并且异常处理器必须使用日志打印异常对象，保留完整堆栈，避免吞掉真实报错原因。
+19. `Controller` 接收请求体必须使用 `domain/param` 包下的 Param 对象，不得使用 `Map`、`JsonNode` 等弱类型接收请求参数。

@@ -62,10 +62,19 @@ export function getKnowledgeChunkDetail(id: number) {
   });
 }
 
-export function updateKnowledgeChunk(id: number, text: string) {
+export interface KnowledgeChunkUpdateParam {
+  reembed?: boolean;
+  scenes?: ScenesData;
+  text?: string;
+}
+
+export function updateKnowledgeChunk(
+  id: number,
+  param: KnowledgeChunkUpdateParam,
+) {
   return requestClient.put<KnowledgeChunk>(
     `/knowledge/chunks/${id}`,
-    { text },
+    param,
     {
       responseReturn: 'body',
     },
