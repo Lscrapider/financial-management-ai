@@ -46,7 +46,7 @@ backend-java/finance-ai/
 | `GET /api/ai/console/overview` | 查询 AI 控制台总览。 |
 | `GET /api/ai/console/visit-trends` | 查询应用访问趋势。 |
 
-详细参数和返回字段见根目录 `API_DOCUMENTATION.md`。
+详细参数和返回字段见 `docs/API_DOCUMENTATION.md`。
 
 ## Chat 处理流程
 

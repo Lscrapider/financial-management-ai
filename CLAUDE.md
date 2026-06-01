@@ -2,11 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-编写代码前请先阅读 [AGENTS.md](AGENTS.md) 和 [CODEX_GUIDELINES.md](CODEX_GUIDELINES.md)，并遵循其中的要求。项目文档使用中文。非 trivial 实现任务请使用 `karpathy-guidelines` skill。
+编写代码前请先阅读 [AGENTS.md](AGENTS.md) 和 [docs/CODEX_GUIDELINES.md](docs/CODEX_GUIDELINES.md)，并遵循其中的要求。项目文档使用中文。非 trivial 实现任务请使用 `karpathy-guidelines` skill。
 
 ## 项目概览
 
-理财分析 AI 系统，Java + Python + Vue 混合架构。Java Spring Boot 负责业务系统、任务调度、接口聚合；Python FastAPI/RabbitMQ worker 负责 AI 计算（OCR、Embedding、向量检索）；Vue 3 (Vben Admin v5) 负责前端展示；PostgreSQL + pgvector + InfluxDB 负责存储。
+理财分析 AI 系统，Java + Python + Vue 混合架构。Java Spring Boot 负责业务系统、任务调度、接口聚合；Python RabbitMQ worker 负责 AI 计算（OCR、Embedding、向量检索、LLM 打标）；Vue 3 (Vben Admin v5) 负责前端展示；PostgreSQL + pgvector + InfluxDB 负责存储。
 
 ## 常用命令
 
@@ -118,7 +118,7 @@ docker compose -f docker/docker-compose.yml up --build finance-service  # 构建
 
 ### OCR 流程
 
-见根目录 [OCR_PIPELINE.md](OCR_PIPELINE.md)。5 个阶段通过 RabbitMQ 串联，Java 负责上传/复核入口，Python 负责标准化/识别/清洗/向量索引。
+见 [docs/OCR_PIPELINE.md](docs/OCR_PIPELINE.md)。8 个阶段通过 RabbitMQ 串联，Java 负责上传/复核入口，Python 负责标准化/识别/清洗/打标/回正/向量索引。
 
 ## 环境变量
 

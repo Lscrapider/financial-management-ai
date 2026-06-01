@@ -9,25 +9,25 @@
 项目采用 Java、Python、Vue 混合架构：
 
 - Java Spring Boot 负责核心业务系统、权限、任务调度、数据编排、接口聚合和后端管理能力。
-- Python FastAPI 负责模型微调、Embedding、向量检索、AI 推理等复杂 AI 计算能力。
+- Python RabbitMQ Worker 负责模型微调、Embedding、向量检索、AI 推理等复杂 AI 计算能力，通过消息队列进行异步处理。
 - Vue 负责前端展示，包括股市行情看板、分析结果展示、知识库管理和任务状态查看。
 - PostgreSQL 负责业务数据、行情数据、结构化分析结果和向量化数据存储。
 - Docker 负责项目整体部署和本地开发环境编排。
 
 ## 文档索引
 
-根目录文档按用途拆分：
+项目文档统一放在 `docs/` 目录：
 
 | 文档 | 说明 |
 | --- | --- |
-| [REPORT_PIPELINE.md](./REPORT_PIPELINE.md) | AI 分析报告全链路实现说明。 |
-| [架构图.png](./架构图.png) | 系统架构图。 |
-| [report流程图.png](./report流程图.png) | 分析报告流程图。 |
-| [OCR_PIPELINE.md](./OCR_PIPELINE.md) | OCR 全链路实现说明，包括 Java/Python 边界、RabbitMQ 队列、阶段消息、MinIO 产物、人工复核、chunk 规则、软删除和向量入库。 |
-| [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) | 后端接口文档，记录主要 API 的请求方式、请求参数和响应结构。 |
-| [COMPLETED_REQUIREMENTS.md](./COMPLETED_REQUIREMENTS.md) | 已完成需求记录，用于追踪阶段性功能交付情况。 |
-| [CODEX_GUIDELINES.md](./CODEX_GUIDELINES.md) | Codex 在本仓库写代码、改代码和审查代码时需要遵守的协作与代码规范。 |
-| [AGENTS.md](./AGENTS.md) | Agent 入口说明，要求修改代码前先阅读 `CODEX_GUIDELINES.md`。 |
+| [docs/REPORT_PIPELINE.md](./docs/REPORT_PIPELINE.md) | AI 分析报告全链路实现说明。 |
+| [docs/架构图.png](./docs/架构图.png) | 系统架构图。 |
+| [docs/report流程图.png](./docs/report流程图.png) | 分析报告流程图。 |
+| [docs/OCR_PIPELINE.md](./docs/OCR_PIPELINE.md) | OCR 全链路实现说明，包括 Java/Python 边界、RabbitMQ 队列、阶段消息、MinIO 产物、人工复核、chunk 打标、软删除和向量入库。 |
+| [docs/API_DOCUMENTATION.md](./docs/API_DOCUMENTATION.md) | 后端接口文档，记录主要 API 的请求方式、请求参数和响应结构。 |
+| [docs/COMPLETED_REQUIREMENTS.md](./docs/COMPLETED_REQUIREMENTS.md) | 已完成需求记录，用于追踪阶段性功能交付情况。 |
+| [docs/CODEX_GUIDELINES.md](./docs/CODEX_GUIDELINES.md) | 写代码、改代码和审查代码时需要遵守的协作与代码规范。 |
+| [docs/chunk入库打标签文档.md](./docs/chunk入库打标签文档.md) | Chunk 场景标签规则和 LLM 打标方案。 |
 
 模块内文档：
 
@@ -38,7 +38,6 @@
 | [backend-java/finance-service/README.md](./backend-java/finance-service/README.md) | Java 主服务说明。 |
 | [database/README.md](./database/README.md) | 数据库和迁移脚本说明。 |
 | [frontend-vue/README.md](./frontend-vue/README.md) | 前端工程说明。 |
-| [ai-python/app/ocr/OCR_PIPELINE.md](./ai-python/app/ocr/OCR_PIPELINE.md) | OCR 旧路径跳转文件，实际内容以根目录 `OCR_PIPELINE.md` 为准。 |
 
 ## 核心目标
 
@@ -64,10 +63,10 @@
 ### AI 服务
 
 - Python 3.11+
-- FastAPI + Uvicorn
-- RabbitMQ worker（消息队列消费者）
+- RabbitMQ worker（消息队列消费者，全异步处理）
 - Sentence Transformers / Embedding 模型
 - OCR 大模型接口（阿里云 DashScope `qwen-vl-ocr-latest`）
+- LLM 接口（DeepSeek V4 Pro，场景标签生成）
 
 ### 前端
 
@@ -112,10 +111,12 @@ financial-management-ai/
 ├── .gitignore                        # Git 忽略规则
 ├── pom.xml                           # Maven 聚合工程配置
 ├── docs/                             # 项目文档
-│   ├── architecture.md               # 系统架构设计
-│   ├── api.md                        # 接口文档
-│   ├── database.md                   # 数据库设计
-│   └── ai-workflow.md                # AI 处理流程说明
+│   ├── OCR_PIPELINE.md               # OCR 全链路说明
+│   ├── REPORT_PIPELINE.md            # AI 分析报告流程
+│   ├── API_DOCUMENTATION.md          # 接口文档
+│   ├── CODEX_GUIDELINES.md           # 代码规范
+│   ├── COMPLETED_REQUIREMENTS.md     # 已完成需求记录
+│   └── chunk入库打标签文档.md         # 场景标签方案
 ├── backend-java/                     # Java 后端聚合目录
 │   ├── pom.xml                       # Java 后端聚合工程配置
 │   ├── finance-service/              # 主业务 Java 服务
@@ -139,13 +140,10 @@ financial-management-ai/
 │       └── src/
 ├── ai-python/                        # Python AI 服务
 │   ├── app/
-│   │   ├── api/                      # FastAPI 路由
-│   │   ├── core/                     # 配置、日志、通用能力
-│   │   ├── embeddings/               # Embedding 生成逻辑
-│   │   ├── retrieval/                # 向量检索逻辑
-│   │   ├── ocr/                      # 扫描件 OCR 处理
-│   │   ├── models/                   # 模型加载、微调、推理
-│   │   └── schemas/                  # 请求和响应结构
+│   │   ├── core/                     # 配置、日志
+│   │   ├── ocr/                      # OCR 处理（engines/handlers/services）
+│   │   ├── messaging/                # RabbitMQ 消息通信
+│   │   └── worker/                   # Worker 启动入口
 │   ├── tests/                        # Python 测试代码
 │   ├── requirements.txt              # Python 依赖
 │   └── README.md                     # AI 服务说明
@@ -224,9 +222,9 @@ Java 定时任务 / 数据同步服务
   ↓
 PostgreSQL 结构化存储
   ↓
-Java 调用 Python AI 服务
+Java 发布消息到 RabbitMQ
   ↓
-Python 执行 Embedding 检索与模型推理
+Python Worker 消费消息执行 AI 计算（Embedding / OCR / LLM 推理）
   ↓
 返回结构化分析结果
   ↓
@@ -248,6 +246,12 @@ OCR 识别
   ↓
 人工复核
   ↓
+规则打标
+  ↓
+LLM 打标
+  ↓
+标签回正
+  ↓
 Embedding 向量化
   ↓
 写入 PostgreSQL pgvector
@@ -255,7 +259,7 @@ Embedding 向量化
 用于 AI 检索增强分析
 ```
 
-OCR 详细阶段、消息体、产物目录和人工复核规则见 [OCR_PIPELINE.md](./OCR_PIPELINE.md)。
+OCR 详细阶段、消息体、产物目录和人工复核规则见 [docs/OCR_PIPELINE.md](./docs/OCR_PIPELINE.md)。
 
 ## 结构化分析结果示例
 
@@ -299,16 +303,18 @@ OCR 详细阶段、消息体、产物目录和人工复核规则见 [OCR_PIPELIN
 ## 后续建设计划
 
 1. ✅ 初始化 Java Spring Boot 项目。
-2. ✅ 初始化 Python FastAPI / RabbitMQ Worker 项目。
+2. ✅ 初始化 Python RabbitMQ Worker 项目。
 3. ✅ 初始化 Vue 3 前端项目。
 4. ✅ 配置 PostgreSQL 和 pgvector。
 5. ✅ 设计行情数据表、知识库表、向量表和分析结果表。
 6. ✅ 接入股票/指数/可转债行情 API。
-7. ✅ 完成扫描件 OCR 到向量库的全链路处理。
+7. ✅ 完成扫描件 OCR 到向量库的全链路处理（8 阶段 RabbitMQ 串联）。
 8. ✅ 完成 AI Chat 结构化分析接口。
 9. ✅ 完成前端行情展示（行情总览/指数行情/可转债行情/投资观察池）。
 10. ✅ 完成 AI 中心（知识库处理队列 + 人工复核）。
 11. ✅ 完成知识库浏览、股票预警、控制台指标。
-12. 完成投资分析建议生成与展示。
-13. 增加更多财务指标数据源。
-14. 优化 AI Chat 上下文策略和反问能力。
+12. ✅ 完成 Chunk 场景标签系统（规则打标 → LLM 打标 → 标签回正）。
+13. ✅ 完成知识库页面场景标签展示。
+14. 完成投资分析报告生成与展示。
+15. 增加更多财务指标数据源。
+16. 优化 AI Chat 上下文策略和反问能力。

@@ -102,7 +102,7 @@ backend-java/finance-service/src/main/resources/application.yml
 - `/api/ai/token-usage/**`：AI Token 用量记录与统计。
 - `/api/ai/console/**`：AI 控制台概览和访问趋势。
 
-根目录的 `API_DOCUMENTATION.md` 对接口参数和返回结构做了集中说明。
+`docs/API_DOCUMENTATION.md` 对接口参数和返回结构做了集中说明。
 
 ## 权限规则
 

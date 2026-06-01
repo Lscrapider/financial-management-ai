@@ -139,8 +139,8 @@
 - 已新增 `finance-data` README。
 - 已补充 `finance-ai` README。
 - 已补充数据库 README 和 InfluxDB README。
-- 已新增根目录接口文档 `API_DOCUMENTATION.md`。
-- 已新增根目录已完成需求文档 `COMPLETED_REQUIREMENTS.md`。
+- 已新增接口文档 `docs/API_DOCUMENTATION.md`。
+- 已新增已完成需求文档 `docs/COMPLETED_REQUIREMENTS.md`。
 ## 后续步骤待定
 
 第一阶段：结构化分析报告

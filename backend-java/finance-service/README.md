@@ -48,7 +48,7 @@ backend-java/finance-service/
 | 指数 | `/api/indices/**` | 指数最新行情列表、指数日 K。 |
 | AI | `/api/ai/**` | 由 `finance-ai` 提供，随主应用启动后暴露，包括 Chat、OCR、Token 用量和控制台指标。 |
 
-根目录 `API_DOCUMENTATION.md` 中维护了接口级参数和返回字段说明。
+`docs/API_DOCUMENTATION.md` 中维护了接口级参数和返回字段说明。
 
 ## 权限规则
 

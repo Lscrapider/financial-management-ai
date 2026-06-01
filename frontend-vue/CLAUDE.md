@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-编写代码前请先阅读上级目录的 [AGENTS.md](../AGENTS.md) 和 [CODEX_GUIDELINES.md](../CODEX_GUIDELINES.md)，并遵循其中的要求。项目文档使用中文。非 trivial 实现任务请使用 `karpathy-guidelines` skill。
+编写代码前请先阅读上级目录的 [AGENTS.md](../AGENTS.md) 和 [docs/CODEX_GUIDELINES.md](../docs/CODEX_GUIDELINES.md)，并遵循其中的要求。项目文档使用中文。非 trivial 实现任务请使用 `karpathy-guidelines` skill。
 
 ## 常用命令
 
