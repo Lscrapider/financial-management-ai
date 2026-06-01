@@ -22,6 +22,7 @@
 - 已创建应用访问日志表 `app_visit_log`。
 - 已创建 OCR 识别任务表 `ocr_task`、阶段记录表 `ocr_task_stage`、复核表 `ocr_review`。
 - 已创建知识库向量表 `knowledge_vector`。
+- 已为 OCR 任务增加来源类型字段 `source_type`，用于区分文件 OCR 和手动文本导入。
 - 已提供默认关注股票和核心指数种子数据。
 - 已注册 MyBatis-Plus 分页插件 `MybatisPlusConfig`。
 
@@ -102,8 +103,12 @@
 
 - 已实现知识库分页查询接口 `GET /api/knowledge/chunks`。
 - 已实现知识库统计接口 `GET /api/knowledge/stats`。
-- 已实现单条文本编辑接口 `PUT /api/knowledge/chunks/{id}`。
-- 已实现前端知识库浏览页面（分页列表 + 详情 + 编辑）。
+- 已实现知识库概览接口 `GET /api/knowledge/overview`，返回总量统计和 7 大类场景标签分布。
+- 已实现知识库详情接口 `GET /api/knowledge/chunks/{id}`。
+- 已支持知识库分页按文件名、来源类型、场景大类和场景标签过滤。
+- 已实现单条文本、场景标签编辑接口 `PUT /api/knowledge/chunks/{id}`，支持按需发布单 chunk 重嵌入消息。
+- 已实现前端知识库浏览页面（分页列表 + 标签过滤 + 详情 + 编辑）。
+- 已实现前端知识库概览页面，展示任务数、chunk 数、文本长度和标签分布。
 - 已支持 chunk 按 taskNo/chunkIndex 排序展示。
 
 ## 批量同步优化
@@ -122,7 +127,14 @@
 - 已支持将上传文件保存到 MinIO 对象存储。
 - 已支持创建 `ready` 状态 OCR 任务，发布第一阶段 RabbitMQ 消息。
 - 已实现 OCR 任务分页查询、软删除。
-- 已实现 5 阶段 RabbitMQ 串联：文档标准化 → OCR 识别 → 文本清洗 → 人工复核 → 向量入库。
+- 已实现 8 阶段 RabbitMQ 串联：文档标准化 → OCR 识别 → 文本清洗 → 人工复核 → 规则标签 → LLM 标签 → 标签回正 → 向量入库。
+
+## 手动知识导入
+
+- 已实现手动知识导入任务创建、分页查询、详情查询、草稿保存、提交和软删除接口。
+- 已支持通过 `ocr_task.source_type = manual_text` 与文件 OCR 任务隔离。
+- 已支持手动文本跳过文档标准化、OCR 识别和文本清洗，直接进入场景打标、标签回正和向量入库流程。
+- 已实现前端手动知识导入页面，并在 AI 中心中与 OCR 文件任务分开展示。
 
 ## 本地运行与配置
 

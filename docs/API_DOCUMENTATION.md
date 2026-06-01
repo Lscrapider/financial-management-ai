@@ -309,6 +309,17 @@
 
 `GET /api/knowledge/chunks?pageNum=1&pageSize=20`
 
+查询参数：
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+| --- | --- | --- | --- | --- |
+| `pageNum` | number | 否 | `1` | 页码 |
+| `pageSize` | number | 否 | `20` | 每页条数，最大 `200` |
+| `filename` | string | 否 | 无 | 按 OCR 原始文件名模糊过滤 |
+| `sourceType` | string | 否 | 无 | 来源过滤，常用值：`ocr`、`manual_text` |
+| `category` | string | 否 | 无 | 场景大类过滤，可选：`asset`、`price`、`volume`、`trend`、`valuation`、`sentiment`、`risk_strategy` |
+| `tag` | string | 否 | 无 | 场景标签过滤，支持逗号分隔多个标签；传 `category` 时只在该大类下匹配，不传则跨所有大类匹配 |
+
 返回 `KnowledgeChunkPageVO`。
 
 ### 统计
@@ -317,11 +328,48 @@
 
 返回：`taskCount`、`chunkCount`、`totalTextLength`、`latestCreatedAt`。
 
+### 概览
+
+`GET /api/knowledge/overview`
+
+返回：`taskCount`、`chunkCount`、`totalTextLength`、`latestCreatedAt`、`tagDistributions`。
+
+`tagDistributions` 元素：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `categoryKey` | string | 场景大类 |
+| `tags` | array | 该大类下所有白名单标签的统计 |
+
+`tags` 元素：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `categoryKey` | string | 场景大类 |
+| `tagKey` | string | 标签 key |
+| `count` | number | 命中该标签的 chunk 数 |
+| `categoryPercentage` | number | 在当前大类命中标签总数中的占比 |
+| `totalPercentage` | number | 在全部 chunk 中的占比 |
+
+### 查询详情
+
+`GET /api/knowledge/chunks/{id}`
+
+返回单条 `KnowledgeChunkVO`，包含文本、来源任务、页码、段落号、原始文件名和 `metadata.scenes`。
+
 ### 更新文本
 
 `PUT /api/knowledge/chunks/{id}`
 
-请求体：`{ "text": "新文本内容" }`，返回更新后的 `KnowledgeChunkVO`。
+请求体：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `text` | string | 否 | 新文本内容，非空时更新 chunk 文本 |
+| `scenes` | object | 否 | 新场景标签，key 必须是 7 大类之一，标签必须在白名单内 |
+| `reembed` | boolean | 否 | 更新文本后是否发布单 chunk 重嵌入消息 |
+
+返回更新后的 `KnowledgeChunkVO`。
 
 ## AI Chat
 
