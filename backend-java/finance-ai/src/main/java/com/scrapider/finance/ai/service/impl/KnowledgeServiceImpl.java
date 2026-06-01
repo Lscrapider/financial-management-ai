@@ -15,6 +15,7 @@ import com.scrapider.finance.domain.po.OcrTaskPO;
 import com.scrapider.finance.manage.KnowledgeVectorManage;
 import com.scrapider.finance.manage.OcrTaskManage;
 import java.time.OffsetDateTime;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -80,7 +81,8 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     }
 
     @Override
-    public KnowledgeChunkPageVO pageChunks(int pageNum, int pageSize, String filename, String sourceType) {
+    public KnowledgeChunkPageVO pageChunks(int pageNum, int pageSize, String filename, String sourceType,
+            String category, String tag) {
         int pn = Math.max(pageNum, DEFAULT_PAGE_NUM);
         int ps = Math.max(1, Math.min(pageSize, MAX_PAGE_SIZE));
         Set<String> taskNos = null;
@@ -108,7 +110,30 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                 }
             }
         }
-        Page<KnowledgeVectorPO> page = this.knowledgeVectorManage.pageChunks(pn, ps, taskNos);
+        String trimmedCategory = category != null ? category.trim() : null;
+        if (trimmedCategory != null && !trimmedCategory.isBlank() && !ALLOWED_CATEGORIES.contains(trimmedCategory)) {
+            throw new IllegalArgumentException("未知的场景类别: " + trimmedCategory);
+        }
+        List<String> tags = null;
+        if (tag != null && !tag.isBlank()) {
+            tags = Arrays.stream(tag.split(","))
+                    .map(String::trim)
+                    .filter(t -> !t.isBlank())
+                    .toList();
+            for (String t : tags) {
+                boolean valid;
+                if (trimmedCategory != null && !trimmedCategory.isBlank()) {
+                    valid = VALID_TAGS.getOrDefault(trimmedCategory, Set.of()).contains(t);
+                } else {
+                    valid = VALID_TAGS.values().stream().anyMatch(s -> s.contains(t));
+                }
+                if (!valid) {
+                    throw new IllegalArgumentException("未知的标签: " + t);
+                }
+            }
+        }
+        Page<KnowledgeVectorPO> page = this.knowledgeVectorManage.pageChunks(
+                pn, ps, taskNos, trimmedCategory, tags);
         Map<String, String> filenameMap = this.filenameMap(page);
         return KnowledgeChunkPageVO.fromPage(page, filenameMap);
     }

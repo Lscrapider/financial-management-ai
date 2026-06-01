@@ -47,6 +47,8 @@ const pageSize = ref(20);
 const total = ref(0);
 const searchFilename = ref('');
 const searchSourceType = ref('');
+const searchCategory = ref('');
+const searchTag = ref<string[]>([]);
 
 const formatNumber = (n: number) => n.toLocaleString();
 
@@ -74,6 +76,8 @@ async function fetchChunks() {
       pageSize.value,
       searchFilename.value || undefined,
       searchSourceType.value || undefined,
+      searchCategory.value || undefined,
+      searchTag.value.length > 0 ? searchTag.value.join(',') : undefined,
     );
     if (data) {
       chunks.value = data.records;
@@ -93,6 +97,16 @@ function handleClearSearch() {
   searchFilename.value = '';
   pageNum.value = 1;
   void fetchChunks();
+}
+
+function handleCategoryChange() {
+  searchTag.value = [];
+  void handleSearch();
+}
+
+function availableFilterTags(): string[] {
+  if (!searchCategory.value) return [];
+  return VALID_TAGS_BY_CATEGORY[searchCategory.value] ?? [];
 }
 
 function selectChunk(chunk: KnowledgeChunk | undefined) {
@@ -416,18 +430,50 @@ onMounted(async () => {
                     placeholder="来源类型"
                     clearable
                     size="small"
-                    style="width: 130px"
+                    style="width: 120px"
                     @change="handleSearch"
                   >
                     <ElOption label="OCR" value="ocr" />
                     <ElOption label="手动导入" value="manual_text" />
+                  </ElSelect>
+                  <ElSelect
+                    v-model="searchCategory"
+                    placeholder="场景类别"
+                    clearable
+                    size="small"
+                    style="width: 120px"
+                    @change="handleCategoryChange"
+                  >
+                    <ElOption
+                      v-for="(label, key) in SCENE_CATEGORY_LABELS"
+                      :key="key"
+                      :label="label"
+                      :value="key"
+                    />
+                  </ElSelect>
+                  <ElSelect
+                    v-model="searchTag"
+                    placeholder="标签"
+                    clearable
+                    multiple
+                    size="small"
+                    style="width: 160px"
+                    :disabled="!searchCategory"
+                    @change="handleSearch"
+                  >
+                    <ElOption
+                      v-for="tag in availableFilterTags()"
+                      :key="tag"
+                      :label="TAG_LABELS[tag] ?? tag"
+                      :value="tag"
+                    />
                   </ElSelect>
                   <ElInput
                     v-model="searchFilename"
                     placeholder="搜索文档名称..."
                     clearable
                     size="small"
-                    style="width: 200px"
+                    style="width: 180px"
                     @clear="handleClearSearch"
                     @keyup.enter="handleSearch"
                   />

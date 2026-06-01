@@ -49,9 +49,9 @@ export function getKnowledgeStats() {
   });
 }
 
-export function getKnowledgeChunks(pageNum = 1, pageSize = 20, filename?: string, sourceType?: string) {
+export function getKnowledgeChunks(pageNum = 1, pageSize = 20, filename?: string, sourceType?: string, category?: string, tag?: string) {
   return requestClient.get<KnowledgeChunkPage>('/knowledge/chunks', {
-    params: { pageNum, pageSize, filename, sourceType },
+    params: { pageNum, pageSize, filename, sourceType, category, tag },
     responseReturn: 'body',
   });
 }

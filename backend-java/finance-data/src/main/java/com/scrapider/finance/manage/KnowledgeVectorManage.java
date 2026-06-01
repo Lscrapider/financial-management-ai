@@ -7,6 +7,7 @@ import com.scrapider.finance.domain.po.KnowledgeVectorPO;
 import com.scrapider.finance.mapper.KnowledgeVectorMapper;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Service;
@@ -14,12 +15,40 @@ import org.springframework.stereotype.Service;
 @Service
 public class KnowledgeVectorManage extends ServiceImpl<KnowledgeVectorMapper, KnowledgeVectorPO> {
 
-    public Page<KnowledgeVectorPO> pageChunks(int pageNum, int pageSize, Set<String> taskNos) {
-        return this.lambdaQuery()
+    public Page<KnowledgeVectorPO> pageChunks(int pageNum, int pageSize, Set<String> taskNos,
+            String category, List<String> tags) {
+        var query = this.lambdaQuery()
                 .in(taskNos != null && !taskNos.isEmpty(), KnowledgeVectorPO::getTaskNo, taskNos)
                 .orderByAsc(KnowledgeVectorPO::getTaskNo)
-                .orderByAsc(KnowledgeVectorPO::getChunkIndex)
-                .page(Page.of(pageNum, pageSize));
+                .orderByAsc(KnowledgeVectorPO::getChunkIndex);
+        if (tags != null && !tags.isEmpty()) {
+            List<String> safeTags = tags.stream().filter(t -> t != null && !t.isBlank()).toList();
+            if (!safeTags.isEmpty()) {
+                if (category != null && !category.isBlank()) {
+                    StringBuilder sql = new StringBuilder("(");
+                    Object[] params = new Object[safeTags.size() + 1];
+                    params[0] = category;
+                    for (int i = 0; i < safeTags.size(); i++) {
+                        if (i > 0) sql.append(" OR ");
+                        sql.append("metadata -> 'scenes' -> {0} @> jsonb_build_array({")
+                                .append(i + 1).append("})");
+                        params[i + 1] = safeTags.get(i);
+                    }
+                    sql.append(")");
+                    query.apply(sql.toString(), params);
+                } else {
+                    StringBuilder sql = new StringBuilder(
+                            "EXISTS (SELECT 1 FROM jsonb_each(metadata -> 'scenes') AS sc WHERE ");
+                    for (int i = 0; i < safeTags.size(); i++) {
+                        if (i > 0) sql.append(" OR ");
+                        sql.append("sc.value @> jsonb_build_array({").append(i).append("})");
+                    }
+                    sql.append(")");
+                    query.apply(sql.toString(), safeTags.toArray());
+                }
+            }
+        }
+        return query.page(Page.of(pageNum, pageSize));
     }
 
     public KnowledgeVectorPO findById(Long id) {
