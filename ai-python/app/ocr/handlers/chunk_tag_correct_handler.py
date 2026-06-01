@@ -58,6 +58,19 @@ class ChunkTagCorrectHandler(MessageHandler):
             input_message=message.body,
             input_ref={},
         )
+        chunk = message.body.get("chunk") or {}
+        chunk_id = chunk.get("chunkId") or ""
+        chunk_index = int(chunk.get("chunkIndex") or 0)
+        self._repository.start_chunk_stage(
+            task_no=message.task_no,
+            stage=STAGE_CHUNK_TAG_CORRECT,
+            chunk_id=chunk_id,
+            chunk_index=chunk_index,
+            attempt=message.attempt,
+            max_attempts=self._max_attempts,
+            input_message=message.body,
+            input_ref={},
+        )
 
         try:
             chunk_result = self._corrector.correct(message.body)
@@ -70,10 +83,30 @@ class ChunkTagCorrectHandler(MessageHandler):
                 str(exc),
                 mark_task_failed=message.attempt >= self._max_attempts,
             )
+            self._repository.fail_chunk_stage(
+                message.task_no,
+                STAGE_CHUNK_TAG_CORRECT,
+                chunk_id,
+                str(exc),
+            )
             raise
 
-        chunk_id = chunk_result.get("chunkId") or ""
         if not aggregation.ready:
+            self._repository.finish_chunk_stage(
+                task_no=message.task_no,
+                stage=STAGE_CHUNK_TAG_CORRECT,
+                chunk_id=chunk_id,
+                output_ref={},
+                output_message={
+                    "taskNo": message.task_no,
+                    "stage": STAGE_CHUNK_TAG_CORRECT,
+                    "chunkId": chunk_id,
+                    "aggregationReady": False,
+                },
+                metrics={
+                    "aggregationReady": False,
+                },
+            )
             logger.info("chunk tag correct pending task_no=%s chunk_id=%s", message.task_no, chunk_id)
             return HandlerResult()
 
@@ -94,12 +127,36 @@ class ChunkTagCorrectHandler(MessageHandler):
                     "tagVersion": self._tag_version(message.body),
                 },
             )
+            self._repository.finish_chunk_stage(
+                task_no=message.task_no,
+                stage=STAGE_CHUNK_TAG_CORRECT,
+                chunk_id=chunk_id,
+                output_ref=output_ref,
+                output_message={
+                    "taskNo": message.task_no,
+                    "stage": STAGE_CHUNK_TAG_CORRECT,
+                    "chunkId": chunk_id,
+                    "aggregationReady": True,
+                    "embeddingMessage": outgoing_message.body,
+                },
+                metrics={
+                    "aggregationReady": True,
+                    "chunkCount": len(aggregation.chunks),
+                    "tagVersion": self._tag_version(message.body),
+                },
+            )
         except Exception as exc:
             self._repository.fail_stage(
                 message.task_no,
                 STAGE_CHUNK_TAG_CORRECT,
                 str(exc),
                 mark_task_failed=message.attempt >= self._max_attempts,
+            )
+            self._repository.fail_chunk_stage(
+                message.task_no,
+                STAGE_CHUNK_TAG_CORRECT,
+                chunk_id,
+                str(exc),
             )
             raise RetryableMessageError(str(exc)) from exc
         self._aggregator.complete(message.task_no)

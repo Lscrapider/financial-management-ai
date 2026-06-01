@@ -77,6 +77,7 @@ class ChunkRuleTagHandler(MessageHandler):
         output_ref = self._write_result(message, bucket, rule_result)
         output_prefix = self._message_output_prefix(message, output_ref)
         outgoing_messages = self._build_chunk_messages(rule_result, output_prefix)
+        self._finish_rule_chunk_stages(message, rule_result, outgoing_messages)
         output_message = {
             "eventId": str(uuid.uuid4()),
             "taskNo": message.task_no,
@@ -117,6 +118,47 @@ class ChunkRuleTagHandler(MessageHandler):
         return HandlerResult(
             outgoing_messages=outgoing_messages
         )
+
+    def _finish_rule_chunk_stages(
+        self,
+        message: IncomingMessage,
+        rule_result: dict,
+        outgoing_messages: list[OutgoingMessage],
+    ) -> None:
+        output_by_chunk_id = {
+            outgoing.body.get("chunk", {}).get("chunkId"): outgoing.body
+            for outgoing in outgoing_messages
+        }
+        for chunk in rule_result["chunks"]:
+            chunk_id = chunk["chunkId"]
+            chunk_index = int(chunk["chunkIndex"])
+            output_message = output_by_chunk_id.get(chunk_id) or {}
+            self._repository.start_chunk_stage(
+                task_no=message.task_no,
+                stage=STAGE_CHUNK_TAG_RULE,
+                chunk_id=chunk_id,
+                chunk_index=chunk_index,
+                attempt=message.attempt,
+                max_attempts=self._max_attempts,
+                input_message={
+                    "taskNo": message.task_no,
+                    "stage": STAGE_CHUNK_TAG_RULE,
+                    "chunkId": chunk_id,
+                    "chunkIndex": chunk_index,
+                },
+                input_ref=message.body.get("inputRef") or {},
+            )
+            self._repository.finish_chunk_stage(
+                task_no=message.task_no,
+                stage=STAGE_CHUNK_TAG_RULE,
+                chunk_id=chunk_id,
+                output_ref={},
+                output_message=output_message,
+                metrics={
+                    "needLlm": chunk["qualityGate"]["needLlm"],
+                    "tagVersion": rule_result["tagVersion"],
+                },
+            )
 
     def _write_result(self, message: IncomingMessage, fallback_bucket: str, rule_result: dict) -> dict:
         output_prefix = message.body.get("outputPrefix") or {}

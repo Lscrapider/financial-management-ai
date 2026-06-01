@@ -112,6 +112,52 @@ class OcrTaskRepository:
                 )
             connection.commit()
 
+    def start_chunk_stage(
+        self,
+        task_no: str,
+        stage: str,
+        chunk_id: str,
+        chunk_index: int,
+        attempt: int,
+        max_attempts: int,
+        input_message: dict[str, Any],
+        input_ref: dict[str, Any],
+    ) -> None:
+        with psycopg.connect(self._settings.dsn) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO ocr_task_stage (
+                        task_no, stage, chunk_id, chunk_index, status, attempt_count, max_attempts,
+                        input_message, input_ref, error_message, started_at, updated_at
+                    )
+                    VALUES (%s, %s, %s, %s, 'running', %s, %s, %s, %s, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ON CONFLICT (task_no, chunk_id, stage)
+                    WHERE chunk_id IS NOT NULL
+                    DO UPDATE SET
+                        chunk_index = EXCLUDED.chunk_index,
+                        status = 'running',
+                        attempt_count = EXCLUDED.attempt_count,
+                        max_attempts = EXCLUDED.max_attempts,
+                        input_message = EXCLUDED.input_message,
+                        input_ref = EXCLUDED.input_ref,
+                        error_message = NULL,
+                        started_at = CURRENT_TIMESTAMP,
+                        updated_at = CURRENT_TIMESTAMP
+                    """,
+                    (
+                        task_no,
+                        stage,
+                        chunk_id,
+                        chunk_index,
+                        attempt,
+                        max_attempts,
+                        Jsonb(input_message),
+                        Jsonb(input_ref),
+                    ),
+                )
+            connection.commit()
+
     def finish_stage(
         self,
         task_no: str,
@@ -159,6 +205,42 @@ class OcrTaskRepository:
                         Jsonb(metrics),
                         task_no,
                         stage,
+                    ),
+                )
+            connection.commit()
+
+    def finish_chunk_stage(
+        self,
+        task_no: str,
+        stage: str,
+        chunk_id: str,
+        output_ref: dict[str, Any],
+        output_message: dict[str, Any],
+        metrics: dict[str, Any],
+    ) -> None:
+        with psycopg.connect(self._settings.dsn) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE ocr_task_stage
+                    SET status = 'finished',
+                        output_ref = %s,
+                        output_message = %s,
+                        metrics = %s,
+                        error_message = NULL,
+                        finished_at = CURRENT_TIMESTAMP,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE task_no = %s
+                      AND stage = %s
+                      AND chunk_id = %s
+                    """,
+                    (
+                        Jsonb(output_ref),
+                        Jsonb(output_message),
+                        Jsonb(metrics),
+                        task_no,
+                        stage,
+                        chunk_id,
                     ),
                 )
             connection.commit()
@@ -239,5 +321,29 @@ class OcrTaskRepository:
                     WHERE task_no = %s
                     """,
                     (stage, error_message, task_no),
+                )
+            connection.commit()
+
+    def fail_chunk_stage(
+        self,
+        task_no: str,
+        stage: str,
+        chunk_id: str,
+        error_message: str,
+    ) -> None:
+        with psycopg.connect(self._settings.dsn) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE ocr_task_stage
+                    SET status = 'failed',
+                        error_message = %s,
+                        finished_at = CURRENT_TIMESTAMP,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE task_no = %s
+                      AND stage = %s
+                      AND chunk_id = %s
+                    """,
+                    (error_message, task_no, stage, chunk_id),
                 )
             connection.commit()

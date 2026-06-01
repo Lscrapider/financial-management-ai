@@ -167,7 +167,18 @@ class ChunkLlmTagHandler(MessageHandler):
 
         chunk = message.body.get("chunk") or {}
         chunk_id = chunk.get("chunkId", "")
+        chunk_index = int(chunk.get("chunkIndex") or 0)
         rule_tagging = message.body.get("ruleTagging") or {}
+        self._repository.start_chunk_stage(
+            task_no=message.task_no,
+            stage=STAGE_CHUNK_TAG_LLM,
+            chunk_id=chunk_id,
+            chunk_index=chunk_index,
+            attempt=message.attempt,
+            max_attempts=self._max_attempts,
+            input_message=message.body,
+            input_ref={},
+        )
         logger.info(
             "chunk llm tag started task_no=%s chunk_id=%s",
             message.task_no,
@@ -184,6 +195,12 @@ class ChunkLlmTagHandler(MessageHandler):
                 STAGE_CHUNK_TAG_LLM,
                 str(exc),
                 mark_task_failed=message.attempt >= self._max_attempts,
+            )
+            self._repository.fail_chunk_stage(
+                message.task_no,
+                STAGE_CHUNK_TAG_LLM,
+                chunk_id,
+                str(exc),
             )
             raise
 
@@ -210,6 +227,17 @@ class ChunkLlmTagHandler(MessageHandler):
             output_message=output_message,
             metrics={
                 "chunkId": chunk_id,
+                "llmModel": self._settings.model,
+                "tokenUsage": result["usage"],
+            },
+        )
+        self._repository.finish_chunk_stage(
+            task_no=message.task_no,
+            stage=STAGE_CHUNK_TAG_LLM,
+            chunk_id=chunk_id,
+            output_ref={},
+            output_message=outgoing_message.body,
+            metrics={
                 "llmModel": self._settings.model,
                 "tokenUsage": result["usage"],
             },
