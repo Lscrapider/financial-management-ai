@@ -42,10 +42,7 @@ public class KnowledgeVectorManage extends ServiceImpl<KnowledgeVectorMapper, Kn
     }
 
     public void updateMetadata(Long id, JsonNode metadata) {
-        this.lambdaUpdate()
-                .eq(KnowledgeVectorPO::getId, id)
-                .set(KnowledgeVectorPO::getMetadata, metadata)
-                .update();
+        this.baseMapper.updateMetadata(id, metadata.toString());
     }
 
     public Map<String, Object> stats() {
