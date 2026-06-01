@@ -74,6 +74,10 @@ public class KnowledgeVectorManage extends ServiceImpl<KnowledgeVectorMapper, Kn
         this.baseMapper.updateMetadata(id, metadata.toString());
     }
 
+    public List<Map<String, Object>> tagDistribution() {
+        return this.baseMapper.tagDistribution();
+    }
+
     public Map<String, Object> stats() {
         long chunkCount = this.count();
         long taskCount = this.baseMapper.countDistinctTaskNo();

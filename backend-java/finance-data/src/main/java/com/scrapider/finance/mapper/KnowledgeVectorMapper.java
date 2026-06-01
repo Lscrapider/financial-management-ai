@@ -2,6 +2,8 @@ package com.scrapider.finance.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.scrapider.finance.domain.po.KnowledgeVectorPO;
+import java.util.List;
+import java.util.Map;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -18,4 +20,12 @@ public interface KnowledgeVectorMapper extends BaseMapper<KnowledgeVectorPO> {
 
     @Update("UPDATE knowledge_vector SET metadata = #{metadata}::jsonb WHERE id = #{id}")
     int updateMetadata(@Param("id") Long id, @Param("metadata") String metadata);
+
+    @Select("SELECT scenes.key AS category, tag.value AS tag, COUNT(*) AS cnt " +
+            "FROM knowledge_vector, " +
+            "jsonb_each(metadata -> 'scenes') AS scenes, " +
+            "jsonb_array_elements_text(scenes.value) AS tag " +
+            "GROUP BY scenes.key, tag.value " +
+            "ORDER BY scenes.key, cnt DESC")
+    List<Map<String, Object>> tagDistribution();
 }

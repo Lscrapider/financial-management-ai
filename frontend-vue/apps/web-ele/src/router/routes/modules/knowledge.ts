@@ -21,6 +21,15 @@ const routes: RouteRecordRaw[] = [
           title: $t('page.knowledge.base'),
         },
       },
+      {
+        name: 'KnowledgeOverview',
+        path: '/knowledge/overview',
+        component: () => import('#/views/knowledge/overview.vue'),
+        meta: {
+          icon: 'lucide:bar-chart-3',
+          title: $t('page.knowledge.overview'),
+        },
+      },
     ],
   },
 ];

@@ -4,9 +4,12 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.scrapider.finance.ai.domain.dto.KnowledgeReembedMessageDTO;
+import com.scrapider.finance.ai.domain.vo.CategoryTagDistribution;
 import com.scrapider.finance.ai.domain.vo.KnowledgeChunkPageVO;
 import com.scrapider.finance.ai.domain.vo.KnowledgeChunkVO;
+import com.scrapider.finance.ai.domain.vo.KnowledgeOverviewVO;
 import com.scrapider.finance.ai.domain.vo.KnowledgeStatsVO;
+import com.scrapider.finance.ai.domain.vo.TagCount;
 import com.scrapider.finance.ai.service.KnowledgeService;
 import com.scrapider.finance.ai.service.OcrTaskMessagePublisher;
 import com.scrapider.finance.domain.param.KnowledgeChunkUpdateParam;
@@ -15,8 +18,11 @@ import com.scrapider.finance.domain.po.OcrTaskPO;
 import com.scrapider.finance.manage.KnowledgeVectorManage;
 import com.scrapider.finance.manage.OcrTaskManage;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -78,6 +84,58 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                 ((Number) stats.get("chunkCount")).longValue(),
                 ((Number) stats.get("totalTextLength")).longValue(),
                 (OffsetDateTime) stats.get("latestCreatedAt"));
+    }
+
+    @Override
+    public KnowledgeOverviewVO overview() {
+        Map<String, Object> stats = this.knowledgeVectorManage.stats();
+        long taskCount = ((Number) stats.get("taskCount")).longValue();
+        long chunkCount = ((Number) stats.get("chunkCount")).longValue();
+        long totalTextLength = ((Number) stats.get("totalTextLength")).longValue();
+        OffsetDateTime latestCreatedAt = (OffsetDateTime) stats.get("latestCreatedAt");
+
+        List<Map<String, Object>> rawRows = this.knowledgeVectorManage.tagDistribution();
+
+        Map<String, List<Map<String, Object>>> grouped = rawRows.stream()
+                .collect(Collectors.groupingBy(
+                        row -> (String) row.get("category"),
+                        LinkedHashMap::new,
+                        Collectors.toList()));
+
+        Map<String, Long> categoryTotals = new HashMap<>();
+        for (var entry : grouped.entrySet()) {
+            long sum = entry.getValue().stream()
+                    .mapToLong(row -> ((Number) row.get("cnt")).longValue())
+                    .sum();
+            categoryTotals.put(entry.getKey(), sum);
+        }
+
+        List<CategoryTagDistribution> distributions = new ArrayList<>();
+        for (var entry : grouped.entrySet()) {
+            String categoryKey = entry.getKey();
+            long categoryTotal = categoryTotals.get(categoryKey);
+            List<TagCount> tagCounts = entry.getValue().stream()
+                    .map(row -> {
+                        long count = ((Number) row.get("cnt")).longValue();
+                        double catPct = categoryTotal > 0
+                                ? Math.round(count * 10000.0 / categoryTotal) / 100.0
+                                : 0.0;
+                        double totalPct = chunkCount > 0
+                                ? Math.round(count * 10000.0 / chunkCount) / 100.0
+                                : 0.0;
+                        return new TagCount(
+                                categoryKey,
+                                (String) row.get("tag"),
+                                count,
+                                catPct,
+                                totalPct);
+                    })
+                    .toList();
+            distributions.add(new CategoryTagDistribution(categoryKey, tagCounts));
+        }
+
+        return new KnowledgeOverviewVO(
+                taskCount, chunkCount, totalTextLength, latestCreatedAt, distributions);
     }
 
     @Override

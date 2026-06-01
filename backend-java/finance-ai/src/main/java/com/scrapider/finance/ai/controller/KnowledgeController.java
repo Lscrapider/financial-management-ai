@@ -2,6 +2,7 @@ package com.scrapider.finance.ai.controller;
 
 import com.scrapider.finance.ai.domain.vo.KnowledgeChunkPageVO;
 import com.scrapider.finance.ai.domain.vo.KnowledgeChunkVO;
+import com.scrapider.finance.ai.domain.vo.KnowledgeOverviewVO;
 import com.scrapider.finance.ai.domain.vo.KnowledgeStatsVO;
 import com.scrapider.finance.ai.service.KnowledgeService;
 import com.scrapider.finance.domain.param.KnowledgeChunkUpdateParam;
@@ -27,6 +28,11 @@ public class KnowledgeController {
     @GetMapping("/stats")
     public ResponseEntity<KnowledgeStatsVO> stats() {
         return ResponseEntity.ok(this.knowledgeService.stats());
+    }
+
+    @GetMapping("/overview")
+    public ResponseEntity<KnowledgeOverviewVO> overview() {
+        return ResponseEntity.ok(this.knowledgeService.overview());
     }
 
     @GetMapping("/chunks")

@@ -80,3 +80,30 @@ export function updateKnowledgeChunk(
     },
   );
 }
+
+export interface TagCount {
+  categoryKey: string;
+  tagKey: string;
+  count: number;
+  categoryPercentage: number;
+  totalPercentage: number;
+}
+
+export interface CategoryTagDistribution {
+  categoryKey: string;
+  tags: TagCount[];
+}
+
+export interface KnowledgeOverview {
+  taskCount: number;
+  chunkCount: number;
+  totalTextLength: number;
+  latestCreatedAt: string | null;
+  tagDistributions: CategoryTagDistribution[];
+}
+
+export function getKnowledgeOverview() {
+  return requestClient.get<KnowledgeOverview>('/knowledge/overview', {
+    responseReturn: 'body',
+  });
+}

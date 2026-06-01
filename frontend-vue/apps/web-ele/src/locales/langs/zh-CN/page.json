@@ -24,6 +24,7 @@
   },
   "knowledge": {
     "title": "知识库",
+    "overview": "知识库概览",
     "base": "知识库浏览"
   },
   "systemConfig": {

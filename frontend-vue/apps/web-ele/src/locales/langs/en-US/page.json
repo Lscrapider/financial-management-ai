@@ -24,7 +24,8 @@
   },
   "knowledge": {
     "title": "Knowledge Base",
-    "base": "Knowledge Browser"
+    "base": "Knowledge Browser",
+    "overview": "Knowledge Overview"
   },
   "systemConfig": {
     "title": "System Config"
