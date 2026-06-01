@@ -46,6 +46,7 @@ const pageNum = ref(1);
 const pageSize = ref(20);
 const total = ref(0);
 const searchFilename = ref('');
+const searchSourceType = ref('');
 
 const formatNumber = (n: number) => n.toLocaleString();
 
@@ -72,6 +73,7 @@ async function fetchChunks() {
       pageNum.value,
       pageSize.value,
       searchFilename.value || undefined,
+      searchSourceType.value || undefined,
     );
     if (data) {
       chunks.value = data.records;
@@ -408,15 +410,28 @@ onMounted(async () => {
             <template #header>
               <div class="chunk-list-header">
                 <span>知识条目</span>
-                <ElInput
-                  v-model="searchFilename"
-                  placeholder="搜索文档名称..."
-                  clearable
-                  size="small"
-                  style="width: 200px"
-                  @clear="handleClearSearch"
-                  @keyup.enter="handleSearch"
-                />
+                <div class="chunk-list-filters">
+                  <ElSelect
+                    v-model="searchSourceType"
+                    placeholder="来源类型"
+                    clearable
+                    size="small"
+                    style="width: 130px"
+                    @change="handleSearch"
+                  >
+                    <ElOption label="OCR" value="ocr" />
+                    <ElOption label="手动导入" value="manual_text" />
+                  </ElSelect>
+                  <ElInput
+                    v-model="searchFilename"
+                    placeholder="搜索文档名称..."
+                    clearable
+                    size="small"
+                    style="width: 200px"
+                    @clear="handleClearSearch"
+                    @keyup.enter="handleSearch"
+                  />
+                </div>
               </div>
             </template>
             <div v-loading="loading">
@@ -709,6 +724,12 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.chunk-list-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .chunk-list-card {

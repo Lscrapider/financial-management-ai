@@ -18,9 +18,9 @@
   },
   "aiCenter": {
     "title": "AI中心",
-    "knowledgeProcessing": "知识库处理进度",
+    "knowledgeProcessing": "知识库OCR导入",
     "ocrReview": "OCR人工复核",
-    "manualKnowledge": "手动知识导入"
+    "manualKnowledge": "知识库手动导入"
   },
   "knowledge": {
     "title": "知识库",

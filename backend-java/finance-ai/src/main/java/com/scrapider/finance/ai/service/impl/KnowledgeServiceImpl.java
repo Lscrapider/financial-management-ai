@@ -80,17 +80,33 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     }
 
     @Override
-    public KnowledgeChunkPageVO pageChunks(int pageNum, int pageSize, String filename) {
+    public KnowledgeChunkPageVO pageChunks(int pageNum, int pageSize, String filename, String sourceType) {
         int pn = Math.max(pageNum, DEFAULT_PAGE_NUM);
         int ps = Math.max(1, Math.min(pageSize, MAX_PAGE_SIZE));
         Set<String> taskNos = null;
+        if (sourceType != null && !sourceType.isBlank()) {
+            List<String> matched = this.ocrTaskManage.listTaskNosBySourceType(sourceType.trim());
+            if (matched.isEmpty()) {
+                return KnowledgeChunkPageVO.fromPage(
+                        new Page<>(pn, ps), Map.of());
+            }
+            taskNos = new HashSet<>(matched);
+        }
         if (filename != null && !filename.isBlank()) {
             List<String> matched = this.ocrTaskManage.listTaskNosByFilenameLike(filename.trim());
             if (matched.isEmpty()) {
                 return KnowledgeChunkPageVO.fromPage(
                         new Page<>(pn, ps), Map.of());
             }
-            taskNos = new HashSet<>(matched);
+            if (taskNos == null) {
+                taskNos = new HashSet<>(matched);
+            } else {
+                taskNos.retainAll(matched);
+                if (taskNos.isEmpty()) {
+                    return KnowledgeChunkPageVO.fromPage(
+                            new Page<>(pn, ps), Map.of());
+                }
+            }
         }
         Page<KnowledgeVectorPO> page = this.knowledgeVectorManage.pageChunks(pn, ps, taskNos);
         Map<String, String> filenameMap = this.filenameMap(page);

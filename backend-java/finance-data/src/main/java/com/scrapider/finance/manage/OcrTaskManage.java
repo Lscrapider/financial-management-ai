@@ -33,6 +33,17 @@ public class OcrTaskManage extends ServiceImpl<OcrTaskMapper, OcrTaskPO> {
                 .page(Page.of(pageNum, pageSize));
     }
 
+    public List<String> listTaskNosBySourceType(String sourceType) {
+        return this.lambdaQuery()
+                .select(OcrTaskPO::getTaskNo)
+                .eq(OcrTaskPO::getSourceType, sourceType)
+                .isNull(OcrTaskPO::getDeletedAt)
+                .list()
+                .stream()
+                .map(OcrTaskPO::getTaskNo)
+                .toList();
+    }
+
     public List<String> listTaskNosByFilenameLike(String filename) {
         return this.lambdaQuery()
                 .select(OcrTaskPO::getTaskNo)
