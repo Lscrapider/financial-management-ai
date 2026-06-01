@@ -28,6 +28,7 @@
 | [docs/COMPLETED_REQUIREMENTS.md](./docs/COMPLETED_REQUIREMENTS.md) | 已完成需求记录，用于追踪阶段性功能交付情况。 |
 | [docs/CODEX_GUIDELINES.md](./docs/CODEX_GUIDELINES.md) | 写代码、改代码和审查代码时需要遵守的协作与代码规范。 |
 | [docs/chunk入库打标签文档.md](./docs/chunk入库打标签文档.md) | Chunk 场景标签规则和 LLM 打标方案。 |
+| [docs/标的标签计算规则2.md](./docs/标的标签计算规则2.md) | 标的标签计算规则。 |
 
 模块内文档：
 
