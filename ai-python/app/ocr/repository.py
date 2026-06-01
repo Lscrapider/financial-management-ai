@@ -199,6 +199,7 @@ class OcrTaskRepository:
                         updated_at = CURRENT_TIMESTAMP
                     WHERE task_no = %s
                       AND stage = %s
+                      AND chunk_id IS NULL
                     """,
                     (
                         Jsonb(output_ref),
@@ -271,6 +272,7 @@ class OcrTaskRepository:
                         updated_at = CURRENT_TIMESTAMP
                     WHERE task_no = %s
                       AND stage = %s
+                      AND chunk_id IS NULL
                     """,
                     (
                         Jsonb(output_ref),
@@ -308,6 +310,7 @@ class OcrTaskRepository:
                         updated_at = CURRENT_TIMESTAMP
                     WHERE task_no = %s
                       AND stage = %s
+                      AND chunk_id IS NULL
                     """,
                     (error_message, task_no, stage),
                 )

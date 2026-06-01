@@ -48,6 +48,7 @@ docker compose -f database/docker-compose.yml up -d
 | `009_create_ocr_task_stage.sql` | 创建 OCR 阶段处理记录表。 |
 | `010_create_ocr_review.sql` | 创建 OCR 人工复核任务表。 |
 | `011_add_ocr_task_deleted_at.sql` | 为 OCR 任务增加软删除时间字段。 |
+| `024_add_source_type_to_ocr_task.sql` | 为 OCR 任务增加来源类型字段，用于区分文件 OCR 和手动文本导入。 |
 
 ## 种子数据
 
@@ -68,7 +69,7 @@ docker compose -f database/docker-compose.yml up -d
 | `index_daily_kline` | 指数日 K 数据。 |
 | `ai_token_usage_log` | AI 模型 Token 用量日志。 |
 | `app_visit_log` | 后端 API 访问日志。 |
-| `ocr_task` | OCR 文件上传和识别任务状态。 |
+| `ocr_task` | OCR 文件上传、识别任务状态和手动文本导入任务状态。 |
 | `ocr_task_stage` | OCR 各阶段输入、输出、指标和错误记录。 |
 | `ocr_review` | OCR 人工复核状态和草稿内容。 |
 

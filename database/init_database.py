@@ -37,6 +37,7 @@ def connect(database: str):
         password=env("POSTGRES_PASSWORD", "123456"),
         dbname=database,
         autocommit=True,
+        options="-c timezone=Asia/Shanghai",
     )
 
 

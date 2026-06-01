@@ -9,6 +9,7 @@ import com.scrapider.finance.mapper.OcrTaskMapper;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -20,8 +21,13 @@ public class OcrTaskManage extends ServiceImpl<OcrTaskMapper, OcrTaskPO> {
     }
 
     public Page<OcrTaskPO> pageTasks(int pageNum, int pageSize, OcrTaskStatusEnum status) {
+        return this.pageTasks(pageNum, pageSize, status, "ocr");
+    }
+
+    public Page<OcrTaskPO> pageTasks(int pageNum, int pageSize, OcrTaskStatusEnum status, String sourceType) {
         return this.lambdaQuery()
                 .isNull(OcrTaskPO::getDeletedAt)
+                .eq(OcrTaskPO::getSourceType, sourceType)
                 .eq(status != null, OcrTaskPO::getStatus, status == null ? null : status.getCode())
                 .orderByDesc(OcrTaskPO::getSubmittedAt)
                 .page(Page.of(pageNum, pageSize));
@@ -55,11 +61,40 @@ public class OcrTaskManage extends ServiceImpl<OcrTaskMapper, OcrTaskPO> {
                 .update();
     }
 
+    public boolean softDelete(String taskNo, String sourceType) {
+        return this.lambdaUpdate()
+                .eq(OcrTaskPO::getTaskNo, taskNo)
+                .eq(OcrTaskPO::getSourceType, sourceType)
+                .isNull(OcrTaskPO::getDeletedAt)
+                .set(OcrTaskPO::getDeletedAt, LocalDateTime.now())
+                .set(OcrTaskPO::getUpdatedAt, LocalDateTime.now())
+                .update();
+    }
+
+    public Optional<OcrTaskPO> findActiveByTaskNoAndSourceType(String taskNo, String sourceType) {
+        return this.lambdaQuery()
+                .eq(OcrTaskPO::getTaskNo, taskNo)
+                .eq(OcrTaskPO::getSourceType, sourceType)
+                .isNull(OcrTaskPO::getDeletedAt)
+                .oneOpt();
+    }
+
     public void markManualReviewRequired(String taskNo) {
         this.lambdaUpdate()
                 .eq(OcrTaskPO::getTaskNo, taskNo)
                 .set(OcrTaskPO::getStatus, OcrTaskStatusEnum.MANUAL_REVIEW_REQUIRED.getCode())
                 .set(OcrTaskPO::getCurrentStage, OcrTaskStageEnum.QUALITY_VALIDATE.getCode())
+                .set(OcrTaskPO::getUpdatedAt, LocalDateTime.now())
+                .update();
+    }
+
+    public void updateManualDraft(String taskNo, String title, int segmentCount) {
+        this.lambdaUpdate()
+                .eq(OcrTaskPO::getTaskNo, taskNo)
+                .eq(OcrTaskPO::getSourceType, "manual_text")
+                .set(OcrTaskPO::getOriginalFilename, title)
+                .set(OcrTaskPO::getStoredFilename, title)
+                .set(OcrTaskPO::getSegmentCount, segmentCount)
                 .set(OcrTaskPO::getUpdatedAt, LocalDateTime.now())
                 .update();
     }

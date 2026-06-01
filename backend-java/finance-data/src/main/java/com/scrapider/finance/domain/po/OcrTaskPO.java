@@ -17,6 +17,7 @@ public class OcrTaskPO {
     private String filePath;
     private String fileType;
     private String contentType;
+    private String sourceType;
     private Long fileSize;
     private String status;
     private String currentStage;
@@ -45,12 +46,34 @@ public class OcrTaskPO {
         task.setFilePath(filePath);
         task.setFileType(fileType);
         task.setContentType(contentType);
+        task.setSourceType("ocr");
         task.setFileSize(fileSize);
         task.setStatus(OcrTaskStatusEnum.READY.getCode());
         task.setCurrentStage(OcrTaskStageEnum.DOCUMENT_NORMALIZE.getCode());
         task.setProgress(0);
         task.setPageCount(0);
         task.setSegmentCount(0);
+        task.setSubmittedAt(now);
+        task.setUpdatedAt(now);
+        return task;
+    }
+
+    public static OcrTaskPO createManualText(String taskNo, String title, Integer paragraphCount) {
+        LocalDateTime now = LocalDateTime.now();
+        OcrTaskPO task = new OcrTaskPO();
+        task.setTaskNo(taskNo);
+        task.setOriginalFilename(title);
+        task.setStoredFilename(title);
+        task.setFilePath("");
+        task.setFileType("text");
+        task.setContentType("text/plain");
+        task.setSourceType("manual_text");
+        task.setFileSize(0L);
+        task.setStatus(OcrTaskStatusEnum.MANUAL_REVIEW_REQUIRED.getCode());
+        task.setCurrentStage(OcrTaskStageEnum.QUALITY_VALIDATE.getCode());
+        task.setProgress(60);
+        task.setPageCount(0);
+        task.setSegmentCount(paragraphCount == null ? 0 : paragraphCount);
         task.setSubmittedAt(now);
         task.setUpdatedAt(now);
         return task;

@@ -19,7 +19,8 @@
   "aiCenter": {
     "title": "AI Center",
     "knowledgeProcessing": "Knowledge Processing",
-    "ocrReview": "OCR Review"
+    "ocrReview": "OCR Review",
+    "manualKnowledge": "Manual Knowledge"
   },
   "knowledge": {
     "title": "Knowledge Base",

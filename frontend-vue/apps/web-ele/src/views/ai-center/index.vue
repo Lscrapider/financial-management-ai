@@ -7,6 +7,7 @@ import { Page } from '@vben/common-ui';
 import {
   ElButton,
   ElCard,
+  ElDialog,
   ElMessage,
   ElOption,
   ElPagination,
@@ -25,8 +26,13 @@ import type { UploadInstance } from 'element-plus';
 
 import {
   deleteOcrTask,
+  getOcrChunkTagDetail,
+  getOcrStageDetail,
   pageOcrTasks,
   submitOcrTask,
+  type OcrChunkTagDetail,
+  type OcrChunkTagChunk,
+  type OcrStageDetail,
   type OcrTask,
 } from '#/api/ocr-task';
 
@@ -61,13 +67,18 @@ const pipelineStages = [
   { key: 'ocr.recognize', label: 'OCR识别' },
   { key: 'text.clean', label: '文本清洗' },
   { key: 'quality.validate', label: '质量校验' },
-  { key: 'chunk.tag.rule', label: '规则打标' },
-  { key: 'chunk.tag.llm', label: 'LLM打标' },
-  { key: 'chunk.tag.correct', label: '标签回正' },
+  { key: 'chunk.tag', label: '场景打标' },
   { key: 'embedding.index', label: '向量入库' },
 ];
 
 const processingTasks = ref<ProcessingTask[]>([]);
+const chunkTagDialogVisible = ref(false);
+const loadingChunkTags = ref(false);
+const chunkTagDetail = ref<OcrChunkTagDetail>();
+const stageDialogVisible = ref(false);
+const loadingStageDetail = ref(false);
+const stageDetail = ref<OcrStageDetail>();
+const selectedStageKey = ref('');
 
 const statusFilterOptions: Array<{
   label: string;
@@ -272,7 +283,8 @@ function statusType(status: ProcessingStatus) {
 
 function stageLabel(stage: ProcessingStage) {
   return (
-    pipelineStages.find((item) => item.key === stage)?.label ?? '未知阶段'
+    pipelineStages.find((item) => item.key === normalizeStage(stage))?.label ??
+    '未知阶段'
   );
 }
 
@@ -282,7 +294,7 @@ function stageClass(index: number) {
     return '';
   }
   const currentIndex = pipelineStages.findIndex(
-    (item) => item.key === task.currentStage,
+    (item) => item.key === normalizeStage(task.currentStage),
   );
   if (currentIndex < 0) {
     return '';
@@ -294,6 +306,127 @@ function stageClass(index: number) {
     return 'is-active';
   }
   return '';
+}
+
+function normalizeStage(stage: ProcessingStage) {
+  return isChunkTagStage(stage) ? 'chunk.tag' : stage;
+}
+
+function isChunkTagStage(stage: string) {
+  return [
+    'chunk.tag.rule',
+    'chunk.tag.llm',
+    'chunk.tag.correct',
+  ].includes(stage);
+}
+
+function canOpenStage(stageKey: string) {
+  if (!selectedTask.value) {
+    return false;
+  }
+  const stageIndex = pipelineStages.findIndex((item) => item.key === stageKey);
+  const currentIndex = pipelineStages.findIndex(
+    (item) => item.key === normalizeStage(selectedTask.value!.currentStage),
+  );
+  return stageIndex >= 0 && currentIndex >= stageIndex;
+}
+
+async function openStage(stageKey: string) {
+  if (!selectedTask.value || !canOpenStage(stageKey)) {
+    return;
+  }
+  if (stageKey === 'chunk.tag') {
+    await openChunkTags();
+    return;
+  }
+  selectedStageKey.value = stageKey;
+  stageDialogVisible.value = true;
+  await loadStageDetail();
+}
+
+async function loadStageDetail() {
+  if (!selectedTask.value) {
+    return;
+  }
+  loadingStageDetail.value = true;
+  try {
+    stageDetail.value = await getOcrStageDetail(selectedTask.value.id);
+  } finally {
+    loadingStageDetail.value = false;
+  }
+}
+
+async function openChunkTags() {
+  if (!selectedTask.value) {
+    return;
+  }
+  chunkTagDialogVisible.value = true;
+  await loadChunkTags();
+}
+
+async function loadChunkTags() {
+  if (!selectedTask.value) {
+    return;
+  }
+  loadingChunkTags.value = true;
+  try {
+    chunkTagDetail.value = await getOcrChunkTagDetail(selectedTask.value.id);
+  } finally {
+    loadingChunkTags.value = false;
+  }
+}
+
+const selectedStageRecord = computed(() => {
+  return stageDetail.value?.stages.find(
+    (item) => item.stage === selectedStageKey.value,
+  );
+});
+
+function chunkStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    failed: '失败',
+    finished: '完成',
+    pending: '待处理',
+    running: '处理中',
+  };
+  return labels[status] ?? status;
+}
+
+function chunkStatusType(status: string) {
+  const types: Record<string, 'danger' | 'info' | 'success' | 'warning'> = {
+    failed: 'danger',
+    finished: 'success',
+    pending: 'info',
+    running: 'warning',
+  };
+  return types[status] ?? 'info';
+}
+
+function formatNumberList(values: number[]) {
+  return values.length > 0 ? values.join(', ') : '-';
+}
+
+function formatScenes(chunk: OcrChunkTagChunk) {
+  if (!chunk.scenes) {
+    return '-';
+  }
+  const tags = Object.values(chunk.scenes).flat();
+  return tags.length > 0 ? tags.join(' / ') : '-';
+}
+
+function formatJson(value?: Record<string, unknown>) {
+  if (!value || Object.keys(value).length === 0) {
+    return '-';
+  }
+  return JSON.stringify(value, null, 2);
+}
+
+function stageStatusType(status?: string) {
+  return chunkStatusType(status ?? 'pending');
+}
+
+function stageStatusLabel(status?: string) {
+  return chunkStatusLabel(status ?? 'pending');
 }
 
 function formatDateTime(value?: string) {
@@ -373,7 +506,12 @@ function formatDateTime(value?: string) {
         <div
           v-for="(stage, index) in pipelineStages"
           :key="stage.key"
-          :class="['pipeline-step', stageClass(index)]"
+          :class="[
+            'pipeline-step',
+            stageClass(index),
+            { 'is-clickable': canOpenStage(stage.key) },
+          ]"
+          @click="openStage(stage.key)"
         >
           <span class="step-index">{{ index + 1 }}</span>
           <strong>{{ stage.label }}</strong>
@@ -533,11 +671,192 @@ function formatDateTime(value?: string) {
               :key="stage.key"
               :type="stageClass(index) === 'is-done' ? 'success' : undefined"
             >
-              {{ stage.label }}
+              <ElButton
+                :disabled="!canOpenStage(stage.key)"
+                link
+                type="primary"
+                @click="openStage(stage.key)"
+              >
+                {{ stage.label }}
+              </ElButton>
             </ElTimelineItem>
           </ElTimeline>
         </aside>
       </div>
+
+      <ElDialog
+        v-model="stageDialogVisible"
+        :title="`${stageLabel(selectedStageKey)}详情`"
+        width="840px"
+      >
+        <template #header>
+          <div class="dialog-header">
+            <span>{{ stageLabel(selectedStageKey) }}详情</span>
+            <ElButton
+              :loading="loadingStageDetail"
+              size="small"
+              type="primary"
+              @click="loadStageDetail"
+            >
+              刷新
+            </ElButton>
+          </div>
+        </template>
+        <div v-loading="loadingStageDetail" class="stage-detail">
+          <div class="stage-detail-row">
+            <span>阶段</span>
+            <strong>{{ stageLabel(selectedStageKey) }}</strong>
+          </div>
+          <div class="stage-detail-row">
+            <span>状态</span>
+            <ElTag
+              :type="stageStatusType(selectedStageRecord?.status)"
+              effect="plain"
+            >
+              {{ stageStatusLabel(selectedStageRecord?.status) }}
+            </ElTag>
+          </div>
+          <div class="stage-detail-row">
+            <span>尝试</span>
+            <strong>
+              {{ selectedStageRecord?.attemptCount ?? 0 }} /
+              {{ selectedStageRecord?.maxAttempts ?? 0 }}
+            </strong>
+          </div>
+          <div class="stage-detail-row">
+            <span>开始</span>
+            <strong>{{ formatDateTime(selectedStageRecord?.startedAt ?? '') }}</strong>
+          </div>
+          <div class="stage-detail-row">
+            <span>结束</span>
+            <strong>{{ formatDateTime(selectedStageRecord?.finishedAt ?? '') }}</strong>
+          </div>
+          <div class="stage-detail-block">
+            <span>指标</span>
+            <pre>{{ formatJson(selectedStageRecord?.metrics) }}</pre>
+          </div>
+          <div class="stage-detail-block">
+            <span>输入引用</span>
+            <pre>{{ formatJson(selectedStageRecord?.inputRef) }}</pre>
+          </div>
+          <div class="stage-detail-block">
+            <span>输出引用</span>
+            <pre>{{ formatJson(selectedStageRecord?.outputRef) }}</pre>
+          </div>
+          <div class="stage-detail-block">
+            <span>错误</span>
+            <pre>{{ selectedStageRecord?.errorMessage ?? '-' }}</pre>
+          </div>
+        </div>
+      </ElDialog>
+
+      <ElDialog
+        v-model="chunkTagDialogVisible"
+        title="场景打标明细"
+        width="1180px"
+      >
+        <template #header>
+          <div class="dialog-header">
+            <span>场景打标明细</span>
+            <ElButton
+              :loading="loadingChunkTags"
+              size="small"
+              type="primary"
+              @click="loadChunkTags"
+            >
+              刷新
+            </ElButton>
+          </div>
+        </template>
+        <div v-if="chunkTagDetail" class="chunk-summary">
+          <div>
+            <span>总数</span>
+            <strong>{{ chunkTagDetail.totalChunkCount }}</strong>
+          </div>
+          <div>
+            <span>完成</span>
+            <strong>{{ chunkTagDetail.finishedChunkCount }}</strong>
+          </div>
+          <div>
+            <span>待处理</span>
+            <strong>{{ chunkTagDetail.pendingChunkCount }}</strong>
+          </div>
+          <div>
+            <span>失败</span>
+            <strong>{{ chunkTagDetail.failedChunkCount }}</strong>
+          </div>
+          <div>
+            <span>需 LLM</span>
+            <strong>{{ chunkTagDetail.llmChunkCount }}</strong>
+          </div>
+          <div>
+            <span>已删除</span>
+            <strong>{{ chunkTagDetail.deletedChunkCount }}</strong>
+          </div>
+        </div>
+        <ElTable
+          :data="chunkTagDetail?.chunks ?? []"
+          v-loading="loadingChunkTags"
+          border
+          height="620"
+          row-key="chunkId"
+        >
+          <ElTableColumn
+            align="right"
+            label="#"
+            prop="chunkIndex"
+            width="72"
+          />
+          <ElTableColumn label="页码" width="100">
+            <template #default="{ row }">
+              {{ formatNumberList(row.pageNos) }}
+            </template>
+          </ElTableColumn>
+          <ElTableColumn label="段落" width="100">
+            <template #default="{ row }">
+              {{ formatNumberList(row.paragraphNos) }}
+            </template>
+          </ElTableColumn>
+          <ElTableColumn label="状态" width="96">
+            <template #default="{ row }">
+              <ElTag :type="chunkStatusType(row.status)" effect="plain">
+                {{ chunkStatusLabel(row.status) }}
+              </ElTag>
+            </template>
+          </ElTableColumn>
+          <ElTableColumn label="LLM" width="76">
+            <template #default="{ row }">
+              <ElTag :type="row.needLlm ? 'warning' : 'info'" effect="plain">
+                {{ row.needLlm ? '是' : '否' }}
+              </ElTag>
+            </template>
+          </ElTableColumn>
+          <ElTableColumn label="删除" width="76">
+            <template #default="{ row }">
+              <ElTag :type="row.deleted ? 'danger' : 'success'" effect="plain">
+                {{ row.deleted ? '是' : '否' }}
+              </ElTag>
+            </template>
+          </ElTableColumn>
+          <ElTableColumn label="标签" min-width="180" show-overflow-tooltip>
+            <template #default="{ row }">
+              {{ formatScenes(row) }}
+            </template>
+          </ElTableColumn>
+          <ElTableColumn
+            label="内容"
+            min-width="260"
+            prop="text"
+            show-overflow-tooltip
+          />
+          <ElTableColumn
+            label="错误"
+            min-width="180"
+            prop="errorMessage"
+            show-overflow-tooltip
+          />
+        </ElTable>
+      </ElDialog>
     </div>
   </Page>
 </template>
@@ -629,6 +948,14 @@ function formatDateTime(value?: string) {
   color: rgb(5 150 105);
 }
 
+.pipeline-step.is-clickable {
+  cursor: pointer;
+}
+
+.pipeline-step.is-clickable:hover {
+  outline: 1px solid currentcolor;
+}
+
 .step-index {
   display: inline-flex;
   align-items: center;
@@ -703,6 +1030,104 @@ function formatDateTime(value?: string) {
   display: flex;
   justify-content: flex-end;
   padding: 12px;
+}
+
+.chunk-summary {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(80px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.chunk-summary div {
+  padding: 10px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+}
+
+.chunk-summary span {
+  display: block;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+
+.chunk-summary strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 20px;
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding-right: 38px;
+}
+
+.stage-detail {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.stage-detail-row,
+.stage-detail-block {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+}
+
+.stage-detail-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.stage-detail-block {
+  grid-column: 1 / -1;
+}
+
+.stage-detail-block span {
+  display: block;
+  margin-bottom: 8px;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+
+.stage-detail-row span {
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+
+.stage-detail-row strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stage-detail-row :deep(.el-tag) {
+  max-width: 100%;
+}
+
+.stage-detail-row :deep(.el-tag__content) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stage-detail pre {
+  max-height: 180px;
+  padding: 10px;
+  margin: 0;
+  overflow: auto;
+  border-radius: 6px;
+  background: hsl(var(--muted) / 45%);
+  font-size: 12px;
+  white-space: pre-wrap;
 }
 
 @media (max-width: 1200px) {

@@ -363,7 +363,7 @@
 
 `POST /api/ai/ocr/tasks/page`
 
-需要 Token。
+需要 Token。只返回 `ocr_task.source_type = 'ocr'` 的文件 OCR 任务。
 
 请求体：
 
@@ -389,6 +389,71 @@
 
 需要 Token。请求体：`{ "taskNo": "ocr-xxx" }`。删除任务并同步删除对应知识库向量。
 
+### 查询任务阶段明细
+
+`GET /api/ai/ocr/tasks/{taskNo}/stages`
+
+需要 Token。用于 OCR 任务页普通流程节点弹窗展示任务级阶段记录。
+
+返回：`OcrStageDetailVO`
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `taskNo` | string | 任务编号 |
+| `stages` | array | 任务级阶段记录，不包含 chunk 级记录 |
+
+`stages` 元素：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `stage` | string | 阶段 code |
+| `status` | string | 阶段状态 |
+| `attemptCount` | number | 当前尝试次数 |
+| `maxAttempts` | number | 最大尝试次数 |
+| `inputRef` | object | 输入产物引用 |
+| `outputRef` | object | 输出产物引用 |
+| `metrics` | object | 阶段指标 |
+| `errorMessage` | string | 失败原因 |
+| `startedAt` | string | 开始时间 |
+| `finishedAt` | string | 完成时间 |
+| `updatedAt` | string | 更新时间 |
+
+### 查询场景打标明细
+
+`GET /api/ai/ocr/tasks/{taskNo}/chunk-tags`
+
+需要 Token。用于 OCR 任务页“场景打标”弹窗展示 chunk 粒度处理状态，不改变 RabbitMQ 消息结构。
+
+返回：`OcrChunkTagDetailVO`
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `taskNo` | string | 任务编号 |
+| `totalChunkCount` | number | 总 chunk 数 |
+| `finishedChunkCount` | number | 已完成 chunk 数 |
+| `failedChunkCount` | number | 失败 chunk 数 |
+| `pendingChunkCount` | number | 待处理 chunk 数 |
+| `llmChunkCount` | number | 需要 LLM 补标的 chunk 数 |
+| `ruleOnlyChunkCount` | number | 规则直通 chunk 数 |
+| `deletedChunkCount` | number | 标签回正后标记 `metadata.deleted=true` 的 chunk 数 |
+| `chunks` | array | chunk 明细列表 |
+
+`chunks` 元素：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `chunkId` | string | chunk 唯一标识 |
+| `chunkIndex` | number | chunk 序号 |
+| `pageNos` | number[] | 来源页码 |
+| `paragraphNos` | number[] | 来源段落号 |
+| `status` | string | 当前 chunk 状态 |
+| `currentStage` | string | 当前 chunk 阶段 |
+| `needLlm` | boolean | 是否需要 LLM 补标 |
+| `deleted` | boolean | 是否因无最终标签被跳过入库 |
+| `scenes` | object | 当前可用标签，优先使用最终标签 |
+| `errorMessage` | string | 失败原因 |
+| `text` | string | chunk 文本 |
+
 ### 提交 OCR 文件
 
 `POST /api/ai/ocr/tasks`
@@ -409,9 +474,10 @@
 | `taskNo` | string | 任务编号 |
 | `originalFilename` | string | 原始文件名 |
 | `fileType` | string | 文件类型 |
+| `sourceType` | string | 来源类型，文件 OCR 为 `ocr` |
 | `fileSize` | number | 文件大小，单位字节 |
 | `status` | string | 任务状态 code，初始为 `ready`，可选值：`ready`、`running`、`manual_review_required`、`finished`、`failed` |
-| `currentStage` | string | 当前阶段 code，初始为 `document.normalize`，可选值：`document.normalize`、`ocr.recognize`、`text.clean`、`quality.validate`、`embedding.index` |
+| `currentStage` | string | 当前阶段 code，初始为 `document.normalize`，可选值：`document.normalize`、`ocr.recognize`、`text.clean`、`quality.validate`、`chunk.tag.rule`、`chunk.tag.llm`、`chunk.tag.correct`、`embedding.index` |
 | `progress` | number | 处理进度，初始为 `0` |
 | `pageCount` | number | 页数，初始为 `0` |
 | `segmentCount` | number | 文本分段数，初始为 `0` |
@@ -419,6 +485,59 @@
 | `updatedAt` | string | 更新时间 |
 
 当前接口只负责上传文件、保存文件和创建待处理任务。
+
+## 手动知识导入
+
+手动知识导入复用 `ocr_task` 和 `ocr_review`，任务来源为 `ocr_task.source_type = 'manual_text'`，不会出现在 OCR 处理进度列表中。草稿提交后跳过格式校验、OCR 识别和文本清洗，直接发布 `ocr.chunk.tag.rule`，继续复用场景打标、标签回正和向量入库流程。
+
+### 分页查询手动知识任务
+
+`POST /api/ai/manual-knowledge/tasks/page`
+
+需要 Token。
+
+请求体同 OCR 任务分页：`pageNum`、`pageSize`、`status`。
+
+返回：`OcrTaskPageVO`，其中 `records[].sourceType` 为 `manual_text`。
+
+### 创建手动知识草稿
+
+`POST /api/ai/manual-knowledge/tasks`
+
+需要 Token。
+
+请求体：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `title` | string | 否 | 标题；为空时取第一个非空 chunk 的前 5 个字并追加 `...` |
+| `chunks` | string[] | 是 | 手动输入的文本分段；每一项保存为一个 chunk |
+
+返回：`OcrTaskVO`。任务编号前缀为 `manual-`，初始状态为 `manual_review_required`，当前阶段为 `quality.validate`。
+
+### 查询手动知识草稿
+
+`GET /api/ai/manual-knowledge/tasks/{taskNo}`
+
+需要 Token。返回结构同 `OcrReviewVO`，`pages` 固定为空数组。
+
+### 保存手动知识草稿
+
+`PUT /api/ai/manual-knowledge/tasks/{taskNo}/draft`
+
+需要 Token。请求体同创建草稿。仅 `manual_review_required` 状态的手动任务允许保存。
+
+### 提交手动知识
+
+`POST /api/ai/manual-knowledge/tasks/{taskNo}/submit`
+
+需要 Token。请求体同创建草稿。提交后写入 `reviewed.json`，更新 `ocr_review.status = approved`，将 `ocr_task.current_stage` 更新为 `chunk.tag.rule`，并发布场景打标消息。
+
+### 删除手动知识任务
+
+`POST /api/ai/manual-knowledge/tasks/delete`
+
+需要 Token。请求体：`{ "taskNo": "manual-xxx" }`。只允许删除 `source_type = 'manual_text'` 的任务，并同步删除对应知识库向量。
 
 ## AI Token 用量
 

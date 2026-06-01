@@ -47,6 +47,18 @@ public class OcrReviewManage extends ServiceImpl<OcrReviewMapper, OcrReviewPO> {
                 LocalDateTime.now());
     }
 
+    public void saveManualDraft(OcrReviewPO review) {
+        this.baseMapper.updateManualDraft(
+                review.getTaskNo(),
+                OcrReviewStatusEnum.SAVED.getCode(),
+                this.toJson(review.getCleanedRef()),
+                this.toJson(review.getDraftContent()),
+                review.getOverallConfidence(),
+                review.getParagraphCount(),
+                review.getWarningCount(),
+                LocalDateTime.now());
+    }
+
     public void approve(String taskNo, JsonNode reviewedRef) {
         LocalDateTime now = LocalDateTime.now();
         this.baseMapper.approve(

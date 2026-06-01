@@ -2,10 +2,14 @@ package com.scrapider.finance.ai.controller;
 
 import com.scrapider.finance.ai.domain.param.OcrTaskDeleteParam;
 import com.scrapider.finance.ai.domain.param.OcrTaskPageParam;
+import com.scrapider.finance.ai.domain.vo.OcrChunkTagDetailVO;
+import com.scrapider.finance.ai.domain.vo.OcrStageDetailVO;
 import com.scrapider.finance.ai.domain.vo.OcrTaskPageVO;
 import com.scrapider.finance.ai.domain.vo.OcrTaskVO;
 import com.scrapider.finance.ai.service.OcrTaskService;
 import java.util.List;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -27,6 +31,16 @@ public class OcrTaskController {
     @PostMapping("/page")
     public ResponseEntity<OcrTaskPageVO> page(@RequestBody(required = false) OcrTaskPageParam param) {
         return ResponseEntity.ok(this.ocrTaskService.page(param));
+    }
+
+    @GetMapping("/{taskNo}/stages")
+    public ResponseEntity<OcrStageDetailVO> stages(@PathVariable String taskNo) {
+        return ResponseEntity.ok(this.ocrTaskService.stageDetail(taskNo));
+    }
+
+    @GetMapping("/{taskNo}/chunk-tags")
+    public ResponseEntity<OcrChunkTagDetailVO> chunkTags(@PathVariable String taskNo) {
+        return ResponseEntity.ok(this.ocrTaskService.chunkTagDetail(taskNo));
     }
 
     @PostMapping("/delete")

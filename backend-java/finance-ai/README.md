@@ -13,6 +13,7 @@
 - AI 控制台指标：汇总用户数、访问量、Token 用量和访问趋势。
 - OCR 任务提交：上传 PDF、PNG、JPG、JPEG、WEBP 文件，创建待处理任务并保存文件。
 - OCR 人工复核：消费文本清洗结果，提供复核草稿、页面图片、确认提交和任务软删除能力。
+- 手动知识导入：用户按 chunk 录入文本，保存草稿后可直接提交到场景打标和向量入库流程。
 
 ## 目录结构
 
@@ -35,11 +36,19 @@ backend-java/finance-ai/
 | `POST /api/ai/chat` | 接收用户问题，执行 Query Rewrite、行情上下文查询和最终模型回答。 |
 | `POST /api/ai/ocr/tasks` | 上传 OCR 文件，保存本地文件并创建待处理任务。 |
 | `POST /api/ai/ocr/tasks/page` | 分页查询 OCR 任务，支持 `pageNum`、`pageSize`、`status`。默认排除软删除任务。 |
+| `GET /api/ai/ocr/tasks/{taskNo}/stages` | 查询 OCR 任务级阶段明细，用于前端流程节点弹窗展示。 |
+| `GET /api/ai/ocr/tasks/{taskNo}/chunk-tags` | 查询场景打标 chunk 明细，用于前端弹窗展示每个 chunk 的页码、状态、LLM 标记和最终标签。 |
 | `POST /api/ai/ocr/tasks/delete` | 软删除 OCR 任务，只更新 `deleted_at`，不删除 MinIO 产物。 |
 | `GET /api/ai/ocr/reviews/{taskNo}` | 查询 OCR 人工复核详情。 |
 | `PUT /api/ai/ocr/reviews/{taskNo}/draft` | 保存 OCR 人工复核草稿。 |
-| `POST /api/ai/ocr/reviews/{taskNo}/submit` | 确认提交 OCR 人工复核结果，写入 `reviewed.json` 并发布向量入库消息。 |
+| `POST /api/ai/ocr/reviews/{taskNo}/submit` | 确认提交 OCR 人工复核结果，写入 `reviewed.json` 并发布场景打标消息。 |
 | `GET /api/ai/ocr/reviews/{taskNo}/pages/{pageNo}/image` | 代理读取复核页图片，允许匿名访问以支持浏览器 `<img>` 加载。 |
+| `POST /api/ai/manual-knowledge/tasks/page` | 分页查询手动知识导入任务，只返回 `source_type=manual_text`。 |
+| `POST /api/ai/manual-knowledge/tasks` | 创建手动知识草稿，每个文本框对应一个 chunk。 |
+| `GET /api/ai/manual-knowledge/tasks/{taskNo}` | 查询手动知识草稿详情。 |
+| `PUT /api/ai/manual-knowledge/tasks/{taskNo}/draft` | 保存手动知识草稿。 |
+| `POST /api/ai/manual-knowledge/tasks/{taskNo}/submit` | 提交手动知识，写入 `reviewed.json` 并发布场景打标消息。 |
+| `POST /api/ai/manual-knowledge/tasks/delete` | 软删除手动知识任务，并删除对应知识库向量。 |
 | `POST /api/ai/token-usage/deepseek-response` | 传入 DeepSeek 原始响应 JSON，提取并保存 Token 用量。 |
 | `GET /api/ai/token-usage/overview` | 查询 Token 用量汇总。 |
 | `GET /api/ai/token-usage/trends` | 查询 Token 用量趋势。 |
@@ -159,6 +168,8 @@ POST /api/ai/ocr/tasks/page
 }
 ```
 
+OCR 任务列表只返回 `ocr_task.source_type = 'ocr'` 的任务。手动复制文本导入的任务使用独立接口和页面查询。
+
 删除任务使用软删除：
 
 - 接口：`POST /api/ai/ocr/tasks/delete`
@@ -172,8 +183,18 @@ POST /api/ai/ocr/tasks/page
 - Java 消费 `ocr.quality.validate` 消息后读取 `cleaned.json`，创建 `ocr_review` 草稿，并将任务标记为 `manual_review_required`。
 - 前端复核页允许修改、删除、合并和调整段落。
 - 保存草稿只更新 `ocr_review.draft_content`。
-- 确认提交会将最终内容写入 MinIO `reviewed.json`，把 `ocr_review.status` 更新为 `approved`，并发布 `ocr.embedding.index`。
+- 确认提交会将最终内容写入 MinIO `reviewed.json`，把 `ocr_review.status` 更新为 `approved`，并发布 `ocr.chunk.tag.rule`。
 - 确认提交时后端根据最终 `paragraphs.length` 更新 `ocr_task.segment_count`，因此任务列表“分段”显示人工确认后的最终段落数。
+
+## 手动知识导入
+
+手动知识导入复用 `ocr_task` 和 `ocr_review`，通过 `ocr_task.source_type = 'manual_text'` 与文件 OCR 任务隔离：
+
+- 新任务编号前缀为 `manual-`，标题由用户输入；标题为空时取第一个非空 chunk 前 5 个字并追加 `...`。
+- 每个文本框保存为一个 paragraph/chunk，`sourcePages`、`sourceSegments` 为空，`avgConfidence` 为 `1`。
+- 保存草稿会写入兼容 OCR 复核结构的 `cleaned.json`，并更新 `ocr_review.draft_content`。
+- 提交时跳过 `document.normalize`、`ocr.recognize`、`text.clean`，从 `quality.validate` 等价的草稿页直接进入 `chunk.tag.rule`。
+- 提交后复用现有 `chunk.tag.rule -> chunk.tag.llm -> chunk.tag.correct -> embedding.index` 流程。
 
 ## 构建
 

@@ -61,6 +61,27 @@ public interface OcrReviewMapper extends BaseMapper<OcrReviewPO> {
     @Update("""
             UPDATE ocr_review
             SET status = #{status},
+                cleaned_ref = CAST(#{cleanedRefJson} AS jsonb),
+                draft_content = CAST(#{draftContentJson} AS jsonb),
+                overall_confidence = #{overallConfidence},
+                paragraph_count = #{paragraphCount},
+                warning_count = #{warningCount},
+                updated_at = #{updatedAt}
+            WHERE task_no = #{taskNo}
+            """)
+    void updateManualDraft(
+            @Param("taskNo") String taskNo,
+            @Param("status") String status,
+            @Param("cleanedRefJson") String cleanedRefJson,
+            @Param("draftContentJson") String draftContentJson,
+            @Param("overallConfidence") BigDecimal overallConfidence,
+            @Param("paragraphCount") Integer paragraphCount,
+            @Param("warningCount") Integer warningCount,
+            @Param("updatedAt") LocalDateTime updatedAt);
+
+    @Update("""
+            UPDATE ocr_review
+            SET status = #{status},
                 reviewed_ref = CAST(#{reviewedRefJson} AS jsonb),
                 reviewed_at = #{reviewedAt},
                 updated_at = #{updatedAt}
