@@ -8,13 +8,15 @@ import com.scrapider.finance.mapper.KnowledgeVectorMapper;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 
 @Service
 public class KnowledgeVectorManage extends ServiceImpl<KnowledgeVectorMapper, KnowledgeVectorPO> {
 
-    public Page<KnowledgeVectorPO> pageChunks(int pageNum, int pageSize) {
+    public Page<KnowledgeVectorPO> pageChunks(int pageNum, int pageSize, Set<String> taskNos) {
         return this.lambdaQuery()
+                .in(taskNos != null && !taskNos.isEmpty(), KnowledgeVectorPO::getTaskNo, taskNos)
                 .orderByAsc(KnowledgeVectorPO::getTaskNo)
                 .orderByAsc(KnowledgeVectorPO::getChunkIndex)
                 .page(Page.of(pageNum, pageSize));

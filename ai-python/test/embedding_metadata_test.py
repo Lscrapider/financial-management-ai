@@ -53,17 +53,53 @@ def main():
                         "summary": "",
                         "tagging": {"ruleTagging": {"tagVersion": "rule-v1.1"}},
                     },
+                },
+                {
+                    "paragraphNo": 2,
+                    "sourcePages": [2],
+                    "text": "没有有效标签的段落",
+                    "metadata": {
+                        "deleted": True,
+                        "scenes": {
+                            "asset": [],
+                            "price": [],
+                            "volume": [],
+                            "trend": [],
+                            "valuation": [],
+                            "sentiment": [],
+                            "risk_strategy": [],
+                        },
+                    },
+                },
+                {
+                    "paragraphNo": 3,
+                    "sourcePages": [3],
+                    "text": "低估值股票控制风险",
+                    "metadata": {
+                        "scenes": {
+                            "asset": ["stock"],
+                            "price": [],
+                            "volume": [],
+                            "trend": [],
+                            "valuation": ["low_pe"],
+                            "sentiment": [],
+                            "risk_strategy": ["risk_control"],
+                        },
+                    },
                 }
             ]
         },
     }
     chunks = service.embed(reviewed_json)
-    assert len(chunks) == 1
+    assert len(chunks) == 2
     metadata = chunks[0].metadata
+    assert chunks[0].chunk_id == "ocr-embedding-test:chunk:0001"
+    assert chunks[1].chunk_id == "ocr-embedding-test:chunk:0003"
     assert metadata["scenes"]["volume"] == ["volume_expand"]
     assert metadata["scenes"]["risk_strategy"] == ["position_control"]
     assert metadata["keywords"] == []
     assert metadata["summary"] == ""
+    assert metadata["deleted"] is False
     assert metadata["tagging"]["ruleTagging"]["tagVersion"] == "rule-v1.1"
     print("embedding metadata test passed")
 

@@ -15,6 +15,7 @@ import com.scrapider.finance.domain.po.OcrTaskPO;
 import com.scrapider.finance.manage.KnowledgeVectorManage;
 import com.scrapider.finance.manage.OcrTaskManage;
 import java.time.OffsetDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -79,10 +80,19 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     }
 
     @Override
-    public KnowledgeChunkPageVO pageChunks(int pageNum, int pageSize) {
+    public KnowledgeChunkPageVO pageChunks(int pageNum, int pageSize, String filename) {
         int pn = Math.max(pageNum, DEFAULT_PAGE_NUM);
         int ps = Math.max(1, Math.min(pageSize, MAX_PAGE_SIZE));
-        Page<KnowledgeVectorPO> page = this.knowledgeVectorManage.pageChunks(pn, ps);
+        Set<String> taskNos = null;
+        if (filename != null && !filename.isBlank()) {
+            List<String> matched = this.ocrTaskManage.listTaskNosByFilenameLike(filename.trim());
+            if (matched.isEmpty()) {
+                return KnowledgeChunkPageVO.fromPage(
+                        new Page<>(pn, ps), Map.of());
+            }
+            taskNos = new HashSet<>(matched);
+        }
+        Page<KnowledgeVectorPO> page = this.knowledgeVectorManage.pageChunks(pn, ps, taskNos);
         Map<String, String> filenameMap = this.filenameMap(page);
         return KnowledgeChunkPageVO.fromPage(page, filenameMap);
     }

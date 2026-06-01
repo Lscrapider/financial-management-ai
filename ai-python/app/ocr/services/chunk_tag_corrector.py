@@ -18,6 +18,7 @@ class ChunkTagCorrector:
         rule_scores = rule_tagging.get("ruleScenesWithConfidence") or {}
         if isinstance(rule_scores, dict):
             self._append_high_confidence_rule_tags(final_scenes, rule_scores, threshold)
+        deleted = self._is_empty_scenes(final_scenes)
 
         return {
             "taskNo": message_body.get("taskNo") or "",
@@ -30,6 +31,7 @@ class ChunkTagCorrector:
                 "scenes": final_scenes,
                 "keywords": [],
                 "summary": "",
+                "deleted": deleted,
                 "tagging": {
                     "ruleTagging": rule_tagging,
                     "llmTagging": llm_tagging if llm_tagging else None,
@@ -72,6 +74,10 @@ class ChunkTagCorrector:
         if not isinstance(quality_gate, dict):
             return 0.75
         return self._score_value(quality_gate.get("confidenceThreshold"), default=0.75)
+
+    @staticmethod
+    def _is_empty_scenes(scenes: dict[str, list[str]]) -> bool:
+        return all(not scenes.get(category) for category in SCENE_CATEGORIES)
 
     def _score_value(self, value: Any, default: float = 0.0) -> float:
         if isinstance(value, (int, float)):

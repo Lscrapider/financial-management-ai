@@ -147,7 +147,7 @@ docker compose -f docker/docker-compose.yml up --build finance-service  # 构建
 8 个阶段通过 RabbitMQ 串联，详见 [docs/OCR_PIPELINE.md](docs/OCR_PIPELINE.md)：
 
 1. `document.normalize`（Python）：PDF 转 PNG 分页，写入 MinIO
-2. `ocr.recognize`（Python）：调用 `qwen-vl-ocr-latest` 识别文本
+2. `ocr.recognize`（Python）：图片调用 `qwen-vl-ocr-latest`，PDF 调用 OpenDataLoader 解析并适配为标准 OCR segments
 3. `text.clean`（Python）：清洗文本、标记低置信度/乱码
 4. `quality.validate`（Java）：创建人工复核任务
 5. `chunk.tag.rule`（Python）：规则引擎生成场景标签，质量不足则转 LLM

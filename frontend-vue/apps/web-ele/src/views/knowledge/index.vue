@@ -45,6 +45,7 @@ const loading = ref(false);
 const pageNum = ref(1);
 const pageSize = ref(20);
 const total = ref(0);
+const searchFilename = ref('');
 
 const formatNumber = (n: number) => n.toLocaleString();
 
@@ -67,7 +68,11 @@ async function fetchStats() {
 async function fetchChunks() {
   loading.value = true;
   try {
-    const data = await getKnowledgeChunks(pageNum.value, pageSize.value);
+    const data = await getKnowledgeChunks(
+      pageNum.value,
+      pageSize.value,
+      searchFilename.value || undefined,
+    );
     if (data) {
       chunks.value = data.records;
       total.value = data.total;
@@ -75,6 +80,17 @@ async function fetchChunks() {
   } finally {
     loading.value = false;
   }
+}
+
+function handleSearch() {
+  pageNum.value = 1;
+  void fetchChunks();
+}
+
+function handleClearSearch() {
+  searchFilename.value = '';
+  pageNum.value = 1;
+  void fetchChunks();
 }
 
 function selectChunk(chunk: KnowledgeChunk | undefined) {
@@ -388,7 +404,21 @@ onMounted(async () => {
 
       <ElRow :gutter="16" class="content-row">
         <ElCol :xs="24" :lg="10">
-          <ElCard header="知识条目" class="chunk-list-card">
+          <ElCard class="chunk-list-card">
+            <template #header>
+              <div class="chunk-list-header">
+                <span>知识条目</span>
+                <ElInput
+                  v-model="searchFilename"
+                  placeholder="搜索文档名称..."
+                  clearable
+                  size="small"
+                  style="width: 200px"
+                  @clear="handleClearSearch"
+                  @keyup.enter="handleSearch"
+                />
+              </div>
+            </template>
             <div v-loading="loading">
               <ElTable
                 :data="chunks"
@@ -673,6 +703,12 @@ onMounted(async () => {
   flex: 1;
   min-height: 0;
   row-gap: 16px;
+}
+
+.chunk-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .chunk-list-card {

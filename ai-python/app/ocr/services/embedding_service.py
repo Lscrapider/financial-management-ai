@@ -35,6 +35,8 @@ class EmbeddingService:
                 continue
             chunk_index = i + 1
             paragraph_metadata = paragraph.get("metadata") or {}
+            if isinstance(paragraph_metadata, dict) and paragraph_metadata.get("deleted") is True:
+                continue
             metadata = {
                 "taskNo": task_no,
                 "documentId": task_no,
@@ -55,6 +57,7 @@ class EmbeddingService:
                 metadata["scenes"] = paragraph_metadata.get("scenes") or {}
                 metadata["keywords"] = paragraph_metadata.get("keywords") or []
                 metadata["summary"] = paragraph_metadata.get("summary") or ""
+                metadata["deleted"] = bool(paragraph_metadata.get("deleted"))
                 metadata["tagging"] = paragraph_metadata.get("tagging") or {}
             chunks.append(
                 VectorChunk(

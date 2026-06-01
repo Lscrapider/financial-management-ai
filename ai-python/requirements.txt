@@ -3,6 +3,7 @@ psycopg[binary]==3.2.3
 minio==7.2.10
 PyMuPDF==1.24.14
 Pillow==11.0.0
+opendataloader-pdf
 openai==1.82.0
 sentence-transformers>=3.0.0
 pgvector>=0.3.0

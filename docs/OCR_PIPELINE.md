@@ -99,8 +99,10 @@ Python document.normalize
  -> 发布 ocr.recognize
 
 Python ocr.recognize
- -> 读取页面图片
- -> 调用 qwen-vl-ocr-latest
+ -> 根据源文件类型选择识别策略
+ -> 图片源文件读取页面图片，调用 qwen-vl-ocr-latest
+ -> PDF 源文件读取原始 PDF，调用 OpenDataLoader 解析、清洗并切 chunk
+ -> PDF chunk 适配为标准 OCR segments
  -> 写入 result.json
  -> 更新原始 OCR 分段数
  -> 发布 ocr.text.clean
@@ -157,6 +159,8 @@ Python embedding.index
 当前规则以人工复核结果为准：
 
 - OCR 原始 `segments` 只作为来源信息。
+- 图片源文件的 `segments` 来自视觉 OCR 识别结果。
+- PDF 源文件的 `segments` 来自 OpenDataLoader 解析后的 chunk，每个 chunk 适配为一个 segment，并使用 OpenDataLoader 元素的 `page number` 关联到对应页面。
 - 文本清洗阶段把 OCR segment 转成初始 `paragraphs`。
 - 人工复核可以删除、修改、合并段落。
 - 复核提交时，最终 `paragraphs.length` 就是任务最终分段数。
@@ -240,9 +244,10 @@ embedding.index
 3. 去重。
 4. 补齐 7 大类空数组。
 5. 生成最终 metadata.scenes。
+6. 如果 7 大类全部为空，标记 metadata.deleted=true。
 ```
 
-最终检索只使用 `metadata.scenes`，不直接使用 `ruleScenes` 或 `llmScenes`。
+最终检索只使用 `metadata.scenes`，不直接使用 `ruleScenes` 或 `llmScenes`。`metadata.deleted=true` 的 chunk 会保留在 `tagged_reviewed.json` 中用于排查，但不会进入 embedding 和 `knowledge_vector`。
 
 ## 存储目录
 
@@ -258,6 +263,8 @@ embedding.index
 | 规则标签 | 规则标签结果 | `stage-5-output/2026/05/25/ocr-xxx/chunk-tag/rule_tag_result.json` |
 | 标签回正 | 带标签复核结果 | `stage-5-output/2026/05/25/ocr-xxx/chunk-tag/tagged_reviewed.json` |
 | 向量索引 | 索引结果 | `stage-5-output/2026/05/25/ocr-xxx/chunk-tag/embedding/embedding_result.json` |
+
+PDF 识别阶段的 OpenDataLoader 原始 JSON、Markdown、临时 PDF 等只作为进程内临时文件使用，处理结束后删除，不作为 MinIO 阶段产物保存。系统只保留标准 `result.json`。
 
 ## 消息结构
 
@@ -320,6 +327,10 @@ embedding.index
 
 ### OCR 识别产物 result.json
 
+`ocr.recognize` 的输出结构固定为 `pages[].segments[]`。图片源文件使用 `qwen-vl-ocr-latest` 生成 segment；PDF 源文件使用 OpenDataLoader 直接解析原始 PDF，并把内部 chunk 按 OpenDataLoader `page number` 适配到对应页面的 segment。后续 `text.clean` 不区分来源，统一把 segment 转成 paragraph。
+
+图片源文件示例：
+
 ```json
 {
   "taskNo": "ocr-xxx",
@@ -360,6 +371,50 @@ embedding.index
       "promptTokens": 8376,
       "completionTokens": 597,
       "totalTokens": 8973
+    }
+  },
+  "createdAt": "2026-05-25T16:40:00"
+}
+```
+
+PDF 源文件示例：
+
+```json
+{
+  "taskNo": "ocr-xxx",
+  "engine": "opendataloader_pdf",
+  "pageCount": 1,
+  "pages": [
+    {
+      "pageNo": 1,
+      "imageRef": {
+        "storageType": "minio",
+        "bucket": "finance-ocr",
+        "objectKey": "stage-1-output/2026/05/25/ocr-xxx/pages/page-001.png"
+      },
+      "width": 2480,
+      "height": 3508,
+      "enabled": true,
+      "segments": [
+        {
+          "segmentNo": 1,
+          "confidence": 1.0,
+          "content": "OpenDataLoader 已清洗并切好的 chunk 文本"
+        }
+      ],
+      "rawContent": "",
+      "usage": {}
+    }
+  ],
+  "metrics": {
+    "enabledPageCount": 1,
+    "emptyPageCount": 0,
+    "segmentCount": 1,
+    "avgConfidence": 1.0,
+    "usage": {
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0
     }
   },
   "createdAt": "2026-05-25T16:40:00"
@@ -953,9 +1008,14 @@ OCR 任务删除使用软删除：
 - Java 删除任务时同步删除 `knowledge_vector` 中对应 `task_no` 的向量。
 - MinIO 原始文件和阶段产物当前不删除，用于后续排查和审计。
 
-## 当前 OCR 引擎
+## 当前 OCR 识别策略
 
-OCR 识别使用阿里云 DashScope OpenAI 兼容接口：
+`ocr.recognize` 按源文件类型选择识别策略：
+
+- 图片源文件：使用阿里云 DashScope OpenAI 兼容接口调用 `qwen-vl-ocr-latest`。
+- PDF 源文件：使用 OpenDataLoader 解析原始 PDF，清洗正文并切 chunk，再适配为系统标准 `segments`。
+
+图片 OCR 配置：
 
 - model：`qwen-vl-ocr-latest`
 - 图片通过 `data:image/png;base64,...` 传入。

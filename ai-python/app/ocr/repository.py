@@ -91,6 +91,7 @@ class OcrTaskRepository:
                     )
                     VALUES (%s, %s, 'running', %s, %s, %s, %s, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     ON CONFLICT (task_no, stage)
+                    WHERE chunk_id IS NULL
                     DO UPDATE SET
                         status = 'running',
                         attempt_count = EXCLUDED.attempt_count,

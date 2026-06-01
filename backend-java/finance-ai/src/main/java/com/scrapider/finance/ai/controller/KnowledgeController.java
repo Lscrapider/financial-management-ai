@@ -32,8 +32,9 @@ public class KnowledgeController {
     @GetMapping("/chunks")
     public ResponseEntity<KnowledgeChunkPageVO> chunks(
             @RequestParam(defaultValue = "1") int pageNum,
-            @RequestParam(defaultValue = "20") int pageSize) {
-        return ResponseEntity.ok(this.knowledgeService.pageChunks(pageNum, pageSize));
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(required = false) String filename) {
+        return ResponseEntity.ok(this.knowledgeService.pageChunks(pageNum, pageSize, filename));
     }
 
     @GetMapping("/chunks/{id}")

@@ -9,7 +9,7 @@ public interface KnowledgeService {
 
     KnowledgeStatsVO stats();
 
-    KnowledgeChunkPageVO pageChunks(int pageNum, int pageSize);
+    KnowledgeChunkPageVO pageChunks(int pageNum, int pageSize, String filename);
 
     KnowledgeChunkVO chunkDetail(Long id);
 

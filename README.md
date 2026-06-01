@@ -189,7 +189,7 @@ financial-management-ai/
 ### 知识库模块
 
 - 管理手写副本扫描件和识别后的文本。
-- 对扫描件执行 OCR 识别（5 阶段 RabbitMQ 串联）。
+- 对扫描件执行 OCR 识别，图片走视觉 OCR，PDF 走 OpenDataLoader 解析并适配为统一分段。
 - 对识别文本进行清洗、分段和元数据标注。
 - 支持人工复核修改、合并、删除段落。
 - 生成向量并写入 PostgreSQL pgvector 表。
@@ -236,11 +236,11 @@ Vue 前端展示
 知识库处理流程：
 
 ```text
-扫描件上传
+扫描件或 PDF 上传
   ↓
 文档标准化
   ↓
-OCR 识别
+OCR 识别（图片视觉 OCR / PDF OpenDataLoader）
   ↓
 文本清洗
   ↓
