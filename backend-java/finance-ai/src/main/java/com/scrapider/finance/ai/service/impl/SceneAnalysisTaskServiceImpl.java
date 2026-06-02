@@ -8,11 +8,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scrapider.finance.ai.domain.dto.SceneAnalysisConfigDTO;
 import com.scrapider.finance.ai.domain.dto.SceneAnalysisMessageDTO;
 import com.scrapider.finance.ai.domain.dto.SceneAnalysisTargetDTO;
+import com.scrapider.finance.ai.domain.dto.StockSceneDataDTO;
 import com.scrapider.finance.ai.domain.param.SceneAnalysisCallbackParam;
 import com.scrapider.finance.ai.domain.param.SceneAnalysisSubmitParam;
 import com.scrapider.finance.ai.domain.param.SceneAnalysisUserConfigParam;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisSubmitVO;
 import com.scrapider.finance.ai.service.SceneAnalysisMessagePublisher;
+import com.scrapider.finance.ai.service.StockSceneDataEnsureService;
 import com.scrapider.finance.ai.service.SceneAnalysisTaskService;
 import com.scrapider.finance.domain.po.BondConfigPO;
 import com.scrapider.finance.domain.po.BondQuoteSnapshotPO;
@@ -21,6 +23,7 @@ import com.scrapider.finance.domain.po.IndexQuoteSnapshotPO;
 import com.scrapider.finance.domain.po.SceneAnalysisTaskPO;
 import com.scrapider.finance.domain.po.StockConfigPO;
 import com.scrapider.finance.domain.po.StockQuoteSnapshotPO;
+import com.scrapider.finance.domain.po.StockValuationHistoryPO;
 import com.scrapider.finance.manage.BondConfigManage;
 import com.scrapider.finance.manage.BondDailyKlineManage;
 import com.scrapider.finance.manage.BondQuoteSnapshotManage;
@@ -33,6 +36,8 @@ import com.scrapider.finance.manage.StockDailyKlineManage;
 import com.scrapider.finance.manage.StockIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
 import java.lang.reflect.Method;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -67,6 +72,7 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
     private final BondConfigManage bondConfigManage;
     private final BondDailyKlineManage bondDailyKlineManage;
     private final SceneAnalysisTaskManage sceneAnalysisTaskManage;
+    private final StockSceneDataEnsureService stockSceneDataEnsureService;
 
     public SceneAnalysisTaskServiceImpl(
             ObjectMapper objectMapper,
@@ -81,7 +87,8 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
             BondQuoteSnapshotManage bondQuoteSnapshotManage,
             BondConfigManage bondConfigManage,
             BondDailyKlineManage bondDailyKlineManage,
-            SceneAnalysisTaskManage sceneAnalysisTaskManage) {
+            SceneAnalysisTaskManage sceneAnalysisTaskManage,
+            StockSceneDataEnsureService stockSceneDataEnsureService) {
         this.objectMapper = objectMapper;
         this.sceneAnalysisMessagePublisher = sceneAnalysisMessagePublisher;
         this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
@@ -95,6 +102,7 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
         this.bondConfigManage = bondConfigManage;
         this.bondDailyKlineManage = bondDailyKlineManage;
         this.sceneAnalysisTaskManage = sceneAnalysisTaskManage;
+        this.stockSceneDataEnsureService = stockSceneDataEnsureService;
     }
 
     @Override
@@ -164,6 +172,9 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
                 new LambdaQueryWrapper<StockConfigPO>()
                         .eq(StockConfigPO::getStockCode, stockCode)
                         .last("LIMIT 1"));
+        if (config == null) {
+            missing.add("stock_config");
+        }
         String targetName = this.firstNotBlank(
                 param.targetName(),
                 quote == null ? null : quote.getStockName(),
@@ -179,14 +190,20 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
                 this.firstNotBlank(
                         quote == null ? null : quote.getExchangeCode(),
                         config == null ? null : config.getExchangeCode()));
+        StockSceneDataDTO sceneData = this.queryStockSceneData(config, missing);
         List<Map<String, Object>> intraday = this.queryStockIntraday(stockCode, missing);
-        List<Map<String, Object>> dailyKlines = this.queryStockDailyKlines(stockCode, missing);
+        List<Map<String, Object>> dailyKlines =
+                this.fillDailyTurnoverRate(this.queryStockDailyKlines(stockCode, missing), sceneData.valuationHistory());
         return this.message(
                 taskNo,
                 param,
                 target,
                 this.toMap(quote),
                 this.stockValuationData(quote),
+                this.toMap(sceneData.industryInfo()),
+                this.toMapList(sceneData.valuationHistory()),
+                this.toMapList(sceneData.financialIndicators()),
+                this.toMapList(sceneData.dividendHistory()),
                 dailyKlines,
                 intraday,
                 missing);
@@ -234,6 +251,10 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
                 target,
                 this.toMap(quote),
                 Map.of(),
+                Map.of(),
+                List.of(),
+                List.of(),
+                List.of(),
                 dailyKlines,
                 List.of(),
                 missing);
@@ -281,6 +302,10 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
                 target,
                 this.toMap(quote),
                 this.bondValuationData(quote),
+                Map.of(),
+                List.of(),
+                List.of(),
+                List.of(),
                 dailyKlines,
                 List.of(),
                 missing);
@@ -292,6 +317,10 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
             SceneAnalysisTargetDTO target,
             Map<String, Object> marketData,
             Map<String, Object> valuationData,
+            Map<String, Object> industryData,
+            List<Map<String, Object>> valuationHistory,
+            List<Map<String, Object>> financialIndicators,
+            List<Map<String, Object>> dividendHistory,
             List<Map<String, Object>> dailyKlines,
             List<Map<String, Object>> intradayData,
             List<String> missing) {
@@ -305,6 +334,10 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
                         SceneAnalysisUserConfigParam.effective(param.userOverrides(), target.type())),
                 marketData,
                 valuationData,
+                industryData,
+                valuationHistory,
+                financialIndicators,
+                dividendHistory,
                 dailyKlines,
                 intradayData,
                 this.dataCompleteness(missing));
@@ -350,6 +383,68 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
         return rows;
     }
 
+    private List<Map<String, Object>> fillDailyTurnoverRate(
+            List<Map<String, Object>> dailyKlines,
+            List<StockValuationHistoryPO> valuationHistory) {
+        if (dailyKlines.isEmpty() || valuationHistory.isEmpty()) {
+            return dailyKlines;
+        }
+        Map<String, Long> freeSharesByDate = new LinkedHashMap<>();
+        valuationHistory.forEach(valuation -> {
+            if (valuation.getTradeDate() != null && valuation.getFreeSharesA() != null) {
+                freeSharesByDate.put(valuation.getTradeDate().toString(), valuation.getFreeSharesA());
+            }
+        });
+        if (freeSharesByDate.isEmpty()) {
+            return dailyKlines;
+        }
+        return dailyKlines.stream()
+                .map(row -> this.fillDailyTurnoverRate(row, freeSharesByDate))
+                .toList();
+    }
+
+    private Map<String, Object> fillDailyTurnoverRate(Map<String, Object> row, Map<String, Long> freeSharesByDate) {
+        if (row.get("turnoverRate") != null) {
+            return row;
+        }
+        Object tradeDate = row.get("tradeDate");
+        Object volumeValue = row.get("volume");
+        if (tradeDate == null || volumeValue == null) {
+            return row;
+        }
+        Long freeShares = freeSharesByDate.get(tradeDate.toString());
+        if (freeShares == null || freeShares <= 0) {
+            return row;
+        }
+        BigDecimal volume = new BigDecimal(volumeValue.toString());
+        BigDecimal turnoverRate = volume
+                .multiply(BigDecimal.valueOf(100))
+                .divide(BigDecimal.valueOf(freeShares), 6, RoundingMode.HALF_UP);
+        Map<String, Object> filled = new LinkedHashMap<>(row);
+        filled.put("turnoverRate", turnoverRate);
+        return filled;
+    }
+
+    private StockSceneDataDTO queryStockSceneData(StockConfigPO config, List<String> missing) {
+        if (config == null) {
+            return new StockSceneDataDTO(null, List.of(), List.of(), List.of());
+        }
+        StockSceneDataDTO sceneData = this.stockSceneDataEnsureService.ensureStockSceneData(config);
+        if (sceneData.industryInfo() == null) {
+            missing.add("stock_industry_info");
+        }
+        if (sceneData.valuationHistory().isEmpty()) {
+            missing.add("stock_valuation_history");
+        }
+        if (sceneData.financialIndicators().isEmpty()) {
+            missing.add("stock_financial_indicator");
+        }
+        if (sceneData.dividendHistory().isEmpty()) {
+            missing.add("stock_dividend_history");
+        }
+        return sceneData;
+    }
+
     private Map<String, Object> stockValuationData(StockQuoteSnapshotPO quote) {
         if (quote == null) {
             return Map.of();
@@ -385,6 +480,13 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
             return Map.of();
         }
         return this.compactMap(this.objectMapper.convertValue(value, MAP_TYPE));
+    }
+
+    private List<Map<String, Object>> toMapList(List<?> values) {
+        if (values == null || values.isEmpty()) {
+            return List.of();
+        }
+        return values.stream().map(this::toMap).toList();
     }
 
     private Map<String, Object> compactMap(Map<String, Object> source) {

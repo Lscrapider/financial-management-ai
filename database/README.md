@@ -49,6 +49,7 @@ docker compose -f database/docker-compose.yml up -d
 | `010_create_ocr_review.sql` | 创建 OCR 人工复核任务表。 |
 | `011_add_ocr_task_deleted_at.sql` | 为 OCR 任务增加软删除时间字段。 |
 | `024_add_source_type_to_ocr_task.sql` | 为 OCR 任务增加来源类型字段，用于区分文件 OCR 和手动文本导入。 |
+| `027_create_stock_scene_data_tables.sql` | 创建股票场景分析所需的行业、估值历史、财务指标和分红历史表。 |
 
 ## 种子数据
 
@@ -64,6 +65,10 @@ docker compose -f database/docker-compose.yml up -d
 | `app_user` | 登录用户、角色和默认首页。 |
 | `stock_config` | 股票同步清单和腾讯行情 `secid`。 |
 | `stock_quote_snapshot` | 股票最新行情快照。 |
+| `stock_industry_info` | 股票行业、地域和概念信息。 |
+| `stock_valuation_history` | 股票每日 PE/PB 等估值历史。 |
+| `stock_financial_indicator` | 股票财务主指标和银行专项指标。 |
+| `stock_dividend_history` | 股票分红股息历史。 |
 | `index_config` | 指数同步清单和腾讯行情 `secid`。 |
 | `index_quote_snapshot` | 指数最新行情快照。 |
 | `index_daily_kline` | 指数日 K 数据。 |

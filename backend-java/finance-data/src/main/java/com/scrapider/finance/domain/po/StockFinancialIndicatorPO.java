@@ -1,0 +1,112 @@
+package com.scrapider.finance.domain.po;
+
+import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.scrapider.finance.domain.util.StockMarketJsonParser;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.StreamSupport;
+import lombok.Data;
+
+@Data
+@TableName("stock_financial_indicator")
+public class StockFinancialIndicatorPO {
+
+    private Long id;
+    private String stockCode;
+    private String stockName;
+    private String secucode;
+    private String orgType;
+    private LocalDate reportDate;
+    private String reportType;
+    private String reportDateName;
+    private LocalDate noticeDate;
+    private BigDecimal epsBasic;
+    private BigDecimal bps;
+    private BigDecimal totalOperateRevenue;
+    private BigDecimal parentNetProfit;
+    private BigDecimal totalOperateRevenueYoy;
+    private BigDecimal parentNetProfitYoy;
+    private BigDecimal roeWeighted;
+    private BigDecimal debtAssetRatio;
+    private BigDecimal totalDeposits;
+    private BigDecimal grossLoans;
+    private BigDecimal loanToDepositRatio;
+    private BigDecimal capitalAdequacyRatio;
+    private BigDecimal coreTier1CapitalAdequacyRatio;
+    private BigDecimal firstAdequacyRatio;
+    private BigDecimal nonPerformingLoanRatio;
+    private BigDecimal provisionCoverageRatio;
+    private BigDecimal netInterestSpread;
+    private BigDecimal netInterestMargin;
+    private BigDecimal loanProvisionRatio;
+    private String source;
+    private String rawResponse;
+    private LocalDateTime syncedAt;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+
+    public static List<StockFinancialIndicatorPO> fromEastMoneyResponse(StockConfigPO stockConfig, JsonNode response) {
+        JsonNode rows = response.path("result").path("data");
+        LocalDateTime syncedAt = LocalDateTime.now();
+        return StreamSupport.stream(rows.spliterator(), false)
+                .map(row -> fromEastMoneyRow(stockConfig, row, syncedAt))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private static StockFinancialIndicatorPO fromEastMoneyRow(
+            StockConfigPO stockConfig,
+            JsonNode row,
+            LocalDateTime syncedAt) {
+        LocalDate reportDate = date(row, "REPORT_DATE");
+        if (reportDate == null) {
+            return null;
+        }
+
+        StockFinancialIndicatorPO indicator = new StockFinancialIndicatorPO();
+        indicator.setStockCode(stockConfig.getStockCode());
+        indicator.setStockName(StockMarketJsonParser.text(row, "SECURITY_NAME_ABBR", stockConfig.getStockName()));
+        indicator.setSecucode(StockMarketJsonParser.text(row, "SECUCODE", stockConfig.getStockCode()));
+        indicator.setOrgType(StockMarketJsonParser.text(row, "ORG_TYPE", null));
+        indicator.setReportDate(reportDate);
+        indicator.setReportType(StockMarketJsonParser.text(row, "REPORT_TYPE", null));
+        indicator.setReportDateName(StockMarketJsonParser.text(row, "REPORT_DATE_NAME", null));
+        indicator.setNoticeDate(date(row, "NOTICE_DATE"));
+        indicator.setEpsBasic(StockMarketJsonParser.decimal(row, "EPSJB"));
+        indicator.setBps(StockMarketJsonParser.decimal(row, "BPS"));
+        indicator.setTotalOperateRevenue(StockMarketJsonParser.decimal(row, "TOTALOPERATEREVE"));
+        indicator.setParentNetProfit(StockMarketJsonParser.decimal(row, "PARENTNETPROFIT"));
+        indicator.setTotalOperateRevenueYoy(StockMarketJsonParser.decimal(row, "TOTALOPERATEREVETZ"));
+        indicator.setParentNetProfitYoy(StockMarketJsonParser.decimal(row, "PARENTNETPROFITTZ"));
+        indicator.setRoeWeighted(StockMarketJsonParser.decimal(row, "ROEJQ"));
+        indicator.setDebtAssetRatio(StockMarketJsonParser.decimal(row, "ZCFZL"));
+        indicator.setTotalDeposits(StockMarketJsonParser.decimal(row, "TOTALDEPOSITS"));
+        indicator.setGrossLoans(StockMarketJsonParser.decimal(row, "GROSSLOANS"));
+        indicator.setLoanToDepositRatio(StockMarketJsonParser.decimal(row, "LTDRR"));
+        indicator.setCapitalAdequacyRatio(StockMarketJsonParser.decimal(row, "NEWCAPITALADER"));
+        indicator.setCoreTier1CapitalAdequacyRatio(StockMarketJsonParser.decimal(row, "HXYJBCZL"));
+        indicator.setFirstAdequacyRatio(StockMarketJsonParser.decimal(row, "FIRST_ADEQUACY_RATIO"));
+        indicator.setNonPerformingLoanRatio(StockMarketJsonParser.decimal(row, "NONPERLOAN"));
+        indicator.setProvisionCoverageRatio(StockMarketJsonParser.decimal(row, "BLDKBBL"));
+        indicator.setNetInterestSpread(StockMarketJsonParser.decimal(row, "NET_INTEREST_SPREAD"));
+        indicator.setNetInterestMargin(StockMarketJsonParser.decimal(row, "NET_INTEREST_MARGIN"));
+        indicator.setLoanProvisionRatio(StockMarketJsonParser.decimal(row, "LOAN_PROVISION_RATIO"));
+        indicator.setSource("eastmoney");
+        indicator.setRawResponse(row.toString());
+        indicator.setSyncedAt(syncedAt);
+        return indicator;
+    }
+
+    private static LocalDate date(JsonNode row, String fieldName) {
+        String value = StockMarketJsonParser.text(row, fieldName, null);
+        if (StrUtil.isBlank(value)) {
+            return null;
+        }
+        return LocalDate.parse(value.substring(0, 10));
+    }
+}
