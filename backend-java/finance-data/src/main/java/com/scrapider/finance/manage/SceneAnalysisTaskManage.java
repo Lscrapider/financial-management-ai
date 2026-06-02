@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.scrapider.finance.domain.enums.SceneAnalysisTaskStatusEnum;
 import com.scrapider.finance.domain.po.SceneAnalysisTaskPO;
 import com.scrapider.finance.mapper.SceneAnalysisTaskMapper;
 import java.time.LocalDateTime;
@@ -39,10 +40,19 @@ public class SceneAnalysisTaskManage extends ServiceImpl<SceneAnalysisTaskMapper
         LocalDateTime now = LocalDateTime.now();
         this.lambdaUpdate()
                 .eq(SceneAnalysisTaskPO::getTaskNo, taskNo)
-                .set(SceneAnalysisTaskPO::getStatus, SceneAnalysisTaskPO.STATUS_PROCESSING)
+                .set(SceneAnalysisTaskPO::getStatus, SceneAnalysisTaskStatusEnum.PROCESSING_CURRENT_SCENES.getCode())
                 .set(SceneAnalysisTaskPO::getStartedAt, now)
                 .set(SceneAnalysisTaskPO::getUpdatedAt, now)
                 .update();
+    }
+
+    public void markCurrentScenesReady(String taskNo, JsonNode currentScenesPayload) {
+        LocalDateTime now = LocalDateTime.now();
+        this.baseMapper.markCurrentScenesReady(
+                taskNo,
+                SceneAnalysisTaskStatusEnum.CURRENT_SCENES_READY.getCode(),
+                this.toJson(currentScenesPayload),
+                now);
     }
 
     public void markSuccess(
@@ -53,7 +63,7 @@ public class SceneAnalysisTaskManage extends ServiceImpl<SceneAnalysisTaskMapper
         LocalDateTime now = LocalDateTime.now();
         this.baseMapper.markSuccess(
                 taskNo,
-                SceneAnalysisTaskPO.STATUS_SUCCESS,
+                SceneAnalysisTaskStatusEnum.SUCCESS.getCode(),
                 this.toJson(currentScenesPayload),
                 this.toJson(reportPayload),
                 reportText,
@@ -65,7 +75,7 @@ public class SceneAnalysisTaskManage extends ServiceImpl<SceneAnalysisTaskMapper
         LocalDateTime now = LocalDateTime.now();
         this.lambdaUpdate()
                 .eq(SceneAnalysisTaskPO::getTaskNo, taskNo)
-                .set(SceneAnalysisTaskPO::getStatus, SceneAnalysisTaskPO.STATUS_FAILED)
+                .set(SceneAnalysisTaskPO::getStatus, SceneAnalysisTaskStatusEnum.FAILED.getCode())
                 .set(SceneAnalysisTaskPO::getErrorMessage, errorMessage)
                 .set(SceneAnalysisTaskPO::getFinishedAt, now)
                 .set(SceneAnalysisTaskPO::getUpdatedAt, now)

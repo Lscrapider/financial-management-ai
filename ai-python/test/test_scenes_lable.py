@@ -85,10 +85,9 @@ def main() -> None:
         risk_strategy_result,
     ]
     current_scenes_payload = build_current_scenes_payload(
-        task_no=str(message.get("taskNo") or ""),
         target=target,
         report_type=message.get("reportType"),
-        base_metrics=base_metrics,
+        total_chunks=message.get("totalChunks") or 10,
         module_results=module_results,
     )
 

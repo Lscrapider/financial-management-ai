@@ -57,6 +57,7 @@ class CurrentSceneHandler(MessageHandler):
             raise PermanentMessageError(f"scene analysis target.code is required task_no={task_no}")
         if not isinstance(config, dict) or not isinstance(config.get("parameters"), dict):
             raise PermanentMessageError(f"scene analysis config.parameters is required task_no={task_no}")
+        total_chunks = self._total_chunks(message.body)
         self._save_test_data(message.body)
         base_metrics = self._base_metrics_calculator.calculate(message.body)
         context = SceneAnalysisContext.from_message(message.body, base_metrics)
@@ -82,10 +83,9 @@ class CurrentSceneHandler(MessageHandler):
             risk_strategy_result,
         ]
         current_scenes_payload = build_current_scenes_payload(
-            task_no=task_no,
             target=target,
             report_type=message.body.get("reportType"),
-            base_metrics=base_metrics,
+            total_chunks=total_chunks,
             module_results=module_results,
         )
         logger.info(
@@ -112,3 +112,9 @@ class CurrentSceneHandler(MessageHandler):
     def _save_test_data(self, payload: dict) -> None:
         DEFAULT_TEST_DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
         DEFAULT_TEST_DATA_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def _total_chunks(self, payload: dict) -> int:
+        value = payload.get("totalChunks")
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            raise PermanentMessageError("scene analysis totalChunks is required and must be greater than 0")
+        return value

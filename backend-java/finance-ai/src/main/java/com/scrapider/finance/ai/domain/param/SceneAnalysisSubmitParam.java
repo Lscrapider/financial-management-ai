@@ -5,6 +5,7 @@ public record SceneAnalysisSubmitParam(
         String targetCode,
         String targetName,
         String reportType,
+        Integer totalChunks,
         String configProfile,
         SceneAnalysisUserConfigParam userOverrides) {
 }

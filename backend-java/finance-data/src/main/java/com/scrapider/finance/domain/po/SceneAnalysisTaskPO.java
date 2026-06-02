@@ -4,17 +4,13 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.scrapider.finance.domain.enums.SceneAnalysisTaskStatusEnum;
 import java.time.LocalDateTime;
 import lombok.Data;
 
 @Data
 @TableName(value = "scene_analysis_task", autoResultMap = true)
 public class SceneAnalysisTaskPO {
-
-    public static final String STATUS_PENDING = "pending";
-    public static final String STATUS_PROCESSING = "processing";
-    public static final String STATUS_SUCCESS = "success";
-    public static final String STATUS_FAILED = "failed";
 
     private Long id;
     private String taskNo;
@@ -63,7 +59,7 @@ public class SceneAnalysisTaskPO {
         task.setReportType(reportType);
         task.setConfigProfile(configProfile);
         task.setConfigSnapshot(configSnapshot);
-        task.setStatus(STATUS_PENDING);
+        task.setStatus(SceneAnalysisTaskStatusEnum.PENDING.getCode());
         task.setSubmittedAt(now);
         task.setCreatedAt(now);
         task.setUpdatedAt(now);

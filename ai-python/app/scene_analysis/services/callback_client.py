@@ -14,11 +14,7 @@ class SceneAnalysisCallbackClient:
         self._post_callback(
             task_no,
             {
-                "status": "success",
                 "currentScenesPayload": current_scenes_payload,
-                "reportPayload": None,
-                "reportText": None,
-                "errorMessage": None,
             },
         )
 

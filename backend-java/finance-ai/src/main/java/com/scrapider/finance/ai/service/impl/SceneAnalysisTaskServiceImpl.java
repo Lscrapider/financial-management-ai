@@ -10,12 +10,15 @@ import com.scrapider.finance.ai.domain.dto.SceneAnalysisMessageDTO;
 import com.scrapider.finance.ai.domain.dto.SceneAnalysisTargetDTO;
 import com.scrapider.finance.ai.domain.dto.StockSceneDataDTO;
 import com.scrapider.finance.ai.domain.param.SceneAnalysisCallbackParam;
+import com.scrapider.finance.ai.domain.param.SceneAnalysisCurrentScenesPayloadParam;
 import com.scrapider.finance.ai.domain.param.SceneAnalysisSubmitParam;
 import com.scrapider.finance.ai.domain.param.SceneAnalysisUserConfigParam;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisSubmitVO;
 import com.scrapider.finance.ai.service.SceneAnalysisMessagePublisher;
+import com.scrapider.finance.ai.service.SceneReportPipelineService;
 import com.scrapider.finance.ai.service.StockSceneDataEnsureService;
 import com.scrapider.finance.ai.service.SceneAnalysisTaskService;
+import com.scrapider.finance.domain.enums.SceneAnalysisTaskStatusEnum;
 import com.scrapider.finance.domain.po.BondConfigPO;
 import com.scrapider.finance.domain.po.BondQuoteSnapshotPO;
 import com.scrapider.finance.domain.po.IndexConfigPO;
@@ -73,6 +76,7 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
     private final BondDailyKlineManage bondDailyKlineManage;
     private final SceneAnalysisTaskManage sceneAnalysisTaskManage;
     private final StockSceneDataEnsureService stockSceneDataEnsureService;
+    private final SceneReportPipelineService sceneReportPipelineService;
 
     public SceneAnalysisTaskServiceImpl(
             ObjectMapper objectMapper,
@@ -88,7 +92,8 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
             BondConfigManage bondConfigManage,
             BondDailyKlineManage bondDailyKlineManage,
             SceneAnalysisTaskManage sceneAnalysisTaskManage,
-            StockSceneDataEnsureService stockSceneDataEnsureService) {
+            StockSceneDataEnsureService stockSceneDataEnsureService,
+            SceneReportPipelineService sceneReportPipelineService) {
         this.objectMapper = objectMapper;
         this.sceneAnalysisMessagePublisher = sceneAnalysisMessagePublisher;
         this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
@@ -103,6 +108,7 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
         this.bondDailyKlineManage = bondDailyKlineManage;
         this.sceneAnalysisTaskManage = sceneAnalysisTaskManage;
         this.stockSceneDataEnsureService = stockSceneDataEnsureService;
+        this.sceneReportPipelineService = sceneReportPipelineService;
     }
 
     @Override
@@ -114,6 +120,9 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
         String targetCode = StrUtil.trim(param.targetCode());
         if (StrUtil.isBlank(targetType) || StrUtil.isBlank(targetCode)) {
             throw new IllegalArgumentException("targetType and targetCode are required");
+        }
+        if (param.totalChunks() == null || param.totalChunks() <= 0) {
+            throw new IllegalArgumentException("totalChunks is required and must be greater than 0");
         }
         Long userId = this.currentUserId();
         String taskNo = this.newTaskNo();
@@ -136,7 +145,7 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
                 message.target().type(),
                 message.target().code(),
                 message.config().profile(),
-                SceneAnalysisTaskPO.STATUS_PROCESSING);
+                SceneAnalysisTaskStatusEnum.PROCESSING_CURRENT_SCENES.getCode());
     }
 
     @Override
@@ -147,16 +156,17 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
         if (param == null) {
             throw new IllegalArgumentException("request body is required");
         }
-        String status = StrUtil.blankToDefault(param.status(), SceneAnalysisTaskPO.STATUS_SUCCESS);
-        if (SceneAnalysisTaskPO.STATUS_FAILED.equals(status)) {
-            this.sceneAnalysisTaskManage.markFailed(taskNo, param.errorMessage());
-            return;
+        SceneAnalysisCurrentScenesPayloadParam currentScenesPayload = param.currentScenesPayload();
+        if (currentScenesPayload == null) {
+            throw new IllegalArgumentException("currentScenesPayload is required");
         }
-        this.sceneAnalysisTaskManage.markSuccess(
-                taskNo,
-                param.currentScenesPayload(),
-                param.reportPayload(),
-                param.reportText());
+        this.sceneAnalysisTaskManage.markCurrentScenesReady(taskNo, this.objectMapper.valueToTree(currentScenesPayload));
+        try {
+            this.sceneReportPipelineService.start(taskNo, currentScenesPayload);
+        } catch (Exception ex) {
+            this.sceneAnalysisTaskManage.markFailed(taskNo, ex.getMessage());
+            throw ex;
+        }
     }
 
     private SceneAnalysisMessageDTO buildStockMessage(String taskNo, String stockCode, SceneAnalysisSubmitParam param) {
@@ -328,6 +338,7 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
                 taskNo,
                 LocalDateTime.now(),
                 StrUtil.blankToDefault(param.reportType(), "quick_analysis"),
+                param.totalChunks(),
                 target,
                 new SceneAnalysisConfigDTO(
                         StrUtil.blankToDefault(param.configProfile(), "system_recommended"),

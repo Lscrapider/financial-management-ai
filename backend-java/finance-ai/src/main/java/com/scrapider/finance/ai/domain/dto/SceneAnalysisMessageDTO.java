@@ -8,6 +8,7 @@ public record SceneAnalysisMessageDTO(
         String taskNo,
         LocalDateTime requestedAt,
         String reportType,
+        Integer totalChunks,
         SceneAnalysisTargetDTO target,
         SceneAnalysisConfigDTO config,
         Map<String, Object> marketData,
