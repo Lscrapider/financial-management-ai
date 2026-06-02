@@ -14,7 +14,5 @@ public record SceneAnalysisMessageDTO(
         Map<String, Object> valuationData,
         List<Map<String, Object>> dailyKlines,
         List<Map<String, Object>> intradayData,
-        Map<String, Object> watchlistState,
-        Map<String, Object> alertState,
         Map<String, Object> dataCompleteness) {
 }

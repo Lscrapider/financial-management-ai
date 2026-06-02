@@ -3,10 +3,12 @@ package com.scrapider.finance.ai.service.impl;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scrapider.finance.ai.domain.dto.SceneAnalysisConfigDTO;
 import com.scrapider.finance.ai.domain.dto.SceneAnalysisMessageDTO;
 import com.scrapider.finance.ai.domain.dto.SceneAnalysisTargetDTO;
+import com.scrapider.finance.ai.domain.param.SceneAnalysisCallbackParam;
 import com.scrapider.finance.ai.domain.param.SceneAnalysisSubmitParam;
 import com.scrapider.finance.ai.domain.param.SceneAnalysisUserConfigParam;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisSubmitVO;
@@ -16,22 +18,21 @@ import com.scrapider.finance.domain.po.BondConfigPO;
 import com.scrapider.finance.domain.po.BondQuoteSnapshotPO;
 import com.scrapider.finance.domain.po.IndexConfigPO;
 import com.scrapider.finance.domain.po.IndexQuoteSnapshotPO;
-import com.scrapider.finance.domain.po.StockAlertConfigPO;
+import com.scrapider.finance.domain.po.SceneAnalysisTaskPO;
 import com.scrapider.finance.domain.po.StockConfigPO;
 import com.scrapider.finance.domain.po.StockQuoteSnapshotPO;
-import com.scrapider.finance.domain.po.WatchGroupItemPO;
 import com.scrapider.finance.manage.BondConfigManage;
 import com.scrapider.finance.manage.BondDailyKlineManage;
 import com.scrapider.finance.manage.BondQuoteSnapshotManage;
 import com.scrapider.finance.manage.IndexConfigManage;
 import com.scrapider.finance.manage.IndexDailyKlineManage;
 import com.scrapider.finance.manage.IndexQuoteSnapshotManage;
-import com.scrapider.finance.manage.StockAlertConfigManage;
+import com.scrapider.finance.manage.SceneAnalysisTaskManage;
 import com.scrapider.finance.manage.StockConfigManage;
 import com.scrapider.finance.manage.StockDailyKlineManage;
 import com.scrapider.finance.manage.StockIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
-import com.scrapider.finance.manage.WatchGroupItemManage;
+import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -39,6 +40,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -63,8 +66,7 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
     private final BondQuoteSnapshotManage bondQuoteSnapshotManage;
     private final BondConfigManage bondConfigManage;
     private final BondDailyKlineManage bondDailyKlineManage;
-    private final WatchGroupItemManage watchGroupItemManage;
-    private final StockAlertConfigManage stockAlertConfigManage;
+    private final SceneAnalysisTaskManage sceneAnalysisTaskManage;
 
     public SceneAnalysisTaskServiceImpl(
             ObjectMapper objectMapper,
@@ -79,8 +81,7 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
             BondQuoteSnapshotManage bondQuoteSnapshotManage,
             BondConfigManage bondConfigManage,
             BondDailyKlineManage bondDailyKlineManage,
-            WatchGroupItemManage watchGroupItemManage,
-            StockAlertConfigManage stockAlertConfigManage) {
+            SceneAnalysisTaskManage sceneAnalysisTaskManage) {
         this.objectMapper = objectMapper;
         this.sceneAnalysisMessagePublisher = sceneAnalysisMessagePublisher;
         this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
@@ -93,8 +94,7 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
         this.bondQuoteSnapshotManage = bondQuoteSnapshotManage;
         this.bondConfigManage = bondConfigManage;
         this.bondDailyKlineManage = bondDailyKlineManage;
-        this.watchGroupItemManage = watchGroupItemManage;
-        this.stockAlertConfigManage = stockAlertConfigManage;
+        this.sceneAnalysisTaskManage = sceneAnalysisTaskManage;
     }
 
     @Override
@@ -107,6 +107,7 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
         if (StrUtil.isBlank(targetType) || StrUtil.isBlank(targetCode)) {
             throw new IllegalArgumentException("targetType and targetCode are required");
         }
+        Long userId = this.currentUserId();
         String taskNo = this.newTaskNo();
         SceneAnalysisMessageDTO message = switch (targetType) {
             case "STOCK" -> this.buildStockMessage(taskNo, targetCode, param);
@@ -114,13 +115,40 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
             case "CONVERTIBLE_BOND" -> this.buildBondMessage(taskNo, targetCode, param);
             default -> throw new IllegalArgumentException("unsupported targetType: " + param.targetType());
         };
-        this.sceneAnalysisMessagePublisher.publishCurrentSceneAnalysisMessage(message);
+        this.sceneAnalysisTaskManage.saveTask(this.pendingTask(userId, message));
+        try {
+            this.sceneAnalysisMessagePublisher.publishCurrentSceneAnalysisMessage(message);
+            this.sceneAnalysisTaskManage.markProcessing(taskNo);
+        } catch (Exception ex) {
+            this.sceneAnalysisTaskManage.markFailed(taskNo, ex.getMessage());
+            throw ex;
+        }
         return new SceneAnalysisSubmitVO(
                 taskNo,
                 message.target().type(),
                 message.target().code(),
                 message.config().profile(),
-                "published");
+                SceneAnalysisTaskPO.STATUS_PROCESSING);
+    }
+
+    @Override
+    public void callback(String taskNo, SceneAnalysisCallbackParam param) {
+        if (StrUtil.isBlank(taskNo)) {
+            throw new IllegalArgumentException("taskNo is required");
+        }
+        if (param == null) {
+            throw new IllegalArgumentException("request body is required");
+        }
+        String status = StrUtil.blankToDefault(param.status(), SceneAnalysisTaskPO.STATUS_SUCCESS);
+        if (SceneAnalysisTaskPO.STATUS_FAILED.equals(status)) {
+            this.sceneAnalysisTaskManage.markFailed(taskNo, param.errorMessage());
+            return;
+        }
+        this.sceneAnalysisTaskManage.markSuccess(
+                taskNo,
+                param.currentScenesPayload(),
+                param.reportPayload(),
+                param.reportText());
     }
 
     private SceneAnalysisMessageDTO buildStockMessage(String taskNo, String stockCode, SceneAnalysisSubmitParam param) {
@@ -161,8 +189,6 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
                 this.stockValuationData(quote),
                 dailyKlines,
                 intraday,
-                this.watchlistState(param.userId(), "STOCK", stockCode),
-                this.alertState(param.userId(), "STOCK", stockCode),
                 missing);
     }
 
@@ -210,8 +236,6 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
                 Map.of(),
                 dailyKlines,
                 List.of(),
-                this.watchlistState(param.userId(), "INDEX", indexCode),
-                this.alertState(param.userId(), "INDEX", indexCode),
                 missing);
     }
 
@@ -259,8 +283,6 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
                 this.bondValuationData(quote),
                 dailyKlines,
                 List.of(),
-                this.watchlistState(param.userId(), "BOND", bondCode),
-                this.alertState(param.userId(), "BOND", bondCode),
                 missing);
     }
 
@@ -272,8 +294,6 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
             Map<String, Object> valuationData,
             List<Map<String, Object>> dailyKlines,
             List<Map<String, Object>> intradayData,
-            Map<String, Object> watchlistState,
-            Map<String, Object> alertState,
             List<String> missing) {
         return new SceneAnalysisMessageDTO(
                 taskNo,
@@ -287,9 +307,19 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
                 valuationData,
                 dailyKlines,
                 intradayData,
-                watchlistState,
-                alertState,
                 this.dataCompleteness(missing));
+    }
+
+    private SceneAnalysisTaskPO pendingTask(Long userId, SceneAnalysisMessageDTO message) {
+        return SceneAnalysisTaskPO.createPending(
+                message.taskNo(),
+                userId,
+                message.target().type(),
+                message.target().code(),
+                message.target().name(),
+                message.reportType(),
+                message.config().profile(),
+                this.toJsonNode(message.config().parameters()));
     }
 
     private List<Map<String, Object>> queryStockIntraday(String stockCode, List<String> missing) {
@@ -341,39 +371,6 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("bondRating", quote.getBondRating());
         return this.compactMap(data);
-    }
-
-    private Map<String, Object> watchlistState(Long userId, String targetType, String targetCode) {
-        Map<String, Object> state = new LinkedHashMap<>();
-        if (userId == null) {
-            state.put("matched", false);
-            state.put("reason", "userId is empty");
-            return state;
-        }
-        List<Map<String, Object>> items = this.watchGroupItemManage.lambdaQuery()
-                .eq(WatchGroupItemPO::getUserId, userId)
-                .eq(WatchGroupItemPO::getTargetType, targetType)
-                .eq(WatchGroupItemPO::getTargetCode, targetCode)
-                .list()
-                .stream()
-                .map(this::toMap)
-                .toList();
-        state.put("matched", !items.isEmpty());
-        state.put("items", items);
-        return state;
-    }
-
-    private Map<String, Object> alertState(Long userId, String targetType, String targetCode) {
-        Map<String, Object> state = new LinkedHashMap<>();
-        if (userId == null) {
-            state.put("matched", false);
-            state.put("reason", "userId is empty");
-            return state;
-        }
-        StockAlertConfigPO alert = this.stockAlertConfigManage.getByUserIdAndTarget(userId, targetType, targetCode);
-        state.put("matched", alert != null);
-        state.put("config", this.toMap(alert));
-        return state;
     }
 
     private Map<String, Object> dataCompleteness(List<String> missing) {
@@ -457,5 +454,32 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
 
     private String newTaskNo() {
         return "scene-" + UUID.randomUUID().toString().replace("-", "");
+    }
+
+    private JsonNode toJsonNode(Object value) {
+        return this.objectMapper.valueToTree(value);
+    }
+
+    private Long currentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new IllegalArgumentException("login required");
+        }
+        Object principal = authentication.getPrincipal();
+        try {
+            Method getUser = principal.getClass().getMethod("getUser");
+            Object user = getUser.invoke(principal);
+            Method getId = user.getClass().getMethod("getId");
+            Object id = getId.invoke(user);
+            if (id instanceof Long userId) {
+                return userId;
+            }
+            if (id instanceof Number number) {
+                return number.longValue();
+            }
+        } catch (ReflectiveOperationException ex) {
+            throw new IllegalArgumentException("login user id is unavailable", ex);
+        }
+        throw new IllegalArgumentException("login user id is unavailable");
     }
 }

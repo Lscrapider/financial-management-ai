@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from collections.abc import Callable
 from typing import Any
 
 
@@ -35,3 +36,5 @@ class HandlerRoute:
     queue: str
     routing_key: str
     handler_key: str
+    retry_exchange: str | None = None
+    task_deleted_checker: Callable[[str], bool] | None = None

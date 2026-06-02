@@ -81,8 +81,9 @@ class RabbitMqWorker:
         future.add_done_callback(lambda completed: self._schedule_finalize(message, completed))
 
     def _dispatch(self, route: HandlerRoute, message: IncomingMessage) -> HandlerResult:
-        if self._task_deleted_checker is not None and message.task_no:
-            if self._task_deleted_checker(message.task_no):
+        task_deleted_checker = route.task_deleted_checker or self._task_deleted_checker
+        if task_deleted_checker is not None and message.task_no:
+            if task_deleted_checker(message.task_no):
                 logger.info(
                     "skip soft deleted task message task_no=%s stage=%s routing_key=%s",
                     message.task_no,
@@ -138,9 +139,10 @@ class RabbitMqWorker:
             return
         retry_body = dict(message.body)
         retry_body["attempt"] = message.attempt + 1
+        retry_exchange = self._retry_exchange_for(message.routing_key)
         # retry 队列依赖 TTL + DLX 回到原业务 exchange，原消息发布 retry 成功后 ack。
         self._channel.basic_publish(
-            exchange=self._settings.retry_exchange,
+            exchange=retry_exchange,
             routing_key=f"{message.routing_key}.retry",
             body=json.dumps(retry_body, ensure_ascii=False).encode("utf-8"),
             properties=pika.BasicProperties(
@@ -156,6 +158,12 @@ class RabbitMqWorker:
             retry_body["attempt"],
         )
         self._ack(message.delivery_tag)
+
+    def _retry_exchange_for(self, routing_key: str) -> str:
+        for route in self._routes:
+            if route.routing_key == routing_key and route.retry_exchange:
+                return route.retry_exchange
+        return self._settings.retry_exchange
 
     def _reject_to_dead_letter(self, message: IncomingMessage) -> None:
         # requeue=False 会触发当前队列的 x-dead-letter-exchange，最终进入 DLQ。

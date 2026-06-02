@@ -6,6 +6,5 @@ public record SceneAnalysisSubmitParam(
         String targetName,
         String reportType,
         String configProfile,
-        SceneAnalysisUserConfigParam userOverrides,
-        Long userId) {
+        SceneAnalysisUserConfigParam userOverrides) {
 }

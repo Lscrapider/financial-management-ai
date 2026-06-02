@@ -50,6 +50,33 @@
       "auto_delete": false,
       "internal": false,
       "arguments": {}
+    },
+    {
+      "name": "finance.scene-analysis.topic",
+      "vhost": "finance",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "finance.scene-analysis.dlx",
+      "vhost": "finance",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "finance.scene-analysis.retry.topic",
+      "vhost": "finance",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
     }
   ],
   "queues": [
@@ -237,6 +264,34 @@
       "durable": true,
       "auto_delete": false,
       "arguments": {}
+    },
+    {
+      "name": "finance.scene-analysis.current.generate",
+      "vhost": "finance",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "finance.scene-analysis.dlx",
+        "x-dead-letter-routing-key": "scene.analysis.current.generate.dead"
+      }
+    },
+    {
+      "name": "finance.scene-analysis.current.generate.retry",
+      "vhost": "finance",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 30000,
+        "x-dead-letter-exchange": "finance.scene-analysis.topic",
+        "x-dead-letter-routing-key": "scene.analysis.current.generate"
+      }
+    },
+    {
+      "name": "finance.scene-analysis.dlq",
+      "vhost": "finance",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
     }
   ],
   "bindings": [
@@ -382,6 +437,30 @@
       "destination": "finance.ocr.embedding.index.retry",
       "destination_type": "queue",
       "routing_key": "ocr.embedding.index.retry",
+      "arguments": {}
+    },
+    {
+      "source": "finance.scene-analysis.topic",
+      "vhost": "finance",
+      "destination": "finance.scene-analysis.current.generate",
+      "destination_type": "queue",
+      "routing_key": "scene.analysis.current.generate",
+      "arguments": {}
+    },
+    {
+      "source": "finance.scene-analysis.dlx",
+      "vhost": "finance",
+      "destination": "finance.scene-analysis.dlq",
+      "destination_type": "queue",
+      "routing_key": "#",
+      "arguments": {}
+    },
+    {
+      "source": "finance.scene-analysis.retry.topic",
+      "vhost": "finance",
+      "destination": "finance.scene-analysis.current.generate.retry",
+      "destination_type": "queue",
+      "routing_key": "scene.analysis.current.generate.retry",
       "arguments": {}
     }
   ]
