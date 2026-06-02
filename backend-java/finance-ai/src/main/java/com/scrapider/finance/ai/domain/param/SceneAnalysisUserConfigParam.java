@@ -40,16 +40,13 @@ public record SceneAnalysisUserConfigParam(
                 new TrendConfigParam(0.05, new BreakoutFromRangeConfirmWeightsParam(0.70, 0.30)),
                 new SentimentConfigParam(
                         1.5,
-                        0.8,
-                        24.0,
-                        24.0,
-                        48.0,
-                        new SourceWeightsParam(1.00, 0.80, 0.70, 0.40, 0.25),
-                        new ShortTermEmotionWeightsParam(0.35, 0.25, 0.25, 0.15),
-                        new PanicSellingWeightsParam(0.30, 0.25, 0.25, 0.20),
-                        new SectorRotationWeightsParam(0.40, 0.30, 0.30),
-                        new WeakSentimentWeightsParam(0.35, 0.25, 0.20, 0.20),
-                        new HerdingEffectWeightsParam(0.30, 0.25, 0.25, 0.20)),
+                        0.4,
+                        0.5,
+                        new MarketProxyEmotionWeightsParam(0.35, 0.25, 0.20, 0.20),
+                        new MarketProxyPanicWeightsParam(0.35, 0.25, 0.25, 0.15),
+                        new MarketProxyWeakWeightsParam(0.25, 0.20, 0.20, 0.20, 0.15),
+                        new MarketProxyHerdingWeightsParam(0.35, 0.30, 0.35),
+                        new SectorRotationWeightsParam(0.40, 0.30, 0.30)),
                 new RiskStrategyConfigParam(
                         new ChaseHighRiskWeightsParam(0.25, 0.25, 0.20, 0.15, 0.15),
                         new FalseBreakoutRiskWeightsParam(0.35, 0.25, 0.20, 0.20),
@@ -61,7 +58,7 @@ public record SceneAnalysisUserConfigParam(
                         new StopLossPlanWeightsParam(0.35, 0.25, 0.20, 0.20),
                         0.01,
                         0.08,
-                        new UncertaintyWeightsParam(0.30, 0.25, 0.25, 0.20)));
+                        new UncertaintyWeightsParam(1.00)));
     }
 
     private static String defaultAssetType(String targetType) {
@@ -124,17 +121,14 @@ public record SceneAnalysisUserConfigParam(
             return defaults;
         }
         return new SentimentConfigParam(
-                value(overrides.attentionCenter(), defaults.attentionCenter()),
-                value(overrides.attentionScale(), defaults.attentionScale()),
-                value(overrides.sentimentHalfLifeHours(), defaults.sentimentHalfLifeHours()),
-                value(overrides.newsHalfLifeHours(), defaults.newsHalfLifeHours()),
-                value(overrides.policyHalfLifeHours(), defaults.policyHalfLifeHours()),
-                merge(defaults.sourceWeights(), overrides.sourceWeights()),
-                merge(defaults.shortTermEmotionWeights(), overrides.shortTermEmotionWeights()),
-                merge(defaults.panicSellingWeights(), overrides.panicSellingWeights()),
-                merge(defaults.sectorRotationWeights(), overrides.sectorRotationWeights()),
-                merge(defaults.weakSentimentWeights(), overrides.weakSentimentWeights()),
-                merge(defaults.herdingEffectWeights(), overrides.herdingEffectWeights()));
+                value(overrides.attentionRiseCenter(), defaults.attentionRiseCenter()),
+                value(overrides.attentionRiseScale(), defaults.attentionRiseScale()),
+                value(overrides.lowAttentionScale(), defaults.lowAttentionScale()),
+                merge(defaults.marketProxyEmotionWeights(), overrides.marketProxyEmotionWeights()),
+                merge(defaults.marketProxyPanicWeights(), overrides.marketProxyPanicWeights()),
+                merge(defaults.marketProxyWeakWeights(), overrides.marketProxyWeakWeights()),
+                merge(defaults.marketProxyHerdingWeights(), overrides.marketProxyHerdingWeights()),
+                merge(defaults.sectorRotationWeights(), overrides.sectorRotationWeights()));
     }
 
     private static RiskStrategyConfigParam merge(
@@ -168,40 +162,30 @@ public record SceneAnalysisUserConfigParam(
                 value(overrides.volumeExpand(), defaults.volumeExpand()));
     }
 
-    private static SourceWeightsParam merge(SourceWeightsParam defaults, SourceWeightsParam overrides) {
+    private static MarketProxyEmotionWeightsParam merge(
+            MarketProxyEmotionWeightsParam defaults,
+            MarketProxyEmotionWeightsParam overrides) {
         if (overrides == null) {
             return defaults;
         }
-        return new SourceWeightsParam(
-                value(overrides.announcement(), defaults.announcement()),
-                value(overrides.mainstreamNews(), defaults.mainstreamNews()),
-                value(overrides.research(), defaults.research()),
-                value(overrides.socialMedia(), defaults.socialMedia()),
-                value(overrides.forum(), defaults.forum()));
-    }
-
-    private static ShortTermEmotionWeightsParam merge(
-            ShortTermEmotionWeightsParam defaults,
-            ShortTermEmotionWeightsParam overrides) {
-        if (overrides == null) {
-            return defaults;
-        }
-        return new ShortTermEmotionWeightsParam(
-                value(overrides.sentimentPositive(), defaults.sentimentPositive()),
+        return new MarketProxyEmotionWeightsParam(
                 value(overrides.priceRise(), defaults.priceRise()),
                 value(overrides.volumeExpand(), defaults.volumeExpand()),
+                value(overrides.highTurnover(), defaults.highTurnover()),
                 value(overrides.marketAttentionRise(), defaults.marketAttentionRise()));
     }
 
-    private static PanicSellingWeightsParam merge(PanicSellingWeightsParam defaults, PanicSellingWeightsParam overrides) {
+    private static MarketProxyPanicWeightsParam merge(
+            MarketProxyPanicWeightsParam defaults,
+            MarketProxyPanicWeightsParam overrides) {
         if (overrides == null) {
             return defaults;
         }
-        return new PanicSellingWeightsParam(
+        return new MarketProxyPanicWeightsParam(
                 value(overrides.priceDrop(), defaults.priceDrop()),
                 value(overrides.volumeExpand(), defaults.volumeExpand()),
-                value(overrides.sentimentNegative(), defaults.sentimentNegative()),
-                value(overrides.breakRecentLow(), defaults.breakRecentLow()));
+                value(overrides.breakRecentLow(), defaults.breakRecentLow()),
+                value(overrides.closeWeak(), defaults.closeWeak()));
     }
 
     private static SectorRotationWeightsParam merge(
@@ -216,26 +200,30 @@ public record SceneAnalysisUserConfigParam(
                 value(overrides.sectorVolumeExpand(), defaults.sectorVolumeExpand()));
     }
 
-    private static WeakSentimentWeightsParam merge(WeakSentimentWeightsParam defaults, WeakSentimentWeightsParam overrides) {
+    private static MarketProxyWeakWeightsParam merge(
+            MarketProxyWeakWeightsParam defaults,
+            MarketProxyWeakWeightsParam overrides) {
         if (overrides == null) {
             return defaults;
         }
-        return new WeakSentimentWeightsParam(
-                value(overrides.sentimentNegative(), defaults.sentimentNegative()),
+        return new MarketProxyWeakWeightsParam(
                 value(overrides.priceDrop(), defaults.priceDrop()),
-                value(overrides.lowAttention(), defaults.lowAttention()),
-                value(overrides.reboundWeak(), defaults.reboundWeak()));
+                value(overrides.volumeShrink(), defaults.volumeShrink()),
+                value(overrides.lowTurnover(), defaults.lowTurnover()),
+                value(overrides.closeWeak(), defaults.closeWeak()),
+                value(overrides.lowAttention(), defaults.lowAttention()));
     }
 
-    private static HerdingEffectWeightsParam merge(HerdingEffectWeightsParam defaults, HerdingEffectWeightsParam overrides) {
+    private static MarketProxyHerdingWeightsParam merge(
+            MarketProxyHerdingWeightsParam defaults,
+            MarketProxyHerdingWeightsParam overrides) {
         if (overrides == null) {
             return defaults;
         }
-        return new HerdingEffectWeightsParam(
-                value(overrides.marketAttentionRise(), defaults.marketAttentionRise()),
+        return new MarketProxyHerdingWeightsParam(
                 value(overrides.highTurnover(), defaults.highTurnover()),
                 value(overrides.volumeExpand(), defaults.volumeExpand()),
-                value(overrides.llmHerdingSignal(), defaults.llmHerdingSignal()));
+                value(overrides.marketAttentionRise(), defaults.marketAttentionRise()));
     }
 
     private static ChaseHighRiskWeightsParam merge(
@@ -329,7 +317,7 @@ public record SceneAnalysisUserConfigParam(
         return new StopLossPlanWeightsParam(
                 value(overrides.breakRecentLow(), defaults.breakRecentLow()),
                 value(overrides.downtrend(), defaults.downtrend()),
-                value(overrides.sentimentNegative(), defaults.sentimentNegative()),
+                value(overrides.panicSelling(), defaults.panicSelling()),
                 value(overrides.drawdownRisk(), defaults.drawdownRisk()));
     }
 
@@ -338,10 +326,7 @@ public record SceneAnalysisUserConfigParam(
             return defaults;
         }
         return new UncertaintyWeightsParam(
-                value(overrides.waitConfirm(), defaults.waitConfirm()),
-                value(overrides.sentimentConflict(), defaults.sentimentConflict()),
-                value(overrides.policyUncertainty(), defaults.policyUncertainty()),
-                value(overrides.newsUncertainty(), defaults.newsUncertainty()));
+                value(overrides.sentimentConflict(), defaults.sentimentConflict()));
     }
 
     private static Double value(Double overrideValue, Double defaultValue) {
@@ -379,17 +364,14 @@ public record SceneAnalysisUserConfigParam(
     }
 
     public record SentimentConfigParam(
-            @JsonProperty("attention_center") Double attentionCenter,
-            @JsonProperty("attention_scale") Double attentionScale,
-            @JsonProperty("sentiment_half_life_hours") Double sentimentHalfLifeHours,
-            @JsonProperty("news_half_life_hours") Double newsHalfLifeHours,
-            @JsonProperty("policy_half_life_hours") Double policyHalfLifeHours,
-            @JsonProperty("source_weights") SourceWeightsParam sourceWeights,
-            @JsonProperty("short_term_emotion_weights") ShortTermEmotionWeightsParam shortTermEmotionWeights,
-            @JsonProperty("panic_selling_weights") PanicSellingWeightsParam panicSellingWeights,
-            @JsonProperty("sector_rotation_weights") SectorRotationWeightsParam sectorRotationWeights,
-            @JsonProperty("weak_sentiment_weights") WeakSentimentWeightsParam weakSentimentWeights,
-            @JsonProperty("herding_effect_weights") HerdingEffectWeightsParam herdingEffectWeights) {
+            @JsonProperty("attention_rise_center") Double attentionRiseCenter,
+            @JsonProperty("attention_rise_scale") Double attentionRiseScale,
+            @JsonProperty("low_attention_scale") Double lowAttentionScale,
+            @JsonProperty("market_proxy_emotion_weights") MarketProxyEmotionWeightsParam marketProxyEmotionWeights,
+            @JsonProperty("market_proxy_panic_weights") MarketProxyPanicWeightsParam marketProxyPanicWeights,
+            @JsonProperty("market_proxy_weak_weights") MarketProxyWeakWeightsParam marketProxyWeakWeights,
+            @JsonProperty("market_proxy_herding_weights") MarketProxyHerdingWeightsParam marketProxyHerdingWeights,
+            @JsonProperty("sector_rotation_weights") SectorRotationWeightsParam sectorRotationWeights) {
     }
 
     public record RiskStrategyConfigParam(
@@ -411,26 +393,18 @@ public record SceneAnalysisUserConfigParam(
             @JsonProperty("volume_expand") Double volumeExpand) {
     }
 
-    public record SourceWeightsParam(
-            @JsonProperty("announcement") Double announcement,
-            @JsonProperty("mainstream_news") Double mainstreamNews,
-            @JsonProperty("research") Double research,
-            @JsonProperty("social_media") Double socialMedia,
-            @JsonProperty("forum") Double forum) {
-    }
-
-    public record ShortTermEmotionWeightsParam(
-            @JsonProperty("sentiment_positive") Double sentimentPositive,
+    public record MarketProxyEmotionWeightsParam(
             @JsonProperty("price_rise") Double priceRise,
             @JsonProperty("volume_expand") Double volumeExpand,
+            @JsonProperty("high_turnover") Double highTurnover,
             @JsonProperty("market_attention_rise") Double marketAttentionRise) {
     }
 
-    public record PanicSellingWeightsParam(
+    public record MarketProxyPanicWeightsParam(
             @JsonProperty("price_drop") Double priceDrop,
             @JsonProperty("volume_expand") Double volumeExpand,
-            @JsonProperty("sentiment_negative") Double sentimentNegative,
-            @JsonProperty("break_recent_low") Double breakRecentLow) {
+            @JsonProperty("break_recent_low") Double breakRecentLow,
+            @JsonProperty("close_weak") Double closeWeak) {
     }
 
     public record SectorRotationWeightsParam(
@@ -439,18 +413,18 @@ public record SceneAnalysisUserConfigParam(
             @JsonProperty("sector_volume_expand") Double sectorVolumeExpand) {
     }
 
-    public record WeakSentimentWeightsParam(
-            @JsonProperty("sentiment_negative") Double sentimentNegative,
+    public record MarketProxyWeakWeightsParam(
             @JsonProperty("price_drop") Double priceDrop,
-            @JsonProperty("low_attention") Double lowAttention,
-            @JsonProperty("rebound_weak") Double reboundWeak) {
+            @JsonProperty("volume_shrink") Double volumeShrink,
+            @JsonProperty("low_turnover") Double lowTurnover,
+            @JsonProperty("close_weak") Double closeWeak,
+            @JsonProperty("low_attention") Double lowAttention) {
     }
 
-    public record HerdingEffectWeightsParam(
-            @JsonProperty("market_attention_rise") Double marketAttentionRise,
+    public record MarketProxyHerdingWeightsParam(
             @JsonProperty("high_turnover") Double highTurnover,
             @JsonProperty("volume_expand") Double volumeExpand,
-            @JsonProperty("llm_herding_signal") Double llmHerdingSignal) {
+            @JsonProperty("market_attention_rise") Double marketAttentionRise) {
     }
 
     public record ChaseHighRiskWeightsParam(
@@ -504,14 +478,11 @@ public record SceneAnalysisUserConfigParam(
     public record StopLossPlanWeightsParam(
             @JsonProperty("break_recent_low") Double breakRecentLow,
             @JsonProperty("downtrend") Double downtrend,
-            @JsonProperty("sentiment_negative") Double sentimentNegative,
+            @JsonProperty("panic_selling") Double panicSelling,
             @JsonProperty("drawdown_risk") Double drawdownRisk) {
     }
 
     public record UncertaintyWeightsParam(
-            @JsonProperty("wait_confirm") Double waitConfirm,
-            @JsonProperty("sentiment_conflict") Double sentimentConflict,
-            @JsonProperty("policy_uncertainty") Double policyUncertainty,
-            @JsonProperty("news_uncertainty") Double newsUncertainty) {
+            @JsonProperty("sentiment_conflict") Double sentimentConflict) {
     }
 }

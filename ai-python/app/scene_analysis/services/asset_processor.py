@@ -2,23 +2,20 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.scene_analysis.models import BaseMetrics, SceneModuleResult
+from app.scene_analysis.context import SceneAnalysisContext
+from app.scene_analysis.models import SceneModuleResult
+from app.scene_analysis.services.module_scoring import active_tags, module_level, module_score, number
 
 
 class AssetProcessor:
     MODULE = "asset"
 
-    def process(self, message: dict[str, Any], base_metrics: BaseMetrics) -> SceneModuleResult:
-        target = self._dict(message.get("target"))
-        config = self._dict(self._dict(message.get("config")).get("parameters"))
-        industry_data = self._dict(message.get("industryData"))
-        asset_config = self._dict(config.get("asset_config"))
-
-        asset_type = self._asset_type(config, target)
-        configured_asset_type = self._normalize_asset_type(config.get("asset_type"))
-        industry_name = str(industry_data.get("industryName") or "")
-        current_price = self._number(base_metrics.get("current_price") or base_metrics.get("latest_price"))
-        low_price_threshold = self._number(asset_config.get("low_price_threshold"))
+    def process(self, context: SceneAnalysisContext) -> SceneModuleResult:
+        asset_type = self._asset_type(context.config, context.target)
+        configured_asset_type = self._normalize_asset_type(context.config.get("asset_type"))
+        industry_name = str(context.industry_data.get("industryName") or "")
+        current_price = number(context.base_metrics.get("current_price") or context.base_metrics.get("latest_price"))
+        low_price_threshold = number(context.asset_config.get("low_price_threshold"))
 
         tags: dict[str, float] = {}
         evidence: list[str] = []
@@ -38,11 +35,12 @@ class AssetProcessor:
             tags["general"] = 1.0
             evidence.append("未识别到更具体的资产类型")
 
-        score = max(tags.values()) if tags else 0.0
+        tags = active_tags(tags)
+        score = module_score(tags)
         return SceneModuleResult(
             module=self.MODULE,
             score=score,
-            level=self._level(score),
+            level=module_level(score),
             direction="neutral",
             tags=tags,
             evidence=evidence,
@@ -95,21 +93,3 @@ class AssetProcessor:
     def _is_bank_industry(self, industry_name: str) -> bool:
         normalized = industry_name.strip().lower()
         return "银行" in normalized or "bank" in normalized
-
-    def _level(self, score: float) -> str:
-        if score >= 0.7:
-            return "high"
-        if score >= 0.3:
-            return "medium"
-        return "low"
-
-    def _dict(self, value: Any) -> dict[str, Any]:
-        return value if isinstance(value, dict) else {}
-
-    def _number(self, value: Any) -> float | None:
-        if value is None or value == "":
-            return None
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return None

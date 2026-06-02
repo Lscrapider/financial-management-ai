@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from math import exp, sqrt
+from math import exp, log1p, sqrt
 from statistics import median
 from typing import Any
 
@@ -33,6 +33,7 @@ class BaseMetricsCalculator:
         low_price = self._number(market_data.get("lowPrice"))
         previous_close_price = self._number(market_data.get("previousClosePrice"))
         change_percent = self._number(market_data.get("changePercent"))
+        turnover_amount = self._number(market_data.get("turnoverAmount") or market_data.get("amount"))
 
         self._put(values, "latest_price", latest_price)
         self._put(values, "open_price", open_price)
@@ -43,6 +44,7 @@ class BaseMetricsCalculator:
         self._put(values, "turnover_rate", self._number(market_data.get("turnoverRate")))
         self._put(values, "volume_ratio", self._number(market_data.get("volumeRatio")))
         self._put(values, "amplitude", self._number(market_data.get("amplitude")))
+        self._put(values, "turnover_amount", turnover_amount)
         self._put(values, "pe_ttm", self._number(market_data.get("peTtm")))
         self._put(values, "pe_dynamic", self._number(market_data.get("peDynamic")))
         self._put(values, "pe_static", self._number(market_data.get("peStatic")))
@@ -76,6 +78,11 @@ class BaseMetricsCalculator:
         lows = self._numbers(row.get("lowPrice") for row in klines)
         volumes = self._numbers(row.get("volume") for row in klines)
         turnover_rates = self._numbers(row.get("turnoverRate") for row in klines)
+        amounts = [
+            self._amount(row.get("turnoverAmount") or row.get("amount"), row.get("volume"), row.get("closePrice"))
+            for row in klines
+        ]
+        amplitudes = self._amplitude_history(highs, lows, closes)
         if not closes:
             missing.append("daily_klines.close_price")
             return
@@ -96,12 +103,19 @@ class BaseMetricsCalculator:
         values["position_20d"] = self._position(current_price, values["recent_high_20d"], values["recent_low_20d"])
         values["volume_ratio_5d"] = self._ratio_to_mean_last(volumes, 5)
         values["volume_ratio_20d"] = self._ratio_to_mean_last(volumes, 20)
+        values["volume_ratio_20d_history"] = self._ratio_to_mean_history(volumes, 20)
         values["volatility_20d"] = self._volatility(closes, 20)
         values["price_return_5d"] = self._return_pct(closes, 5)
         values["price_return_20d"] = self._return_pct(closes, 20)
         values["volume_robust_zscore"] = self._robust_zscore_last(volumes, 20)
         values["volume_history_60d"] = volumes[-60:]
         values["turnover_rate_history"] = turnover_rates[-250:]
+        values["trading_attention_history_20d"] = self._trading_attention_history(
+            amounts,
+            turnover_rates,
+            amplitudes,
+            20,
+        )
         values["atr_ratio_14"] = self._atr_ratio_last(highs, lows, closes, 14)
         values["atr_ratio_history_250d"] = self._atr_ratio_history(highs, lows, closes, 14)[-250:]
         self._put(values, "support_price", values["recent_low_20d"])
@@ -114,6 +128,8 @@ class BaseMetricsCalculator:
             missing.append("daily_klines.volume_60d_window")
         if len(turnover_rates) < 20:
             missing.append("daily_klines.turnover_rate_window")
+        if len(values["trading_attention_history_20d"]) < 20:
+            missing.append("daily_klines.trading_attention_20d_window")
         if len(closes) < 15 or len(highs) < 15 or len(lows) < 15:
             missing.append("daily_klines.atr_14_window")
 
@@ -152,6 +168,7 @@ class BaseMetricsCalculator:
         price_config = self._dict(config.get("price_config"))
         volume_config = self._dict(config.get("volume_config"))
         risk_config = self._dict(config.get("risk_strategy_config"))
+        sentiment_config = self._dict(config.get("sentiment_config"))
 
         change_pct = self._number(values.get("change_pct"))
         if change_pct is not None:
@@ -252,13 +269,44 @@ class BaseMetricsCalculator:
                 ((current_price - support_price) / current_price) / support_distance_threshold
             )
 
+        turnover_amount = self._number(values.get("turnover_amount"))
+        current_volume = self._number(values.get("current_volume"))
+        turnover_rate = self._number(values.get("turnover_rate"))
+        amplitude = self._number(values.get("amplitude"))
+        amount = turnover_amount if turnover_amount is not None else self._amount(None, current_volume, current_price)
+        trading_attention = self._trading_attention(amount, turnover_rate, amplitude)
+        if trading_attention is not None:
+            values["trading_attention"] = trading_attention
+            history = self._number_list(values.get("trading_attention_history_20d"))
+            if history:
+                average_attention = sum(history) / len(history)
+                if average_attention > 0:
+                    attention_rise = trading_attention / average_attention
+                    values["trading_attention_rise"] = attention_rise
+                    values["market_attention_rise"] = self._sigmoid_score(
+                        attention_rise,
+                        self._config_number_any(
+                            sentiment_config,
+                            ("attention_rise_center", "attention_center"),
+                            1.5,
+                        ),
+                        self._config_number_any(
+                            sentiment_config,
+                            ("attention_rise_scale", "attention_scale"),
+                            0.4,
+                        ),
+                    )
+                    values["low_attention"] = self._clamp(
+                        (1 - attention_rise)
+                        / self._config_number_any(sentiment_config, ("low_attention_scale",), 0.5)
+                    )
+
     def _add_distribution_requirements(self, target_type: Any, missing: list[str]) -> None:
         missing.append("distribution.pe_history_or_industry")
         missing.append("distribution.pb_history_or_industry")
         if str(target_type or "").upper() == "STOCK":
             missing.append("fundamental.financial_summary")
             missing.append("fundamental.industry")
-        missing.append("sentiment.news_announcement_research")
 
     def _put(self, values: dict[str, Any], key: str, value: Any) -> None:
         if value is not None:
@@ -323,10 +371,76 @@ class BaseMetricsCalculator:
             return None
         return values[-1] / average
 
+    def _ratio_to_mean_history(self, values: list[float], window: int) -> list[float]:
+        if len(values) < window + 1:
+            return []
+        ratios: list[float] = []
+        for index in range(window, len(values)):
+            baseline = values[index - window : index]
+            average = sum(baseline) / len(baseline)
+            if average == 0:
+                continue
+            ratios.append(values[index] / average)
+        return ratios
+
     def _return_pct(self, closes: list[float], lookback: int) -> float | None:
         if len(closes) <= lookback or closes[-lookback - 1] == 0:
             return None
         return (closes[-1] - closes[-lookback - 1]) / closes[-lookback - 1] * 100
+
+    def _amount(self, amount: Any, volume: Any, price: Any) -> float | None:
+        value = self._number(amount)
+        if value is not None:
+            return value
+        volume_value = self._number(volume)
+        price_value = self._number(price)
+        if volume_value is None or price_value is None:
+            return None
+        return volume_value * price_value
+
+    def _amplitude_history(self, highs: list[float], lows: list[float], closes: list[float]) -> list[float | None]:
+        values: list[float | None] = []
+        length = min(len(highs), len(lows), len(closes))
+        for index in range(length):
+            if index == 0:
+                values.append(None)
+                continue
+            previous_close = closes[index - 1]
+            if previous_close == 0:
+                values.append(None)
+                continue
+            values.append((highs[index] - lows[index]) / previous_close * 100)
+        return values
+
+    def _trading_attention(
+        self,
+        amount: float | None,
+        turnover_rate: float | None,
+        amplitude: float | None,
+    ) -> float | None:
+        if amount is None or amount <= 0 or turnover_rate is None or amplitude is None:
+            return None
+        return log1p(amount) * (1 + turnover_rate / 100) * (1 + amplitude / 100)
+
+    def _trading_attention_history(
+        self,
+        amounts: list[float | None],
+        turnover_rates: list[float],
+        amplitudes: list[float | None],
+        window: int,
+    ) -> list[float]:
+        length = min(len(amounts), len(turnover_rates), len(amplitudes))
+        scores = [
+            score
+            for score in (
+                self._trading_attention(amounts[index], turnover_rates[index], amplitudes[index])
+                for index in range(length)
+            )
+            if score is not None
+        ]
+        if len(scores) < window + 1:
+            return []
+        return scores[-window - 1 : -1]
 
     def _volatility(self, closes: list[float], window: int) -> float | None:
         if len(closes) < window + 1:
@@ -403,6 +517,13 @@ class BaseMetricsCalculator:
         if value is None:
             missing.append(f"config.{key}")
         return value
+
+    def _config_number_any(self, config: dict[str, Any], keys: tuple[str, ...], default: float) -> float:
+        for key in keys:
+            value = self._number(config.get(key))
+            if value is not None:
+                return value
+        return default
 
     def _clamp(self, value: float) -> float:
         return min(max(value, 0.0), 1.0)

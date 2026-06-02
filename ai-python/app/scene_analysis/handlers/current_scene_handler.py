@@ -5,11 +5,18 @@ from pathlib import Path
 from app.messaging.base_handler import MessageHandler
 from app.messaging.errors import PermanentMessageError
 from app.messaging.models import HandlerResult, IncomingMessage
+from app.scene_analysis.context import SceneAnalysisContext
 from app.scene_analysis.services.asset_processor import AssetProcessor
 from app.scene_analysis.services.base_metrics import BaseMetricsCalculator
+from app.scene_analysis.services.price_processor import PriceProcessor
+from app.scene_analysis.services.risk_strategy_processor import RiskStrategyProcessor
+from app.scene_analysis.services.sentiment_processor import SentimentProcessor
+from app.scene_analysis.services.trend_processor import TrendProcessor
+from app.scene_analysis.services.valuation_processor import ValuationProcessor
+from app.scene_analysis.services.volume_processor import VolumeProcessor
 
 logger = logging.getLogger(__name__)
-DEFAULT_TEST_DATA_PATH = Path(__file__).resolve().parents[3] / "test" / "data2.json"
+DEFAULT_TEST_DATA_PATH = Path(__file__).resolve().parents[3] / "test" / "data3.json"
 
 
 class CurrentSceneHandler(MessageHandler):
@@ -18,10 +25,22 @@ class CurrentSceneHandler(MessageHandler):
         max_attempts: int,
         base_metrics_calculator: BaseMetricsCalculator | None = None,
         asset_processor: AssetProcessor | None = None,
+        price_processor: PriceProcessor | None = None,
+        volume_processor: VolumeProcessor | None = None,
+        trend_processor: TrendProcessor | None = None,
+        valuation_processor: ValuationProcessor | None = None,
+        sentiment_processor: SentimentProcessor | None = None,
+        risk_strategy_processor: RiskStrategyProcessor | None = None,
     ) -> None:
         self._max_attempts = max_attempts
         self._base_metrics_calculator = base_metrics_calculator or BaseMetricsCalculator()
         self._asset_processor = asset_processor or AssetProcessor()
+        self._price_processor = price_processor or PriceProcessor()
+        self._volume_processor = volume_processor or VolumeProcessor()
+        self._trend_processor = trend_processor or TrendProcessor()
+        self._valuation_processor = valuation_processor or ValuationProcessor()
+        self._sentiment_processor = sentiment_processor or SentimentProcessor()
+        self._risk_strategy_processor = risk_strategy_processor or RiskStrategyProcessor()
 
     def handle(self, message: IncomingMessage) -> HandlerResult:
         task_no = message.task_no
@@ -35,7 +54,19 @@ class CurrentSceneHandler(MessageHandler):
             raise PermanentMessageError(f"scene analysis config.parameters is required task_no={task_no}")
         self._save_test_data(message.body)
         base_metrics = self._base_metrics_calculator.calculate(message.body)
-        asset_result = self._asset_processor.process(message.body, base_metrics)
+        context = SceneAnalysisContext.from_message(message.body, base_metrics)
+        asset_result = self._asset_processor.process(context)
+        price_result = self._price_processor.process(context)
+        volume_result = self._volume_processor.process(context)
+        trend_result = self._trend_processor.process(context)
+        valuation_result = self._valuation_processor.process(context, trend_result.tags)
+        sentiment_result = self._sentiment_processor.process(context)
+        risk_strategy_result = self._risk_strategy_processor.process(
+            context,
+            trend_result.tags,
+            valuation_result.tags,
+            sentiment_result.tags,
+        )
         logger.info(
             "scene analysis base metrics calculated task_no=%s target_type=%s target_code=%s report_type=%s "
             "metric_count=%s missing_metrics=%s attempt=%s/%s",
@@ -52,6 +83,36 @@ class CurrentSceneHandler(MessageHandler):
             "scene analysis asset module calculated task_no=%s result=%s",
             task_no,
             asset_result.to_dict(),
+        )
+        logger.info(
+            "scene analysis price module calculated task_no=%s result=%s",
+            task_no,
+            price_result.to_dict(),
+        )
+        logger.info(
+            "scene analysis volume module calculated task_no=%s result=%s",
+            task_no,
+            volume_result.to_dict(),
+        )
+        logger.info(
+            "scene analysis trend module calculated task_no=%s result=%s",
+            task_no,
+            trend_result.to_dict(),
+        )
+        logger.info(
+            "scene analysis valuation module calculated task_no=%s result=%s",
+            task_no,
+            valuation_result.to_dict(),
+        )
+        logger.info(
+            "scene analysis sentiment module calculated task_no=%s result=%s",
+            task_no,
+            sentiment_result.to_dict(),
+        )
+        logger.info(
+            "scene analysis risk_strategy module calculated task_no=%s result=%s",
+            task_no,
+            risk_strategy_result.to_dict(),
         )
         return HandlerResult()
 
