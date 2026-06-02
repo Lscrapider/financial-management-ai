@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from app.scene_analysis.context import SceneAnalysisContext
 from app.scene_analysis.models import SceneModuleResult
-from app.scene_analysis.services.evidence import build_evidence
+from app.scene_analysis.services.evidence import active_signal_names, build_evidence, joined_signal_reason
 from app.scene_analysis.services.module_scoring import active_tags, clamp, module_level, module_score, noisy_or, number, weighted_sum
 
 
@@ -117,13 +117,23 @@ class RiskStrategyProcessor:
             "stop_loss_plan": stop_loss_plan,
         })
         score = module_score(tags)
+        evidence_signals = {
+            **context.base_metrics.values,
+            **trend_tags,
+            **valuation_tags,
+            **sentiment_tags,
+            **tags,
+            "low_volume": low_volume,
+            "uncertainty": uncertainty,
+            "trend_confirmed": self._trend_confirmed(context),
+        }
         return SceneModuleResult(
             module=self.MODULE,
             score=score,
             level=module_level(score),
             direction="risk" if score >= 0.3 else "neutral",
             tags=tags,
-            evidence=self._evidence(tags),
+            evidence=self._evidence(tags, evidence_signals),
         )
 
     def _weights(self, context: SceneAnalysisContext, key: str) -> dict:
@@ -170,19 +180,95 @@ class RiskStrategyProcessor:
         price_rise = number(context.base_metrics.get("price_rise")) or 0.0
         return clamp(max(short_term_emotion * price_drop, panic_selling * price_rise))
 
-    def _evidence(self, tags: dict[str, float]) -> list[str]:
+    def _evidence(self, tags: dict[str, float], signals: dict) -> list[str]:
+        labels = {
+            "price_rise": "上涨强度",
+            "near_recent_high": "接近近期高位",
+            "volume_expand": "放量",
+            "high_turnover": "高换手",
+            "short_term_emotion": "短线情绪升温",
+            "breakout": "突破信号",
+            "close_weak": "收盘偏弱",
+            "upper_shadow": "上影线",
+            "low_turnover": "低换手",
+            "low_volume": "低成交",
+            "volatility": "波动率",
+            "support_distance": "支撑距离",
+            "risk_control": "风险控制信号",
+            "uncertainty": "不确定性",
+            "market_attention_rise": "交易关注度上升",
+            "volume_spike": "爆量",
+            "large_intraday_move": "日内波动",
+            "panic_selling": "恐慌抛售",
+            "herding_effect": "交易拥挤",
+            "overheated_risk": "过热风险",
+            "drawdown_risk": "回撤风险",
+            "false_breakout_risk": "假突破风险",
+            "liquidity_risk": "流动性风险",
+            "chase_high_risk": "追高风险",
+            "break_recent_low": "跌破近期低位",
+            "downtrend": "下降趋势",
+        }
         reasons = {
-            "chase_high_risk": "上涨、高位、放量、高换手或短线情绪升温共同提高追高风险，chase_high_risk 标签触发",
-            "false_breakout_risk": "突破信号同时伴随收盘偏弱、上影线或量能异常，false_breakout_risk 标签触发",
-            "liquidity_risk": "低换手或低成交量代理信号显示交易活跃度不足，liquidity_risk 标签触发",
-            "drawdown_risk": "高位、波动率、上涨强度和支撑距离共同提高回撤风险，drawdown_risk 标签触发",
-            "overheated_risk": "上涨、放量、高换手或短线情绪升温共同提高过热风险，overheated_risk 标签触发",
-            "risk_control": "多个风险子标签累计后达到风险控制阈值，risk_control 标签触发",
-            "position_control": "风险控制、波动率或不确定性信号提示需要控制仓位，position_control 标签触发",
-            "wait_confirm": "突破、量能或短线情绪信号尚未形成充分确认，wait_confirm 标签触发",
-            "observe_next_day": "关注度、爆量或日内波动提示需要观察次日延续性，observe_next_day 标签触发",
-            "avoid_emotional_trade": "短线情绪、恐慌、交易拥挤或过热风险提示避免情绪化交易，avoid_emotional_trade 标签触发",
-            "take_profit_plan": "上涨、高位、过热或回撤风险提示需要预设止盈计划，take_profit_plan 标签触发",
-            "stop_loss_plan": "跌破前低、下降趋势、恐慌抛售或回撤风险提示需要预设止损计划，stop_loss_plan 标签触发",
+            "chase_high_risk": joined_signal_reason(
+                active_signal_names({key: signals.get(key) for key in ["price_rise", "near_recent_high", "volume_expand", "high_turnover", "short_term_emotion"]}, labels),
+                "行情代理信号提高追高风险，chase_high_risk 标签触发",
+                "提高追高风险，chase_high_risk 标签触发",
+            ),
+            "false_breakout_risk": joined_signal_reason(
+                active_signal_names({key: signals.get(key) for key in ["breakout", "close_weak", "upper_shadow", "volume_expand"]}, labels),
+                "突破相关代理信号提高假突破风险，false_breakout_risk 标签触发",
+                "提高假突破风险，false_breakout_risk 标签触发",
+            ),
+            "liquidity_risk": joined_signal_reason(
+                active_signal_names({key: signals.get(key) for key in ["low_turnover", "low_volume"]}, labels),
+                "交易活跃度代理信号偏弱，liquidity_risk 标签触发",
+                "显示交易活跃度不足，liquidity_risk 标签触发",
+            ),
+            "drawdown_risk": joined_signal_reason(
+                active_signal_names({key: signals.get(key) for key in ["near_recent_high", "volatility", "price_rise", "support_distance"]}, labels),
+                "价格位置和波动代理信号提高回撤风险，drawdown_risk 标签触发",
+                "提高回撤风险，drawdown_risk 标签触发",
+            ),
+            "overheated_risk": joined_signal_reason(
+                active_signal_names({key: signals.get(key) for key in ["price_rise", "volume_expand", "high_turnover", "short_term_emotion"]}, labels),
+                "行情代理信号提高过热风险，overheated_risk 标签触发",
+                "提高过热风险，overheated_risk 标签触发",
+            ),
+            "risk_control": joined_signal_reason(
+                active_signal_names({key: signals.get(key) for key in ["chase_high_risk", "false_breakout_risk", "liquidity_risk", "drawdown_risk", "overheated_risk"]}, labels),
+                "多个风险子标签累计后达到风险控制阈值，risk_control 标签触发",
+                "累计后达到风险控制阈值，risk_control 标签触发",
+            ),
+            "position_control": joined_signal_reason(
+                active_signal_names({key: signals.get(key) for key in ["risk_control", "volatility", "uncertainty"]}, labels),
+                "风险或波动信号提示需要控制仓位，position_control 标签触发",
+                "提示需要控制仓位，position_control 标签触发",
+            ),
+            "wait_confirm": joined_signal_reason(
+                active_signal_names({key: signals.get(key) for key in ["breakout", "volume_expand", "short_term_emotion"]}, labels),
+                "信号尚未形成充分确认，wait_confirm 标签触发",
+                "尚未形成充分确认，wait_confirm 标签触发",
+            ),
+            "observe_next_day": joined_signal_reason(
+                active_signal_names({key: signals.get(key) for key in ["market_attention_rise", "volume_spike", "large_intraday_move"]}, labels),
+                "异动代理信号提示需要观察次日延续性，observe_next_day 标签触发",
+                "提示需要观察次日延续性，observe_next_day 标签触发",
+            ),
+            "avoid_emotional_trade": joined_signal_reason(
+                active_signal_names({key: signals.get(key) for key in ["short_term_emotion", "panic_selling", "herding_effect", "overheated_risk"]}, labels),
+                "情绪或过热代理信号提示避免情绪化交易，avoid_emotional_trade 标签触发",
+                "提示避免情绪化交易，avoid_emotional_trade 标签触发",
+            ),
+            "take_profit_plan": joined_signal_reason(
+                active_signal_names({key: signals.get(key) for key in ["price_rise", "near_recent_high", "overheated_risk", "drawdown_risk"]}, labels),
+                "上涨或风险代理信号提示需要预设止盈计划，take_profit_plan 标签触发",
+                "提示需要预设止盈计划，take_profit_plan 标签触发",
+            ),
+            "stop_loss_plan": joined_signal_reason(
+                active_signal_names({key: signals.get(key) for key in ["break_recent_low", "downtrend", "panic_selling", "drawdown_risk"]}, labels),
+                "下行风险代理信号提示需要预设止损计划，stop_loss_plan 标签触发",
+                "提示需要预设止损计划，stop_loss_plan 标签触发",
+            ),
         }
         return build_evidence(tags, reasons)
