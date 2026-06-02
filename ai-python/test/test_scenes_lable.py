@@ -9,6 +9,7 @@ sys.path.insert(0, str(ROOT_DIR))
 from app.scene_analysis.services.asset_processor import AssetProcessor
 from app.scene_analysis.services.base_metrics import BaseMetricsCalculator
 from app.scene_analysis.context import SceneAnalysisContext
+from app.scene_analysis.services.current_scene_result import build_current_scenes_payload
 from app.scene_analysis.services.price_processor import PriceProcessor
 from app.scene_analysis.services.risk_strategy_processor import RiskStrategyProcessor
 from app.scene_analysis.services.sentiment_processor import SentimentProcessor
@@ -74,17 +75,27 @@ def main() -> None:
         valuation_result.tags,
         sentiment_result.tags,
     )
+    module_results = [
+        asset_result,
+        price_result,
+        volume_result,
+        trend_result,
+        valuation_result,
+        sentiment_result,
+        risk_strategy_result,
+    ]
+    current_scenes_payload = build_current_scenes_payload(
+        task_no=str(message.get("taskNo") or ""),
+        target=target,
+        report_type=message.get("reportType"),
+        base_metrics=base_metrics,
+        module_results=module_results,
+    )
 
     print("target:", target)
     print("metric_count:", len(base_metrics.values))
     print("missing:", base_metrics.missing)
-    print("asset:", json.dumps(asset_result.to_dict(), ensure_ascii=False, indent=2))
-    print("price:", json.dumps(price_result.to_dict(), ensure_ascii=False, indent=2))
-    print("volume:", json.dumps(volume_result.to_dict(), ensure_ascii=False, indent=2))
-    print("trend:", json.dumps(trend_result.to_dict(), ensure_ascii=False, indent=2))
-    print("valuation:", json.dumps(valuation_result.to_dict(), ensure_ascii=False, indent=2))
-    print("sentiment:", json.dumps(sentiment_result.to_dict(), ensure_ascii=False, indent=2))
-    print("risk_strategy:", json.dumps(risk_strategy_result.to_dict(), ensure_ascii=False, indent=2))
+    print("current_scenes_payload:", json.dumps(current_scenes_payload, ensure_ascii=False, indent=2))
     print("key_metrics:")
     for key in KEY_METRICS:
         print(f"  {key}: {base_metrics.values.get(key)}")

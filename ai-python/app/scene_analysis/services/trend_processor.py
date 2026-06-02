@@ -4,6 +4,7 @@ from typing import Any
 
 from app.scene_analysis.context import SceneAnalysisContext
 from app.scene_analysis.models import BaseMetrics, SceneModuleResult
+from app.scene_analysis.services.evidence import build_evidence
 from app.scene_analysis.services.module_scoring import active_tags, clamp, module_level, module_score, number, weighted_sum
 
 
@@ -114,13 +115,13 @@ class TrendProcessor:
         return "neutral"
 
     def _evidence(self, tags: dict[str, float]) -> list[str]:
-        messages = {
-            "uptrend": "均线结构呈上升趋势",
-            "downtrend": "均线结构呈下降趋势",
-            "range_bound": "近 20 日呈区间震荡",
-            "rebound": "下降趋势中出现反弹",
-            "trend_reversal": "出现趋势反转迹象",
-            "breakout_from_range": "横盘区间出现突破",
-            "failed_breakout": "突破后收盘偏弱且上影线明显",
+        reasons = {
+            "uptrend": "短中期均线呈多头排列且价格位于均线之上，uptrend 标签触发",
+            "downtrend": "短中期均线呈空头排列且价格位于均线之下，downtrend 标签触发",
+            "range_bound": "近 20 日价格区间收敛，range_bound 标签触发",
+            "rebound": "下降趋势中价格从近期低位回升，rebound 标签触发",
+            "trend_reversal": "价格与均线关系出现趋势切换信号，trend_reversal 标签触发",
+            "breakout_from_range": "区间震荡后价格向上突破并获得成交确认，breakout_from_range 标签触发",
+            "failed_breakout": "突破后收盘偏弱且上影线明显，failed_breakout 标签触发",
         }
-        return [message for key, message in messages.items() if tags.get(key, 0.0) >= 0.3]
+        return build_evidence(tags, reasons)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.scene_analysis.context import SceneAnalysisContext
 from app.scene_analysis.models import SceneModuleResult
+from app.scene_analysis.services.evidence import build_evidence
 from app.scene_analysis.services.module_scoring import active_tags, clamp, module_level, module_score, number, score_value
 
 
@@ -70,14 +71,14 @@ class VolumeProcessor:
         return "neutral"
 
     def _evidence(self, tags: dict[str, float]) -> list[str]:
-        messages = {
-            "volume_expand": "成交量放大",
-            "volume_shrink": "成交量缩小",
-            "high_turnover": "当前换手率处于历史较高位置",
-            "low_turnover": "当前换手率处于历史较低位置",
-            "volume_price_confirm": "量价配合较明显",
-            "volume_price_divergence": "量价背离较明显",
-            "volume_spike": "成交量突然放大",
-            "volume_dry_up": "成交活跃度接近枯竭",
+        reasons = {
+            "volume_expand": "当前成交量相对 60 日稳健中位水平明显放大，volume_expand 标签触发",
+            "volume_shrink": "当前成交量在 60 日历史分布中偏低，volume_shrink 标签触发",
+            "high_turnover": "当前换手率处于历史分布较高位置，high_turnover 标签触发",
+            "low_turnover": "当前换手率处于历史分布较低位置，low_turnover 标签触发",
+            "volume_price_confirm": "价格方向与成交量变化相互确认，volume_price_confirm 标签触发",
+            "volume_price_divergence": "价格方向与成交量或收盘强弱出现背离，volume_price_divergence 标签触发",
+            "volume_spike": "当前成交量相对 60 日稳健分布出现异常放大，volume_spike 标签触发",
+            "volume_dry_up": "当前量比在历史量比分布中偏低，volume_dry_up 标签触发",
         }
-        return [message for key, message in messages.items() if tags.get(key, 0.0) >= 0.3]
+        return build_evidence(tags, reasons)

@@ -23,17 +23,17 @@ class AssetProcessor:
         self._add_asset_type_tags(tags, evidence, asset_type)
         if asset_type == "stock" and (configured_asset_type == "bank_stock" or self._is_bank_industry(industry_name)):
             tags["bank_stock"] = 1.0
-            evidence.append("标的为银行股")
+            evidence.append("行业或用户配置识别为银行股，bank_stock 标签命中")
         if asset_type == "stock" and current_price is not None and low_price_threshold is not None:
             if current_price <= low_price_threshold:
                 tags["low_price_stock"] = 1.0
-                evidence.append("当前价格处于低价股区间")
+                evidence.append("当前价格不高于低价股阈值，low_price_stock 标签命中")
             else:
                 tags["low_price_stock"] = 0.0
 
         if not tags:
             tags["general"] = 1.0
-            evidence.append("未识别到更具体的资产类型")
+            evidence.append("未识别到股票、指数、可转债或基金等更具体资产类型，使用 general 标签")
 
         tags = active_tags(tags)
         score = module_score(tags)
@@ -49,19 +49,19 @@ class AssetProcessor:
     def _add_asset_type_tags(self, tags: dict[str, float], evidence: list[str], asset_type: str | None) -> None:
         if asset_type == "stock":
             tags["stock"] = 1.0
-            evidence.append("标的类型为股票")
+            evidence.append("标的类型识别为股票，stock 标签命中")
             return
         if asset_type == "index":
             tags["index"] = 1.0
-            evidence.append("标的类型为指数")
+            evidence.append("标的类型识别为指数，index 标签命中")
             return
         if asset_type == "convertible_bond":
             tags["convertible_bond"] = 1.0
-            evidence.append("标的类型为可转债")
+            evidence.append("标的类型识别为可转债，convertible_bond 标签命中")
             return
         if asset_type in {"fund", "etf"}:
             tags["fund"] = 1.0
-            evidence.append("标的类型为基金")
+            evidence.append("标的类型识别为基金或 ETF，fund 标签命中")
 
     def _asset_type(self, config: dict[str, Any], target: dict[str, Any]) -> str | None:
         configured = self._normalize_asset_type(config.get("asset_type"))

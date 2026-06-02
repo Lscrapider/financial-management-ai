@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.scene_analysis.context import SceneAnalysisContext
 from app.scene_analysis.models import SceneModuleResult
+from app.scene_analysis.services.evidence import build_evidence
 from app.scene_analysis.services.module_scoring import active_tags, clamp, module_level, module_score, number, percentile_rank
 
 
@@ -89,12 +90,12 @@ class ValuationProcessor:
         return "neutral"
 
     def _evidence(self, tags: dict[str, float]) -> list[str]:
-        messages = {
-            "low_pe": "PE 处于历史较低位置",
-            "high_pe": "PE 处于历史较高位置",
-            "low_pb": "PB 处于历史较低位置",
-            "high_pb": "PB 处于历史较高位置",
-            "high_dividend": "股息率处于历史较高位置",
-            "valuation_repair": "低估值叠加价格上涨和趋势改善",
+        reasons = {
+            "low_pe": "PE 在历史估值分布中处于较低位置，low_pe 标签触发",
+            "high_pe": "PE 在历史估值分布中处于较高位置，high_pe 标签触发",
+            "low_pb": "PB 在历史估值分布中处于较低位置，low_pb 标签触发",
+            "high_pb": "PB 在历史估值分布中处于较高位置，high_pb 标签触发",
+            "high_dividend": "股息率在历史分布中处于较高位置，high_dividend 标签触发",
+            "valuation_repair": "低估值信号叠加价格上涨与趋势改善，valuation_repair 标签触发",
         }
-        return [message for key, message in messages.items() if tags.get(key, 0.0) >= 0.3]
+        return build_evidence(tags, reasons)

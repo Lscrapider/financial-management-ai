@@ -2,12 +2,15 @@ import json
 import logging
 from pathlib import Path
 
+from app.core.config import settings
 from app.messaging.base_handler import MessageHandler
 from app.messaging.errors import PermanentMessageError
 from app.messaging.models import HandlerResult, IncomingMessage
 from app.scene_analysis.context import SceneAnalysisContext
 from app.scene_analysis.services.asset_processor import AssetProcessor
 from app.scene_analysis.services.base_metrics import BaseMetricsCalculator
+from app.scene_analysis.services.callback_client import SceneAnalysisCallbackClient
+from app.scene_analysis.services.current_scene_result import build_current_scenes_payload
 from app.scene_analysis.services.price_processor import PriceProcessor
 from app.scene_analysis.services.risk_strategy_processor import RiskStrategyProcessor
 from app.scene_analysis.services.sentiment_processor import SentimentProcessor
@@ -31,6 +34,7 @@ class CurrentSceneHandler(MessageHandler):
         valuation_processor: ValuationProcessor | None = None,
         sentiment_processor: SentimentProcessor | None = None,
         risk_strategy_processor: RiskStrategyProcessor | None = None,
+        callback_client: SceneAnalysisCallbackClient | None = None,
     ) -> None:
         self._max_attempts = max_attempts
         self._base_metrics_calculator = base_metrics_calculator or BaseMetricsCalculator()
@@ -41,6 +45,7 @@ class CurrentSceneHandler(MessageHandler):
         self._valuation_processor = valuation_processor or ValuationProcessor()
         self._sentiment_processor = sentiment_processor or SentimentProcessor()
         self._risk_strategy_processor = risk_strategy_processor or RiskStrategyProcessor()
+        self._callback_client = callback_client or SceneAnalysisCallbackClient(settings.finance_api)
 
     def handle(self, message: IncomingMessage) -> HandlerResult:
         task_no = message.task_no
@@ -67,6 +72,22 @@ class CurrentSceneHandler(MessageHandler):
             valuation_result.tags,
             sentiment_result.tags,
         )
+        module_results = [
+            asset_result,
+            price_result,
+            volume_result,
+            trend_result,
+            valuation_result,
+            sentiment_result,
+            risk_strategy_result,
+        ]
+        current_scenes_payload = build_current_scenes_payload(
+            task_no=task_no,
+            target=target,
+            report_type=message.body.get("reportType"),
+            base_metrics=base_metrics,
+            module_results=module_results,
+        )
         logger.info(
             "scene analysis base metrics calculated task_no=%s target_type=%s target_code=%s report_type=%s "
             "metric_count=%s missing_metrics=%s attempt=%s/%s",
@@ -80,40 +101,12 @@ class CurrentSceneHandler(MessageHandler):
             self._max_attempts,
         )
         logger.info(
-            "scene analysis asset module calculated task_no=%s result=%s",
+            "scene analysis currentScenes calculated task_no=%s result=%s",
             task_no,
-            asset_result.to_dict(),
+            current_scenes_payload,
         )
-        logger.info(
-            "scene analysis price module calculated task_no=%s result=%s",
-            task_no,
-            price_result.to_dict(),
-        )
-        logger.info(
-            "scene analysis volume module calculated task_no=%s result=%s",
-            task_no,
-            volume_result.to_dict(),
-        )
-        logger.info(
-            "scene analysis trend module calculated task_no=%s result=%s",
-            task_no,
-            trend_result.to_dict(),
-        )
-        logger.info(
-            "scene analysis valuation module calculated task_no=%s result=%s",
-            task_no,
-            valuation_result.to_dict(),
-        )
-        logger.info(
-            "scene analysis sentiment module calculated task_no=%s result=%s",
-            task_no,
-            sentiment_result.to_dict(),
-        )
-        logger.info(
-            "scene analysis risk_strategy module calculated task_no=%s result=%s",
-            task_no,
-            risk_strategy_result.to_dict(),
-        )
+        self._callback_client.mark_success(task_no, current_scenes_payload)
+        logger.info("scene analysis callback success task_no=%s", task_no)
         return HandlerResult()
 
     def _save_test_data(self, payload: dict) -> None:

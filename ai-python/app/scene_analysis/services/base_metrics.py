@@ -23,7 +23,6 @@ class BaseMetricsCalculator:
         self._add_daily_kline_metrics(values, daily_klines, missing)
         self._add_intraday_metrics(values, intraday_data, missing)
         self._add_formula_metrics(values, config, missing)
-        self._add_distribution_requirements(target_type, missing)
         return BaseMetrics(values=values, missing=self._unique(missing))
 
     def _add_market_metrics(self, values: dict[str, Any], market_data: dict[str, Any], missing: list[str]) -> None:
@@ -300,13 +299,6 @@ class BaseMetricsCalculator:
                         (1 - attention_rise)
                         / self._config_number_any(sentiment_config, ("low_attention_scale",), 0.5)
                     )
-
-    def _add_distribution_requirements(self, target_type: Any, missing: list[str]) -> None:
-        missing.append("distribution.pe_history_or_industry")
-        missing.append("distribution.pb_history_or_industry")
-        if str(target_type or "").upper() == "STOCK":
-            missing.append("fundamental.financial_summary")
-            missing.append("fundamental.industry")
 
     def _put(self, values: dict[str, Any], key: str, value: Any) -> None:
         if value is not None:

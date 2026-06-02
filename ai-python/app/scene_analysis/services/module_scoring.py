@@ -27,7 +27,10 @@ def active_tags(tags: Mapping[str, float | None]) -> dict[str, float]:
 
 
 def module_score(tags: Mapping[str, float]) -> float:
-    return max(tags.values()) if tags else 0.0
+    if not tags:
+        return 0.0
+    scores = list(tags.values())
+    return clamp(0.7 * max(scores) + 0.3 * (sum(scores) / len(scores)))
 
 
 def module_level(score: float) -> str:

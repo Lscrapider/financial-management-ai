@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.scene_analysis.context import SceneAnalysisContext
 from app.scene_analysis.models import SceneModuleResult
+from app.scene_analysis.services.evidence import build_evidence
 from app.scene_analysis.services.module_scoring import active_tags, clamp, module_level, module_score, noisy_or, number, weighted_sum
 
 
@@ -170,18 +171,18 @@ class RiskStrategyProcessor:
         return clamp(max(short_term_emotion * price_drop, panic_selling * price_rise))
 
     def _evidence(self, tags: dict[str, float]) -> list[str]:
-        messages = {
-            "chase_high_risk": "上涨、高位或高换手提升追高风险",
-            "false_breakout_risk": "突破配合收盘弱或上影线提升假突破风险",
-            "liquidity_risk": "低换手或低成交提升流动性风险",
-            "drawdown_risk": "波动率、上涨和支撑距离提升回撤风险",
-            "overheated_risk": "上涨、放量和高换手提升过热风险",
-            "risk_control": "多个风险信号提示需要风险控制",
-            "position_control": "风险和波动提示需要控制仓位",
-            "wait_confirm": "信号尚未充分确认",
-            "observe_next_day": "日内波动或异动提示需要观察次日表现",
-            "avoid_emotional_trade": "情绪或过热信号提示避免情绪化交易",
-            "take_profit_plan": "上涨和风险信号提示制定止盈计划",
-            "stop_loss_plan": "跌破或下行风险提示制定止损计划",
+        reasons = {
+            "chase_high_risk": "上涨、高位、放量、高换手或短线情绪升温共同提高追高风险，chase_high_risk 标签触发",
+            "false_breakout_risk": "突破信号同时伴随收盘偏弱、上影线或量能异常，false_breakout_risk 标签触发",
+            "liquidity_risk": "低换手或低成交量代理信号显示交易活跃度不足，liquidity_risk 标签触发",
+            "drawdown_risk": "高位、波动率、上涨强度和支撑距离共同提高回撤风险，drawdown_risk 标签触发",
+            "overheated_risk": "上涨、放量、高换手或短线情绪升温共同提高过热风险，overheated_risk 标签触发",
+            "risk_control": "多个风险子标签累计后达到风险控制阈值，risk_control 标签触发",
+            "position_control": "风险控制、波动率或不确定性信号提示需要控制仓位，position_control 标签触发",
+            "wait_confirm": "突破、量能或短线情绪信号尚未形成充分确认，wait_confirm 标签触发",
+            "observe_next_day": "关注度、爆量或日内波动提示需要观察次日延续性，observe_next_day 标签触发",
+            "avoid_emotional_trade": "短线情绪、恐慌、交易拥挤或过热风险提示避免情绪化交易，avoid_emotional_trade 标签触发",
+            "take_profit_plan": "上涨、高位、过热或回撤风险提示需要预设止盈计划，take_profit_plan 标签触发",
+            "stop_loss_plan": "跌破前低、下降趋势、恐慌抛售或回撤风险提示需要预设止损计划，stop_loss_plan 标签触发",
         }
-        return [message for key, message in messages.items() if tags.get(key, 0.0) >= 0.3]
+        return build_evidence(tags, reasons)

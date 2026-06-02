@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.scene_analysis.context import SceneAnalysisContext
 from app.scene_analysis.models import SceneModuleResult
+from app.scene_analysis.services.evidence import active_signal_names, build_evidence, joined_signal_reason
 from app.scene_analysis.services.module_scoring import active_tags, module_level, module_score, number, weighted_sum
 
 
@@ -70,7 +71,7 @@ class SentimentProcessor:
             level=module_level(score),
             direction=self._direction(tags),
             tags=tags,
-            evidence=self._evidence(tags),
+            evidence=self._evidence(tags, {**context.base_metrics.values, **tags}),
         )
 
     def _weighted(self, context: SceneAnalysisContext, weight_key: str, signals: dict[str, float | None]) -> float | None:
@@ -84,12 +85,40 @@ class SentimentProcessor:
             return "negative"
         return "neutral"
 
-    def _evidence(self, tags: dict[str, float]) -> list[str]:
-        messages = {
-            "market_attention_rise": "交易关注度代理信号升温",
-            "short_term_emotion": "上涨、放量、换手或交易关注度支持短线情绪升温",
-            "panic_selling": "下跌、放量、跌破前低或收盘弱支持恐慌抛售代理信号",
-            "weak_sentiment": "价格、成交、换手或关注度偏弱",
-            "herding_effect": "高换手、放量或交易关注度升温支持交易拥挤代理信号",
+    def _evidence(self, tags: dict[str, float], signals: dict) -> list[str]:
+        labels = {
+            "price_rise": "价格上涨",
+            "price_drop": "价格下跌",
+            "volume_expand": "放量",
+            "volume_shrink": "缩量",
+            "high_turnover": "高换手",
+            "low_turnover": "低换手",
+            "market_attention_rise": "交易关注度上升",
+            "break_recent_low": "跌破近期低位",
+            "close_weak": "收盘偏弱",
+            "low_attention": "交易关注度偏低",
         }
-        return [message for key, message in messages.items() if tags.get(key, 0.0) >= 0.3]
+        reasons = {
+            "market_attention_rise": "基于成交额、换手率和振幅计算的交易关注度较近期均值上升，market_attention_rise 标签触发",
+            "short_term_emotion": joined_signal_reason(
+                active_signal_names({key: signals.get(key) for key in ["price_rise", "volume_expand", "high_turnover", "market_attention_rise"]}, labels),
+                "行情代理信号显示短线情绪升温，short_term_emotion 标签触发",
+                "共同指向短线情绪升温，short_term_emotion 标签触发",
+            ),
+            "panic_selling": joined_signal_reason(
+                active_signal_names({key: signals.get(key) for key in ["price_drop", "volume_expand", "break_recent_low", "close_weak"]}, labels),
+                "行情代理信号显示恐慌抛售压力，panic_selling 标签触发",
+                "共同指向恐慌抛售压力，panic_selling 标签触发",
+            ),
+            "weak_sentiment": joined_signal_reason(
+                active_signal_names({key: signals.get(key) for key in ["price_drop", "volume_shrink", "low_turnover", "close_weak", "low_attention"]}, labels),
+                "行情代理信号显示情绪偏弱，weak_sentiment 标签触发",
+                "共同指向情绪偏弱，weak_sentiment 标签触发",
+            ),
+            "herding_effect": joined_signal_reason(
+                active_signal_names({key: signals.get(key) for key in ["high_turnover", "volume_expand", "market_attention_rise"]}, labels),
+                "行情代理信号显示交易拥挤度提高，herding_effect 标签触发",
+                "显示交易拥挤度提高，herding_effect 标签触发",
+            ),
+        }
+        return build_evidence(tags, reasons)

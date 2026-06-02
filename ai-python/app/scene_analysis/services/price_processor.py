@@ -4,6 +4,7 @@ from typing import Any
 
 from app.scene_analysis.context import SceneAnalysisContext
 from app.scene_analysis.models import BaseMetrics, SceneModuleResult
+from app.scene_analysis.services.evidence import build_evidence
 from app.scene_analysis.services.module_scoring import active_tags, clamp, module_level, module_score, number, score_value
 
 
@@ -92,20 +93,16 @@ class PriceProcessor:
         return "neutral"
 
     def _evidence(self, tags: dict[str, float]) -> list[str]:
-        evidence: list[str] = []
-        messages = {
-            "price_rise": "当日上涨强度较高",
-            "price_drop": "当日下跌强度较高",
-            "sideways": "近 20 日价格区间较窄",
-            "near_recent_high": "当前价格接近近期高位",
-            "near_recent_low": "当前价格接近近期低位",
-            "breakout": "当前价格突破近期前高",
-            "break_recent_low": "当前价格跌破近期前低",
-            "pullback": "上升趋势中出现回调",
-            "gap_up": "出现跳空高开",
-            "gap_down": "出现跳空低开",
+        reasons = {
+            "price_rise": "当日涨幅超过上涨强度阈值，price_rise 标签触发",
+            "price_drop": "当日跌幅超过下跌强度阈值，price_drop 标签触发",
+            "sideways": "近 20 日价格振幅较窄，sideways 标签触发",
+            "near_recent_high": "当前价格处于近 20 日区间高位，near_recent_high 标签触发",
+            "near_recent_low": "当前价格处于近 20 日区间低位，near_recent_low 标签触发",
+            "breakout": "当前价格突破近 20 日前高，breakout 标签触发",
+            "break_recent_low": "当前价格跌破近 20 日前低，break_recent_low 标签触发",
+            "pullback": "上升趋势中价格从近期高位回落，pullback 标签触发",
+            "gap_up": "开盘价高于前期高点并形成向上跳空，gap_up 标签触发",
+            "gap_down": "开盘价低于前期低点并形成向下跳空，gap_down 标签触发",
         }
-        for key, message in messages.items():
-            if tags.get(key, 0.0) >= 0.3:
-                evidence.append(message)
-        return evidence
+        return build_evidence(tags, reasons)
