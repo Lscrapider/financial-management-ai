@@ -68,4 +68,15 @@ public class StockMarketController {
                 ? ApiResponseVO.success(new MarketSyncStatusVO(true, false))
                 : ApiResponseVO.error(404, "股票不存在或未启用: " + stockCode);
     }
+
+    @PostMapping("/sync/daily-klines/{stockCode}")
+    public ApiResponseVO<MarketSyncStatusVO> syncStockDailyKline(@PathVariable String stockCode) {
+        if (StrUtil.isBlank(stockCode)) {
+            return ApiResponseVO.error(400, "stockCode must not be blank");
+        }
+        boolean submitted = this.stockMarketSyncTask.syncStockDailyKline(stockCode.trim());
+        return submitted
+                ? ApiResponseVO.success(new MarketSyncStatusVO(true, false))
+                : ApiResponseVO.error(404, "股票不存在或未启用: " + stockCode);
+    }
 }

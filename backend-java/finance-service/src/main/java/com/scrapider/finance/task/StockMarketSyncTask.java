@@ -6,10 +6,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.scrapider.finance.api.StockMarketApi;
 import com.scrapider.finance.domain.dto.StockMarketDataDTO;
 import com.scrapider.finance.domain.po.StockConfigPO;
+import com.scrapider.finance.domain.po.StockDailyKlinePO;
 import com.scrapider.finance.domain.po.StockIntradayTrendPO;
 import com.scrapider.finance.domain.po.StockQuoteSnapshotPO;
 import com.scrapider.finance.domain.util.StockMarketJsonParser;
 import com.scrapider.finance.manage.StockConfigManage;
+import com.scrapider.finance.manage.StockDailyKlineManage;
 import com.scrapider.finance.manage.StockIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
 import com.scrapider.finance.service.StockAlertService;
@@ -39,6 +41,7 @@ public class StockMarketSyncTask {
     private final StockMarketApi stockMarketApi;
     private final StockConfigManage stockConfigManage;
     private final StockQuoteSnapshotManage stockQuoteSnapshotManage;
+    private final StockDailyKlineManage stockDailyKlineManage;
     private final StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage;
     private final StockAlertService stockAlertService;
     private final AtomicBoolean syncing = new AtomicBoolean(false);
@@ -49,6 +52,12 @@ public class StockMarketSyncTask {
 
     @Value("${stock.sync.request-interval-ms:1500}")
     private long requestIntervalMs;
+
+    @Value("${stock.sync.daily-kline-enabled:true}")
+    private boolean dailyKlineEnabled;
+
+    @Value("${stock.sync.daily-kline-limit:250}")
+    private Integer dailyKlineLimit;
 
     @Value("${stock.sync.start-time:09:29}")
     private String startTime;
@@ -66,11 +75,13 @@ public class StockMarketSyncTask {
             StockMarketApi stockMarketApi,
             StockConfigManage stockConfigManage,
             StockQuoteSnapshotManage stockQuoteSnapshotManage,
+            StockDailyKlineManage stockDailyKlineManage,
             StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage,
             StockAlertService stockAlertService) {
         this.stockMarketApi = stockMarketApi;
         this.stockConfigManage = stockConfigManage;
         this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
+        this.stockDailyKlineManage = stockDailyKlineManage;
         this.stockIntradayTrendInfluxManage = stockIntradayTrendInfluxManage;
         this.stockAlertService = stockAlertService;
     }
@@ -125,6 +136,21 @@ public class StockMarketSyncTask {
             return true;
         } catch (Exception ex) {
             log.warn("Failed to sync trend for stock: {}", stockCode, ex);
+            return false;
+        }
+    }
+
+    public boolean syncStockDailyKline(String stockCode) {
+        StockConfigPO stock = this.stockConfigManage.getEnabledByStockCode(stockCode);
+        if (stock == null || StrUtil.isBlank(stock.getSecid())) {
+            log.warn("Cannot sync daily kline: stock not found or no secid, code: {}", stockCode);
+            return false;
+        }
+        try {
+            this.doSyncDailyKlinesForStock(stock);
+            return true;
+        } catch (Exception ex) {
+            log.warn("Failed to sync daily kline for stock: {}", stockCode, ex);
             return false;
         }
     }
@@ -197,6 +223,17 @@ public class StockMarketSyncTask {
                 }
             }
         }
+
+        if (this.dailyKlineEnabled) {
+            for (StockConfigPO stock : valid) {
+                try {
+                    this.doSyncDailyKlinesForStock(stock);
+                    this.sleepForRateLimit();
+                } catch (Exception ex) {
+                    log.warn("Failed to sync daily kline for stock: {}", stock.getStockCode(), ex);
+                }
+            }
+        }
     }
 
     private void doSyncTrendsForStock(StockConfigPO stock) {
@@ -211,6 +248,11 @@ public class StockMarketSyncTask {
                     stock.getStockName(),
                     ex);
         }
+    }
+
+    private void doSyncDailyKlinesForStock(StockConfigPO stock) {
+        StockMarketDataDTO dailyKlines = this.stockMarketApi.getDailyKlines(stock.getSecid(), this.dailyKlineLimit);
+        this.stockDailyKlineManage.saveDailyKlines(StockDailyKlinePO.fromApiResponse(stock, dailyKlines.data()));
     }
 
     private void saveTrends(StockConfigPO stock, JsonNode response, String syncBatchNo) {
