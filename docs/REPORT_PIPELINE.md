@@ -615,13 +615,15 @@ chunk 文本：
     "high_turnover": 0.80
   },
   "evidence": [
-    "成交量高于近 20 日均量",
-    "换手率处于较高水平"
+    "当前成交量相对 60 日稳健中位水平明显放大，volume_expand 标签触发",
+    "当前换手率处于历史分布较高位置，high_turnover 标签触发"
   ]
 }
 ```
 
 注意：当前标的的小标签建议带 score，而 chunk 入库时的小标签可以先只存标签，不一定存分数。
+
+`evidence` 固定为字符串数组，不输出 `metrics`、`reason` 等对象字段。文案应保持客观、细粒度，说明本次实际触发的标签和依据，便于 RAG 召回、后续文本拼接和 LLM 分析。组合类标签只描述本次实际达到阈值的子信号。
 
 ---
 
@@ -661,9 +663,9 @@ small_cap_stock
     "low_price_stock": 0.8
   },
   "evidence": [
-    "标的类型为股票",
-    "行业属于银行",
-    "价格区间属于低价股"
+    "标的类型识别为股票，stock 标签命中",
+    "行业或用户配置识别为银行股，bank_stock 标签命中",
+    "当前价格不高于低价股阈值，low_price_stock 标签命中"
   ]
 }
 ```
@@ -709,8 +711,8 @@ gap_down
     "near_recent_high": 0.75
   },
   "evidence": [
-    "当日涨幅较明显",
-    "当前价格接近近期高位"
+    "当日涨幅超过上涨强度阈值，price_rise 标签触发",
+    "当前价格处于近 20 日区间高位，near_recent_high 标签触发"
   ]
 }
 ```
@@ -757,8 +759,8 @@ volume_dry_up
     "high_turnover": 0.80
   },
   "evidence": [
-    "成交量高于近 20 日均量",
-    "换手率处于较高水平"
+    "当前成交量相对 60 日稳健中位水平明显放大，volume_expand 标签触发",
+    "当前换手率处于历史分布较高位置，high_turnover 标签触发"
   ]
 }
 ```
@@ -802,7 +804,7 @@ failed_breakout
     "breakout_from_range": 0.70
   },
   "evidence": [
-    "近期价格从震荡区间上沿突破"
+    "区间震荡后价格向上突破并获得成交确认，breakout_from_range 标签触发"
   ]
 }
 ```
@@ -851,8 +853,8 @@ fundamental_risk
     "low_pe": 0.65
   },
   "evidence": [
-    "PB 小于 1",
-    "PE 处于较低区间"
+    "PB 在历史估值分布中处于较低位置，low_pb 标签触发",
+    "PE 在历史估值分布中处于较低位置，low_pe 标签触发"
   ]
 }
 ```
@@ -904,8 +906,8 @@ institutional_behavior
     "market_attention_rise": 0.65
   },
   "evidence": [
-    "价格和成交活跃度同步上升",
-    "短线关注度可能提高"
+    "基于成交额、换手率和振幅计算的交易关注度较近期均值上升，market_attention_rise 标签触发",
+    "价格上涨、放量和交易关注度上升共同指向短线情绪升温，short_term_emotion 标签触发"
   ]
 }
 ```
@@ -956,9 +958,8 @@ stop_loss_plan
     "wait_confirm": 0.70
   },
   "evidence": [
-    "价格上涨后接近近期高位",
-    "成交活跃度较高",
-    "存在追高和短线情绪过热风险"
+    "上涨强度、接近近期高位和高换手提高追高风险，chase_high_risk 标签触发",
+    "突破、量能或短线情绪信号尚未形成充分确认，wait_confirm 标签触发"
   ]
 }
 ```
@@ -1116,32 +1117,57 @@ volume_score = 0.85
 {
   "asset": {
     "score": 1.0,
+    "level": "high",
+    "direction": "neutral",
     "tags": {
       "stock": 1.0,
       "bank_stock": 1.0,
       "low_price_stock": 0.8
-    }
+    },
+    "evidence": [
+      "标的类型识别为股票，stock 标签命中",
+      "行业或用户配置识别为银行股，bank_stock 标签命中",
+      "当前价格不高于低价股阈值，low_price_stock 标签命中"
+    ]
   },
   "price": {
     "score": 0.74,
+    "level": "high",
+    "direction": "positive",
     "tags": {
       "price_rise": 0.80,
       "near_recent_high": 0.75
-    }
+    },
+    "evidence": [
+      "当日涨幅超过上涨强度阈值，price_rise 标签触发",
+      "当前价格处于近 20 日区间高位，near_recent_high 标签触发"
+    ]
   },
   "volume": {
     "score": 0.82,
+    "level": "high",
+    "direction": "positive",
     "tags": {
       "volume_expand": 0.90,
       "high_turnover": 0.80
-    }
+    },
+    "evidence": [
+      "当前成交量相对 60 日稳健中位水平明显放大，volume_expand 标签触发",
+      "当前换手率处于历史分布较高位置，high_turnover 标签触发"
+    ]
   },
   "risk_strategy": {
     "score": 0.76,
+    "level": "high",
+    "direction": "risk",
     "tags": {
       "chase_high_risk": 0.85,
       "wait_confirm": 0.70
-    }
+    },
+    "evidence": [
+      "上涨强度、接近近期高位和高换手提高追高风险，chase_high_risk 标签触发",
+      "突破、量能或短线情绪信号尚未形成充分确认，wait_confirm 标签触发"
+    ]
   }
 }
 ```
@@ -1158,51 +1184,92 @@ volume_score = 0.85
 {
   "asset": {
     "score": 1.0,
+    "level": "high",
+    "direction": "neutral",
     "tags": {
       "stock": 1.0,
       "bank_stock": 1.0,
       "low_price_stock": 0.8
-    }
+    },
+    "evidence": [
+      "标的类型识别为股票，stock 标签命中",
+      "行业或用户配置识别为银行股，bank_stock 标签命中",
+      "当前价格不高于低价股阈值，low_price_stock 标签命中"
+    ]
   },
   "price": {
     "score": 0.74,
+    "level": "high",
+    "direction": "positive",
     "tags": {
       "price_rise": 0.80,
       "near_recent_high": 0.75
-    }
+    },
+    "evidence": [
+      "当日涨幅超过上涨强度阈值，price_rise 标签触发",
+      "当前价格处于近 20 日区间高位，near_recent_high 标签触发"
+    ]
   },
   "volume": {
     "score": 0.82,
+    "level": "high",
+    "direction": "positive",
     "tags": {
       "volume_expand": 0.90,
       "high_turnover": 0.80
-    }
+    },
+    "evidence": [
+      "当前成交量相对 60 日稳健中位水平明显放大，volume_expand 标签触发",
+      "当前换手率处于历史分布较高位置，high_turnover 标签触发"
+    ]
   },
   "trend": {
     "score": 0.65,
+    "level": "medium",
+    "direction": "positive",
     "tags": {
       "breakout_from_range": 0.70
-    }
+    },
+    "evidence": [
+      "区间震荡后价格向上突破并获得成交确认，breakout_from_range 标签触发"
+    ]
   },
   "valuation": {
     "score": 0.71,
+    "level": "high",
+    "direction": "positive",
     "tags": {
       "low_pb": 0.80,
       "low_pe": 0.65
-    }
+    },
+    "evidence": [
+      "PB 在历史估值分布中处于较低位置，low_pb 标签触发",
+      "PE 在历史估值分布中处于较低位置，low_pe 标签触发"
+    ]
   },
   "sentiment": {
     "score": 0.68,
+    "level": "medium",
+    "direction": "positive",
     "tags": {
       "short_term_emotion": 0.72
-    }
+    },
+    "evidence": [
+      "价格上涨、放量和交易关注度上升共同指向短线情绪升温，short_term_emotion 标签触发"
+    ]
   },
   "risk_strategy": {
     "score": 0.76,
+    "level": "high",
+    "direction": "risk",
     "tags": {
       "chase_high_risk": 0.85,
       "wait_confirm": 0.70
-    }
+    },
+    "evidence": [
+      "上涨强度、接近近期高位和高换手提高追高风险，chase_high_risk 标签触发",
+      "突破、量能或短线情绪信号尚未形成充分确认，wait_confirm 标签触发"
+    ]
   }
 }
 ```
@@ -1237,17 +1304,29 @@ volume_score = 0.85
   "currentScenes": {
     "volume": {
       "score": 0.82,
+      "level": "high",
+      "direction": "positive",
       "tags": {
         "volume_expand": 0.90,
         "high_turnover": 0.80
-      }
+      },
+      "evidence": [
+        "当前成交量相对 60 日稳健中位水平明显放大，volume_expand 标签触发",
+        "当前换手率处于历史分布较高位置，high_turnover 标签触发"
+      ]
     },
     "risk_strategy": {
       "score": 0.76,
+      "level": "high",
+      "direction": "risk",
       "tags": {
         "chase_high_risk": 0.85,
         "wait_confirm": 0.70
-      }
+      },
+      "evidence": [
+        "上涨强度、接近近期高位和高换手提高追高风险，chase_high_risk 标签触发",
+        "突破、量能或短线情绪信号尚未形成充分确认，wait_confirm 标签触发"
+      ]
     }
   }
 }
@@ -2148,24 +2227,42 @@ outputRequirement
 {
   "price": {
     "score": 0.74,
+    "level": "high",
+    "direction": "positive",
     "tags": {
       "price_rise": 0.80,
       "near_recent_high": 0.75
-    }
+    },
+    "evidence": [
+      "当日涨幅超过上涨强度阈值，price_rise 标签触发",
+      "当前价格处于近 20 日区间高位，near_recent_high 标签触发"
+    ]
   },
   "volume": {
     "score": 0.82,
+    "level": "high",
+    "direction": "positive",
     "tags": {
       "volume_expand": 0.90,
       "high_turnover": 0.80
-    }
+    },
+    "evidence": [
+      "当前成交量相对 60 日稳健中位水平明显放大，volume_expand 标签触发",
+      "当前换手率处于历史分布较高位置，high_turnover 标签触发"
+    ]
   },
   "risk_strategy": {
     "score": 0.76,
+    "level": "high",
+    "direction": "risk",
     "tags": {
       "chase_high_risk": 0.85,
       "wait_confirm": 0.70
-    }
+    },
+    "evidence": [
+      "上涨强度、接近近期高位和高换手提高追高风险，chase_high_risk 标签触发",
+      "突破、量能或短线情绪信号尚未形成充分确认，wait_confirm 标签触发"
+    ]
   }
 }
 ```
