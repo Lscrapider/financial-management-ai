@@ -1,0 +1,232 @@
+from __future__ import annotations
+
+from collections.abc import Iterable
+from math import sqrt
+from statistics import median
+from typing import Any
+
+from app.scene_analysis.models import BaseMetrics
+
+
+class BaseMetricsCalculator:
+    def calculate(self, message: dict[str, Any]) -> BaseMetrics:
+        values: dict[str, Any] = {}
+        missing: list[str] = []
+
+        market_data = self._dict(message.get("marketData"))
+        daily_klines = self._list(message.get("dailyKlines"))
+        intraday_data = self._list(message.get("intradayData"))
+        target_type = self._dict(message.get("target")).get("type")
+
+        self._add_market_metrics(values, market_data, missing)
+        self._add_daily_kline_metrics(values, daily_klines, missing)
+        self._add_intraday_metrics(values, intraday_data, missing)
+        self._add_distribution_requirements(target_type, missing)
+        return BaseMetrics(values=values, missing=self._unique(missing))
+
+    def _add_market_metrics(self, values: dict[str, Any], market_data: dict[str, Any], missing: list[str]) -> None:
+        latest_price = self._number(market_data.get("latestPrice"))
+        open_price = self._number(market_data.get("openPrice"))
+        high_price = self._number(market_data.get("highPrice"))
+        low_price = self._number(market_data.get("lowPrice"))
+        previous_close_price = self._number(market_data.get("previousClosePrice"))
+        change_percent = self._number(market_data.get("changePercent"))
+
+        self._put(values, "latest_price", latest_price)
+        self._put(values, "open_price", open_price)
+        self._put(values, "high_price", high_price)
+        self._put(values, "low_price", low_price)
+        self._put(values, "previous_close_price", previous_close_price)
+        self._put(values, "change_pct", change_percent)
+        self._put(values, "turnover_rate", self._number(market_data.get("turnoverRate")))
+        self._put(values, "volume_ratio", self._number(market_data.get("volumeRatio")))
+        self._put(values, "amplitude", self._number(market_data.get("amplitude")))
+        self._put(values, "pe_ttm", self._number(market_data.get("peTtm")))
+        self._put(values, "pe_dynamic", self._number(market_data.get("peDynamic")))
+        self._put(values, "pe_static", self._number(market_data.get("peStatic")))
+        self._put(values, "pb_ratio", self._number(market_data.get("pbRatio")))
+        self._put(values, "total_market_value", self._number(market_data.get("totalMarketValue")))
+        self._put(values, "float_market_value", self._number(market_data.get("floatMarketValue")))
+
+        if change_percent is None and latest_price is not None and previous_close_price:
+            values["change_pct"] = (latest_price - previous_close_price) / previous_close_price * 100
+        if latest_price is None:
+            missing.append("market.latest_price")
+        if previous_close_price is None:
+            missing.append("market.previous_close_price")
+
+    def _add_daily_kline_metrics(
+        self,
+        values: dict[str, Any],
+        daily_klines: list[dict[str, Any]],
+        missing: list[str],
+    ) -> None:
+        if not daily_klines:
+            missing.append("daily_klines")
+            return
+
+        klines = sorted(
+            [row for row in daily_klines if row.get("tradeDate")],
+            key=lambda row: str(row.get("tradeDate")),
+        )
+        closes = self._numbers(row.get("closePrice") for row in klines)
+        highs = self._numbers(row.get("highPrice") for row in klines)
+        lows = self._numbers(row.get("lowPrice") for row in klines)
+        volumes = self._numbers(row.get("volume") for row in klines)
+        if not closes:
+            missing.append("daily_klines.close_price")
+            return
+
+        current_price = self._number(values.get("latest_price")) or closes[-1]
+        values["daily_count"] = len(klines)
+        values["ma5"] = self._mean_last(closes, 5)
+        values["ma10"] = self._mean_last(closes, 10)
+        values["ma20"] = self._mean_last(closes, 20)
+        values["recent_high_20d"] = self._max_last(highs, 20)
+        values["recent_low_20d"] = self._min_last(lows, 20)
+        values["prev_high_20d"] = self._max_last(highs[:-1], 20)
+        values["prev_low_20d"] = self._min_last(lows[:-1], 20)
+        values["range_pct_20d"] = self._range_pct(values["recent_high_20d"], values["recent_low_20d"])
+        values["position_20d"] = self._position(current_price, values["recent_high_20d"], values["recent_low_20d"])
+        values["volume_ratio_5d"] = self._ratio_to_mean_last(volumes, 5)
+        values["volume_ratio_20d"] = self._ratio_to_mean_last(volumes, 20)
+        values["volatility_20d"] = self._volatility(closes, 20)
+        values["price_return_5d"] = self._return_pct(closes, 5)
+        values["price_return_20d"] = self._return_pct(closes, 20)
+        values["volume_robust_zscore"] = self._robust_zscore_last(volumes, 20)
+
+        if len(closes) < 20:
+            missing.append("daily_klines.20d_window")
+        if len(volumes) < 20:
+            missing.append("daily_klines.volume_20d_window")
+
+    def _add_intraday_metrics(
+        self,
+        values: dict[str, Any],
+        intraday_data: list[dict[str, Any]],
+        missing: list[str],
+    ) -> None:
+        if not intraday_data:
+            missing.append("intraday_data")
+            return
+
+        prices = self._numbers(
+            row.get("price") or row.get("latestPrice") or row.get("closePrice")
+            for row in intraday_data
+        )
+        if not prices:
+            missing.append("intraday_data.price")
+            return
+
+        previous_close = self._number(values.get("previous_close_price"))
+        values["intraday_latest_price"] = prices[-1]
+        values["intraday_high"] = max(prices)
+        values["intraday_low"] = min(prices)
+        values["intraday_range_pct"] = self._range_pct(max(prices), min(prices))
+        if previous_close:
+            values["intraday_return_pct"] = (prices[-1] - previous_close) / previous_close * 100
+
+    def _add_distribution_requirements(self, target_type: Any, missing: list[str]) -> None:
+        missing.append("distribution.volume_history_or_industry")
+        missing.append("distribution.turnover_history_or_industry")
+        missing.append("distribution.pe_history_or_industry")
+        missing.append("distribution.pb_history_or_industry")
+        if str(target_type or "").upper() == "STOCK":
+            missing.append("fundamental.financial_summary")
+            missing.append("fundamental.industry")
+        missing.append("sentiment.news_announcement_research")
+
+    def _put(self, values: dict[str, Any], key: str, value: Any) -> None:
+        if value is not None:
+            values[key] = value
+
+    def _dict(self, value: Any) -> dict[str, Any]:
+        return value if isinstance(value, dict) else {}
+
+    def _list(self, value: Any) -> list[dict[str, Any]]:
+        if not isinstance(value, list):
+            return []
+        return [row for row in value if isinstance(row, dict)]
+
+    def _number(self, value: Any) -> float | None:
+        if value is None or value == "":
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _numbers(self, values: Iterable[Any]) -> list[float]:
+        return [number for number in (self._number(value) for value in values) if number is not None]
+
+    def _mean_last(self, values: list[float], window: int) -> float | None:
+        if len(values) < window:
+            return None
+        sample = values[-window:]
+        return sum(sample) / len(sample)
+
+    def _max_last(self, values: list[float], window: int) -> float | None:
+        if not values:
+            return None
+        return max(values[-window:])
+
+    def _min_last(self, values: list[float], window: int) -> float | None:
+        if not values:
+            return None
+        return min(values[-window:])
+
+    def _range_pct(self, high: float | None, low: float | None) -> float | None:
+        if high is None or low is None or low == 0:
+            return None
+        return (high - low) / low
+
+    def _position(self, price: float | None, high: float | None, low: float | None) -> float | None:
+        if price is None or high is None or low is None or high == low:
+            return None
+        return (price - low) / (high - low)
+
+    def _ratio_to_mean_last(self, values: list[float], window: int) -> float | None:
+        if len(values) < window + 1:
+            return None
+        baseline = values[-window - 1 : -1]
+        average = sum(baseline) / len(baseline)
+        if average == 0:
+            return None
+        return values[-1] / average
+
+    def _return_pct(self, closes: list[float], lookback: int) -> float | None:
+        if len(closes) <= lookback or closes[-lookback - 1] == 0:
+            return None
+        return (closes[-1] - closes[-lookback - 1]) / closes[-lookback - 1] * 100
+
+    def _volatility(self, closes: list[float], window: int) -> float | None:
+        if len(closes) < window + 1:
+            return None
+        returns = [
+            (closes[index] - closes[index - 1]) / closes[index - 1]
+            for index in range(len(closes) - window, len(closes))
+            if closes[index - 1] != 0
+        ]
+        if len(returns) < 2:
+            return None
+        average = sum(returns) / len(returns)
+        variance = sum((item - average) ** 2 for item in returns) / (len(returns) - 1)
+        return sqrt(variance)
+
+    def _robust_zscore_last(self, values: list[float], window: int) -> float | None:
+        if len(values) < window + 1:
+            return None
+        baseline = values[-window - 1 : -1]
+        baseline_median = median(baseline)
+        deviations = [abs(item - baseline_median) for item in baseline]
+        mad = median(deviations)
+        if mad == 0:
+            return None
+        return (values[-1] - baseline_median) / (1.4826 * mad)
+
+    def _unique(self, values: list[str]) -> list[str]:
+        result: list[str] = []
+        for value in values:
+            if value not in result:
+                result.append(value)
+        return result
