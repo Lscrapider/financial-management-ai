@@ -35,7 +35,8 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
     private static final String SYSTEM_PROMPT = """
             你是一个面向个人投资研究的理财分析报告生成助手。
             必须基于输入的 currentScenes 和 knowledgeContext 生成结构化 JSON 报告。
-            不要提供确定性买卖建议，不要承诺收益，不要编造缺失数据。
+            可以给出买入、卖出、持有、观望或回避建议，但必须解释依据、适用条件和主要风险。
+            不要承诺收益，不要编造缺失数据，不要把建议表述为确定性结论。
             必须区分事实、推断和风险提示。
             使用知识库内容时必须引用 chunkId，chunkId 只能来自输入的 knowledgeContext。
             只输出 JSON object，不要输出 Markdown，不要输出 JSON 之外的解释文本。
@@ -237,7 +238,8 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
         requirement.put("language", "zh-CN");
         requirement.put("format", "json_object");
         requirement.put("mustReferenceChunkIds", true);
-        requirement.put("noInvestmentAdvice", true);
+        requirement.put("allowTradingSuggestion", true);
+        requirement.put("tradingSuggestionMustExplainReason", true);
         requirement.put("noFabricatedData", true);
         requirement.put("chunkIdsFieldName", "chunkIds");
         requirement.put("recommendedSchema", """
@@ -246,6 +248,14 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
                   "marketFacts": [{"fact": "", "source": "currentScenes|knowledgeContext", "chunkIds": []}],
                   "sceneInterpretation": [{"scene": "", "view": "", "basis": [], "chunkIds": []}],
                   "knowledgeBasedAnalysis": [{"scene": "", "point": "", "chunkIds": []}],
+                  "tradingSuggestions": [{
+                    "action": "buy|sell|hold|watch|avoid",
+                    "suggestion": "",
+                    "reason": "",
+                    "conditions": [],
+                    "risks": [],
+                    "chunkIds": []
+                  }],
                   "riskWarnings": [{"risk": "", "reason": "", "chunkIds": []}],
                   "watchPoints": [{"item": "", "reason": "", "chunkIds": []}],
                   "missingData": [],
@@ -264,7 +274,8 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
                 2. 引用知识库内容时必须在对应对象里填写 chunkIds。
                 3. chunkIds 只能来自 allowedChunkIds。
                 4. 没有知识库依据的判断可以使用空数组 chunkIds: []，但不能编造 chunkId。
-                5. 不要给出确定性买卖建议。
+                5. 可以给出买入、卖出、持有、观望或回避建议，但必须同时说明 reason、conditions 和 risks。
+                6. 操作建议只能作为研究判断，不得承诺收益，不得使用“必涨”“必跌”“一定买入”等确定性表述。
 
                 allowedChunkIds:
                 %s
@@ -352,6 +363,7 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
         this.appendArray(builder, "市场事实", reportContent.path("marketFacts"), "fact", chunkReferenceLabels);
         this.appendArray(builder, "场景解读", reportContent.path("sceneInterpretation"), "view", chunkReferenceLabels);
         this.appendArray(builder, "知识库分析", reportContent.path("knowledgeBasedAnalysis"), "point", chunkReferenceLabels);
+        this.appendTradingSuggestions(builder, reportContent.path("tradingSuggestions"), chunkReferenceLabels);
         this.appendArray(builder, "风险提示", reportContent.path("riskWarnings"), "risk", chunkReferenceLabels);
         this.appendArray(builder, "观察点", reportContent.path("watchPoints"), "item", chunkReferenceLabels);
         return builder.toString().trim();
@@ -391,6 +403,71 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
             }
         }
         builder.append("\n");
+    }
+
+    private void appendTradingSuggestions(
+            StringBuilder builder,
+            JsonNode suggestions,
+            Map<Long, String> chunkReferenceLabels) {
+        if (!suggestions.isArray() || suggestions.size() == 0) {
+            return;
+        }
+        builder.append("## 操作建议\n");
+        for (JsonNode item : suggestions) {
+            String suggestion = item.path("suggestion").asText("");
+            String action = item.path("action").asText("");
+            String reason = item.path("reason").asText("");
+            if (suggestion.isBlank() && reason.isBlank()) {
+                continue;
+            }
+            String actionLabel = this.actionLabel(action);
+            builder.append("- ");
+            if (!actionLabel.isBlank()) {
+                builder.append("【").append(actionLabel).append("】");
+            }
+            builder.append(suggestion.isBlank() ? "建议" : suggestion);
+            builder.append("\n");
+            if (!reason.isBlank() && !reason.equals(suggestion)) {
+                builder.append("  - 理由：").append(reason).append("\n");
+            }
+            String conditions = this.stringArrayText(item.path("conditions"));
+            if (!conditions.isBlank()) {
+                builder.append("  - 条件：").append(conditions).append("\n");
+            }
+            String risks = this.stringArrayText(item.path("risks"));
+            if (!risks.isBlank()) {
+                builder.append("  - 风险：").append(risks).append("\n");
+            }
+            ArrayNode chunkIds = item.has("chunkIds") && item.get("chunkIds").isArray()
+                    ? (ArrayNode) item.get("chunkIds")
+                    : null;
+            if (chunkIds != null && chunkIds.size() > 0) {
+                builder.append("  - 引用：").append(this.chunkReferences(chunkIds, chunkReferenceLabels)).append("\n");
+            }
+        }
+        builder.append("\n");
+    }
+
+    private String stringArrayText(JsonNode values) {
+        if (!values.isArray() || values.size() == 0) {
+            return "";
+        }
+        return java.util.stream.StreamSupport.stream(values.spliterator(), false)
+                .map(JsonNode::asText)
+                .filter(value -> value != null && !value.isBlank())
+                .distinct()
+                .collect(java.util.stream.Collectors.joining("、"));
+    }
+
+    private String actionLabel(String action) {
+        return switch (action == null ? "" : action.trim()) {
+            case "buy" -> "买入";
+            case "sell" -> "卖出";
+            case "hold" -> "持有";
+            case "watch" -> "观望";
+            case "avoid" -> "回避";
+            default -> "";
+        };
     }
 
     private Map<Long, String> chunkReferenceLabels(JsonNode knowledgeContext) {
