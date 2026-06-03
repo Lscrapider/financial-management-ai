@@ -8,7 +8,12 @@ import java.util.List;
 
 public interface SceneAnalysisReportQueryService {
 
-    SceneAnalysisReportTargetPageVO pageTargets(int pageNum, int pageSize, String keyword);
+    SceneAnalysisReportTargetPageVO pageTargets(
+            int pageNum,
+            int pageSize,
+            String targetName,
+            String targetCode,
+            String targetType);
 
     List<SceneAnalysisReportHistoryVO> listHistory(String targetType, String targetCode);
 

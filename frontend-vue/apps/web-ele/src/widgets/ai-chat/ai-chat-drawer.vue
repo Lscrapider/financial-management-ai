@@ -37,7 +37,7 @@ const messages = ref<ChatMessage[]>([]);
 const scrollbarRef = ref<InstanceType<typeof ElScrollbar>>();
 const triggerSize = 60;
 const triggerPosition = reactive({
-  left: window.innerWidth - triggerSize - 24,
+  left: 24,
   top: window.innerHeight - triggerSize - 24,
 });
 const dragState = reactive({

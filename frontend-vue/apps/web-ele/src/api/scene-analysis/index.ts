@@ -34,9 +34,11 @@ export interface SceneAnalysisReportTargetPage {
 }
 
 export interface SceneAnalysisReportTargetPageParams {
-  keyword?: string;
   pageNum?: number;
   pageSize?: number;
+  targetCode?: string;
+  targetName?: string;
+  targetType?: string;
 }
 
 export interface SceneAnalysisReportHistory {
@@ -74,15 +76,156 @@ export interface SceneAnalysisTaskReport {
   versionNo?: null | number;
 }
 
+export interface SceneAnalysisTaskSubmitPayload {
+  configProfile?: string;
+  reportType?: string;
+  targetCode: string;
+  targetName?: string;
+  targetType: string;
+  totalChunks: number;
+  userOverrides?: Record<string, unknown>;
+}
+
+export interface SceneAnalysisSubmitResult {
+  configProfile: string;
+  status: SceneReportStatus;
+  targetCode: string;
+  targetType: string;
+  taskNo: string;
+}
+
+export interface SceneAnalysisConfigProfile {
+  configGroup: string;
+  configJson: Record<string, unknown>;
+  configProfile: string;
+  createdAt?: null | string;
+  enabled: boolean;
+  id: number;
+  name: string;
+  reportType: string;
+  systemDefault: boolean;
+  targetType?: null | string;
+  updatedAt?: null | string;
+}
+
+export interface SceneAnalysisConfigProfilePayload {
+  configGroup?: string;
+  configJson: Record<string, unknown>;
+  name: string;
+  reportType?: string;
+  targetType?: string;
+}
+
+export interface SceneAnalysisConfigField {
+  defaultValue: number;
+  description: string;
+  key: string;
+  label: string;
+  max: number;
+  min: number;
+  path: string[];
+  recommended: string;
+  step: number;
+  unit?: null | string;
+}
+
+export interface SceneAnalysisConfigGroup {
+  fields: SceneAnalysisConfigField[];
+  label: string;
+  name: string;
+}
+
+export interface SceneAnalysisReportType {
+  code: string;
+  label: string;
+}
+
+export interface SceneAnalysisTargetOption {
+  exchangeCode?: null | string;
+  marketCode?: null | string;
+  secid?: null | string;
+  targetCode: string;
+  targetName?: null | string;
+  targetType: string;
+}
+
 export function listSceneReportTargets(params: SceneAnalysisReportTargetPageParams = {}) {
   return requestClient.get<SceneAnalysisReportTargetPage>(
     '/ai/scene-analysis/tasks/reports/targets',
     {
       params: {
-        keyword: params.keyword || undefined,
         pageNum: params.pageNum ?? 1,
         pageSize: params.pageSize ?? 20,
+        targetCode: params.targetCode || undefined,
+        targetName: params.targetName || undefined,
+        targetType: params.targetType || undefined,
       },
+      responseReturn: 'body',
+    },
+  );
+}
+
+export function submitSceneAnalysisTask(payload: SceneAnalysisTaskSubmitPayload) {
+  return requestClient.post<SceneAnalysisSubmitResult>(
+    '/ai/scene-analysis/tasks',
+    payload,
+    { responseReturn: 'body' },
+  );
+}
+
+export function listSceneAnalysisConfigProfiles() {
+  return requestClient.get<SceneAnalysisConfigProfile[]>(
+    '/ai/scene-analysis/config-profiles',
+    { responseReturn: 'body' },
+  );
+}
+
+export function getSceneAnalysisConfigParameterSchema() {
+  return requestClient.get<SceneAnalysisConfigGroup[]>(
+    '/ai/scene-analysis/config-profiles/parameter-schema',
+    { responseReturn: 'body' },
+  );
+}
+
+export function getSceneAnalysisReportTypes() {
+  return requestClient.get<SceneAnalysisReportType[]>(
+    '/ai/scene-analysis/config-profiles/report-types',
+    { responseReturn: 'body' },
+  );
+}
+
+export function createSceneAnalysisConfigProfile(payload: SceneAnalysisConfigProfilePayload) {
+  return requestClient.post<SceneAnalysisConfigProfile>(
+    '/ai/scene-analysis/config-profiles',
+    payload,
+    { responseReturn: 'body' },
+  );
+}
+
+export function updateSceneAnalysisConfigProfile(
+  id: number,
+  payload: SceneAnalysisConfigProfilePayload,
+) {
+  return requestClient.put<SceneAnalysisConfigProfile>(
+    `/ai/scene-analysis/config-profiles/${id}`,
+    payload,
+    { responseReturn: 'body' },
+  );
+}
+
+export function deleteSceneAnalysisConfigProfile(id: number) {
+  return requestClient.delete<void>(`/ai/scene-analysis/config-profiles/${id}`);
+}
+
+export function searchSceneAnalysisTargets(params: {
+  keyword?: string;
+  limit?: number;
+  targetType: string;
+}) {
+  return requestClient.get<SceneAnalysisTargetOption[]>(
+    '/ai/scene-analysis/targets/search',
+    {
+      params,
       responseReturn: 'body',
     },
   );

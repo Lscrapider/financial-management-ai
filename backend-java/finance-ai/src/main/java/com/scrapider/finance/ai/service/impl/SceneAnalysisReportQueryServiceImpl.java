@@ -1,5 +1,6 @@
 package com.scrapider.finance.ai.service.impl;
 
+import cn.hutool.core.util.StrUtil;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisReportDetailVO;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisReportHistoryVO;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisReportTargetPageVO;
@@ -28,13 +29,21 @@ public class SceneAnalysisReportQueryServiceImpl implements SceneAnalysisReportQ
     }
 
     @Override
-    public SceneAnalysisReportTargetPageVO pageTargets(int pageNum, int pageSize, String keyword) {
+    public SceneAnalysisReportTargetPageVO pageTargets(
+            int pageNum,
+            int pageSize,
+            String targetName,
+            String targetCode,
+            String targetType) {
         int pn = Math.max(pageNum, DEFAULT_PAGE_NUM);
         int ps = pageSize <= 0 ? DEFAULT_PAGE_SIZE : Math.min(pageSize, MAX_PAGE_SIZE);
-        String normalizedKeyword = this.normalizeKeyword(keyword);
-        Long total = this.sceneAnalysisReportManage.countTargets(normalizedKeyword);
+        String normalizedTargetName = this.normalizeText(targetName);
+        String normalizedTargetCode = this.normalizeText(targetCode);
+        String normalizedTargetType = this.normalizeText(targetType);
+        Long total = this.sceneAnalysisReportManage
+                .countTargets(normalizedTargetName, normalizedTargetCode, normalizedTargetType);
         List<SceneAnalysisReportTargetVO> records = this.sceneAnalysisReportManage
-                .listTargets(normalizedKeyword, ps, (long) (pn - 1) * ps)
+                .listTargets(normalizedTargetName, normalizedTargetCode, normalizedTargetType, ps, (long) (pn - 1) * ps)
                 .stream()
                 .map(this::toTargetVO)
                 .toList();
@@ -44,10 +53,10 @@ public class SceneAnalysisReportQueryServiceImpl implements SceneAnalysisReportQ
 
     @Override
     public List<SceneAnalysisReportHistoryVO> listHistory(String targetType, String targetCode) {
-        if (targetType == null || targetType.isBlank()) {
+        if (StrUtil.isBlank(targetType)) {
             throw new IllegalArgumentException("targetType is required");
         }
-        if (targetCode == null || targetCode.isBlank()) {
+        if (StrUtil.isBlank(targetCode)) {
             throw new IllegalArgumentException("targetCode is required");
         }
         return this.sceneAnalysisReportManage.listHistory(targetType, targetCode).stream()
@@ -129,11 +138,11 @@ public class SceneAnalysisReportQueryServiceImpl implements SceneAnalysisReportQ
         return compact.substring(0, PREVIEW_LENGTH) + "...";
     }
 
-    private String normalizeKeyword(String keyword) {
-        if (keyword == null || keyword.isBlank()) {
+    private String normalizeText(String text) {
+        if (StrUtil.isBlank(text)) {
             return null;
         }
-        return keyword.trim();
+        return text.trim();
     }
 
     private String format(LocalDateTime time) {

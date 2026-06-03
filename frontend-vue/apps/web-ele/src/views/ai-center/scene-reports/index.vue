@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
 import { Page } from '@vben/common-ui';
+import { IconifyIcon } from '@vben/icons';
 
 import {
   ElButton,
@@ -10,26 +11,63 @@ import {
   ElDescriptionsItem,
   ElDrawer,
   ElEmpty,
+  ElForm,
+  ElFormItem,
   ElInput,
+  ElInputNumber,
   ElMessage,
+  ElOption,
   ElPagination,
   ElPopconfirm,
+  ElSelect,
+  ElSlider,
   ElTable,
   ElTableColumn,
   ElTag,
+  ElTooltip,
 } from 'element-plus';
 
 import {
+  createSceneAnalysisConfigProfile,
+  deleteSceneAnalysisConfigProfile,
+  getSceneAnalysisConfigParameterSchema,
+  getSceneAnalysisReportTypes,
   getSceneReportDetail,
+  listSceneAnalysisConfigProfiles,
   listSceneReportHistory,
   listSceneReportTargets,
   regenerateSceneReport,
+  searchSceneAnalysisTargets,
+  submitSceneAnalysisTask,
+  updateSceneAnalysisConfigProfile,
+  type SceneAnalysisConfigProfile,
   type SceneAnalysisReportDetail,
   type SceneAnalysisReportHistory,
   type SceneAnalysisReportTarget,
+  type SceneAnalysisReportType,
+  type SceneAnalysisTargetOption,
   type SceneReportStatus,
 } from '#/api/scene-analysis';
 import { useReportPollingStore } from '#/store';
+
+interface ParameterField {
+  defaultValue: number;
+  description: string;
+  key: string;
+  label: string;
+  max: number;
+  min: number;
+  path: string[];
+  recommended: string;
+  step: number;
+  unit?: null | string;
+}
+
+interface ParameterGroup {
+  fields: ParameterField[];
+  label: string;
+  name: string;
+}
 
 const route = useRoute();
 const pollingStore = useReportPollingStore();
@@ -48,15 +86,56 @@ const selectedReport = ref<SceneAnalysisReportDetail>();
 const historyDrawerVisible = ref(false);
 const detailDrawerVisible = ref(false);
 const detailFullscreen = ref(false);
-const targetKeyword = ref('');
+const targetNameFilter = ref('');
+const targetCodeFilter = ref('');
+const targetTypeFilter = ref('');
+const createDrawerVisible = ref(false);
+const loadingProfiles = ref(false);
+const loadingParameterSchema = ref(false);
+const submittingTask = ref(false);
+const savingProfile = ref(false);
+const selectedProfileId = ref<null | number>(null);
+const configProfiles = ref<SceneAnalysisConfigProfile[]>([]);
+const selectedConfigGroup = ref('');
+const loadingTargetOptions = ref(false);
+const targetOptions = ref<SceneAnalysisTargetOption[]>([]);
+const reportTypeOptions = ref<SceneAnalysisReportType[]>([
+  { code: 'quick_analysis', label: '快速分析' },
+  { code: 'risk_check', label: '风险检查' },
+  { code: 'valuation_report', label: '估值报告' },
+]);
+const parameterGroups = ref<ParameterGroup[]>([]);
+const parameterValues = ref<Record<string, number>>(defaultParameterValues());
+const customProfileName = ref('');
+const customProfileGroup = ref('自定义');
+const newReportForm = ref({
+  configProfile: 'system_recommended',
+  reportType: 'quick_analysis',
+  targetCode: '',
+  targetName: '',
+  targetType: 'STOCK',
+  totalChunks: 10,
+});
 
 const pollingTaskNos = computed(() => Object.keys(pollingStore.tasks));
+const selectedProfile = computed(() =>
+  configProfiles.value.find((profile) => profile.id === selectedProfileId.value),
+);
+const configGroupOptions = computed(() =>
+  [...new Set(configProfiles.value.map((profile) => profile.configGroup))],
+);
+const filteredConfigProfiles = computed(() =>
+  selectedConfigGroup.value
+    ? configProfiles.value.filter((profile) => profile.configGroup === selectedConfigGroup.value)
+    : configProfiles.value,
+);
 const renderedReportHtml = computed(() =>
   renderMarkdown(selectedReport.value?.reportText || '暂无报告正文'),
 );
 
 onMounted(async () => {
-  await loadTargets();
+  await Promise.all([loadTargets(), loadParameterSchema(), loadReportTypes()]);
+  await loadProfiles();
   const reportId = Number(route.query.reportId);
   if (Number.isFinite(reportId) && reportId > 0) {
     await openDetail(reportId);
@@ -73,13 +152,25 @@ watch(
   },
 );
 
+watch(
+  () => newReportForm.value.targetType,
+  () => {
+    newReportForm.value.targetCode = '';
+    newReportForm.value.targetName = '';
+    targetOptions.value = [];
+    void searchReportTargetOptions('');
+  },
+);
+
 async function loadTargets() {
   loadingTargets.value = true;
   try {
     const page = await listSceneReportTargets({
-      keyword: targetKeyword.value.trim(),
       pageNum: targetPageNum.value,
       pageSize: targetPageSize.value,
+      targetCode: targetCodeFilter.value.trim(),
+      targetName: targetNameFilter.value.trim(),
+      targetType: targetTypeFilter.value,
     });
     targets.value = page.records;
     targetTotal.value = page.total;
@@ -87,6 +178,33 @@ async function loadTargets() {
     targetPageSize.value = page.pageSize;
   } finally {
     loadingTargets.value = false;
+  }
+}
+
+async function loadProfiles() {
+  loadingProfiles.value = true;
+  try {
+    configProfiles.value = await listSceneAnalysisConfigProfiles();
+    selectProfile(selectedProfileId.value);
+  } finally {
+    loadingProfiles.value = false;
+  }
+}
+
+async function loadReportTypes() {
+  const types = await getSceneAnalysisReportTypes();
+  if (types.length > 0) {
+    reportTypeOptions.value = types;
+  }
+}
+
+async function loadParameterSchema() {
+  loadingParameterSchema.value = true;
+  try {
+    parameterGroups.value = await getSceneAnalysisConfigParameterSchema();
+    parameterValues.value = defaultParameterValues();
+  } finally {
+    loadingParameterSchema.value = false;
   }
 }
 
@@ -104,6 +222,176 @@ function changeTargetPageSize(value: number) {
   targetPageNum.value = 1;
   targetPageSize.value = value;
   void loadTargets();
+}
+
+function openCreateReport() {
+  createDrawerVisible.value = true;
+  if (configProfiles.value.length === 0) {
+    void loadProfiles();
+    return;
+  }
+  selectProfile(selectedProfileId.value);
+  applyProfile(selectedProfile.value);
+  void searchReportTargetOptions('');
+}
+
+function changeProfile(profileId: number) {
+  selectProfile(profileId);
+}
+
+function changeConfigGroup(configGroup: string) {
+  selectedConfigGroup.value = configGroup;
+  const profile = filteredConfigProfiles.value[0];
+  selectedProfileId.value = profile?.id ?? null;
+  applyProfile(profile);
+}
+
+function selectProfile(profileId?: null | number) {
+  const profile = configProfiles.value.find((item) => item.id === profileId)
+    ?? configProfiles.value.find((item) => item.configProfile === 'system_recommended')
+    ?? configProfiles.value[0];
+  selectedProfileId.value = profile?.id ?? null;
+  selectedConfigGroup.value = profile?.configGroup ?? '';
+  applyProfile(profile);
+}
+
+function applyProfile(profile?: SceneAnalysisConfigProfile) {
+  if (!profile) {
+    return;
+  }
+  const config = profile.configJson || {};
+  newReportForm.value = {
+    configProfile: textValue(config.configProfile, profile.configProfile),
+    reportType: textValue(config.reportType, profile.reportType || 'quick_analysis'),
+    targetCode: newReportForm.value.targetCode,
+    targetName: newReportForm.value.targetName,
+    targetType: textValue(config.targetType, profile.targetType || 'STOCK'),
+    totalChunks: numberValue(config.totalChunks, 10),
+  };
+  parameterValues.value = parameterValuesFromOverrides(config.userOverrides);
+  void searchReportTargetOptions('');
+}
+
+async function searchReportTargetOptions(keyword: string) {
+  loadingTargetOptions.value = true;
+  try {
+    targetOptions.value = await searchSceneAnalysisTargets({
+      keyword: keyword?.trim() || undefined,
+      limit: 20,
+      targetType: newReportForm.value.targetType,
+    });
+  } finally {
+    loadingTargetOptions.value = false;
+  }
+}
+
+function changeReportTarget(targetCode: string) {
+  const option = targetOptions.value.find((item) => item.targetCode === targetCode);
+  newReportForm.value.targetName = option?.targetName || '';
+}
+
+async function createReportTask() {
+  const targetCode = newReportForm.value.targetCode.trim();
+  if (!targetCode) {
+    ElMessage.warning('请选择标的');
+    return;
+  }
+  const userOverrides = buildUserOverrides();
+  submittingTask.value = true;
+  try {
+    const result = await submitSceneAnalysisTask({
+      configProfile: newReportForm.value.configProfile,
+      reportType: newReportForm.value.reportType,
+      targetCode,
+      targetName: newReportForm.value.targetName.trim() || undefined,
+      targetType: newReportForm.value.targetType,
+      totalChunks: newReportForm.value.totalChunks,
+      userOverrides,
+    });
+    pollingStore.start({
+      targetCode,
+      targetName: newReportForm.value.targetName.trim() || targetCode,
+      taskNo: result.taskNo,
+    });
+    createDrawerVisible.value = false;
+    ElMessage.success('已提交报告生成任务');
+    await loadTargets();
+  } finally {
+    submittingTask.value = false;
+  }
+}
+
+async function saveCurrentProfile() {
+  const name = customProfileName.value.trim();
+  if (!name) {
+    ElMessage.warning('请输入配置名称');
+    return;
+  }
+  const configJson = currentConfigJson();
+  if (!configJson) {
+    return;
+  }
+  savingProfile.value = true;
+  try {
+    const created = await createSceneAnalysisConfigProfile({
+      configGroup: customProfileGroup.value.trim() || '自定义',
+      configJson,
+      name,
+      reportType: newReportForm.value.reportType,
+      targetType: newReportForm.value.targetType,
+    });
+    await loadProfiles();
+    selectedConfigGroup.value = created.configGroup;
+    selectedProfileId.value = created.id;
+    applyProfile(created);
+    ElMessage.success('配置已保存');
+  } finally {
+    savingProfile.value = false;
+  }
+}
+
+async function updateCurrentProfile() {
+  const profile = selectedProfile.value;
+  if (!profile || profile.systemDefault) {
+    return;
+  }
+  const configJson = currentConfigJson();
+  if (!configJson) {
+    return;
+  }
+  savingProfile.value = true;
+  try {
+    const updated = await updateSceneAnalysisConfigProfile(profile.id, {
+      configGroup: profile.configGroup,
+      configJson,
+      name: profile.name,
+      reportType: newReportForm.value.reportType,
+      targetType: newReportForm.value.targetType,
+    });
+    await loadProfiles();
+    selectedConfigGroup.value = updated.configGroup;
+    selectedProfileId.value = updated.id;
+    applyProfile(updated);
+    ElMessage.success('配置已更新');
+  } finally {
+    savingProfile.value = false;
+  }
+}
+
+async function deleteCurrentProfile() {
+  const profile = selectedProfile.value;
+  if (!profile || profile.systemDefault) {
+    return;
+  }
+  savingProfile.value = true;
+  try {
+    await deleteSceneAnalysisConfigProfile(profile.id);
+    selectedProfileId.value = null;
+    await loadProfiles();
+    ElMessage.success('配置已删除');
+  } finally {
+    savingProfile.value = false;
+  }
 }
 
 async function loadHistory(target: SceneAnalysisReportTarget) {
@@ -201,6 +489,105 @@ function formatDateTime(value?: null | string) {
   return value.replace('T', ' ').slice(0, 19);
 }
 
+function currentConfigJson() {
+  return {
+    reportType: newReportForm.value.reportType,
+    targetType: newReportForm.value.targetType,
+    totalChunks: newReportForm.value.totalChunks,
+    userOverrides: buildUserOverrides(),
+  };
+}
+
+function buildUserOverrides() {
+  const overrides: Record<string, unknown> = {
+    asset_type: assetTypeByTargetType(newReportForm.value.targetType),
+  };
+  parameterGroups.value.flatMap((group) => group.fields).forEach((field) => {
+    setNestedValue(overrides, field.path, parameterValues.value[field.key] ?? field.defaultValue);
+  });
+  setNestedValue(overrides, ['volume_config', 'volume_distribution_source'], 'asset_history_then_industry');
+  setNestedValue(overrides, ['volume_config', 'turnover_distribution_source'], 'asset_history_then_industry');
+  return overrides;
+}
+
+function parameterValuesFromOverrides(value: unknown) {
+  const overrides = objectValue(value);
+  const result = defaultParameterValues();
+  parameterGroups.value.flatMap((group) => group.fields).forEach((field) => {
+    const nestedValue = getNestedValue(overrides, field.path);
+    if (typeof nestedValue === 'number' && Number.isFinite(nestedValue)) {
+      result[field.key] = nestedValue;
+    }
+  });
+  return result;
+}
+
+function defaultParameterValues() {
+  return parameterGroups.value.flatMap((group) => group.fields).reduce<Record<string, number>>(
+    (result, field) => {
+      result[field.key] = field.defaultValue;
+      return result;
+    },
+    {},
+  );
+}
+
+function objectValue(value: unknown) {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function getNestedValue(source: Record<string, unknown>, path: string[]) {
+  return path.reduce<unknown>((current, key) => {
+    if (!current || typeof current !== 'object' || Array.isArray(current)) {
+      return undefined;
+    }
+    return (current as Record<string, unknown>)[key];
+  }, source);
+}
+
+function setNestedValue(target: Record<string, unknown>, path: string[], value: unknown) {
+  let cursor = target;
+  path.forEach((key, index) => {
+    if (index === path.length - 1) {
+      cursor[key] = value;
+      return;
+    }
+    if (!cursor[key] || typeof cursor[key] !== 'object' || Array.isArray(cursor[key])) {
+      cursor[key] = {};
+    }
+    cursor = cursor[key] as Record<string, unknown>;
+  });
+}
+
+function assetTypeByTargetType(targetType: string) {
+  if (targetType === 'INDEX') {
+    return 'index';
+  }
+  if (targetType === 'CONVERTIBLE_BOND') {
+    return 'convertible_bond';
+  }
+  return 'stock';
+}
+
+function textValue(value: unknown, fallback: string) {
+  return typeof value === 'string' && value.trim() ? value.trim() : fallback;
+}
+
+function numberValue(value: unknown, fallback: number) {
+  return typeof value === 'number' && value > 0 ? value : fallback;
+}
+
+function parameterTooltip(field: ParameterField) {
+  return `${field.description} 推荐范围：${field.recommended}`;
+}
+
+function parameterValueLabel(field: ParameterField) {
+  const value = parameterValues.value[field.key] ?? field.defaultValue;
+  return `${value}${field.unit || ''}`;
+}
+
 function renderMarkdown(markdown: string) {
   const blocks: string[] = [];
   let listItems: string[] = [];
@@ -221,28 +608,35 @@ function renderMarkdown(markdown: string) {
     }
     if (text.startsWith('# ')) {
       flushList();
-      blocks.push(`<h1>${escapeHtml(text.slice(2))}</h1>`);
+      blocks.push(`<h1>${renderInlineMarkdown(text.slice(2))}</h1>`);
       return;
     }
     if (text.startsWith('## ')) {
       flushList();
-      blocks.push(`<h2>${escapeHtml(text.slice(3))}</h2>`);
+      blocks.push(`<h2>${renderInlineMarkdown(text.slice(3))}</h2>`);
       return;
     }
     if (text.startsWith('### ')) {
       flushList();
-      blocks.push(`<h3>${escapeHtml(text.slice(4))}</h3>`);
+      blocks.push(`<h3>${renderInlineMarkdown(text.slice(4))}</h3>`);
       return;
     }
     if (text.startsWith('- ')) {
-      listItems.push(`<li>${escapeHtml(text.slice(2))}</li>`);
+      listItems.push(`<li>${renderInlineMarkdown(text.slice(2))}</li>`);
       return;
     }
     flushList();
-    blocks.push(`<p>${escapeHtml(text)}</p>`);
+    blocks.push(`<p>${renderInlineMarkdown(text)}</p>`);
   });
   flushList();
   return blocks.join('');
+}
+
+function renderInlineMarkdown(text: string) {
+  return escapeHtml(text).replaceAll(
+    /（引用：[^）]+）/g,
+    (reference) => `<strong class="report-reference">${reference}</strong>`,
+  );
 }
 
 function escapeHtml(text: string) {
@@ -265,19 +659,42 @@ function escapeHtml(text: string) {
             共 {{ targets.length }} 个标的，{{ pollingTaskNos.length }} 个报告生成中
           </div>
         </div>
-        <ElButton :loading="loadingTargets" @click="loadTargets">
-          刷新
-        </ElButton>
+        <div class="toolbar-actions">
+          <ElButton type="primary" @click="openCreateReport">
+            新建报告
+          </ElButton>
+          <ElButton :loading="loadingTargets" @click="loadTargets">
+            刷新
+          </ElButton>
+        </div>
       </div>
 
       <div class="filter-row">
         <ElInput
-          v-model="targetKeyword"
+          v-model="targetNameFilter"
           clearable
-          placeholder="按标的名称、代码或类型筛选"
+          placeholder="标的名称"
           @clear="searchTargets"
           @keyup.enter="searchTargets"
         />
+        <ElInput
+          v-model="targetCodeFilter"
+          clearable
+          placeholder="标的代码"
+          @clear="searchTargets"
+          @keyup.enter="searchTargets"
+        />
+        <ElSelect
+          v-model="targetTypeFilter"
+          clearable
+          placeholder="标的类型"
+          @clear="searchTargets"
+          @change="searchTargets"
+        >
+          <ElOption label="股票" value="STOCK" />
+          <ElOption label="指数" value="INDEX" />
+          <ElOption label="可转债" value="CONVERTIBLE_BOND" />
+        </ElSelect>
         <ElButton :loading="loadingTargets" type="primary" @click="searchTargets">
           查询
         </ElButton>
@@ -362,6 +779,203 @@ function escapeHtml(text: string) {
     </div>
 
     <ElDrawer
+      v-model="createDrawerVisible"
+      destroy-on-close
+      size="620px"
+      title="新建报告任务"
+    >
+      <div class="create-report-panel">
+        <ElForm label-position="top">
+          <div class="form-grid">
+            <ElFormItem label="配置分组">
+              <ElSelect
+                v-model="selectedConfigGroup"
+                :loading="loadingProfiles"
+                placeholder="选择配置分组"
+                @change="changeConfigGroup"
+              >
+                <ElOption
+                  v-for="group in configGroupOptions"
+                  :key="group"
+                  :label="group"
+                  :value="group"
+                />
+              </ElSelect>
+            </ElFormItem>
+            <ElFormItem label="配置模板">
+              <ElSelect
+                :loading="loadingProfiles"
+                :model-value="selectedProfileId"
+                filterable
+                placeholder="选择配置模板"
+                @change="changeProfile"
+              >
+                <ElOption
+                  v-for="profile in filteredConfigProfiles"
+                  :key="profile.id"
+                  :label="`${profile.name}${profile.systemDefault ? '（系统）' : ''}`"
+                  :value="profile.id"
+                />
+              </ElSelect>
+            </ElFormItem>
+          </div>
+
+          <div class="form-grid">
+            <ElFormItem label="标的类型">
+              <ElSelect v-model="newReportForm.targetType">
+                <ElOption label="股票" value="STOCK" />
+                <ElOption label="指数" value="INDEX" />
+                <ElOption label="可转债" value="CONVERTIBLE_BOND" />
+              </ElSelect>
+            </ElFormItem>
+            <ElFormItem label="标的">
+              <ElSelect
+                v-model="newReportForm.targetCode"
+                clearable
+                filterable
+                :loading="loadingTargetOptions"
+                placeholder="输入名称、代码或 secid 搜索"
+                remote
+                :remote-method="searchReportTargetOptions"
+                @change="changeReportTarget"
+              >
+                <ElOption
+                  v-for="option in targetOptions"
+                  :key="`${option.targetType}-${option.targetCode}`"
+                  :label="`${option.targetName || option.targetCode} ${option.targetCode}`"
+                  :value="option.targetCode"
+                >
+                  <div class="target-option">
+                    <strong>{{ option.targetName || option.targetCode }}</strong>
+                    <span>{{ option.targetCode }} · {{ option.exchangeCode || '-' }}</span>
+                  </div>
+                </ElOption>
+              </ElSelect>
+            </ElFormItem>
+          </div>
+
+          <div class="form-grid">
+            <ElFormItem label="报告类型">
+              <ElSelect v-model="newReportForm.reportType">
+                <ElOption
+                  v-for="reportType in reportTypeOptions"
+                  :key="reportType.code"
+                  :label="reportType.label"
+                  :value="reportType.code"
+                />
+              </ElSelect>
+            </ElFormItem>
+            <ElFormItem label="召回片段数">
+              <ElInputNumber
+                v-model="newReportForm.totalChunks"
+                :min="1"
+                :step="1"
+                controls-position="right"
+              />
+            </ElFormItem>
+          </div>
+
+          <section v-loading="loadingParameterSchema" class="parameter-panel">
+            <div class="parameter-panel-title">场景参数</div>
+            <div v-if="parameterGroups.length > 0" class="parameter-groups">
+              <section
+                v-for="group in parameterGroups"
+                :key="group.name"
+                class="parameter-group"
+              >
+                <div class="parameter-group-title">{{ group.label }}</div>
+                <div class="parameter-list">
+                  <div
+                    v-for="field in group.fields"
+                    :key="field.key"
+                    class="parameter-item"
+                  >
+                    <div class="parameter-header">
+                      <span>{{ field.label }}</span>
+                      <ElTooltip
+                        effect="dark"
+                        placement="top"
+                        :content="parameterTooltip(field)"
+                      >
+                        <IconifyIcon class="parameter-info" icon="lucide:info" />
+                      </ElTooltip>
+                    </div>
+                    <div class="parameter-control">
+                      <ElSlider
+                        v-model="parameterValues[field.key]"
+                        :max="field.max"
+                        :min="field.min"
+                        :step="field.step"
+                      />
+                      <span class="parameter-value">
+                        {{ parameterValueLabel(field) }}
+                      </span>
+                    </div>
+                    <div class="parameter-recommended">
+                      推荐 {{ field.recommended }}
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+            <ElEmpty v-else description="暂无参数配置" />
+          </section>
+        </ElForm>
+
+        <section class="profile-save-panel">
+          <div class="profile-save-title">保存为配置</div>
+          <div class="profile-save-row">
+            <ElInput
+              v-model="customProfileName"
+              clearable
+              placeholder="配置名称"
+            />
+            <ElInput
+              v-model="customProfileGroup"
+              clearable
+              placeholder="配置分组"
+            />
+            <ElButton :loading="savingProfile" @click="saveCurrentProfile">
+              保存
+            </ElButton>
+          </div>
+          <div
+            v-if="selectedProfile && !selectedProfile.systemDefault"
+            class="profile-edit-actions"
+          >
+            <ElButton
+              :loading="savingProfile"
+              type="primary"
+              @click="updateCurrentProfile"
+            >
+              更新当前配置
+            </ElButton>
+            <ElPopconfirm title="删除当前自定义配置？" @confirm="deleteCurrentProfile">
+              <template #reference>
+                <ElButton :loading="savingProfile" type="danger">
+                  删除当前配置
+                </ElButton>
+              </template>
+            </ElPopconfirm>
+          </div>
+        </section>
+
+        <div class="drawer-footer">
+          <ElButton @click="createDrawerVisible = false">
+            取消
+          </ElButton>
+          <ElButton
+            :loading="submittingTask"
+            type="primary"
+            @click="createReportTask"
+          >
+            创建任务
+          </ElButton>
+        </div>
+      </div>
+    </ElDrawer>
+
+    <ElDrawer
       v-model="historyDrawerVisible"
       :title="selectedTarget ? `${displayTarget(selectedTarget)} 历史报告` : '历史报告'"
       size="720px"
@@ -442,9 +1056,6 @@ function escapeHtml(text: string) {
                 {{ statusLabel(selectedReport.status) }}
               </ElTag>
             </ElDescriptionsItem>
-            <ElDescriptionsItem label="任务编号">
-              {{ selectedReport.taskNo }}
-            </ElDescriptionsItem>
             <ElDescriptionsItem label="模型">
               {{ selectedReport.model || '-' }}
             </ElDescriptionsItem>
@@ -490,15 +1101,174 @@ function escapeHtml(text: string) {
   min-width: 0;
 }
 
-.filter-row {
+.toolbar-actions {
   display: flex;
+  flex-shrink: 0;
   gap: 8px;
-  max-width: 460px;
+}
+
+.filter-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(160px, 1fr) minmax(140px, 1fr) minmax(140px, 180px) auto;
+  max-width: 760px;
+}
+
+@media (max-width: 768px) {
+  .filter-row {
+    grid-template-columns: 1fr;
+    max-width: none;
+  }
 }
 
 .pagination-row {
   display: flex;
   justify-content: flex-end;
+}
+
+.create-report-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 72px;
+}
+
+.form-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.target-option {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.target-option span {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.parameter-panel {
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 6px;
+  padding: 12px 14px 6px;
+}
+
+.parameter-panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.parameter-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.parameter-group {
+  border-top: 1px solid var(--el-border-color-lighter);
+  padding-top: 12px;
+}
+
+.parameter-group:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.parameter-group-title {
+  color: var(--el-text-color-primary);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 18px;
+  margin-bottom: 10px;
+}
+
+.parameter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.parameter-item {
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  padding-bottom: 12px;
+}
+
+.parameter-item:last-child {
+  border-bottom: 0;
+}
+
+.parameter-header {
+  align-items: center;
+  display: flex;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 6px;
+  line-height: 18px;
+}
+
+.parameter-info {
+  color: var(--el-text-color-secondary);
+  cursor: help;
+  font-size: 15px;
+}
+
+.parameter-control {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) 58px;
+}
+
+.parameter-value {
+  color: var(--el-text-color-primary);
+  font-size: 12px;
+  text-align: right;
+}
+
+.parameter-recommended {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 16px;
+  margin-top: -4px;
+}
+
+.profile-save-panel {
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+}
+
+.profile-save-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.profile-save-row,
+.profile-edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.drawer-footer {
+  align-items: center;
+  background: var(--el-bg-color);
+  border-top: 1px solid var(--el-border-color-light);
+  bottom: 0;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  left: 0;
+  padding: 12px 20px;
+  position: absolute;
+  right: 0;
 }
 
 .toolbar-title {
@@ -596,5 +1366,25 @@ function escapeHtml(text: string) {
 
 :deep(.markdown-report li) {
   margin: 4px 0;
+}
+
+:deep(.markdown-report .report-reference) {
+  color: var(--el-text-color-primary);
+  font-weight: 700;
+}
+
+@media (max-width: 768px) {
+  .form-grid,
+  .profile-save-row,
+  .profile-edit-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-save-row,
+  .profile-edit-actions,
+  .toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }
 </style>

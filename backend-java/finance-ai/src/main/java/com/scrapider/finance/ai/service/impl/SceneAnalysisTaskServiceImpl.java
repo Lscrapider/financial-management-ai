@@ -19,6 +19,7 @@ import com.scrapider.finance.ai.service.SceneAnalysisMessagePublisher;
 import com.scrapider.finance.ai.service.SceneReportPipelineService;
 import com.scrapider.finance.ai.service.StockSceneDataEnsureService;
 import com.scrapider.finance.ai.service.SceneAnalysisTaskService;
+import com.scrapider.finance.domain.enums.SceneAnalysisReportTypeEnum;
 import com.scrapider.finance.domain.enums.SceneAnalysisTaskStatusEnum;
 import com.scrapider.finance.domain.po.BondConfigPO;
 import com.scrapider.finance.domain.po.BondQuoteSnapshotPO;
@@ -345,7 +346,7 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
         return new SceneAnalysisMessageDTO(
                 taskNo,
                 LocalDateTime.now(),
-                StrUtil.blankToDefault(param.reportType(), "quick_analysis"),
+                this.normalizeReportType(param.reportType()),
                 param.totalChunks(),
                 target,
                 new SceneAnalysisConfigDTO(
@@ -360,6 +361,13 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
                 dailyKlines,
                 intradayData,
                 this.dataCompleteness(missing));
+    }
+
+    private String normalizeReportType(String reportType) {
+        if (StrUtil.isBlank(reportType)) {
+            return SceneAnalysisReportTypeEnum.QUICK_ANALYSIS.getCode();
+        }
+        return SceneAnalysisReportTypeEnum.of(reportType.trim()).getCode();
     }
 
     private SceneAnalysisTaskPO pendingTask(Long userId, SceneAnalysisMessageDTO message) {

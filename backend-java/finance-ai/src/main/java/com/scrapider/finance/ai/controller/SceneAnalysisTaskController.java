@@ -66,8 +66,11 @@ public class SceneAnalysisTaskController {
     public ResponseEntity<SceneAnalysisReportTargetPageVO> reportTargets(
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "20") int pageSize,
-            @RequestParam(required = false) String keyword) {
-        return ResponseEntity.ok(this.sceneAnalysisReportQueryService.pageTargets(pageNum, pageSize, keyword));
+            @RequestParam(required = false) String targetName,
+            @RequestParam(required = false) String targetCode,
+            @RequestParam(required = false) String targetType) {
+        return ResponseEntity.ok(this.sceneAnalysisReportQueryService
+                .pageTargets(pageNum, pageSize, targetName, targetCode, targetType));
     }
 
     @GetMapping("/reports")

@@ -34,16 +34,17 @@ public class SceneAnalysisReportManage extends ServiceImpl<SceneAnalysisReportMa
         return this.baseMapper.latestByTaskNo(taskNo);
     }
 
-    public Long countTargets(String keyword) {
-        return keyword == null || keyword.isBlank()
-                ? this.baseMapper.countTargets()
-                : this.baseMapper.countTargetsByKeyword(keyword);
+    public Long countTargets(String targetName, String targetCode, String targetType) {
+        return this.baseMapper.countTargets(targetName, targetCode, targetType);
     }
 
-    public List<SceneAnalysisReportTargetDTO> listTargets(String keyword, int limit, long offset) {
-        return keyword == null || keyword.isBlank()
-                ? this.baseMapper.listTargets(limit, offset)
-                : this.baseMapper.listTargetsByKeyword(keyword, limit, offset);
+    public List<SceneAnalysisReportTargetDTO> listTargets(
+            String targetName,
+            String targetCode,
+            String targetType,
+            int limit,
+            long offset) {
+        return this.baseMapper.listTargets(targetName, targetCode, targetType, limit, offset);
     }
 
     public List<SceneAnalysisReportHistoryDTO> listHistory(String targetType, String targetCode) {

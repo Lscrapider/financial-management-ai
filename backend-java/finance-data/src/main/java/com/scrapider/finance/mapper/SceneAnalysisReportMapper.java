@@ -7,13 +7,12 @@ import com.scrapider.finance.domain.dto.SceneAnalysisReportTargetDTO;
 import com.scrapider.finance.domain.po.SceneAnalysisReportPO;
 import java.time.LocalDateTime;
 import java.util.List;
-import org.apache.ibatis.annotations.Result;
-import org.apache.ibatis.annotations.ResultMap;
-import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
@@ -71,6 +70,7 @@ public interface SceneAnalysisReportMapper extends BaseMapper<SceneAnalysisRepor
     SceneAnalysisReportPO latestByTaskNo(@Param("taskNo") String taskNo);
 
     @Select("""
+            <script>
             WITH ranked AS (
                 SELECT
                     r.*,
@@ -84,10 +84,24 @@ public interface SceneAnalysisReportMapper extends BaseMapper<SceneAnalysisRepor
             SELECT COUNT(*)
             FROM ranked
             WHERE row_num = 1
+            <if test="targetName != null and targetName != ''">
+              AND LOWER(COALESCE(target_name, '')) LIKE CONCAT('%', LOWER(#{targetName}), '%')
+            </if>
+            <if test="targetCode != null and targetCode != ''">
+              AND LOWER(target_code) LIKE CONCAT('%', LOWER(#{targetCode}), '%')
+            </if>
+            <if test="targetType != null and targetType != ''">
+              AND target_type = #{targetType}
+            </if>
+            </script>
             """)
-    Long countTargets();
+    Long countTargets(
+            @Param("targetName") String targetName,
+            @Param("targetCode") String targetCode,
+            @Param("targetType") String targetType);
 
     @Select("""
+            <script>
             WITH ranked AS (
                 SELECT
                     r.*,
@@ -118,10 +132,20 @@ public interface SceneAnalysisReportMapper extends BaseMapper<SceneAnalysisRepor
                     report_count
                 FROM ranked
                 WHERE row_num = 1
+                <if test="targetName != null and targetName != ''">
+                  AND LOWER(COALESCE(target_name, '')) LIKE CONCAT('%', LOWER(#{targetName}), '%')
+                </if>
+                <if test="targetCode != null and targetCode != ''">
+                  AND LOWER(target_code) LIKE CONCAT('%', LOWER(#{targetCode}), '%')
+                </if>
+                <if test="targetType != null and targetType != ''">
+                  AND target_type = #{targetType}
+                </if>
             ) latest
             ORDER BY latest_sort_at DESC, latest_report_id DESC
             LIMIT #{limit}
             OFFSET #{offset}
+            </script>
             """)
     @Results(id = "sceneAnalysisReportTargetMap", value = {
             @Result(column = "target_type", property = "targetType"),
@@ -140,75 +164,9 @@ public interface SceneAnalysisReportMapper extends BaseMapper<SceneAnalysisRepor
             @Result(column = "report_count", property = "reportCount")
     })
     List<SceneAnalysisReportTargetDTO> listTargets(
-            @Param("limit") int limit,
-            @Param("offset") long offset);
-
-    @Select("""
-            WITH ranked AS (
-                SELECT
-                    r.*,
-                    COUNT(*) OVER (PARTITION BY r.target_type, r.target_code) AS report_count,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY r.target_type, r.target_code
-                        ORDER BY COALESCE(r.generated_at, r.created_at) DESC, r.id DESC
-                    ) AS row_num
-                FROM scene_analysis_report r
-            )
-            SELECT COUNT(*)
-            FROM ranked
-            WHERE row_num = 1
-              AND (
-                  LOWER(target_type) LIKE CONCAT('%', LOWER(#{keyword}), '%')
-                  OR LOWER(target_code) LIKE CONCAT('%', LOWER(#{keyword}), '%')
-                  OR LOWER(COALESCE(target_name, '')) LIKE CONCAT('%', LOWER(#{keyword}), '%')
-              )
-            """)
-    Long countTargetsByKeyword(@Param("keyword") String keyword);
-
-    @Select("""
-            WITH ranked AS (
-                SELECT
-                    r.*,
-                    COUNT(*) OVER (PARTITION BY r.target_type, r.target_code) AS report_count,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY r.target_type, r.target_code
-                        ORDER BY COALESCE(r.generated_at, r.created_at) DESC, r.id DESC
-                    ) AS row_num
-                FROM scene_analysis_report r
-            )
-            SELECT *
-            FROM (
-                SELECT
-                    target_type,
-                    target_code,
-                    target_name,
-                    id AS latest_report_id,
-                    task_no AS latest_task_no,
-                    status AS latest_status,
-                    report_type AS latest_report_type,
-                    generation_type AS latest_generation_type,
-                    version_no AS latest_version_no,
-                    model AS latest_model,
-                    report_text AS latest_report_text,
-                    generated_at AS latest_generated_at,
-                    created_at AS latest_created_at,
-                    COALESCE(generated_at, created_at) AS latest_sort_at,
-                    report_count
-                FROM ranked
-                WHERE row_num = 1
-                  AND (
-                      LOWER(target_type) LIKE CONCAT('%', LOWER(#{keyword}), '%')
-                      OR LOWER(target_code) LIKE CONCAT('%', LOWER(#{keyword}), '%')
-                      OR LOWER(COALESCE(target_name, '')) LIKE CONCAT('%', LOWER(#{keyword}), '%')
-                  )
-            ) latest
-            ORDER BY latest_sort_at DESC, latest_report_id DESC
-            LIMIT #{limit}
-            OFFSET #{offset}
-            """)
-    @ResultMap("sceneAnalysisReportTargetMap")
-    List<SceneAnalysisReportTargetDTO> listTargetsByKeyword(
-            @Param("keyword") String keyword,
+            @Param("targetName") String targetName,
+            @Param("targetCode") String targetCode,
+            @Param("targetType") String targetType,
             @Param("limit") int limit,
             @Param("offset") long offset);
 
