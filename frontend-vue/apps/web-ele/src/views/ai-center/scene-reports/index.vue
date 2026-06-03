@@ -315,6 +315,7 @@ async function createReportTask() {
     });
     createDrawerVisible.value = false;
     ElMessage.success('已提交报告生成任务');
+    await new Promise((resolve) => setTimeout(resolve, 500));
     await loadTargets();
   } finally {
     submittingTask.value = false;

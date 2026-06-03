@@ -197,12 +197,39 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
         target.put("code", task.getTargetCode());
         target.put("name", task.getTargetName());
         root.put("reportType", task.getReportType());
-        root.set("currentScenes", currentScenesPayload.path("currentScenes"));
+        root.set("currentScenes", this.reportCurrentScenes(currentScenesPayload.path("currentScenes")));
         root.set("chunkAllocation", reportPayload.path("chunkAllocation"));
         root.set("retrievalTasks", reportPayload.path("retrievalTasks"));
         root.set("knowledgeContext", knowledgeContext);
         root.set("outputRequirement", this.outputRequirement());
         return root;
+    }
+
+    private ObjectNode reportCurrentScenes(JsonNode currentScenes) {
+        ObjectNode result = this.objectMapper.createObjectNode();
+        if (currentScenes == null || !currentScenes.isObject()) {
+            return result;
+        }
+        currentScenes.properties().forEach(entry -> {
+            JsonNode module = entry.getValue();
+            if (module == null || !module.isObject()) {
+                return;
+            }
+            ObjectNode sanitized = result.putObject(entry.getKey());
+            this.copyIfPresent(module, sanitized, "score");
+            this.copyIfPresent(module, sanitized, "level");
+            this.copyIfPresent(module, sanitized, "direction");
+            this.copyIfPresent(module, sanitized, "tags");
+            this.copyIfPresent(module, sanitized, "queryText");
+        });
+        return result;
+    }
+
+    private void copyIfPresent(JsonNode source, ObjectNode target, String fieldName) {
+        JsonNode value = source.path(fieldName);
+        if (!value.isMissingNode() && !value.isNull()) {
+            target.set(fieldName, value);
+        }
     }
 
     private ObjectNode outputRequirement() {

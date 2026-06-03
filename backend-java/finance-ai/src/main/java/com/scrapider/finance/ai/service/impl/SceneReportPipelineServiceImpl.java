@@ -232,22 +232,12 @@ public class SceneReportPipelineServiceImpl implements SceneReportPipelineServic
         return module.tags().entrySet().stream()
                 .filter(entry -> entry.getKey() != null && !entry.getKey().isBlank())
                 .filter(entry -> entry.getValue() != null && entry.getValue() > 0)
-                .filter(entry -> this.evidenceContainsTag(module, entry.getKey().trim()))
                 .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
                 .collect(Collectors.toMap(
                         entry -> entry.getKey().trim(),
                         Map.Entry::getValue,
                         (left, right) -> left,
                         LinkedHashMap::new));
-    }
-
-    private boolean evidenceContainsTag(SceneAnalysisSceneModuleParam module, String tag) {
-        if (module.evidence() == null || module.evidence().isEmpty()) {
-            return false;
-        }
-        return module.evidence().stream()
-                .anyMatch(item -> item != null
-                        && (item.contains(tag + " 标签触发") || item.contains(tag + " 标签命中")));
     }
 
     private String queryText(SceneAnalysisSceneModuleParam module) {
