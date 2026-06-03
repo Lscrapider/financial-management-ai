@@ -133,6 +133,56 @@ LLM 生成结构化报告
 
 ---
 
+### 1.5 当前落地状态
+
+当前报告流程已经打通，落地实现和本文设计的对应关系如下：
+
+```text
+前端报告页面
+  ↓
+POST /api/ai/scene-analysis/tasks
+  ↓
+Java 创建 scene_analysis_task，组装行情上下文并发布 scene.analysis.current 消息
+  ↓
+Python 计算 currentScenes，回调 POST /api/ai/scene-analysis/tasks/{taskNo}/callback
+  ↓
+Java 计算 chunkAllocation，生成 retrievalTasks，发布 scene.analysis.retrieval.embedding 消息
+  ↓
+Python 为每个 retrievalTask 生成 queryEmbedding，再次回调 Java
+  ↓
+Java 使用 pgvector 做语义候选召回，结合 Jaccard 标签匹配和 cross_scene_score 类内重排
+  ↓
+Java 构建 knowledgeContext，异步调用 DeepSeek 生成结构化 JSON 报告
+  ↓
+写入 scene_analysis_report，前端轮询 /report 并支持历史列表、详情和重新生成
+```
+
+已落地能力：
+
+```text
+1. 支持 STOCK、INDEX、CONVERTIBLE_BOND 三类标的。
+2. 支持 quick_analysis、risk_check、valuation_report 三类报告类型。
+3. 支持配置档 scene_analysis_config_profile，前端可查询参数 schema、报告类型和自定义配置。
+4. 支持报告目标分页、单标的历史版本、报告详情和基于已存上下文重新生成。
+5. 报告生成时校验知识库 chunkId 引用，避免 LLM 编造不存在的引用。
+6. Token 用量会从 DeepSeek 原始响应中提取并记录。
+```
+
+当前落地表：
+
+```text
+scene_analysis_task
+  保存任务状态、标的、报告类型、配置快照、currentScenesPayload、reportPayload。
+
+scene_analysis_report
+  保存报告历史版本、生成类型、结构化 JSON、渲染文本、模型、错误信息和生成时间。
+
+scene_analysis_config_profile
+  保存系统默认或用户自定义的报告参数配置。
+```
+
+---
+
 ## 2. 整体流程设计
 
 ### 2.1 Chunk 入库流程
@@ -1338,6 +1388,17 @@ volume_score = 0.85
 
 系统先根据 7 大类得分计算每一类应该召回多少 chunk。
 
+当前 Java 实现中，`asset` 主要用于区分股票、指数、可转债等资产类型，不直接参与报告知识 chunk 配额分配。动态召回实际参与类别为：
+
+```text
+price
+volume
+trend
+valuation
+sentiment
+risk_strategy
+```
+
 例如：
 
 ```text
@@ -1417,7 +1478,6 @@ quick_analysis：
 
 ```json
 {
-  "asset": 1.0,
   "price": 1.0,
   "volume": 1.0,
   "trend": 0.9,
@@ -1431,7 +1491,6 @@ risk_check：
 
 ```json
 {
-  "asset": 1.0,
   "price": 0.9,
   "volume": 1.0,
   "trend": 0.8,
@@ -1445,7 +1504,6 @@ valuation_report：
 
 ```json
 {
-  "asset": 1.0,
   "price": 0.7,
   "volume": 0.7,
   "trend": 0.7,
@@ -1471,6 +1529,20 @@ valuation_report：
   "minPerActiveCategory": 1,
   "maxPerCategory": 4
 }
+```
+
+当前实现常量：
+
+```text
+alpha = 6.0
+categoryScoreThreshold = 0.35
+minPerActiveCategory = 1
+maxPerCategory = 4
+semanticCandidateLimit = 200
+jaccardThreshold = 0.2
+loweredJaccardThreshold = 0.1
+embeddingDimension = 512
+finalScore = 0.45 * semantic_score + 0.45 * tag_match_score + 0.10 * cross_scene_score
 ```
 
 规则：
@@ -2371,7 +2443,7 @@ CREATE TABLE knowledge_vector (
     task_no VARCHAR(64),
     chunk_index INTEGER,
     text TEXT NOT NULL,
-    embedding VECTOR(384),
+    embedding VECTOR(512),
     metadata JSONB,
     enabled BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -2407,22 +2479,27 @@ CREATE TABLE knowledge_vector (
 
 ---
 
-### 8.3 ai_analysis_report 表设计
+### 8.3 scene_analysis_task 表设计
 
 ```sql
-CREATE TABLE ai_analysis_report (
+CREATE TABLE scene_analysis_task (
     id BIGSERIAL PRIMARY KEY,
-    report_no VARCHAR(64) NOT NULL UNIQUE,
+    task_no VARCHAR(64) NOT NULL UNIQUE,
+    user_id BIGINT NOT NULL,
     target_type VARCHAR(32) NOT NULL,
-    target_code VARCHAR(32),
-    target_name VARCHAR(128),
-    report_type VARCHAR(32) NOT NULL,
-    market_context JSONB,
-    current_scenes JSONB,
-    chunk_allocation JSONB,
-    knowledge_context JSONB,
-    report_content JSONB NOT NULL,
-    model VARCHAR(128),
+    target_code VARCHAR(32) NOT NULL,
+    target_name VARCHAR(100),
+    report_type VARCHAR(64) NOT NULL,
+    config_profile VARCHAR(64) NOT NULL,
+    config_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
+    status VARCHAR(32) NOT NULL DEFAULT 'pending',
+    current_scenes_payload JSONB,
+    report_payload JSONB,
+    report_text TEXT,
+    error_message TEXT,
+    submitted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    started_at TIMESTAMP,
+    finished_at TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -2430,27 +2507,68 @@ CREATE TABLE ai_analysis_report (
 
 ---
 
-### 8.4 报告引用关系存储
+### 8.4 scene_analysis_report 表设计
 
-可以将引用关系直接存入 `knowledge_context`。
-
-如果后续需要单独统计引用频率，可以新增：
+报告历史版本独立保存到 `scene_analysis_report`：
 
 ```sql
-CREATE TABLE ai_analysis_report_reference (
+CREATE TABLE scene_analysis_report (
     id BIGSERIAL PRIMARY KEY,
-    report_no VARCHAR(64) NOT NULL,
-    chunk_id BIGINT NOT NULL,
-    category VARCHAR(64),
-    final_score NUMERIC(10, 6),
-    used_in_section VARCHAR(64),
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    task_id BIGINT NOT NULL,
+    task_no VARCHAR(64) NOT NULL,
+    target_type VARCHAR(32) NOT NULL,
+    target_code VARCHAR(32) NOT NULL,
+    target_name VARCHAR(100),
+    report_type VARCHAR(64) NOT NULL,
+    generation_type VARCHAR(32) NOT NULL,
+    version_no INTEGER NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'generating_report',
+    report_content JSONB,
+    report_text TEXT,
+    model VARCHAR(100),
+    error_message TEXT,
+    generated_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+`generation_type` 当前支持 `initial` 和 `regenerate`。同一任务下 `version_no` 从 1 递增。
+
+---
+
+### 8.5 scene_analysis_config_profile 表设计
+
+报告配置档保存到 `scene_analysis_config_profile`，系统默认配置为 `system_recommended`：
+
+```sql
+CREATE TABLE scene_analysis_config_profile (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT,
+    name VARCHAR(100) NOT NULL,
+    config_group VARCHAR(100) NOT NULL DEFAULT '默认',
+    config_profile VARCHAR(64) NOT NULL,
+    target_type VARCHAR(32),
+    report_type VARCHAR(64) NOT NULL DEFAULT 'quick_analysis',
+    config_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+    system_default BOOLEAN NOT NULL DEFAULT FALSE,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
 ---
 
-### 8.5 索引设计建议
+### 8.6 报告引用关系存储
+
+当前实现把引用依据存入 `knowledgeContext` 和最终 `reportContent` 的 `chunkIds` 字段。报告生成阶段会校验 `chunkIds` 必须来自本次输入的 `knowledgeContext`，防止模型编造不存在的知识库引用。
+
+如果后续需要单独统计引用频率，可以新增引用关系表。
+
+---
+
+### 8.7 索引设计建议
 
 metadata 可以加 GIN 索引：
 
@@ -2500,11 +2618,11 @@ RiskStrategySceneModule
 ### 9.3 场景分析服务
 
 ```text
-CurrentSceneAnalysisService
-负责调用七个场景模块，生成 currentScenes。
+Python current_scene_handler
+消费 scene.analysis.current 消息，调用各场景处理器，生成 currentScenes。
 
-CategoryScoreService
-负责根据小标签得分聚合大类总分。
+SceneAnalysisTaskController.callback
+接收 Python 回调，保存 currentScenesPayload，并继续 Java 侧检索流程。
 ```
 
 ---
@@ -2512,16 +2630,22 @@ CategoryScoreService
 ### 9.4 检索召回服务
 
 ```text
-ChunkAllocationService
+SceneReportPipelineServiceImpl.allocateChunks
 根据七大类得分和指数函数计算每类 chunkCount。
 
-CategoryRetrievalTaskService
+SceneReportPipelineServiceImpl.buildRetrievalTasks
 根据 chunkAllocation 生成每类检索任务。
 
-KnowledgeHybridRetrievalService
+Python retrieval_embedding_handler
+消费 retrievalTasks，为每个 queryText 生成 queryEmbedding，并回调 Java。
+
+KnowledgeVectorManage / KnowledgeVectorMapper
+按 scene 和 queryEmbedding 使用 pgvector 生成语义候选。
+
+SceneReportPipelineServiceImpl.retrieveKnowledge
 按类别执行标签过滤、embedding 相似度计算和类内重排。
 
-KnowledgeContextBuilder
+SceneReportPipelineServiceImpl.continueWithRetrievalEmbeddings
 按类别组织最终 knowledgeContext。
 ```
 
@@ -2530,34 +2654,63 @@ KnowledgeContextBuilder
 ### 9.5 报告生成服务
 
 ```text
-AnalysisReportService
+SceneAnalysisReportGenerationServiceImpl
 组装 marketContext、currentScenes、knowledgeContext，并调用 LLM 生成报告。
 
-AnalysisReportManage
+SceneAnalysisReportManage
 负责报告存储和查询。
 
-AnalysisReportController
-提供报告生成、列表、详情接口。
+SceneAnalysisTaskController
+提供任务提交、回调、报告轮询、重新生成、历史列表和详情接口。
+
+SceneAnalysisReportQueryServiceImpl
+提供报告目标分页、单标的历史版本和报告详情查询。
 ```
 
 ---
 
 ### 9.6 Controller 接口设计
 
-推荐接口：
+当前接口：
 
 ```http
-POST /api/ai/reports/generate
-GET /api/ai/reports
-GET /api/ai/reports/{reportNo}
-POST /api/ai/reports/{reportNo}/regenerate
+POST /api/ai/scene-analysis/tasks
+POST /api/ai/scene-analysis/tasks/{taskNo}/callback
+GET /api/ai/scene-analysis/tasks/{taskNo}/report
+POST /api/ai/scene-analysis/tasks/{taskNo}/report/regenerate
+GET /api/ai/scene-analysis/tasks/reports/targets
+GET /api/ai/scene-analysis/tasks/reports?targetType=STOCK&targetCode=000001
+GET /api/ai/scene-analysis/tasks/reports/{reportId}
+GET /api/ai/scene-analysis/targets/search
+GET /api/ai/scene-analysis/config-profiles
+GET /api/ai/scene-analysis/config-profiles/parameter-schema
+GET /api/ai/scene-analysis/config-profiles/report-types
+POST /api/ai/scene-analysis/config-profiles
+PUT /api/ai/scene-analysis/config-profiles/{id}
+DELETE /api/ai/scene-analysis/config-profiles/{id}
+```
+
+任务状态流转：
+
+```text
+pending
+  ↓
+processing_current_scenes
+  ↓
+current_scenes_ready
+  ↓
+retrieving_knowledge
+  ↓
+generating_report
+  ↓
+success / failed
 ```
 
 ---
 
 ## 10. 分阶段落地计划
 
-### 10.1 第一阶段：Chunk 入库标签化
+### 10.1 第一阶段：Chunk 入库标签化（已完成）
 
 ```text
 1. 为 knowledge_vector.metadata 增加 scenes。
@@ -2568,30 +2721,30 @@ POST /api/ai/reports/{reportNo}/regenerate
 
 ---
 
-### 10.2 第二阶段：七个场景模块打分
+### 10.2 第二阶段：七个场景模块打分（已完成）
 
 ```text
 1. 实现七个场景模块。
 2. 每个模块输出 score、tags、evidence。
 3. 实现 currentScenes 结构。
-4. 将 currentScenes 保存到报告表。
+4. 将 currentScenes 保存到 scene_analysis_task.current_scenes_payload。
 ```
 
 ---
 
-### 10.3 第三阶段：动态 Chunk 分配
+### 10.3 第三阶段：动态 Chunk 分配（已完成）
 
 ```text
 1. 实现指数函数分配公式。
 2. 支持 alpha 配置。
 3. 支持 reportType 权重。
-4. 支持categoryScoreThreshold、min、max 限制。
+4. 支持 categoryScoreThreshold、min、max 限制。
 5. 输出每类 chunkCount。
 ```
 
 ---
 
-### 10.4 第四阶段：分类检索与类内重排
+### 10.4 第四阶段：分类检索与类内重排（已完成）
 
 ```text
 1. 按类别生成检索任务。
@@ -2605,26 +2758,70 @@ POST /api/ai/reports/{reportNo}/regenerate
 
 ---
 
-### 10.5 第五阶段：结构化报告生成
+### 10.5 第五阶段：结构化报告生成（已完成）
 
 ```text
-1. 构建 marketContext。
+1. 构建 currentScenesPayload 和 reportPayload。
 2. 构建 currentScenes。
 3. 构建 knowledgeContext。
-4. 调用 LLM 输出 JSON 报告。
-5. 保存报告和引用依据。
+4. 调用 DeepSeek 输出 JSON 报告。
+5. 保存 scene_analysis_report、渲染文本、版本号、模型和引用依据。
 ```
 
 ---
 
-### 10.6 第六阶段：前端展示与引用溯源
+### 10.6 第六阶段：前端展示与引用溯源（部分完成）
 
 ```text
-1. 展示报告内容。
-2. 展示各模块 score。
-3. 展示 chunkAllocation。
-4. 展示知识库引用。
-5. 支持点击 chunk 查看原始 OCR 复核内容。
+1. 已支持报告目标分页、生成、轮询、历史版本、详情和重新生成。
+2. 已支持报告内容展示和报告状态展示。
+3. 待增强：展开展示各模块 score、chunkAllocation 和 retrievalTasks。
+4. 待增强：展示知识库引用详情。
+5. 待增强：支持点击 chunk 查看原始 OCR 复核内容。
+```
+
+---
+
+### 10.7 第七阶段：参数优化与覆盖范围扩展
+
+```text
+1. 优化 alpha、categoryScoreThreshold、jaccardThreshold、semantic/tag/cross-scene 权重等计算参数。
+2. 扩展参数考虑范围，纳入更多行情、估值、成交、波动、财务、行业和标的类型特征。
+3. 针对不同 reportType 和 targetType 维护差异化参数配置。
+4. 增加参数调整后的对比样例，观察召回结果、报告重点和风险提示变化。
+```
+
+---
+
+### 10.8 第八阶段：报告准确度测试与可用度评估
+
+```text
+1. 建立报告准确度测试集，覆盖股票、指数、可转债和不同市场状态。
+2. 评估报告结论是否和输入数据、currentScenes、knowledgeContext 一致。
+3. 检查 chunkIds 引用是否准确、是否存在无依据推断或过度结论。
+4. 通过历史复盘验证报告风险提示、观察点和结论表达是否有实际参考价值。
+```
+
+---
+
+### 10.9 第九阶段：外部数据源增强
+
+```text
+1. 尝试接入新闻、公告、政策、行业动态和机构观点等外部数据。
+2. 为外部文本数据建立来源、发布时间、可信度和适用标的等元数据。
+3. 将外部数据纳入 currentScenes 和 knowledgeContext，但需要区分事实、观点和推断。
+4. 在报告中明确标注外部信息来源和时效性，增强报告可用度。
+```
+
+---
+
+### 10.10 第十阶段：可转债报告扩展
+
+```text
+1. 扩展报告生成对 CONVERTIBLE_BOND 的完整覆盖。
+2. 增加可转债专属分析维度：转股溢价率、纯债价值、到期收益率、评级、赎回/回售条款和正股联动。
+3. 为可转债补充差异化 reportType 权重和 scene 参数。
+4. 优化可转债报告展示，避免沿用股票口径导致结论失真。
 ```
 
 ---

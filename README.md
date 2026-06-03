@@ -21,8 +21,9 @@
 | 文档 | 说明 |
 | --- | --- |
 | [docs/REPORT_PIPELINE.md](./docs/REPORT_PIPELINE.md) | AI 分析报告全链路实现说明。 |
-| [docs/架构图.png](./docs/架构图.png) | 系统架构图。 |
-| [docs/report流程图.png](./docs/report流程图.png) | 分析报告流程图。 |
+| [docs/img/架构图.png](./docs/img/架构图.png) | 系统架构图。 |
+| [docs/img/report流程图.png](./docs/img/report流程图.png) | 分析报告流程图。 |
+| [docs/img/报告示例图.jpg](./docs/img/报告示例图.jpg) | 报告页面效果示例图。 |
 | [docs/OCR_PIPELINE.md](./docs/OCR_PIPELINE.md) | OCR 全链路实现说明，包括 Java/Python 边界、RabbitMQ 队列、阶段消息、MinIO 产物、人工复核、chunk 打标、软删除和向量入库。 |
 | [docs/API_DOCUMENTATION.md](./docs/API_DOCUMENTATION.md) | 后端接口文档，记录主要 API 的请求方式、请求参数和响应结构。 |
 | [docs/COMPLETED_REQUIREMENTS.md](./docs/COMPLETED_REQUIREMENTS.md) | 已完成需求记录，用于追踪阶段性功能交付情况。 |
@@ -46,7 +47,7 @@
 - 将原始市场数据清洗后存入 PostgreSQL，形成可查询、可追踪的数据资产。
 - 对知识库扫描件进行 OCR、文本清洗、分段和向量化处理。
 - 基于股市数据和知识库内容进行语义检索与对比分析。
-- 输出结构化分析建议，例如风险提示、趋势判断、关注指标、参考依据等。
+- 输出结构化分析报告，例如风险提示、趋势判断、关注指标、参考依据和知识库引用等。
 - 提供前端可视化页面，展示股市数据、AI 分析过程和结果。
 
 ## 技术栈
@@ -117,7 +118,8 @@ financial-management-ai/
 │   ├── API_DOCUMENTATION.md          # 接口文档
 │   ├── CODEX_GUIDELINES.md           # 代码规范
 │   ├── COMPLETED_REQUIREMENTS.md     # 已完成需求记录
-│   └── chunk入库打标签文档.md         # 场景标签方案
+│   ├── chunk入库打标签文档.md         # 场景标签方案
+│   └── img/                          # 文档图片素材
 ├── backend-java/                     # Java 后端聚合目录
 │   ├── pom.xml                       # Java 后端聚合工程配置
 │   ├── finance-service/              # 主业务 Java 服务
@@ -204,6 +206,14 @@ financial-management-ai/
 - 向量检索召回相关知识库片段。
 - 通过 DeepSeek ChatClient 输出结构化回答。
 
+### 投资报告模块
+
+- 支持按股票、指数、可转债选择标的生成报告。
+- 支持快速分析、风险检查、估值报告三类报告类型。
+- Java 负责行情上下文、任务状态、动态 chunk 分配、知识库召回、报告保存和历史查询。
+- Python worker 负责当前标的场景标签计算和检索 query embedding 生成，并通过回调继续 Java 流程。
+- 报告生成后保存结构化 JSON、渲染文本、模型、版本号和引用依据，支持重新生成。
+
 ### 交易辅助模块
 
 - 投资观察池：多分组、多类型标的（股票/指数/可转债）管理，实时行情刷新。
@@ -212,7 +222,7 @@ financial-management-ai/
 ### 前端展示模块
 
 - 行情总览、指数行情、可转债行情页面。
-- AI 中心：知识库处理队列、人工复核。
+- AI 中心：知识库处理队列、人工复核、报告生成。
 - 知识库浏览、知识库概览、股票预警管理、控制台指标。
 - AI Chat 对话页面。
 
@@ -234,6 +244,26 @@ Python Worker 消费消息执行 AI 计算（Embedding / OCR / LLM 推理）
 Java 保存结果并提供接口
   ↓
 Vue 前端展示
+```
+
+报告生成流程：
+
+```text
+用户选择标的和报告类型
+  ↓
+Java 创建 scene_analysis_task，组装行情上下文并发布 RabbitMQ 消息
+  ↓
+Python 计算 currentScenes 并回调 Java
+  ↓
+Java 计算 chunkAllocation，生成分类检索任务并发布 query embedding 消息
+  ↓
+Python 生成检索 queryEmbedding 并回调 Java
+  ↓
+Java 按场景做 pgvector 召回、标签过滤、类内重排和 knowledgeContext 构建
+  ↓
+Java 异步调用 DeepSeek 生成结构化报告
+  ↓
+保存 scene_analysis_report，前端轮询展示报告和历史版本
 ```
 
 知识库处理流程：
@@ -264,35 +294,9 @@ Embedding 向量化
 
 OCR 详细阶段、消息体、产物目录和人工复核规则见 [docs/OCR_PIPELINE.md](./docs/OCR_PIPELINE.md)。
 
-## 结构化分析结果示例
+## 报告效果示例
 
-```json
-{
-  "stockCode": "示例股票代码",
-  "analysisDate": "2026-05-22",
-  "summary": "整体结论摘要",
-  "trend": "趋势判断",
-  "riskLevel": "中等",
-  "signals": [
-    {
-      "name": "成交量变化",
-      "description": "近期成交量出现明显变化，需要结合价格走势继续观察"
-    }
-  ],
-  "knowledgeReferences": [
-    {
-      "title": "知识库片段标题",
-      "content": "召回的知识库内容摘要",
-      "score": 0.86
-    }
-  ],
-  "suggestions": [
-    "关注后续财报数据",
-    "结合行业指数判断相对强弱",
-    "避免仅根据单一指标做出决策"
-  ]
-}
-```
+![报告效果示例](./docs/img/报告示例图.jpg)
 
 ## 开发约定
 
@@ -319,6 +323,10 @@ OCR 详细阶段、消息体、产物目录和人工复核规则见 [docs/OCR_PI
 12. ✅ 完成 Chunk 场景标签系统（规则打标 → LLM 打标 → 标签回正）。
 13. ✅ 完成知识库页面场景标签展示。
 14. ✅ 完成知识库概览页面和手动知识导入页面。
-15. 完成投资分析报告生成与展示。
-16. 增加更多财务指标数据源。
-17. 优化 AI Chat 上下文策略和反问能力。
+15. ✅ 完成投资分析报告生成、RAG 召回、历史查询、重新生成和前端展示。
+16. 优化报告计算参数，扩展参数考虑范围，提升不同市场场景下的召回和结论稳定性。
+17. 建立报告准确度测试与复盘机制，持续评估结论、引用依据和风险提示质量。
+18. 尝试接入新闻、政策、机构观点等外部数据源，增强报告可用度。
+19. 扩展报告生成覆盖可转债，完善可转债估值、转股溢价、评级、正股联动等分析维度。
+20. 增加更多财务指标数据源。
+21. 优化 AI Chat 上下文策略和反问能力。
