@@ -11,8 +11,8 @@ public record SceneAnalysisCurrentScenesParam(
         SceneAnalysisSceneModuleParam sentiment,
         @JsonProperty("risk_strategy") SceneAnalysisSceneModuleParam riskStrategy) {
 
-    public SceneAnalysisSceneModuleParam module(String category) {
-        return switch (category) {
+    public SceneAnalysisSceneModuleParam module(String scene) {
+        return switch (scene) {
             case "asset" -> this.asset;
             case "price" -> this.price;
             case "volume" -> this.volume;

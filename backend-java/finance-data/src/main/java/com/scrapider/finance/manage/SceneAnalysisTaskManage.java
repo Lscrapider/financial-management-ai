@@ -55,6 +55,21 @@ public class SceneAnalysisTaskManage extends ServiceImpl<SceneAnalysisTaskMapper
                 now);
     }
 
+    public void markRetrievingKnowledge(String taskNo) {
+        this.baseMapper.updateStatus(
+                taskNo,
+                SceneAnalysisTaskStatusEnum.RETRIEVING_KNOWLEDGE.getCode(),
+                LocalDateTime.now());
+    }
+
+    public void saveKnowledgeContextPayload(String taskNo, JsonNode reportPayload) {
+        this.baseMapper.saveReportPayload(
+                taskNo,
+                SceneAnalysisTaskStatusEnum.GENERATING_REPORT.getCode(),
+                this.toJson(reportPayload),
+                LocalDateTime.now());
+    }
+
     public void markSuccess(
             String taskNo,
             JsonNode currentScenesPayload,

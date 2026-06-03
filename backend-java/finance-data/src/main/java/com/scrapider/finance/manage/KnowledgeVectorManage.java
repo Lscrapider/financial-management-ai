@@ -3,6 +3,7 @@ package com.scrapider.finance.manage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.scrapider.finance.domain.dto.KnowledgeVectorSearchDTO;
 import com.scrapider.finance.domain.po.KnowledgeVectorPO;
 import com.scrapider.finance.mapper.KnowledgeVectorMapper;
 import java.time.OffsetDateTime;
@@ -76,6 +77,10 @@ public class KnowledgeVectorManage extends ServiceImpl<KnowledgeVectorMapper, Kn
 
     public List<Map<String, Object>> tagDistribution() {
         return this.baseMapper.tagDistribution();
+    }
+
+    public List<KnowledgeVectorSearchDTO> searchBySemantic(String scene, String queryEmbedding, int limit) {
+        return this.baseMapper.searchBySemantic(scene, queryEmbedding, limit);
     }
 
     public Map<String, Object> stats() {
