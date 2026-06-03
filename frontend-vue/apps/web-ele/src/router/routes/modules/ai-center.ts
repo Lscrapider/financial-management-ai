@@ -41,6 +41,15 @@ const routes: RouteRecordRaw[] = [
           title: $t('page.aiCenter.manualKnowledge'),
         },
       },
+      {
+        name: 'AiSceneReports',
+        path: '/ai-center/scene-reports',
+        component: () => import('#/views/ai-center/scene-reports/index.vue'),
+        meta: {
+          icon: 'lucide:file-text',
+          title: $t('page.aiCenter.sceneReports'),
+        },
+      },
     ],
   },
 ];

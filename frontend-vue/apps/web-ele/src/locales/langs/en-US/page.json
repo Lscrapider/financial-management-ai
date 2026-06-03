@@ -20,7 +20,8 @@
     "title": "AI Center",
     "knowledgeProcessing": "Knowledge Processing",
     "ocrReview": "OCR Review",
-    "manualKnowledge": "Manual Knowledge"
+    "manualKnowledge": "Manual Knowledge",
+    "sceneReports": "Scene Reports"
   },
   "knowledge": {
     "title": "Knowledge Base",

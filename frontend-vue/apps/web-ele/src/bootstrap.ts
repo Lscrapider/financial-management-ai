@@ -11,6 +11,7 @@ import { useTitle } from '@vueuse/core';
 import { ElLoading } from 'element-plus';
 
 import { $t, setupI18n } from '#/locales';
+import { useReportPollingStore } from '#/store';
 
 import { initComponentAdapter } from './adapter/component';
 import { initSetupVbenForm } from './adapter/form';
@@ -58,6 +59,7 @@ async function bootstrap(namespace: string) {
 
   // 配置路由及路由守卫
   app.use(router);
+  useReportPollingStore().init(router);
 
   // 配置Motion插件
   const { MotionPlugin } = await import('@vben/plugins/motion');

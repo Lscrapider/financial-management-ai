@@ -80,20 +80,14 @@ public interface SceneAnalysisTaskMapper extends BaseMapper<SceneAnalysisTaskPO>
     @Update("""
             UPDATE scene_analysis_task
             SET status = #{status},
-                current_scenes_payload = CAST(#{currentScenesPayloadJson} AS jsonb),
-                report_payload = CAST(#{reportPayloadJson} AS jsonb),
-                report_text = #{reportText},
                 error_message = NULL,
                 finished_at = #{finishedAt},
                 updated_at = #{updatedAt}
             WHERE task_no = #{taskNo}
             """)
-    void markSuccess(
+    void markReportSucceeded(
             @Param("taskNo") String taskNo,
             @Param("status") String status,
-            @Param("currentScenesPayloadJson") String currentScenesPayloadJson,
-            @Param("reportPayloadJson") String reportPayloadJson,
-            @Param("reportText") String reportText,
             @Param("finishedAt") LocalDateTime finishedAt,
             @Param("updatedAt") LocalDateTime updatedAt);
 }

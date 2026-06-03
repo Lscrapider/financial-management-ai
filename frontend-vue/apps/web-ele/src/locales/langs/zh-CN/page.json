@@ -20,7 +20,8 @@
     "title": "AI中心",
     "knowledgeProcessing": "知识库OCR导入",
     "ocrReview": "OCR人工复核",
-    "manualKnowledge": "知识库手动导入"
+    "manualKnowledge": "知识库手动导入",
+    "sceneReports": "标的分析报告"
   },
   "knowledge": {
     "title": "知识库",

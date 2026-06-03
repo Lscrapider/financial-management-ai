@@ -11,6 +11,7 @@ import com.scrapider.finance.ai.domain.param.SceneAnalysisCurrentScenesPayloadPa
 import com.scrapider.finance.ai.domain.param.SceneAnalysisSceneModuleParam;
 import com.scrapider.finance.ai.domain.param.SceneRetrievalEmbeddingParam;
 import com.scrapider.finance.ai.service.SceneAnalysisMessagePublisher;
+import com.scrapider.finance.ai.service.SceneAnalysisReportGenerationService;
 import com.scrapider.finance.ai.service.SceneReportPipelineService;
 import com.scrapider.finance.domain.dto.KnowledgeVectorSearchDTO;
 import com.scrapider.finance.domain.po.SceneAnalysisTaskPO;
@@ -71,16 +72,19 @@ public class SceneReportPipelineServiceImpl implements SceneReportPipelineServic
     private final KnowledgeVectorManage knowledgeVectorManage;
     private final SceneAnalysisTaskManage sceneAnalysisTaskManage;
     private final SceneAnalysisMessagePublisher sceneAnalysisMessagePublisher;
+    private final SceneAnalysisReportGenerationService sceneAnalysisReportGenerationService;
 
     public SceneReportPipelineServiceImpl(
             ObjectMapper objectMapper,
             KnowledgeVectorManage knowledgeVectorManage,
             SceneAnalysisTaskManage sceneAnalysisTaskManage,
-            SceneAnalysisMessagePublisher sceneAnalysisMessagePublisher) {
+            SceneAnalysisMessagePublisher sceneAnalysisMessagePublisher,
+            SceneAnalysisReportGenerationService sceneAnalysisReportGenerationService) {
         this.objectMapper = objectMapper;
         this.knowledgeVectorManage = knowledgeVectorManage;
         this.sceneAnalysisTaskManage = sceneAnalysisTaskManage;
         this.sceneAnalysisMessagePublisher = sceneAnalysisMessagePublisher;
+        this.sceneAnalysisReportGenerationService = sceneAnalysisReportGenerationService;
     }
 
     @Override
@@ -118,6 +122,7 @@ public class SceneReportPipelineServiceImpl implements SceneReportPipelineServic
         reportPayload.set("retrievalTasks", this.objectMapper.valueToTree(this.retrievalTasks(retrievalEmbeddings)));
         reportPayload.set("knowledgeContext", this.objectMapper.valueToTree(knowledgeContext));
         this.sceneAnalysisTaskManage.saveKnowledgeContextPayload(taskNo, reportPayload);
+        this.sceneAnalysisReportGenerationService.generateAfterKnowledgeRetrieved(taskNo);
         LOGGER.info(
                 "scene report knowledge context calculated task_no={} allocations={} retrieval_embeddings={} scenes={}",
                 taskNo,
