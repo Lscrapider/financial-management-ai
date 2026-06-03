@@ -31,4 +31,5 @@ def _module_payload(result: SceneModuleResult) -> dict[str, Any]:
         "direction": result.direction,
         "tags": result.tags,
         "evidence": result.evidence,
+        "queryText": result.query_text(),
     }

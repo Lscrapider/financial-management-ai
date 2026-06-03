@@ -64,6 +64,31 @@ public class RabbitMessageConfig {
     }
 
     @Bean
+    public Queue sceneAnalysisRetrievalEmbeddingQueue(
+            @Value("${finance.scene-analysis.rabbitmq.retrieval-embedding-queue:finance.scene-analysis.retrieval.embedding}")
+                    String queue,
+            @Value("${finance.scene-analysis.rabbitmq.dead-letter-exchange:finance.scene-analysis.dlx}")
+                    String deadLetterExchange) {
+        return QueueBuilder.durable(queue)
+                .deadLetterExchange(deadLetterExchange)
+                .deadLetterRoutingKey("scene.analysis.retrieval.embedding.dead")
+                .build();
+    }
+
+    @Bean
+    public Queue sceneAnalysisRetrievalEmbeddingRetryQueue(
+            @Value("${finance.scene-analysis.rabbitmq.retrieval-embedding-retry-queue:finance.scene-analysis.retrieval.embedding.retry}")
+                    String queue,
+            @Value("${finance.scene-analysis.rabbitmq.exchange:finance.scene-analysis.topic}") String exchange,
+            @Value("${finance.scene-analysis.rabbitmq.retry-ttl-ms:30000}") Integer retryTtlMs) {
+        return QueueBuilder.durable(queue)
+                .ttl(retryTtlMs)
+                .deadLetterExchange(exchange)
+                .deadLetterRoutingKey("scene.analysis.retrieval.embedding")
+                .build();
+    }
+
+    @Bean
     public Queue sceneAnalysisDeadLetterQueue(
             @Value("${finance.scene-analysis.rabbitmq.dead-letter-queue:finance.scene-analysis.dlq}") String queue) {
         return new Queue(queue, true);
@@ -87,6 +112,28 @@ public class RabbitMessageConfig {
             @Value("${finance.scene-analysis.rabbitmq.current-scene-routing-key:scene.analysis.current.generate}")
                     String routingKey) {
         return BindingBuilder.bind(sceneAnalysisCurrentGenerateRetryQueue)
+                .to(sceneAnalysisRetryTopicExchange)
+                .with(routingKey + ".retry");
+    }
+
+    @Bean
+    public Binding sceneAnalysisRetrievalEmbeddingBinding(
+            TopicExchange sceneAnalysisTopicExchange,
+            Queue sceneAnalysisRetrievalEmbeddingQueue,
+            @Value("${finance.scene-analysis.rabbitmq.retrieval-embedding-routing-key:scene.analysis.retrieval.embedding}")
+                    String routingKey) {
+        return BindingBuilder.bind(sceneAnalysisRetrievalEmbeddingQueue)
+                .to(sceneAnalysisTopicExchange)
+                .with(routingKey);
+    }
+
+    @Bean
+    public Binding sceneAnalysisRetrievalEmbeddingRetryBinding(
+            TopicExchange sceneAnalysisRetryTopicExchange,
+            Queue sceneAnalysisRetrievalEmbeddingRetryQueue,
+            @Value("${finance.scene-analysis.rabbitmq.retrieval-embedding-routing-key:scene.analysis.retrieval.embedding}")
+                    String routingKey) {
+        return BindingBuilder.bind(sceneAnalysisRetrievalEmbeddingRetryQueue)
                 .to(sceneAnalysisRetryTopicExchange)
                 .with(routingKey + ".retry");
     }

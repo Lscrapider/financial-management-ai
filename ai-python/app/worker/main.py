@@ -3,13 +3,19 @@ from app.core.logging import configure_logging
 from app.messaging.rabbit_worker import RabbitMqWorker
 from app.messaging.registry import HandlerRegistry
 from app.ocr.bootstrap import register_ocr_handlers
+from app.ocr.engines.embedding_engine import SentenceTransformersEngine
 from app.scene_analysis.bootstrap import register_scene_analysis_handlers
 
 
 def build_worker() -> RabbitMqWorker:
     registry = HandlerRegistry()
-    ocr_routes, _ocr_repository = register_ocr_handlers(settings, registry)
-    scene_analysis_routes = register_scene_analysis_handlers(settings, registry)
+    embedding_engine = SentenceTransformersEngine(
+        settings.embedding.model_name,
+        settings.embedding.device,
+        settings.embedding.batch_size,
+    )
+    ocr_routes, _ocr_repository = register_ocr_handlers(settings, registry, embedding_engine)
+    scene_analysis_routes = register_scene_analysis_handlers(settings, registry, embedding_engine)
     routes = [*ocr_routes, *scene_analysis_routes]
     return RabbitMqWorker(settings.rabbitmq, routes, registry)
 

@@ -62,6 +62,12 @@ public class SceneAnalysisTaskManage extends ServiceImpl<SceneAnalysisTaskMapper
                 LocalDateTime.now());
     }
 
+    public SceneAnalysisTaskPO findByTaskNo(String taskNo) {
+        return this.lambdaQuery()
+                .eq(SceneAnalysisTaskPO::getTaskNo, taskNo)
+                .one();
+    }
+
     public void saveKnowledgeContextPayload(String taskNo, JsonNode reportPayload) {
         this.baseMapper.saveReportPayload(
                 taskNo,

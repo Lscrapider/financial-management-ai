@@ -20,7 +20,7 @@ from app.ocr.constants import (
     ROUTING_KEY_TEXT_CLEAN,
 )
 from app.ocr.engines.deepseek_chat_engine import DeepSeekChatEngine
-from app.ocr.engines.embedding_engine import SentenceTransformersEngine
+from app.ocr.engines.embedding_engine import BaseEmbeddingEngine, SentenceTransformersEngine
 from app.ocr.engines.qwen_vl_ocr_engine import QwenVlOcrEngine
 from app.ocr.handlers.chunk_llm_tag_handler import ChunkLlmTagHandler
 from app.ocr.handlers.chunk_reembed_handler import ChunkReembedHandler
@@ -42,7 +42,11 @@ from app.ocr.services.vector_store import VectorStore
 from app.ocr.storage import OcrArtifactStorage
 
 
-def register_ocr_handlers(settings: Settings, registry: HandlerRegistry) -> tuple[list[HandlerRoute], OcrTaskRepository]:
+def register_ocr_handlers(
+    settings: Settings,
+    registry: HandlerRegistry,
+    embedding_engine: BaseEmbeddingEngine | None = None,
+) -> tuple[list[HandlerRoute], OcrTaskRepository]:
     repository = OcrTaskRepository(settings.postgres)
     storage = OcrArtifactStorage(settings.minio)
     normalizer = DocumentNormalizer(storage)
@@ -87,11 +91,12 @@ def register_ocr_handlers(settings: Settings, registry: HandlerRegistry) -> tupl
             settings.rabbitmq.max_attempts,
         ),
     )
-    embedding_engine = SentenceTransformersEngine(
-        settings.embedding.model_name,
-        settings.embedding.device,
-        settings.embedding.batch_size,
-    )
+    if embedding_engine is None:
+        embedding_engine = SentenceTransformersEngine(
+            settings.embedding.model_name,
+            settings.embedding.device,
+            settings.embedding.batch_size,
+        )
     embedding_service = EmbeddingService(embedding_engine, settings.embedding.model_name)
     vector_store = VectorStore(settings.postgres)
     registry.register(

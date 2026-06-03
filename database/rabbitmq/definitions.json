@@ -287,6 +287,27 @@
       }
     },
     {
+      "name": "finance.scene-analysis.retrieval.embedding",
+      "vhost": "finance",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "finance.scene-analysis.dlx",
+        "x-dead-letter-routing-key": "scene.analysis.retrieval.embedding.dead"
+      }
+    },
+    {
+      "name": "finance.scene-analysis.retrieval.embedding.retry",
+      "vhost": "finance",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 30000,
+        "x-dead-letter-exchange": "finance.scene-analysis.topic",
+        "x-dead-letter-routing-key": "scene.analysis.retrieval.embedding"
+      }
+    },
+    {
       "name": "finance.scene-analysis.dlq",
       "vhost": "finance",
       "durable": true,
@@ -448,6 +469,14 @@
       "arguments": {}
     },
     {
+      "source": "finance.scene-analysis.topic",
+      "vhost": "finance",
+      "destination": "finance.scene-analysis.retrieval.embedding",
+      "destination_type": "queue",
+      "routing_key": "scene.analysis.retrieval.embedding",
+      "arguments": {}
+    },
+    {
       "source": "finance.scene-analysis.dlx",
       "vhost": "finance",
       "destination": "finance.scene-analysis.dlq",
@@ -461,6 +490,14 @@
       "destination": "finance.scene-analysis.current.generate.retry",
       "destination_type": "queue",
       "routing_key": "scene.analysis.current.generate.retry",
+      "arguments": {}
+    },
+    {
+      "source": "finance.scene-analysis.retry.topic",
+      "vhost": "finance",
+      "destination": "finance.scene-analysis.retrieval.embedding.retry",
+      "destination_type": "queue",
+      "routing_key": "scene.analysis.retrieval.embedding.retry",
       "arguments": {}
     }
   ]

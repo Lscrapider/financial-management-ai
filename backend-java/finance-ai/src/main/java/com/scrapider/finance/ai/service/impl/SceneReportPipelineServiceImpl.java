@@ -5,12 +5,15 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.scrapider.finance.ai.domain.dto.SceneChunkAllocationDTO;
 import com.scrapider.finance.ai.domain.dto.SceneKnowledgeChunkDTO;
 import com.scrapider.finance.ai.domain.dto.SceneKnowledgeRetrievalTaskDTO;
+import com.scrapider.finance.ai.domain.dto.SceneRetrievalEmbeddingMessageDTO;
 import com.scrapider.finance.ai.domain.param.SceneAnalysisCurrentScenesParam;
 import com.scrapider.finance.ai.domain.param.SceneAnalysisCurrentScenesPayloadParam;
-import com.scrapider.finance.ai.domain.param.SceneAnalysisCurrentScenesTargetParam;
 import com.scrapider.finance.ai.domain.param.SceneAnalysisSceneModuleParam;
+import com.scrapider.finance.ai.domain.param.SceneRetrievalEmbeddingParam;
+import com.scrapider.finance.ai.service.SceneAnalysisMessagePublisher;
 import com.scrapider.finance.ai.service.SceneReportPipelineService;
 import com.scrapider.finance.domain.dto.KnowledgeVectorSearchDTO;
+import com.scrapider.finance.domain.po.SceneAnalysisTaskPO;
 import com.scrapider.finance.manage.KnowledgeVectorManage;
 import com.scrapider.finance.manage.SceneAnalysisTaskManage;
 import java.util.ArrayList;
@@ -21,8 +24,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.springframework.ai.embedding.EmbeddingModel;
-import org.springframework.beans.factory.ObjectProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -66,65 +67,20 @@ public class SceneReportPipelineServiceImpl implements SceneReportPipelineServic
                     "valuation", 1.5,
                     "sentiment", 0.6,
                     "risk_strategy", 1.0));
-    private static final Map<String, String> SCENE_QUERY_TERMS = Map.of(
-            "price", "价格走势 突破 回调 支撑压力",
-            "volume", "成交量 换手率 量价关系 成交持续性",
-            "trend", "趋势延续 趋势反转 区间震荡 突破失败",
-            "valuation", "估值水平 PE PB 股息率 估值修复 估值陷阱",
-            "sentiment", "市场情绪 关注度 新闻政策 板块轮动",
-            "risk_strategy", "风险控制 仓位管理 等待确认 止盈止损");
-    private static final Map<String, String> TAG_QUERY_TERMS = Map.ofEntries(
-            Map.entry("price_rise", "价格上涨"),
-            Map.entry("price_drop", "价格下跌"),
-            Map.entry("near_recent_high", "接近近期高位"),
-            Map.entry("near_recent_low", "接近近期低位"),
-            Map.entry("breakout", "价格突破"),
-            Map.entry("pullback", "回调"),
-            Map.entry("volume_expand", "放量"),
-            Map.entry("volume_shrink", "缩量"),
-            Map.entry("high_turnover", "高换手"),
-            Map.entry("low_turnover", "低换手"),
-            Map.entry("volume_price_confirm", "量价确认"),
-            Map.entry("volume_price_divergence", "量价背离"),
-            Map.entry("uptrend", "上升趋势"),
-            Map.entry("downtrend", "下降趋势"),
-            Map.entry("range_bound", "区间震荡"),
-            Map.entry("trend_reversal", "趋势反转"),
-            Map.entry("low_pe", "低 PE"),
-            Map.entry("high_pe", "高 PE"),
-            Map.entry("low_pb", "低 PB"),
-            Map.entry("high_pb", "高 PB"),
-            Map.entry("high_dividend", "高股息"),
-            Map.entry("valuation_repair", "估值修复"),
-            Map.entry("valuation_trap", "估值陷阱"),
-            Map.entry("market_attention_rise", "市场关注度提升"),
-            Map.entry("short_term_emotion", "短线情绪"),
-            Map.entry("panic_selling", "恐慌抛售"),
-            Map.entry("policy_driven", "政策驱动"),
-            Map.entry("sector_rotation", "板块轮动"),
-            Map.entry("chase_high_risk", "追高风险"),
-            Map.entry("false_breakout_risk", "假突破风险"),
-            Map.entry("drawdown_risk", "回撤风险"),
-            Map.entry("risk_control", "风险控制"),
-            Map.entry("position_control", "仓位管理"),
-            Map.entry("wait_confirm", "等待确认"),
-            Map.entry("take_profit_plan", "止盈计划"),
-            Map.entry("stop_loss_plan", "止损计划"));
-
     private final ObjectMapper objectMapper;
     private final KnowledgeVectorManage knowledgeVectorManage;
     private final SceneAnalysisTaskManage sceneAnalysisTaskManage;
-    private final ObjectProvider<EmbeddingModel> embeddingModelProvider;
+    private final SceneAnalysisMessagePublisher sceneAnalysisMessagePublisher;
 
     public SceneReportPipelineServiceImpl(
             ObjectMapper objectMapper,
             KnowledgeVectorManage knowledgeVectorManage,
             SceneAnalysisTaskManage sceneAnalysisTaskManage,
-            ObjectProvider<EmbeddingModel> embeddingModelProvider) {
+            SceneAnalysisMessagePublisher sceneAnalysisMessagePublisher) {
         this.objectMapper = objectMapper;
         this.knowledgeVectorManage = knowledgeVectorManage;
         this.sceneAnalysisTaskManage = sceneAnalysisTaskManage;
-        this.embeddingModelProvider = embeddingModelProvider;
+        this.sceneAnalysisMessagePublisher = sceneAnalysisMessagePublisher;
     }
 
     @Override
@@ -135,20 +91,53 @@ public class SceneReportPipelineServiceImpl implements SceneReportPipelineServic
         // 6.3 按 scene 生成检索任务。
         List<SceneKnowledgeRetrievalTaskDTO> retrievalTasks =
                 this.buildRetrievalTasks(allocations, currentScenesPayload);
+        this.sceneAnalysisMessagePublisher.publishRetrievalEmbeddingMessage(
+                SceneRetrievalEmbeddingMessageDTO.create(taskNo, retrievalTasks));
+        LOGGER.info(
+                "scene report retrieval embedding message published task_no={} allocations={} retrieval_tasks={}",
+                taskNo,
+                allocations,
+                retrievalTasks.size());
+    }
+
+    @Override
+    public void continueWithRetrievalEmbeddings(
+            String taskNo,
+            List<SceneRetrievalEmbeddingParam> retrievalEmbeddings) {
+        if (retrievalEmbeddings == null || retrievalEmbeddings.isEmpty()) {
+            throw new IllegalArgumentException("retrievalEmbeddings is required");
+        }
+        SceneAnalysisCurrentScenesPayloadParam currentScenesPayload = this.currentScenesPayload(taskNo);
+        // 6.2 根据 7 大类得分计算 Chunk 分配比例。
+        List<SceneChunkAllocationDTO> allocations = this.allocateChunks(currentScenesPayload);
         Map<String, List<SceneKnowledgeChunkDTO>> knowledgeContext =
-                this.retrieveKnowledge(retrievalTasks);
+                this.retrieveKnowledge(retrievalEmbeddings);
         // 6.9 构建 knowledgeContext 并写入 reportPayload，供后续报告生成使用。
         ObjectNode reportPayload = this.objectMapper.createObjectNode();
         reportPayload.set("chunkAllocation", this.objectMapper.valueToTree(allocations));
-        reportPayload.set("retrievalTasks", this.objectMapper.valueToTree(retrievalTasks));
+        reportPayload.set("retrievalTasks", this.objectMapper.valueToTree(this.retrievalTasks(retrievalEmbeddings)));
         reportPayload.set("knowledgeContext", this.objectMapper.valueToTree(knowledgeContext));
         this.sceneAnalysisTaskManage.saveKnowledgeContextPayload(taskNo, reportPayload);
         LOGGER.info(
-                "scene report knowledge context calculated task_no={} allocations={} retrieval_tasks={} scenes={}",
+                "scene report knowledge context calculated task_no={} allocations={} retrieval_embeddings={} scenes={}",
                 taskNo,
                 allocations,
-                retrievalTasks.size(),
+                retrievalEmbeddings.size(),
                 knowledgeContext.keySet());
+    }
+
+    private SceneAnalysisCurrentScenesPayloadParam currentScenesPayload(String taskNo) {
+        SceneAnalysisTaskPO task = this.sceneAnalysisTaskManage.findByTaskNo(taskNo);
+        if (task == null || task.getCurrentScenesPayload() == null || task.getCurrentScenesPayload().isNull()) {
+            throw new IllegalArgumentException("currentScenesPayload is not ready");
+        }
+        try {
+            return this.objectMapper.treeToValue(
+                    task.getCurrentScenesPayload(),
+                    SceneAnalysisCurrentScenesPayloadParam.class);
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Failed to parse currentScenesPayload", ex);
+        }
     }
 
     public List<SceneChunkAllocationDTO> allocateChunks(SceneAnalysisCurrentScenesPayloadParam payload) {
@@ -226,7 +215,7 @@ public class SceneReportPipelineServiceImpl implements SceneReportPipelineServic
                             allocation.chunkCount(),
                             currentTags,
                             // 6.5 每类语义检索 Query 生成。
-                            this.buildQueryText(allocation.scene(), currentTags, payload));
+                            this.queryText(module));
                 })
                 .toList();
     }
@@ -238,6 +227,7 @@ public class SceneReportPipelineServiceImpl implements SceneReportPipelineServic
         return module.tags().entrySet().stream()
                 .filter(entry -> entry.getKey() != null && !entry.getKey().isBlank())
                 .filter(entry -> entry.getValue() != null && entry.getValue() > 0)
+                .filter(entry -> this.evidenceContainsTag(module, entry.getKey().trim()))
                 .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
                 .collect(Collectors.toMap(
                         entry -> entry.getKey().trim(),
@@ -246,46 +236,49 @@ public class SceneReportPipelineServiceImpl implements SceneReportPipelineServic
                         LinkedHashMap::new));
     }
 
-    private String buildQueryText(
-            String scene,
-            Map<String, Double> currentTags,
-            SceneAnalysisCurrentScenesPayloadParam payload) {
-        List<String> terms = currentTags.keySet().stream()
-                .map(tag -> TAG_QUERY_TERMS.getOrDefault(tag, tag))
-                .collect(Collectors.toCollection(ArrayList::new));
-        terms.add(SCENE_QUERY_TERMS.getOrDefault(scene, scene));
-        SceneAnalysisCurrentScenesTargetParam target = payload.target();
-        if (target != null && target.name() != null && !target.name().isBlank()) {
-            terms.add(target.name().trim());
+    private boolean evidenceContainsTag(SceneAnalysisSceneModuleParam module, String tag) {
+        if (module.evidence() == null || module.evidence().isEmpty()) {
+            return false;
         }
-        if (target != null && target.type() != null && !target.type().isBlank()) {
-            terms.add(target.type().trim());
+        return module.evidence().stream()
+                .anyMatch(item -> item != null
+                        && (item.contains(tag + " 标签触发") || item.contains(tag + " 标签命中")));
+    }
+
+    private String queryText(SceneAnalysisSceneModuleParam module) {
+        if (module == null || module.queryText() == null || module.queryText().isBlank()) {
+            throw new IllegalArgumentException("currentScenes module queryText is required");
         }
-        if (payload.reportType() != null && !payload.reportType().isBlank()) {
-            terms.add(payload.reportType().trim());
-        }
-        return String.join(" ", terms);
+        return module.queryText().trim();
+    }
+
+    private List<SceneKnowledgeRetrievalTaskDTO> retrievalTasks(
+            List<SceneRetrievalEmbeddingParam> retrievalEmbeddings) {
+        return retrievalEmbeddings.stream()
+                .map(item -> new SceneKnowledgeRetrievalTaskDTO(
+                        item.scene(),
+                        item.chunkCount(),
+                        this.safeTags(item.currentTags()),
+                        item.queryText()))
+                .toList();
     }
 
     private Map<String, List<SceneKnowledgeChunkDTO>> retrieveKnowledge(
-            List<SceneKnowledgeRetrievalTaskDTO> retrievalTasks) {
-        if (retrievalTasks.isEmpty()) {
+            List<SceneRetrievalEmbeddingParam> retrievalEmbeddings) {
+        if (retrievalEmbeddings.isEmpty()) {
             return Map.of();
         }
-        EmbeddingModel embeddingModel = this.embeddingModelProvider.getIfAvailable();
-        if (embeddingModel == null) {
-            throw new IllegalStateException("EmbeddingModel is required for scene knowledge retrieval");
-        }
-        Map<String, SceneKnowledgeRetrievalTaskDTO> taskLookup = retrievalTasks.stream()
+        Map<String, SceneRetrievalEmbeddingParam> taskLookup = retrievalEmbeddings.stream()
                 .collect(Collectors.toMap(
-                        SceneKnowledgeRetrievalTaskDTO::scene,
+                        SceneRetrievalEmbeddingParam::scene,
                         task -> task,
                         (left, right) -> left,
                         LinkedHashMap::new));
         Map<String, List<SceneKnowledgeChunkDTO>> context = new LinkedHashMap<>();
-        for (SceneKnowledgeRetrievalTaskDTO task : retrievalTasks) {
-            // 6.5 queryText -> queryEmbedding。
-            String queryEmbedding = this.formatVector(embeddingModel.embed(task.queryText()));
+        for (SceneRetrievalEmbeddingParam task : retrievalEmbeddings) {
+            Map<String, Double> currentTags = this.safeTags(task.currentTags());
+            // 6.5 queryText -> queryEmbedding：queryEmbedding 由 Python 使用入库同款模型生成后回调。
+            String queryEmbedding = this.formatVector(task.queryEmbedding());
             // 6.6 用 pgvector 生成当前 scene 候选集合和 semantic_score。
             List<KnowledgeVectorSearchDTO> rows = this.knowledgeVectorManage.searchBySemantic(
                     task.scene(),
@@ -296,22 +289,22 @@ public class SceneReportPipelineServiceImpl implements SceneReportPipelineServic
                     task,
                     taskLookup,
                     rows,
-                    task.currentTags(),
-                    task.currentTags().isEmpty() ? 0 : JACCARD_THRESHOLD);
-            if (ranked.isEmpty() && !task.currentTags().isEmpty()) {
+                    currentTags,
+                    currentTags.isEmpty() ? 0 : JACCARD_THRESHOLD);
+            if (ranked.isEmpty() && !currentTags.isEmpty()) {
                 ranked = this.rankCandidates(
                         task,
                         taskLookup,
                         rows,
-                        task.currentTags(),
+                        currentTags,
                         LOWERED_JACCARD_THRESHOLD);
             }
-            if (ranked.isEmpty() && task.currentTags().size() > 1) {
+            if (ranked.isEmpty() && currentTags.size() > 1) {
                 ranked = this.rankCandidates(
                         task,
                         taskLookup,
                         rows,
-                        this.coreTags(task.currentTags()),
+                        this.coreTags(currentTags),
                         JACCARD_THRESHOLD);
             }
             // 6.8 每个 scene 取 TopN：按 6.2 分配到的 chunkCount 截断当前 scene 候选。
@@ -332,9 +325,13 @@ public class SceneReportPipelineServiceImpl implements SceneReportPipelineServic
                         LinkedHashMap::new));
     }
 
+    private Map<String, Double> safeTags(Map<String, Double> currentTags) {
+        return currentTags == null ? Map.of() : currentTags;
+    }
+
     private List<SceneKnowledgeChunkDTO> rankCandidates(
-            SceneKnowledgeRetrievalTaskDTO task,
-            Map<String, SceneKnowledgeRetrievalTaskDTO> taskLookup,
+            SceneRetrievalEmbeddingParam task,
+            Map<String, SceneRetrievalEmbeddingParam> taskLookup,
             List<KnowledgeVectorSearchDTO> rows,
             Map<String, Double> requiredTags,
             double jaccardThreshold) {
@@ -410,35 +407,36 @@ public class SceneReportPipelineServiceImpl implements SceneReportPipelineServic
     private double crossSceneScore(
             KnowledgeVectorSearchDTO row,
             String currentScene,
-            Map<String, SceneKnowledgeRetrievalTaskDTO> taskLookup) {
+            Map<String, SceneRetrievalEmbeddingParam> taskLookup) {
         int hitCount = 0;
-        for (Map.Entry<String, SceneKnowledgeRetrievalTaskDTO> entry : taskLookup.entrySet()) {
-            if (entry.getKey().equals(currentScene) || entry.getValue().currentTags().isEmpty()) {
+        for (Map.Entry<String, SceneRetrievalEmbeddingParam> entry : taskLookup.entrySet()) {
+            Map<String, Double> currentTags = this.safeTags(entry.getValue().currentTags());
+            if (entry.getKey().equals(currentScene) || currentTags.isEmpty()) {
                 continue;
             }
             Set<String> chunkTagSet = Set.copyOf(this.chunkTags(row, entry.getKey()));
-            if (chunkTagSet.stream().anyMatch(entry.getValue().currentTags().keySet()::contains)) {
+            if (chunkTagSet.stream().anyMatch(currentTags.keySet()::contains)) {
                 hitCount++;
             }
         }
         return Math.min(0.3, hitCount * 0.1);
     }
 
-    private String formatVector(float[] embedding) {
-        if (embedding == null || embedding.length == 0) {
-            throw new IllegalStateException("EmbeddingModel returned empty vector");
+    private String formatVector(List<Double> embedding) {
+        if (embedding == null || embedding.isEmpty()) {
+            throw new IllegalStateException("retrieval queryEmbedding is required");
         }
-        if (embedding.length != EXPECTED_EMBEDDING_DIMENSION) {
+        if (embedding.size() != EXPECTED_EMBEDDING_DIMENSION) {
             throw new IllegalStateException(
-                    "EmbeddingModel vector dimension must match knowledge_vector.embedding dimension: "
+                    "retrieval queryEmbedding dimension must match knowledge_vector.embedding dimension: "
                             + EXPECTED_EMBEDDING_DIMENSION);
         }
         StringBuilder builder = new StringBuilder("[");
-        for (int i = 0; i < embedding.length; i++) {
+        for (int i = 0; i < embedding.size(); i++) {
             if (i > 0) {
                 builder.append(',');
             }
-            builder.append(embedding[i]);
+            builder.append(embedding.get(i));
         }
         return builder.append(']').toString();
     }

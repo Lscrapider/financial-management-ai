@@ -1,7 +1,8 @@
 {
-  "taskNo": "scene-00f38da24b694ab3915653f9fdf48019",
-  "requestedAt": "2026-06-03T00:47:24.112914",
+  "taskNo": "scene-266332eb7b8f4281bb3b9fa86f369689",
+  "requestedAt": "2026-06-03T15:00:21.820362",
   "reportType": "quick_analysis",
+  "totalChunks": 10,
   "target": {
     "type": "STOCK",
     "code": "002958",
@@ -140,20 +141,20 @@
     "exchangeCode": "SZ",
     "latestPrice": 2.93,
     "openPrice": 2.92,
-    "highPrice": 2.95,
-    "lowPrice": 2.91,
+    "highPrice": 2.93,
+    "lowPrice": 2.89,
     "previousClosePrice": 2.93,
-    "averagePrice": 2.93,
+    "averagePrice": 2.91,
     "changeAmount": 0.0,
     "changePercent": 0.0,
-    "volume": 414767,
-    "externalVolume": 212371,
-    "internalVolume": 202396,
-    "currentVolume": -45533,
-    "turnoverAmount": 12152.0,
-    "turnoverRate": 0.76,
+    "volume": 423091,
+    "externalVolume": 204630,
+    "internalVolume": 218461,
+    "currentVolume": 2121,
+    "turnoverAmount": 12305.0,
+    "turnoverRate": 0.78,
     "amplitude": 1.37,
-    "volumeRatio": 1.18,
+    "volumeRatio": 1.11,
     "limitUpPrice": 3.22,
     "limitDownPrice": 2.64,
     "totalMarketValue": 162.78,
@@ -163,7 +164,7 @@
     "peStatic": 5.2,
     "pbRatio": 0.43,
     "tradeStatus": 0,
-    "syncedAt": "2026-06-02T15:31:27.170287"
+    "syncedAt": "2026-06-03T14:59:14.620061"
   },
   "valuationData": {
     "peTtm": 5.1,
@@ -6132,13 +6133,27 @@
       "secid": "0.002958",
       "marketCode": "SZ_MAIN",
       "exchangeCode": "SZ",
+      "tradeDate": "2026-06-03",
+      "openPrice": 2.92,
+      "closePrice": 2.92,
+      "highPrice": 2.93,
+      "lowPrice": 2.89,
+      "volume": 426135,
+      "syncedAt": "2026-06-03T15:00:06.737032"
+    },
+    {
+      "stockCode": "002958",
+      "stockName": "青农商行",
+      "secid": "0.002958",
+      "marketCode": "SZ_MAIN",
+      "exchangeCode": "SZ",
       "tradeDate": "2026-06-02",
       "openPrice": 2.92,
       "closePrice": 2.93,
       "highPrice": 2.95,
       "lowPrice": 2.91,
       "volume": 414767,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007625
     },
     {
@@ -6153,7 +6168,7 @@
       "highPrice": 2.94,
       "lowPrice": 2.85,
       "volume": 598274,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.010999
     },
     {
@@ -6168,7 +6183,7 @@
       "highPrice": 2.88,
       "lowPrice": 2.83,
       "volume": 392955,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007224
     },
     {
@@ -6183,7 +6198,7 @@
       "highPrice": 2.86,
       "lowPrice": 2.83,
       "volume": 281257,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.005171
     },
     {
@@ -6198,7 +6213,7 @@
       "highPrice": 2.87,
       "lowPrice": 2.85,
       "volume": 223646,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.004112
     },
     {
@@ -6213,7 +6228,7 @@
       "highPrice": 2.88,
       "lowPrice": 2.85,
       "volume": 255214,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.004692
     },
     {
@@ -6228,7 +6243,7 @@
       "highPrice": 2.88,
       "lowPrice": 2.86,
       "volume": 282413,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.005192
     },
     {
@@ -6243,7 +6258,7 @@
       "highPrice": 2.89,
       "lowPrice": 2.86,
       "volume": 319815,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.00588
     },
     {
@@ -6258,7 +6273,7 @@
       "highPrice": 2.92,
       "lowPrice": 2.88,
       "volume": 328966,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.006048
     },
     {
@@ -6273,7 +6288,7 @@
       "highPrice": 2.92,
       "lowPrice": 2.89,
       "volume": 309995,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.005699
     },
     {
@@ -6288,7 +6303,7 @@
       "highPrice": 2.94,
       "lowPrice": 2.91,
       "volume": 333951,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.006139
     },
     {
@@ -6303,7 +6318,7 @@
       "highPrice": 2.94,
       "lowPrice": 2.9,
       "volume": 422652,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.00777
     },
     {
@@ -6318,7 +6333,7 @@
       "highPrice": 2.97,
       "lowPrice": 2.92,
       "volume": 538086,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009892
     },
     {
@@ -6333,7 +6348,7 @@
       "highPrice": 2.99,
       "lowPrice": 2.96,
       "volume": 440751,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008103
     },
     {
@@ -6348,7 +6363,7 @@
       "highPrice": 3.0,
       "lowPrice": 2.98,
       "volume": 397363,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007305
     },
     {
@@ -6363,7 +6378,7 @@
       "highPrice": 3.02,
       "lowPrice": 2.99,
       "volume": 479927,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008823
     },
     {
@@ -6378,7 +6393,7 @@
       "highPrice": 3.03,
       "lowPrice": 3.0,
       "volume": 503000,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009247
     },
     {
@@ -6393,7 +6408,7 @@
       "highPrice": 3.04,
       "lowPrice": 3.02,
       "volume": 381807,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007019
     },
     {
@@ -6408,7 +6423,7 @@
       "highPrice": 3.05,
       "lowPrice": 3.02,
       "volume": 377967,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.006949
     },
     {
@@ -6423,7 +6438,7 @@
       "highPrice": 3.05,
       "lowPrice": 3.01,
       "volume": 553572,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.010177
     },
     {
@@ -6438,7 +6453,7 @@
       "highPrice": 3.08,
       "lowPrice": 3.03,
       "volume": 541967,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009964
     },
     {
@@ -6453,7 +6468,7 @@
       "highPrice": 3.08,
       "lowPrice": 3.02,
       "volume": 915031,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.016822
     },
     {
@@ -6468,7 +6483,7 @@
       "highPrice": 3.01,
       "lowPrice": 2.98,
       "volume": 407206,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007486
     },
     {
@@ -6483,7 +6498,7 @@
       "highPrice": 3.05,
       "lowPrice": 3.0,
       "volume": 545736,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.010033
     },
     {
@@ -6498,7 +6513,7 @@
       "highPrice": 3.11,
       "lowPrice": 3.03,
       "volume": 804768,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.014795
     },
     {
@@ -6513,7 +6528,7 @@
       "highPrice": 3.15,
       "lowPrice": 3.0,
       "volume": 1572268,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.028905
     },
     {
@@ -6528,7 +6543,7 @@
       "highPrice": 3.02,
       "lowPrice": 2.99,
       "volume": 297168,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.005463
     },
     {
@@ -6543,7 +6558,7 @@
       "highPrice": 3.02,
       "lowPrice": 2.98,
       "volume": 469515,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008632
     },
     {
@@ -6558,7 +6573,7 @@
       "highPrice": 3.0,
       "lowPrice": 2.98,
       "volume": 251164,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.004617
     },
     {
@@ -6573,7 +6588,7 @@
       "highPrice": 3.0,
       "lowPrice": 2.98,
       "volume": 336612,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.006188
     },
     {
@@ -6588,7 +6603,7 @@
       "highPrice": 3.01,
       "lowPrice": 2.98,
       "volume": 421621,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007751
     },
     {
@@ -6603,7 +6618,7 @@
       "highPrice": 3.0,
       "lowPrice": 2.98,
       "volume": 290207,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.005335
     },
     {
@@ -6618,7 +6633,7 @@
       "highPrice": 3.0,
       "lowPrice": 2.97,
       "volume": 360600,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.006629
     },
     {
@@ -6633,7 +6648,7 @@
       "highPrice": 2.99,
       "lowPrice": 2.97,
       "volume": 290581,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.005342
     },
     {
@@ -6648,7 +6663,7 @@
       "highPrice": 3.02,
       "lowPrice": 2.98,
       "volume": 334689,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.006153
     },
     {
@@ -6663,7 +6678,7 @@
       "highPrice": 3.04,
       "lowPrice": 2.97,
       "volume": 462674,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008506
     },
     {
@@ -6678,7 +6693,7 @@
       "highPrice": 3.04,
       "lowPrice": 3.0,
       "volume": 478845,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008803
     },
     {
@@ -6693,7 +6708,7 @@
       "highPrice": 3.0,
       "lowPrice": 2.97,
       "volume": 353697,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.006502
     },
     {
@@ -6708,7 +6723,7 @@
       "highPrice": 3.06,
       "lowPrice": 2.98,
       "volume": 503335,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009253
     },
     {
@@ -6723,7 +6738,7 @@
       "highPrice": 3.09,
       "lowPrice": 3.03,
       "volume": 493554,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009074
     },
     {
@@ -6738,7 +6753,7 @@
       "highPrice": 3.11,
       "lowPrice": 3.06,
       "volume": 598356,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.011
     },
     {
@@ -6753,7 +6768,7 @@
       "highPrice": 3.12,
       "lowPrice": 3.06,
       "volume": 552162,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.010151
     },
     {
@@ -6768,7 +6783,7 @@
       "highPrice": 3.08,
       "lowPrice": 3.03,
       "volume": 436501,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008025
     },
     {
@@ -6783,7 +6798,7 @@
       "highPrice": 3.11,
       "lowPrice": 3.05,
       "volume": 620986,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.011416
     },
     {
@@ -6798,7 +6813,7 @@
       "highPrice": 3.14,
       "lowPrice": 3.09,
       "volume": 759343,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.01396
     },
     {
@@ -6813,7 +6828,7 @@
       "highPrice": 3.1,
       "lowPrice": 2.98,
       "volume": 891185,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.016384
     },
     {
@@ -6828,7 +6843,7 @@
       "highPrice": 3.02,
       "lowPrice": 2.93,
       "volume": 641752,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.011798
     },
     {
@@ -6843,7 +6858,7 @@
       "highPrice": 3.1,
       "lowPrice": 2.9,
       "volume": 1319058,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.02425
     },
     {
@@ -6858,7 +6873,7 @@
       "highPrice": 3.15,
       "lowPrice": 3.11,
       "volume": 560244,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.0103
     },
     {
@@ -6873,7 +6888,7 @@
       "highPrice": 3.18,
       "lowPrice": 3.12,
       "volume": 633651,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.011649
     },
     {
@@ -6888,7 +6903,7 @@
       "highPrice": 3.18,
       "lowPrice": 3.12,
       "volume": 798746,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.014684
     },
     {
@@ -6903,7 +6918,7 @@
       "highPrice": 3.2,
       "lowPrice": 3.15,
       "volume": 637782,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.011725
     },
     {
@@ -6918,7 +6933,7 @@
       "highPrice": 3.18,
       "lowPrice": 3.12,
       "volume": 554426,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.010193
     },
     {
@@ -6933,7 +6948,7 @@
       "highPrice": 3.2,
       "lowPrice": 3.14,
       "volume": 683461,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.012565
     },
     {
@@ -6948,7 +6963,7 @@
       "highPrice": 3.17,
       "lowPrice": 3.1,
       "volume": 801839,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.014741
     },
     {
@@ -6963,7 +6978,7 @@
       "highPrice": 3.12,
       "lowPrice": 3.07,
       "volume": 553959,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.010184
     },
     {
@@ -6978,7 +6993,7 @@
       "highPrice": 3.1,
       "lowPrice": 3.07,
       "volume": 509806,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009372
     },
     {
@@ -6993,7 +7008,7 @@
       "highPrice": 3.1,
       "lowPrice": 3.07,
       "volume": 564840,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.010384
     },
     {
@@ -7008,7 +7023,7 @@
       "highPrice": 3.11,
       "lowPrice": 3.07,
       "volume": 496539,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009128
     },
     {
@@ -7023,7 +7038,7 @@
       "highPrice": 3.1,
       "lowPrice": 3.06,
       "volume": 545978,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.010037
     },
     {
@@ -7038,7 +7053,7 @@
       "highPrice": 3.12,
       "lowPrice": 3.05,
       "volume": 782263,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.014381
     },
     {
@@ -7053,7 +7068,7 @@
       "highPrice": 3.17,
       "lowPrice": 3.11,
       "volume": 831930,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.015294
     },
     {
@@ -7068,7 +7083,7 @@
       "highPrice": 3.17,
       "lowPrice": 3.12,
       "volume": 636199,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.011696
     },
     {
@@ -7083,7 +7098,7 @@
       "highPrice": 3.16,
       "lowPrice": 3.11,
       "volume": 446321,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008205
     },
     {
@@ -7098,7 +7113,7 @@
       "highPrice": 3.17,
       "lowPrice": 3.11,
       "volume": 566714,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.010418
     },
     {
@@ -7113,7 +7128,7 @@
       "highPrice": 3.2,
       "lowPrice": 3.13,
       "volume": 648781,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.011927
     },
     {
@@ -7128,7 +7143,7 @@
       "highPrice": 3.15,
       "lowPrice": 3.13,
       "volume": 392977,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007224
     },
     {
@@ -7143,7 +7158,7 @@
       "highPrice": 3.17,
       "lowPrice": 3.12,
       "volume": 401445,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.00738
     },
     {
@@ -7158,7 +7173,7 @@
       "highPrice": 3.23,
       "lowPrice": 3.14,
       "volume": 674411,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.012398
     },
     {
@@ -7173,7 +7188,7 @@
       "highPrice": 3.23,
       "lowPrice": 3.18,
       "volume": 465232,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008553
     },
     {
@@ -7188,7 +7203,7 @@
       "highPrice": 3.23,
       "lowPrice": 3.19,
       "volume": 533756,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009812
     },
     {
@@ -7203,7 +7218,7 @@
       "highPrice": 3.24,
       "lowPrice": 3.16,
       "volume": 875744,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.016099
     },
     {
@@ -7218,7 +7233,7 @@
       "highPrice": 3.19,
       "lowPrice": 3.11,
       "volume": 773100,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.014212
     },
     {
@@ -7233,7 +7248,7 @@
       "highPrice": 3.16,
       "lowPrice": 3.08,
       "volume": 849356,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.015614
     },
     {
@@ -7248,7 +7263,7 @@
       "highPrice": 3.1,
       "lowPrice": 3.04,
       "volume": 672902,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.01237
     },
     {
@@ -7263,7 +7278,7 @@
       "highPrice": 3.1,
       "lowPrice": 3.03,
       "volume": 895856,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.016469
     },
     {
@@ -7278,7 +7293,7 @@
       "highPrice": 3.17,
       "lowPrice": 3.08,
       "volume": 862377,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.015854
     },
     {
@@ -7293,7 +7308,7 @@
       "highPrice": 3.2,
       "lowPrice": 3.13,
       "volume": 630557,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.011592
     },
     {
@@ -7308,7 +7323,7 @@
       "highPrice": 3.2,
       "lowPrice": 3.13,
       "volume": 828860,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.015238
     },
     {
@@ -7323,7 +7338,7 @@
       "highPrice": 3.15,
       "lowPrice": 3.11,
       "volume": 594309,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.010926
     },
     {
@@ -7338,7 +7353,7 @@
       "highPrice": 3.14,
       "lowPrice": 3.1,
       "volume": 487560,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008963
     },
     {
@@ -7353,7 +7368,7 @@
       "highPrice": 3.15,
       "lowPrice": 3.11,
       "volume": 643912,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.011838
     },
     {
@@ -7368,7 +7383,7 @@
       "highPrice": 3.14,
       "lowPrice": 3.11,
       "volume": 449040,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008255
     },
     {
@@ -7383,7 +7398,7 @@
       "highPrice": 3.12,
       "lowPrice": 3.08,
       "volume": 468178,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008607
     },
     {
@@ -7398,7 +7413,7 @@
       "highPrice": 3.12,
       "lowPrice": 3.07,
       "volume": 479284,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008811
     },
     {
@@ -7413,7 +7428,7 @@
       "highPrice": 3.11,
       "lowPrice": 3.07,
       "volume": 547554,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.010066
     },
     {
@@ -7428,7 +7443,7 @@
       "highPrice": 3.09,
       "lowPrice": 3.06,
       "volume": 293971,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.005404
     },
     {
@@ -7443,7 +7458,7 @@
       "highPrice": 3.1,
       "lowPrice": 3.06,
       "volume": 382274,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007028
     },
     {
@@ -7458,7 +7473,7 @@
       "highPrice": 3.13,
       "lowPrice": 3.07,
       "volume": 510530,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009385
     },
     {
@@ -7473,7 +7488,7 @@
       "highPrice": 3.15,
       "lowPrice": 3.11,
       "volume": 645861,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.011873
     },
     {
@@ -7488,7 +7503,7 @@
       "highPrice": 3.15,
       "lowPrice": 3.1,
       "volume": 733338,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.013482
     },
     {
@@ -7503,7 +7518,7 @@
       "highPrice": 3.11,
       "lowPrice": 3.09,
       "volume": 422142,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007761
     },
     {
@@ -7518,7 +7533,7 @@
       "highPrice": 3.1,
       "lowPrice": 3.08,
       "volume": 387533,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007124
     },
     {
@@ -7533,7 +7548,7 @@
       "highPrice": 3.11,
       "lowPrice": 3.08,
       "volume": 355750,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.00654
     },
     {
@@ -7548,7 +7563,7 @@
       "highPrice": 3.13,
       "lowPrice": 3.09,
       "volume": 420502,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.00773
     },
     {
@@ -7563,7 +7578,7 @@
       "highPrice": 3.13,
       "lowPrice": 3.08,
       "volume": 606957,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.011158
     },
     {
@@ -7578,7 +7593,7 @@
       "highPrice": 3.1,
       "lowPrice": 3.08,
       "volume": 452533,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008319
     },
     {
@@ -7593,7 +7608,7 @@
       "highPrice": 3.11,
       "lowPrice": 3.09,
       "volume": 280922,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.005164
     },
     {
@@ -7608,7 +7623,7 @@
       "highPrice": 3.12,
       "lowPrice": 3.1,
       "volume": 300773,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.005529
     },
     {
@@ -7623,7 +7638,7 @@
       "highPrice": 3.14,
       "lowPrice": 3.11,
       "volume": 328903,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.006046
     },
     {
@@ -7638,7 +7653,7 @@
       "highPrice": 3.14,
       "lowPrice": 3.12,
       "volume": 308539,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.005672
     },
     {
@@ -7653,7 +7668,7 @@
       "highPrice": 3.15,
       "lowPrice": 3.13,
       "volume": 201586,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.003706
     },
     {
@@ -7668,7 +7683,7 @@
       "highPrice": 3.14,
       "lowPrice": 3.11,
       "volume": 241629,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.004442
     },
     {
@@ -7683,7 +7698,7 @@
       "highPrice": 3.16,
       "lowPrice": 3.12,
       "volume": 258674,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.004755
     },
     {
@@ -7698,7 +7713,7 @@
       "highPrice": 3.16,
       "lowPrice": 3.14,
       "volume": 259134,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.004764
     },
     {
@@ -7713,7 +7728,7 @@
       "highPrice": 3.17,
       "lowPrice": 3.14,
       "volume": 360541,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.006628
     },
     {
@@ -7728,7 +7743,7 @@
       "highPrice": 3.16,
       "lowPrice": 3.11,
       "volume": 390768,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007184
     },
     {
@@ -7743,7 +7758,7 @@
       "highPrice": 3.13,
       "lowPrice": 3.09,
       "volume": 399573,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007346
     },
     {
@@ -7758,7 +7773,7 @@
       "highPrice": 3.13,
       "lowPrice": 3.1,
       "volume": 312543,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.005746
     },
     {
@@ -7773,7 +7788,7 @@
       "highPrice": 3.14,
       "lowPrice": 3.11,
       "volume": 255576,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.004698
     },
     {
@@ -7788,7 +7803,7 @@
       "highPrice": 3.15,
       "lowPrice": 3.11,
       "volume": 446244,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008204
     },
     {
@@ -7803,7 +7818,7 @@
       "highPrice": 3.16,
       "lowPrice": 3.13,
       "volume": 299567,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.005507
     },
     {
@@ -7818,7 +7833,7 @@
       "highPrice": 3.18,
       "lowPrice": 3.13,
       "volume": 413166,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007595
     },
     {
@@ -7833,7 +7848,7 @@
       "highPrice": 3.21,
       "lowPrice": 3.16,
       "volume": 427199,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007853
     },
     {
@@ -7848,7 +7863,7 @@
       "highPrice": 3.24,
       "lowPrice": 3.19,
       "volume": 523631,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009626
     },
     {
@@ -7863,7 +7878,7 @@
       "highPrice": 3.23,
       "lowPrice": 3.17,
       "volume": 648336,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.011919
     },
     {
@@ -7878,7 +7893,7 @@
       "highPrice": 3.24,
       "lowPrice": 3.18,
       "volume": 535489,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009844
     },
     {
@@ -7893,7 +7908,7 @@
       "highPrice": 3.26,
       "lowPrice": 3.2,
       "volume": 759808,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.013968
     },
     {
@@ -7908,7 +7923,7 @@
       "highPrice": 3.21,
       "lowPrice": 3.18,
       "volume": 329851,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.006064
     },
     {
@@ -7923,7 +7938,7 @@
       "highPrice": 3.21,
       "lowPrice": 3.13,
       "volume": 850318,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.015632
     },
     {
@@ -7938,7 +7953,7 @@
       "highPrice": 3.16,
       "lowPrice": 3.13,
       "volume": 389069,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007152
     },
     {
@@ -7953,7 +7968,7 @@
       "highPrice": 3.18,
       "lowPrice": 3.14,
       "volume": 418118,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007686
     },
     {
@@ -7968,7 +7983,7 @@
       "highPrice": 3.2,
       "lowPrice": 3.15,
       "volume": 447034,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008218
     },
     {
@@ -7983,7 +7998,7 @@
       "highPrice": 3.2,
       "lowPrice": 3.14,
       "volume": 582613,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.01071
     },
     {
@@ -7998,7 +8013,7 @@
       "highPrice": 3.18,
       "lowPrice": 3.14,
       "volume": 439166,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008073
     },
     {
@@ -8013,7 +8028,7 @@
       "highPrice": 3.25,
       "lowPrice": 3.15,
       "volume": 1039756,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.019114
     },
     {
@@ -8028,7 +8043,7 @@
       "highPrice": 3.27,
       "lowPrice": 3.18,
       "volume": 979606,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.018009
     },
     {
@@ -8043,7 +8058,7 @@
       "highPrice": 3.2,
       "lowPrice": 3.17,
       "volume": 414027,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007611
     },
     {
@@ -8058,7 +8073,7 @@
       "highPrice": 3.23,
       "lowPrice": 3.18,
       "volume": 476702,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008763
     },
     {
@@ -8073,7 +8088,7 @@
       "highPrice": 3.27,
       "lowPrice": 3.21,
       "volume": 694291,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.012764
     },
     {
@@ -8088,7 +8103,7 @@
       "highPrice": 3.29,
       "lowPrice": 3.24,
       "volume": 924451,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.016995
     },
     {
@@ -8103,7 +8118,7 @@
       "highPrice": 3.28,
       "lowPrice": 3.23,
       "volume": 839506,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.015433
     },
     {
@@ -8118,7 +8133,7 @@
       "highPrice": 3.31,
       "lowPrice": 3.26,
       "volume": 896245,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.016476
     },
     {
@@ -8133,7 +8148,7 @@
       "highPrice": 3.28,
       "lowPrice": 3.26,
       "volume": 483635,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008891
     },
     {
@@ -8148,7 +8163,7 @@
       "highPrice": 3.28,
       "lowPrice": 3.25,
       "volume": 557392,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.010247
     },
     {
@@ -8163,7 +8178,7 @@
       "highPrice": 3.3,
       "lowPrice": 3.25,
       "volume": 510970,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009393
     },
     {
@@ -8178,7 +8193,7 @@
       "highPrice": 3.29,
       "lowPrice": 3.25,
       "volume": 356984,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.006563
     },
     {
@@ -8193,7 +8208,7 @@
       "highPrice": 3.3,
       "lowPrice": 3.26,
       "volume": 516234,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.00949
     },
     {
@@ -8208,7 +8223,7 @@
       "highPrice": 3.3,
       "lowPrice": 3.23,
       "volume": 645795,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.011872
     },
     {
@@ -8223,7 +8238,7 @@
       "highPrice": 3.25,
       "lowPrice": 3.2,
       "volume": 471183,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008662
     },
     {
@@ -8238,7 +8253,7 @@
       "highPrice": 3.25,
       "lowPrice": 3.2,
       "volume": 513342,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009437
     },
     {
@@ -8253,7 +8268,7 @@
       "highPrice": 3.23,
       "lowPrice": 3.19,
       "volume": 382206,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007026
     },
     {
@@ -8268,7 +8283,7 @@
       "highPrice": 3.25,
       "lowPrice": 3.19,
       "volume": 386792,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007111
     },
     {
@@ -8283,7 +8298,7 @@
       "highPrice": 3.29,
       "lowPrice": 3.23,
       "volume": 433746,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007974
     },
     {
@@ -8298,7 +8313,7 @@
       "highPrice": 3.3,
       "lowPrice": 3.23,
       "volume": 520662,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009572
     },
     {
@@ -8313,7 +8328,7 @@
       "highPrice": 3.31,
       "lowPrice": 3.25,
       "volume": 657168,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.012081
     },
     {
@@ -8328,7 +8343,7 @@
       "highPrice": 3.33,
       "lowPrice": 3.27,
       "volume": 523343,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009621
     },
     {
@@ -8343,7 +8358,7 @@
       "highPrice": 3.31,
       "lowPrice": 3.26,
       "volume": 498290,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.00916
     },
     {
@@ -8358,7 +8373,7 @@
       "highPrice": 3.29,
       "lowPrice": 3.24,
       "volume": 443812,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008159
     },
     {
@@ -8373,7 +8388,7 @@
       "highPrice": 3.27,
       "lowPrice": 3.2,
       "volume": 529418,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009733
     },
     {
@@ -8388,7 +8403,7 @@
       "highPrice": 3.28,
       "lowPrice": 3.22,
       "volume": 615713,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.011319
     },
     {
@@ -8403,7 +8418,7 @@
       "highPrice": 3.28,
       "lowPrice": 3.22,
       "volume": 550657,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.010123
     },
     {
@@ -8418,7 +8433,7 @@
       "highPrice": 3.25,
       "lowPrice": 3.2,
       "volume": 516599,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009497
     },
     {
@@ -8433,7 +8448,7 @@
       "highPrice": 3.23,
       "lowPrice": 3.15,
       "volume": 717491,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.01319
     },
     {
@@ -8448,7 +8463,7 @@
       "highPrice": 3.19,
       "lowPrice": 3.11,
       "volume": 551670,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.010142
     },
     {
@@ -8463,7 +8478,7 @@
       "highPrice": 3.19,
       "lowPrice": 3.13,
       "volume": 464835,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.00941
     },
     {
@@ -8478,7 +8493,7 @@
       "highPrice": 3.14,
       "lowPrice": 3.1,
       "volume": 304478,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.006164
     },
     {
@@ -8493,7 +8508,7 @@
       "highPrice": 3.16,
       "lowPrice": 3.11,
       "volume": 427989,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008664
     },
     {
@@ -8508,7 +8523,7 @@
       "highPrice": 3.17,
       "lowPrice": 3.12,
       "volume": 496689,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.010055
     },
     {
@@ -8523,7 +8538,7 @@
       "highPrice": 3.15,
       "lowPrice": 3.12,
       "volume": 291061,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.005892
     },
     {
@@ -8538,7 +8553,7 @@
       "highPrice": 3.17,
       "lowPrice": 3.13,
       "volume": 356845,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007224
     },
     {
@@ -8553,7 +8568,7 @@
       "highPrice": 3.21,
       "lowPrice": 3.16,
       "volume": 435030,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008807
     },
     {
@@ -8568,7 +8583,7 @@
       "highPrice": 3.19,
       "lowPrice": 3.14,
       "volume": 542251,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.010978
     },
     {
@@ -8583,7 +8598,7 @@
       "highPrice": 3.18,
       "lowPrice": 3.14,
       "volume": 321143,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.006501
     },
     {
@@ -8598,7 +8613,7 @@
       "highPrice": 3.19,
       "lowPrice": 3.13,
       "volume": 461295,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009339
     },
     {
@@ -8613,7 +8628,7 @@
       "highPrice": 3.26,
       "lowPrice": 3.16,
       "volume": 554183,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.011219
     },
     {
@@ -8628,7 +8643,7 @@
       "highPrice": 3.27,
       "lowPrice": 3.23,
       "volume": 373420,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.00756
     },
     {
@@ -8643,7 +8658,7 @@
       "highPrice": 3.27,
       "lowPrice": 3.23,
       "volume": 401430,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008127
     },
     {
@@ -8658,7 +8673,7 @@
       "highPrice": 3.28,
       "lowPrice": 3.23,
       "volume": 465903,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009432
     },
     {
@@ -8673,7 +8688,7 @@
       "highPrice": 3.32,
       "lowPrice": 3.26,
       "volume": 397063,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008038
     },
     {
@@ -8688,7 +8703,7 @@
       "highPrice": 3.32,
       "lowPrice": 3.25,
       "volume": 548927,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.011113
     },
     {
@@ -8703,7 +8718,7 @@
       "highPrice": 3.31,
       "lowPrice": 3.26,
       "volume": 474155,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009599
     },
     {
@@ -8718,7 +8733,7 @@
       "highPrice": 3.3,
       "lowPrice": 3.25,
       "volume": 514344,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.010413
     },
     {
@@ -8733,7 +8748,7 @@
       "highPrice": 3.29,
       "lowPrice": 3.24,
       "volume": 348162,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007048
     },
     {
@@ -8748,7 +8763,7 @@
       "highPrice": 3.29,
       "lowPrice": 3.23,
       "volume": 493635,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009993
     },
     {
@@ -8763,7 +8778,7 @@
       "highPrice": 3.31,
       "lowPrice": 3.23,
       "volume": 559988,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.011337
     },
     {
@@ -8778,7 +8793,7 @@
       "highPrice": 3.38,
       "lowPrice": 3.28,
       "volume": 733258,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.014844
     },
     {
@@ -8793,7 +8808,7 @@
       "highPrice": 3.39,
       "lowPrice": 3.33,
       "volume": 1187503,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.02404
     },
     {
@@ -8808,7 +8823,7 @@
       "highPrice": 3.42,
       "lowPrice": 3.34,
       "volume": 758522,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.015356
     },
     {
@@ -8823,7 +8838,7 @@
       "highPrice": 3.48,
       "lowPrice": 3.39,
       "volume": 661750,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.013397
     },
     {
@@ -8838,7 +8853,7 @@
       "highPrice": 3.44,
       "lowPrice": 3.36,
       "volume": 782669,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.015845
     },
     {
@@ -8853,7 +8868,7 @@
       "highPrice": 3.51,
       "lowPrice": 3.44,
       "volume": 547176,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.011077
     },
     {
@@ -8868,7 +8883,7 @@
       "highPrice": 3.54,
       "lowPrice": 3.5,
       "volume": 474607,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009608
     },
     {
@@ -8883,7 +8898,7 @@
       "highPrice": 3.57,
       "lowPrice": 3.49,
       "volume": 593142,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.012008
     },
     {
@@ -8898,7 +8913,7 @@
       "highPrice": 3.55,
       "lowPrice": 3.47,
       "volume": 633507,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.012825
     },
     {
@@ -8913,7 +8928,7 @@
       "highPrice": 3.56,
       "lowPrice": 3.46,
       "volume": 585702,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.011857
     },
     {
@@ -8928,7 +8943,7 @@
       "highPrice": 3.52,
       "lowPrice": 3.44,
       "volume": 515298,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.010432
     },
     {
@@ -8943,7 +8958,7 @@
       "highPrice": 3.47,
       "lowPrice": 3.44,
       "volume": 318308,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.006444
     },
     {
@@ -8958,7 +8973,7 @@
       "highPrice": 3.49,
       "lowPrice": 3.43,
       "volume": 612562,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.012401
     },
     {
@@ -8973,7 +8988,7 @@
       "highPrice": 3.47,
       "lowPrice": 3.4,
       "volume": 535225,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.010835
     },
     {
@@ -8988,7 +9003,7 @@
       "highPrice": 3.53,
       "lowPrice": 3.47,
       "volume": 363210,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007353
     },
     {
@@ -9003,7 +9018,7 @@
       "highPrice": 3.53,
       "lowPrice": 3.5,
       "volume": 403566,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.00817
     },
     {
@@ -9018,7 +9033,7 @@
       "highPrice": 3.53,
       "lowPrice": 3.5,
       "volume": 285877,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.005787
     },
     {
@@ -9033,7 +9048,7 @@
       "highPrice": 3.55,
       "lowPrice": 3.5,
       "volume": 469911,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009513
     },
     {
@@ -9048,7 +9063,7 @@
       "highPrice": 3.58,
       "lowPrice": 3.53,
       "volume": 393059,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007957
     },
     {
@@ -9063,7 +9078,7 @@
       "highPrice": 3.56,
       "lowPrice": 3.52,
       "volume": 378989,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.007672
     },
     {
@@ -9078,7 +9093,7 @@
       "highPrice": 3.58,
       "lowPrice": 3.53,
       "volume": 423817,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.00858
     },
     {
@@ -9093,7 +9108,7 @@
       "highPrice": 3.58,
       "lowPrice": 3.48,
       "volume": 563985,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.011418
     },
     {
@@ -9108,7 +9123,7 @@
       "highPrice": 3.52,
       "lowPrice": 3.46,
       "volume": 418278,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.008468
     },
     {
@@ -9123,7 +9138,7 @@
       "highPrice": 3.53,
       "lowPrice": 3.45,
       "volume": 476535,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009647
     },
     {
@@ -9138,7 +9153,7 @@
       "highPrice": 3.58,
       "lowPrice": 3.48,
       "volume": 760317,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.015392
     },
     {
@@ -9153,7 +9168,7 @@
       "highPrice": 3.61,
       "lowPrice": 3.51,
       "volume": 830321,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.016809
     },
     {
@@ -9168,7 +9183,7 @@
       "highPrice": 3.58,
       "lowPrice": 3.51,
       "volume": 697409,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.014119
     },
     {
@@ -9183,7 +9198,7 @@
       "highPrice": 3.6,
       "lowPrice": 3.55,
       "volume": 518580,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.010498
     },
     {
@@ -9198,7 +9213,7 @@
       "highPrice": 3.61,
       "lowPrice": 3.56,
       "volume": 595790,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.012061
     },
     {
@@ -9213,7 +9228,7 @@
       "highPrice": 3.63,
       "lowPrice": 3.55,
       "volume": 747610,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.015135
     },
     {
@@ -9228,7 +9243,7 @@
       "highPrice": 3.66,
       "lowPrice": 3.61,
       "volume": 766540,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.015518
     },
     {
@@ -9243,7 +9258,7 @@
       "highPrice": 3.65,
       "lowPrice": 3.55,
       "volume": 870857,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.01763
     },
     {
@@ -9258,7 +9273,7 @@
       "highPrice": 3.68,
       "lowPrice": 3.62,
       "volume": 546047,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.011054
     },
     {
@@ -9273,7 +9288,7 @@
       "highPrice": 3.69,
       "lowPrice": 3.65,
       "volume": 650822,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.013175
     },
     {
@@ -9288,7 +9303,7 @@
       "highPrice": 3.71,
       "lowPrice": 3.65,
       "volume": 477640,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.00967
     },
     {
@@ -9303,7 +9318,7 @@
       "highPrice": 3.74,
       "lowPrice": 3.62,
       "volume": 1006418,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.020374
     },
     {
@@ -9318,7 +9333,7 @@
       "highPrice": 3.85,
       "lowPrice": 3.73,
       "volume": 870758,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.017628
     },
     {
@@ -9333,7 +9348,7 @@
       "highPrice": 3.88,
       "lowPrice": 3.76,
       "volume": 1084385,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.021953
     },
     {
@@ -9348,7 +9363,7 @@
       "highPrice": 3.89,
       "lowPrice": 3.76,
       "volume": 1332728,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.02698
     },
     {
@@ -9363,7 +9378,7 @@
       "highPrice": 3.89,
       "lowPrice": 3.78,
       "volume": 1255187,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.02541
     },
     {
@@ -9378,7 +9393,7 @@
       "highPrice": 3.84,
       "lowPrice": 3.73,
       "volume": 1303568,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.02639
     },
     {
@@ -9393,7 +9408,7 @@
       "highPrice": 3.8,
       "lowPrice": 3.7,
       "volume": 1087335,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.022012
     },
     {
@@ -9408,7 +9423,7 @@
       "highPrice": 3.79,
       "lowPrice": 3.65,
       "volume": 1628567,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.032969
     },
     {
@@ -9423,7 +9438,7 @@
       "highPrice": 3.67,
       "lowPrice": 3.57,
       "volume": 917899,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.018582
     },
     {
@@ -9438,7 +9453,7 @@
       "highPrice": 3.6,
       "lowPrice": 3.54,
       "volume": 468582,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.009486
     },
     {
@@ -9453,7 +9468,7 @@
       "highPrice": 3.61,
       "lowPrice": 3.55,
       "volume": 724381,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.014665
     },
     {
@@ -9468,7 +9483,7 @@
       "highPrice": 3.57,
       "lowPrice": 3.49,
       "volume": 694653,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.014063
     },
     {
@@ -9483,7 +9498,7 @@
       "highPrice": 3.54,
       "lowPrice": 3.45,
       "volume": 941581,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.019062
     },
     {
@@ -9498,7 +9513,7 @@
       "highPrice": 3.68,
       "lowPrice": 3.53,
       "volume": 1494308,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.030251
     },
     {
@@ -9513,7 +9528,7 @@
       "highPrice": 3.65,
       "lowPrice": 3.55,
       "volume": 1143561,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.023151
     },
     {
@@ -9528,7 +9543,7 @@
       "highPrice": 3.61,
       "lowPrice": 3.54,
       "volume": 1054237,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.021342
     },
     {
@@ -9543,7 +9558,7 @@
       "highPrice": 3.6,
       "lowPrice": 3.53,
       "volume": 1172864,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.023744
     },
     {
@@ -9558,7 +9573,7 @@
       "highPrice": 3.61,
       "lowPrice": 3.51,
       "volume": 1103543,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.022341
     },
     {
@@ -9573,7 +9588,7 @@
       "highPrice": 3.62,
       "lowPrice": 3.53,
       "volume": 1094964,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.022167
     },
     {
@@ -9588,7 +9603,7 @@
       "highPrice": 3.61,
       "lowPrice": 3.53,
       "volume": 762959,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.015446
     },
     {
@@ -9603,7 +9618,7 @@
       "highPrice": 3.61,
       "lowPrice": 3.53,
       "volume": 750948,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.015202
     },
     {
@@ -9618,7 +9633,7 @@
       "highPrice": 3.6,
       "lowPrice": 3.54,
       "volume": 749655,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.015176
     },
     {
@@ -9633,7 +9648,7 @@
       "highPrice": 3.58,
       "lowPrice": 3.44,
       "volume": 1283356,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.025981
     },
     {
@@ -9648,7 +9663,7 @@
       "highPrice": 3.53,
       "lowPrice": 3.44,
       "volume": 874432,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.017702
     },
     {
@@ -9663,7 +9678,7 @@
       "highPrice": 3.52,
       "lowPrice": 3.44,
       "volume": 813126,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.016461
     },
     {
@@ -9678,7 +9693,7 @@
       "highPrice": 3.49,
       "lowPrice": 3.41,
       "volume": 785892,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.01591
     },
     {
@@ -9693,7 +9708,7 @@
       "highPrice": 3.47,
       "lowPrice": 3.41,
       "volume": 774029,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.01567
     },
     {
@@ -9708,7 +9723,7 @@
       "highPrice": 3.45,
       "lowPrice": 3.35,
       "volume": 869175,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.017596
     },
     {
@@ -9723,7 +9738,7 @@
       "highPrice": 3.41,
       "lowPrice": 3.34,
       "volume": 879037,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.017796
     },
     {
@@ -9738,7 +9753,7 @@
       "highPrice": 3.46,
       "lowPrice": 3.32,
       "volume": 1119400,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.022662
     },
     {
@@ -9753,7 +9768,7 @@
       "highPrice": 3.49,
       "lowPrice": 3.38,
       "volume": 1127001,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.022815
     },
     {
@@ -9768,7 +9783,7 @@
       "highPrice": 3.43,
       "lowPrice": 3.31,
       "volume": 1140836,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.023096
     },
     {
@@ -9783,7 +9798,7 @@
       "highPrice": 3.35,
       "lowPrice": 3.24,
       "volume": 1298829,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.026294
     },
     {
@@ -9798,7 +9813,7 @@
       "highPrice": 3.28,
       "lowPrice": 3.23,
       "volume": 822781,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.016657
     },
     {
@@ -9813,7 +9828,7 @@
       "highPrice": 3.27,
       "lowPrice": 3.18,
       "volume": 889038,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.017998
     },
     {
@@ -9828,7 +9843,7 @@
       "highPrice": 3.24,
       "lowPrice": 3.18,
       "volume": 772868,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.015646
     },
     {
@@ -9843,7 +9858,7 @@
       "highPrice": 3.25,
       "lowPrice": 3.17,
       "volume": 674842,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.013662
     },
     {
@@ -9858,23 +9873,8 @@
       "highPrice": 3.31,
       "lowPrice": 3.21,
       "volume": 1060780,
-      "syncedAt": "2026-06-02T15:32:15.646361",
+      "syncedAt": "2026-06-03T15:00:06.737032",
       "turnoverRate": 0.021475
-    },
-    {
-      "stockCode": "002958",
-      "stockName": "青农商行",
-      "secid": "0.002958",
-      "marketCode": "SZ_MAIN",
-      "exchangeCode": "SZ",
-      "tradeDate": "2025-05-22",
-      "openPrice": 3.25,
-      "closePrice": 3.28,
-      "highPrice": 3.31,
-      "lowPrice": 3.24,
-      "volume": 1075331,
-      "syncedAt": "2026-06-02T15:32:15.646361",
-      "turnoverRate": 0.021769
     }
   ],
   "intradayData": [

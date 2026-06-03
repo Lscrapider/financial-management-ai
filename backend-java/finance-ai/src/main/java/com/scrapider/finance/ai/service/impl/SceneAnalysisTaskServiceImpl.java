@@ -13,6 +13,7 @@ import com.scrapider.finance.ai.domain.param.SceneAnalysisCallbackParam;
 import com.scrapider.finance.ai.domain.param.SceneAnalysisCurrentScenesPayloadParam;
 import com.scrapider.finance.ai.domain.param.SceneAnalysisSubmitParam;
 import com.scrapider.finance.ai.domain.param.SceneAnalysisUserConfigParam;
+import com.scrapider.finance.ai.domain.param.SceneRetrievalEmbeddingParam;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisSubmitVO;
 import com.scrapider.finance.ai.service.SceneAnalysisMessagePublisher;
 import com.scrapider.finance.ai.service.SceneReportPipelineService;
@@ -157,12 +158,19 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
             throw new IllegalArgumentException("request body is required");
         }
         SceneAnalysisCurrentScenesPayloadParam currentScenesPayload = param.currentScenesPayload();
-        if (currentScenesPayload == null) {
-            throw new IllegalArgumentException("currentScenesPayload is required");
+        List<SceneRetrievalEmbeddingParam> retrievalEmbeddings = param.retrievalEmbeddings();
+        if (currentScenesPayload == null && (retrievalEmbeddings == null || retrievalEmbeddings.isEmpty())) {
+            throw new IllegalArgumentException("currentScenesPayload or retrievalEmbeddings is required");
         }
-        this.sceneAnalysisTaskManage.markCurrentScenesReady(taskNo, this.objectMapper.valueToTree(currentScenesPayload));
         try {
-            this.sceneReportPipelineService.start(taskNo, currentScenesPayload);
+            if (currentScenesPayload != null) {
+                this.sceneAnalysisTaskManage.markCurrentScenesReady(
+                        taskNo,
+                        this.objectMapper.valueToTree(currentScenesPayload));
+                this.sceneReportPipelineService.start(taskNo, currentScenesPayload);
+                return;
+            }
+            this.sceneReportPipelineService.continueWithRetrievalEmbeddings(taskNo, retrievalEmbeddings);
         } catch (Exception ex) {
             this.sceneAnalysisTaskManage.markFailed(taskNo, ex.getMessage());
             throw ex;

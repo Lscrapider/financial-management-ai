@@ -18,6 +18,14 @@ class SceneAnalysisCallbackClient:
             },
         )
 
+    def submit_retrieval_embeddings(self, task_no: str, retrieval_embeddings: list[dict]) -> None:
+        self._post_callback(
+            task_no,
+            {
+                "retrievalEmbeddings": retrieval_embeddings,
+            },
+        )
+
     def _post_callback(self, task_no: str, body: dict) -> None:
         base_url = self._settings.base_url.rstrip("/")
         url = f"{base_url}/api/ai/scene-analysis/tasks/{task_no}/callback"

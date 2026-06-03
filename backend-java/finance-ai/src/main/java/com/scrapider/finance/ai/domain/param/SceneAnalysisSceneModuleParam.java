@@ -8,5 +8,6 @@ public record SceneAnalysisSceneModuleParam(
         String level,
         String direction,
         Map<String, Double> tags,
-        List<String> evidence) {
+        List<String> evidence,
+        String queryText) {
 }
