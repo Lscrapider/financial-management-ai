@@ -39,6 +39,10 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
             currentScenes 是系统计算出的当前场景结果，包含场景分数、方向、内部标签和 evidence，用于辅助理解当前状态。
             knowledgeContext 是知识库召回内容，包含可引用的 chunk，使用其中观点、方法或经验时必须引用 chunkId。
             三者边界：marketContext 负责事实，currentScenes 负责系统解释，knowledgeContext 负责可引用知识依据。
+            marketContext.snapshot 中的现价、涨跌幅等是实时行情快照，按原始行情口径理解。
+            marketContext.klineTrends 和 currentScenes.trend.periodTrends 是基于日 K、周 K、月 K 的趋势压缩结果，K 线价格采用复权口径。
+            快照现价和 K 线最新收盘价可能因价格口径不同而不同，不得直接比较二者并判断“数据不一致”“数据时滞”或“某周期价格错误”。
+            需要提到价格差异时，只能说明“快照和 K 线趋势数据属于不同价格口径”，除非输入中明确提供了时滞或异常字段。
             可以给出买入、卖出、持有、观望或回避建议，但必须解释依据、适用条件和主要风险。
             不要承诺收益，不要编造缺失数据，不要把建议表述为确定性结论。
             必须区分事实、推断和风险提示。
@@ -300,6 +304,11 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
                   "summary": {"title": "", "conclusion": "", "confidence": "low|medium|high"},
                   "marketFacts": [{"fact": "", "source": "marketContext|currentScenes|knowledgeContext", "chunkIds": []}],
                   "sceneInterpretation": [{"scene": "", "view": "", "basis": [], "chunkIds": []}],
+                  "periodTrendAnalysis": [
+                    {"period": "daily", "title": "日K趋势", "trend": "", "basis": [], "interpretation": "", "chunkIds": []},
+                    {"period": "weekly", "title": "周K趋势", "trend": "", "basis": [], "interpretation": "", "chunkIds": []},
+                    {"period": "monthly", "title": "月K趋势", "trend": "", "basis": [], "interpretation": "", "chunkIds": []}
+                  ],
                   "knowledgeBasedAnalysis": [{"scene": "", "point": "", "chunkIds": []}],
                   "tradingSuggestions": [{
                     "action": "buy|sell|hold|watch|avoid",
@@ -329,6 +338,10 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
                 4. 没有知识库依据的判断可以使用空数组 chunkIds: []，但不能编造 chunkId。
                 5. 可以给出买入、卖出、持有、观望或回避建议，但必须同时说明 reason、conditions 和 risks。
                 6. 操作建议只能作为研究判断，不得承诺收益，不得使用“必涨”“必跌”“一定买入”等确定性表述。
+                7. 必须输出 periodTrendAnalysis，且包含 daily、weekly、monthly 三项，分别解释日 K、周 K、月 K 的趋势状态、主要依据和对当前判断的影响。
+                8. periodTrendAnalysis 必须优先使用 currentScenes.trend.periodTrends 与 marketContext.klineTrends 中对应周期的数据；只能用自然语言表达，不得暴露内部标签名、字段名或 score。
+                9. snapshot 是实时行情快照，K 线趋势数据可能是复权口径；不要把 snapshot 现价和 K 线 latestClose 的差异解释成月线价格、数据错误、数据时滞或多周期不一致。
+                10. 如果必须同时提到快照现价和 K 线价格，只能说明它们属于不同价格口径，趋势判断以 K 线趋势结构为准，现价用于描述当前行情快照。
 
                 allowedChunkIds:
                 %s
@@ -418,6 +431,7 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
         this.appendText(builder, "结论", reportContent.path("conclusion").asText(""));
         this.appendArray(builder, "市场事实", reportContent.path("marketFacts"), "fact", chunkReferenceLabels);
         this.appendArray(builder, "场景解读", reportContent.path("sceneInterpretation"), "view", chunkReferenceLabels);
+        this.appendPeriodTrendAnalysis(builder, reportContent.path("periodTrendAnalysis"), chunkReferenceLabels);
         this.appendArray(builder, "知识库分析", reportContent.path("knowledgeBasedAnalysis"), "point", chunkReferenceLabels);
         this.appendTradingSuggestions(builder, reportContent.path("tradingSuggestions"), chunkReferenceLabels);
         this.appendArray(builder, "风险提示", reportContent.path("riskWarnings"), "risk", chunkReferenceLabels);
@@ -457,6 +471,52 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
                 }
                 builder.append("\n");
             }
+        }
+        builder.append("\n");
+    }
+
+    private void appendPeriodTrendAnalysis(
+            StringBuilder builder,
+            JsonNode array,
+            Map<Long, String> chunkReferenceLabels) {
+        if (!array.isArray() || array.size() == 0) {
+            return;
+        }
+        builder.append("## 周期趋势分析\n");
+        for (JsonNode item : array) {
+            String title = item.path("title").asText("");
+            if (title.isBlank()) {
+                title = this.periodLabel(item.path("period").asText(""));
+            }
+            String trend = item.path("trend").asText("");
+            String interpretation = item.path("interpretation").asText("");
+            if (title.isBlank() && trend.isBlank() && interpretation.isBlank()) {
+                continue;
+            }
+            builder.append("- ");
+            if (!title.isBlank()) {
+                builder.append("【").append(title).append("】");
+            }
+            if (!trend.isBlank()) {
+                builder.append(trend);
+            }
+            if (!interpretation.isBlank() && !interpretation.equals(trend)) {
+                if (!trend.isBlank()) {
+                    builder.append("。");
+                }
+                builder.append(interpretation);
+            }
+            String basis = this.stringArrayText(item.path("basis"));
+            if (!basis.isBlank()) {
+                builder.append("（依据：").append(basis).append("）");
+            }
+            ArrayNode chunkIds = item.has("chunkIds") && item.get("chunkIds").isArray()
+                    ? (ArrayNode) item.get("chunkIds")
+                    : null;
+            if (chunkIds != null && chunkIds.size() > 0) {
+                builder.append("（引用：").append(this.chunkReferences(chunkIds, chunkReferenceLabels)).append("）");
+            }
+            builder.append("\n");
         }
         builder.append("\n");
     }
@@ -522,6 +582,15 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
             case "hold" -> "持有";
             case "watch" -> "观望";
             case "avoid" -> "回避";
+            default -> "";
+        };
+    }
+
+    private String periodLabel(String period) {
+        return switch (period == null ? "" : period.trim()) {
+            case "daily" -> "日K趋势";
+            case "weekly" -> "周K趋势";
+            case "monthly" -> "月K趋势";
             default -> "";
         };
     }

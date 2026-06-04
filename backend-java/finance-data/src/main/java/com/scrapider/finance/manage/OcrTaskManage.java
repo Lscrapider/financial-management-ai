@@ -115,6 +115,7 @@ public class OcrTaskManage extends ServiceImpl<OcrTaskMapper, OcrTaskPO> {
                 .eq(OcrTaskPO::getTaskNo, taskNo)
                 .set(OcrTaskPO::getStatus, OcrTaskStatusEnum.RUNNING.getCode())
                 .set(OcrTaskPO::getCurrentStage, OcrTaskStageEnum.EMBEDDING_INDEX.getCode())
+                .set(OcrTaskPO::getProgress, 80)
                 .set(OcrTaskPO::getSegmentCount, segmentCount)
                 .set(OcrTaskPO::getUpdatedAt, LocalDateTime.now())
                 .update();
@@ -125,6 +126,7 @@ public class OcrTaskManage extends ServiceImpl<OcrTaskMapper, OcrTaskPO> {
                 .eq(OcrTaskPO::getTaskNo, taskNo)
                 .set(OcrTaskPO::getStatus, OcrTaskStatusEnum.RUNNING.getCode())
                 .set(OcrTaskPO::getCurrentStage, OcrTaskStageEnum.CHUNK_TAG_RULE.getCode())
+                .set(OcrTaskPO::getProgress, 75)
                 .set(OcrTaskPO::getSegmentCount, segmentCount)
                 .set(OcrTaskPO::getUpdatedAt, LocalDateTime.now())
                 .update();

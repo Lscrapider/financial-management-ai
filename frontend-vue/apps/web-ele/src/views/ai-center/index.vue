@@ -8,6 +8,8 @@ import {
   ElButton,
   ElCard,
   ElDialog,
+  ElEmpty,
+  ElInput,
   ElMessage,
   ElOption,
   ElPagination,
@@ -24,6 +26,12 @@ import {
 import type { UploadFile, UploadRawFile } from 'element-plus';
 import type { UploadInstance } from 'element-plus';
 
+import {
+  getOcrReview,
+  submitOcrReview,
+  type OcrReviewDetail,
+  type OcrReviewDraftContent,
+} from '#/api/ocr-review';
 import {
   deleteOcrTask,
   getOcrChunkTagDetail,
@@ -79,6 +87,11 @@ const stageDialogVisible = ref(false);
 const loadingStageDetail = ref(false);
 const stageDetail = ref<OcrStageDetail>();
 const selectedStageKey = ref('');
+const reviewDialogVisible = ref(false);
+const loadingReview = ref(false);
+const submittingReview = ref(false);
+const reviewTask = ref<ProcessingTask>();
+const reviewDetail = ref<OcrReviewDetail>();
 
 const statusFilterOptions: Array<{
   label: string;
@@ -344,6 +357,52 @@ async function openStage(stageKey: string) {
   await loadStageDetail();
 }
 
+function canOpenReviewDialog(row: ProcessingTask) {
+  return ['finished', 'manual_review_required'].includes(row.status);
+}
+
+async function openReviewDialog(row: ProcessingTask) {
+  reviewTask.value = row;
+  reviewDetail.value = undefined;
+  reviewDialogVisible.value = true;
+  loadingReview.value = true;
+  try {
+    reviewDetail.value = await getOcrReview(row.id);
+  } finally {
+    loadingReview.value = false;
+  }
+}
+
+async function submitReviewDialog() {
+  if (!reviewTask.value || !reviewDetail.value) {
+    return;
+  }
+  submittingReview.value = true;
+  try {
+    renumberReviewParagraphs(reviewDetail.value.draftContent);
+    await submitOcrReview(reviewTask.value.id, reviewDetail.value.draftContent);
+    ElMessage.success('已提交复核内容，将重新打标签并重建向量');
+    reviewDialogVisible.value = false;
+    await loadTasks();
+  } finally {
+    submittingReview.value = false;
+  }
+}
+
+function renumberReviewParagraphs(content: OcrReviewDraftContent) {
+  content.paragraphs.forEach((paragraph, index) => {
+    paragraph.paragraphNo = index + 1;
+  });
+  content.paragraphCount = content.paragraphs.length;
+  if (content.metrics) {
+    content.metrics.paragraphCount = content.paragraphs.length;
+    content.metrics.warningCount = content.paragraphs.reduce(
+      (total, item) => total + item.warnings.length,
+      0,
+    );
+  }
+}
+
 async function loadStageDetail() {
   if (!selectedTask.value) {
     return;
@@ -598,17 +657,25 @@ function formatDateTime(value?: string) {
               fixed="right"
               label="操作"
               resizable
-              width="150"
+              width="220"
             >
               <template #default="{ row }">
                 <div class="table-actions" @click.stop>
+                  <ElButton
+                    v-if="canOpenReviewDialog(row)"
+                    link
+                    type="primary"
+                    @click="openReviewDialog(row)"
+                  >
+                    {{ row.status === 'finished' ? '重新打标' : '复核' }}
+                  </ElButton>
                   <ElButton
                     v-if="row.status === 'manual_review_required'"
                     link
                     type="primary"
                     @click="openReview(row)"
                   >
-                    复核
+                    复核页
                   </ElButton>
                   <ElPopconfirm
                     title="确认删除该任务？"
@@ -857,6 +924,85 @@ function formatDateTime(value?: string) {
           />
         </ElTable>
       </ElDialog>
+
+      <ElDialog
+        v-model="reviewDialogVisible"
+        :close-on-click-modal="false"
+        width="980px"
+      >
+        <template #header>
+          <div class="dialog-header">
+            <span>复核并重新打标签</span>
+            <ElPopconfirm
+              title="确认使用当前复核内容重新打标签并重建向量？"
+              @confirm="submitReviewDialog"
+            >
+              <template #reference>
+                <ElButton
+                  :disabled="!reviewDetail"
+                  :loading="submittingReview"
+                  size="small"
+                  type="primary"
+                >
+                  确认重新打标签
+                </ElButton>
+              </template>
+            </ElPopconfirm>
+          </div>
+        </template>
+
+        <div v-loading="loadingReview" class="review-dialog-body">
+          <template v-if="reviewDetail">
+            <div class="review-summary">
+              <div>
+                <span>任务</span>
+                <strong>{{ reviewTask?.fileName ?? reviewTask?.id ?? '-' }}</strong>
+              </div>
+              <div>
+                <span>段落</span>
+                <strong>{{ reviewDetail.draftContent.paragraphCount }}</strong>
+              </div>
+              <div>
+                <span>警告</span>
+                <strong>{{ reviewDetail.warningCount }}</strong>
+              </div>
+              <div>
+                <span>复核状态</span>
+                <strong>{{ reviewDetail.status }}</strong>
+              </div>
+            </div>
+
+            <div class="review-paragraphs">
+              <article
+                v-for="paragraph in reviewDetail.draftContent.paragraphs"
+                :key="paragraph.paragraphNo"
+                class="review-paragraph"
+              >
+                <div class="paragraph-meta">
+                  <strong>#{{ paragraph.paragraphNo }}</strong>
+                  <span>第 {{ formatNumberList(paragraph.sourcePages) }} 页</span>
+                  <span>{{ paragraph.text.length }} 字</span>
+                  <ElTag
+                    v-if="paragraph.warnings.length > 0"
+                    effect="plain"
+                    size="small"
+                    type="warning"
+                  >
+                    {{ paragraph.warnings.length }} 个警告
+                  </ElTag>
+                </div>
+                <ElInput
+                  v-model="paragraph.text"
+                  :autosize="{ minRows: 3, maxRows: 8 }"
+                  type="textarea"
+                />
+              </article>
+            </div>
+          </template>
+
+          <ElEmpty v-else description="暂无复核内容" />
+        </div>
+      </ElDialog>
     </div>
   </Page>
 </template>
@@ -1013,6 +1159,7 @@ function formatDateTime(value?: string) {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -1130,6 +1277,69 @@ function formatDateTime(value?: string) {
   white-space: pre-wrap;
 }
 
+.review-dialog-body {
+  min-height: 220px;
+}
+
+.review-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.review-summary div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+}
+
+.review-summary span {
+  display: block;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+
+.review-summary strong {
+  display: block;
+  min-width: 0;
+  margin-top: 6px;
+  overflow: hidden;
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-paragraphs {
+  display: grid;
+  max-height: 620px;
+  gap: 10px;
+  overflow: auto;
+}
+
+.review-paragraph {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  background: hsl(var(--background));
+}
+
+.paragraph-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+}
+
+.paragraph-meta strong {
+  color: hsl(var(--foreground));
+}
+
 @media (max-width: 1200px) {
   .overview-band {
     grid-template-columns: repeat(3, minmax(120px, 1fr));
@@ -1142,7 +1352,8 @@ function formatDateTime(value?: string) {
 
 @media (max-width: 768px) {
   .overview-band,
-  .pipeline-band {
+  .pipeline-band,
+  .review-summary {
     grid-template-columns: 1fr;
   }
 }
