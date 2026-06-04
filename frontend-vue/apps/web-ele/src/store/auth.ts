@@ -13,6 +13,10 @@ import { defineStore } from 'pinia';
 import { getAccessCodesApi, getUserInfoApi, loginApi, logoutApi } from '#/api';
 import { $t } from '#/locales';
 
+interface LogoutOptions {
+  remote?: boolean;
+}
+
 export const useAuthStore = defineStore('auth', () => {
   const accessStore = useAccessStore();
   const userStore = useUserStore();
@@ -78,12 +82,18 @@ export const useAuthStore = defineStore('auth', () => {
     };
   }
 
-  async function logout(redirect: boolean = true) {
-    try {
-      await logoutApi();
-    } catch {
-      // 不做任何处理
+  async function logout(redirect: boolean = true, options: LogoutOptions = {}) {
+    const { remote = true } = options;
+    const accessToken = accessStore.accessToken;
+
+    if (remote) {
+      try {
+        await logoutApi(accessToken);
+      } catch {
+        // 不做任何处理
+      }
     }
+
     resetAllStores();
     accessStore.setLoginExpired(false);
 

@@ -14,4 +14,4 @@ else
 fi
 
 cd "$FRONTEND_DIR"
-exec "$PNPM" dev:ele --host "${FRONTEND_HOST:-0.0.0.0}"
+exec "$PNPM" dev:ele --host

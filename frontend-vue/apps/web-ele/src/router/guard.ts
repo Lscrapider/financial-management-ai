@@ -108,7 +108,7 @@ function setupAccessGuard(router: Router) {
         routes: accessRoutes,
       }));
     } catch {
-      await authStore.logout();
+      await authStore.logout(true, { remote: false });
       return false;
     }
 
