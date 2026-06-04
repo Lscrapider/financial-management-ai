@@ -18,18 +18,19 @@
 
 项目文档统一放在 `docs/` 目录：
 
-| 文档 | 说明 |
-| --- | --- |
-| [docs/REPORT_PIPELINE.md](./docs/REPORT_PIPELINE.md) | AI 分析报告全链路实现说明。 |
-| [docs/img/架构图.png](./docs/img/架构图.png) | 系统架构图。 |
-| [docs/img/report流程图.png](./docs/img/report流程图.png) | 分析报告流程图。 |
-| [docs/img/报告示例图.jpg](./docs/img/报告示例图.jpg) | 报告页面效果示例图。 |
+| 文档 | 说明                                                                              |
+| --- |---------------------------------------------------------------------------------|
+| [docs/REPORT_PIPELINE.md](./docs/REPORT_PIPELINE.md) | AI 分析报告全链路实现说明。                                                                 |
+| [docs/img/架构图.png](./docs/img/架构图.png) | 系统架构图。                                                                          |
+| [docs/img/report流程图.png](./docs/img/report流程图.png) | 分析报告流程图。                                                                        |
+| [docs/img/报告示例图.jpg](./docs/img/报告示例图.jpg) | 报告页面效果示例图。                                                                      |
 | [docs/OCR_PIPELINE.md](./docs/OCR_PIPELINE.md) | OCR 全链路实现说明，包括 Java/Python 边界、RabbitMQ 队列、阶段消息、MinIO 产物、人工复核、chunk 打标、软删除和向量入库。 |
-| [docs/API_DOCUMENTATION.md](./docs/API_DOCUMENTATION.md) | 后端接口文档，记录主要 API 的请求方式、请求参数和响应结构。 |
-| [docs/COMPLETED_REQUIREMENTS.md](./docs/COMPLETED_REQUIREMENTS.md) | 已完成需求记录，用于追踪阶段性功能交付情况。 |
-| [docs/CODEX_GUIDELINES.md](./docs/CODEX_GUIDELINES.md) | 写代码、改代码和审查代码时需要遵守的协作与代码规范。 |
-| [docs/chunk入库打标签文档.md](./docs/chunk入库打标签文档.md) | Chunk 场景标签规则和 LLM 打标方案。 |
-| [docs/标的标签计算规则2.md](./docs/标的标签计算规则2.md) | 标的标签计算规则。 |
+| [docs/API_DOCUMENTATION.md](./docs/API_DOCUMENTATION.md) | 后端接口文档，记录主要 API 的请求方式、请求参数和响应结构。                                                |
+| [docs/COMPLETED_REQUIREMENTS.md](./docs/COMPLETED_REQUIREMENTS.md) | 已完成需求记录，用于追踪阶段性功能交付情况。                                                          |
+| [docs/CODEX_GUIDELINES.md](./docs/CODEX_GUIDELINES.md) | 写代码、改代码和审查代码时需要遵守的协作与代码规范。                                                      |
+| [docs/chunk入库打标签文档.md](./docs/chunk入库打标签文档.md) | Chunk 场景标签规则和 LLM 打标方案。                                                         |
+| [docs/标的标签计算规则.md](docs/标的标签计算规则.md) | 标的标签计算规则。                                                                       |
+| [docs/FUTURE_WORK.md](./docs/FUTURE_WORK.md) | 后续能力建设和需求。                                                                      |
 
 模块内文档：
 
@@ -312,30 +313,6 @@ OCR 详细阶段、消息体、产物目录和人工复核规则见 [docs/OCR_PI
 - 前后端接口返回结构保持清晰、可追踪、可扩展。
 - 所有模型输出都需要保留引用依据，避免只有结论没有来源。
 - 原始数据、扫描件、模型文件、日志文件不提交到 Git。
-
-## 后续建设计划
-
-1. ✅ 初始化 Java Spring Boot 项目。
-2. ✅ 初始化 Python RabbitMQ Worker 项目。
-3. ✅ 初始化 Vue 3 前端项目。
-4. ✅ 配置 PostgreSQL 和 pgvector。
-5. ✅ 设计行情数据表、知识库表、向量表和分析结果表。
-6. ✅ 接入股票/指数/可转债行情 API。
-7. ✅ 完成扫描件 OCR 到向量库的全链路处理（8 阶段 RabbitMQ 串联）。
-8. ✅ 完成 AI Chat 结构化分析接口。
-9. ✅ 完成前端行情展示（行情总览/指数行情/可转债行情/投资观察池）。
-10. ✅ 完成 AI 中心（知识库处理队列 + 人工复核）。
-11. ✅ 完成知识库浏览、股票预警、控制台指标。
-12. ✅ 完成 Chunk 场景标签系统（规则打标 → LLM 打标 → 标签回正）。
-13. ✅ 完成知识库页面场景标签展示。
-14. ✅ 完成知识库概览页面和手动知识导入页面。
-15. ✅ 完成投资分析报告生成、RAG 召回、历史查询、重新生成和前端展示。
-16. 优化报告计算参数，扩展参数考虑范围，提升不同市场场景下的召回和结论稳定性。
-17. 建立报告准确度测试与复盘机制，持续评估结论、引用依据和风险提示质量。
-18. 尝试接入新闻、政策、机构观点等外部数据源，增强报告可用度。
-19. 扩展报告生成覆盖可转债，完善可转债估值、转股溢价、评级、正股联动等分析维度。
-20. 增加更多财务指标数据源。
-21. 优化 AI Chat 上下文策略和反问能力。
 
 ## License
 

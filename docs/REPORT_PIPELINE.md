@@ -2108,30 +2108,26 @@ trend 类按 final_score 排序后取 Top 1
 }
 ```
 
-每个进入 `knowledgeContext` 的 chunk 建议保留以下字段：
+报告生成阶段交给 LLM 的 `knowledgeContext` 只保留报告分析和引用所需字段：
 
 ```json
 {
   "chunkId": 123,
-  "taskNo": "ocr-xxx",
-  "chunkIndex": 4,
-  "category": "risk_strategy",
+  "scene": "risk_strategy",
   "text": "接近高位时不要只看涨幅，需要等待确认。",
-  "matchedTags": ["chase_high_risk", "wait_confirm"],
-  "semanticScore": 0.82,
-  "tagMatchScore": 1.0,
-  "crossSceneScore": 0.3,
-  "finalScore": 0.849
+  "matchedTags": ["chase_high_risk", "wait_confirm"]
 }
 ```
+
+`taskNo`、`chunkIndex`、`semanticScore`、`tagMatchScore`、`crossSceneScore`、`finalScore` 不进入 LLM 输入。这些字段是检索流水线内部定位和调参字段，应保存在内部 payload 或日志中，用于排查、审计、复盘和后续参数优化。
 
 这样设计的好处是：
 
 ```text
 1. LLM 可以清楚知道每段知识属于哪个分析维度。
-2. 前端可以按成交量、风险、价格、估值等类别展示引用依据。
+2. LLM 只看到可用于报告生成的文本、场景和标签，不会把检索分数误当作结论置信度。
 3. 报告不会变成一堆无结构的知识片段拼接。
-4. 后续复盘时可以知道当时报告主要依赖哪些类别的知识。
+4. 系统内部仍可保留完整检索调试字段，支持后续复盘和参数优化。
 ```
 
 `knowledgeContext` 是报告生成阶段交给 LLM 的主要知识输入。
@@ -2227,24 +2223,16 @@ chunkTags = chunk.metadata.scenes.risk_strategy
     "volume": [
       {
         "chunkId": 101,
-        "category": "volume",
+        "scene": "volume",
         "matchedTags": ["volume_expand"],
-        "semanticScore": 0.86,
-        "tagMatchScore": 0.33,
-        "crossSceneScore": 0.30,
-        "finalScore": 0.597,
         "text": "放量上涨后需要观察成交量是否持续，不能只看当天涨幅。"
       }
     ],
     "risk_strategy": [
       {
         "chunkId": 205,
-        "category": "risk_strategy",
+        "scene": "risk_strategy",
         "matchedTags": ["chase_high_risk", "wait_confirm"],
-        "semanticScore": 0.82,
-        "tagMatchScore": 1.00,
-        "crossSceneScore": 0.30,
-        "finalScore": 0.849,
         "text": "接近高位时不要只看涨幅，需要等待确认。"
       }
     ]
@@ -2252,7 +2240,7 @@ chunkTags = chunk.metadata.scenes.risk_strategy
 }
 ```
 
-这个结果会作为结构化知识上下文传给 LLM，用于生成最终报告。
+这个结果会作为结构化知识上下文传给 LLM，用于生成最终报告。完整检索结果可以在内部保留 `taskNo`、`chunkIndex` 和各类 score，但不作为 LLM 输入。
 
 ---
 
@@ -2264,34 +2252,114 @@ chunkTags = chunk.metadata.scenes.risk_strategy
 LLM 输入不应只是用户问题，而应包含完整结构化上下文：
 
 ```text
-target
 marketContext
 currentScenes
 knowledgeContext
-outputRequirement
 ```
+
+其中 `marketContext` 表示客观市场事实和压缩后的行情特征，`currentScenes` 表示 Python 计算后的场景标签、解释和计算结果，`knowledgeContext` 表示 Java RAG 召回并重排后的知识库片段。
+
+`chunkAllocation`、`retrievalTasks`、`retrievalEmbeddings`、检索分数和原始任务定位字段属于内部流水线数据，不进入最终 LLM 上下文。
 
 ---
 
 ### 7.2 marketContext 结构
 
-示例：
+`marketContext` 由 Python 统一计算并回调 Java，避免 Java 和 Python 对行情、分时、K 线特征各算一套导致口径漂移。
+
+第一版先拆成三块：
+
+```text
+snapshot
+intraday
+dailyKline
+```
+
+`marketContext` 只放客观事实、原始数值和压缩后的客观特征，不放场景标签、投资建议、风险判断或“看多/看空”等解释性结论。
+
+示例结构：
 
 ```json
 {
-  "latestPrice": 3.21,
-  "changePercent": 4.8,
-  "turnoverRate": 6.2,
-  "volume": 12345678,
-  "pe": 6.8,
-  "pb": 0.55,
-  "syncedAt": "2026-05-31 10:30:00"
+  "snapshot": {
+    "targetType": "STOCK",
+    "targetCode": "000001",
+    "targetName": "平安银行",
+    "secid": "0.000001",
+    "latestPrice": 12.34,
+    "changeAmount": 0.56,
+    "changePercent": 4.76,
+    "openPrice": 11.8,
+    "highPrice": 12.5,
+    "lowPrice": 11.72,
+    "previousClosePrice": 11.78,
+    "volume": 123456789,
+    "turnoverAmount": 2345678901,
+    "turnoverRate": 3.21,
+    "amplitude": 6.62,
+    "syncedAt": "2026-06-04 14:55:00"
+  },
+  "intraday": {
+    "available": true,
+    "window": "latest_trading_day",
+    "points": 241,
+    "openToLatestPct": 3.8,
+    "highTime": "10:34",
+    "lowTime": "09:42",
+    "latestPositionInDayRange": 0.82,
+    "morningReturnPct": 2.1,
+    "afternoonReturnPct": 1.6,
+    "volumeConcentration": {
+      "first30MinPct": 28.4,
+      "last30MinPct": 18.2
+    },
+    "pathFeatures": [
+      {
+        "startTime": "09:30",
+        "endTime": "10:35",
+        "direction": "up",
+        "returnPct": 3.2,
+        "durationMinutes": 65
+      }
+    ]
+  },
+  "dailyKline": {
+    "windowDays": 120,
+    "availableDays": 118,
+    "startDate": "2025-12-01",
+    "endDate": "2026-06-04",
+    "latestClose": 12.34,
+    "windowHigh": 13.2,
+    "windowLow": 9.8,
+    "returnPct": 18.4,
+    "maxDrawdownPct": -12.6,
+    "volatilityPct": 2.1,
+    "distanceToHighPct": -6.5,
+    "distanceToLowPct": 25.9,
+    "movingAverages": {
+      "ma5": 12.1,
+      "ma20": 11.5,
+      "ma60": 10.8
+    },
+    "pathFeatures": {
+      "method": "zigzag",
+      "reversalThresholdPct": 8,
+      "turningPoints": [],
+      "segments": []
+    }
+  }
 }
 ```
+
+分时线和 K 线不把完整点位数组直接传给 LLM，只传压缩后的摘要、位置、路径和统计特征。趋势标签和解释进入 `currentScenes`，不要写入 `marketContext`。
 
 ---
 
 ### 7.3 currentScenes 结构
+
+LLM 输入版 `currentScenes` 只保留 Python 计算后的场景结论和解释依据：`score`、`level`、`direction`、`tags`、`evidence`。
+
+`queryText` 是检索 embedding 使用的内部字段，不进入 LLM 输入。`evidence` 才是给 LLM 和报告解释使用的标签触发依据。
 
 示例：
 
@@ -2339,6 +2407,8 @@ outputRequirement
 }
 ```
 
+如果内部 `currentScenesPayload` 中包含 `queryText`，报告生成前需要裁剪掉该字段。
+
 ---
 
 ### 7.4 knowledgeContext 结构
@@ -2347,14 +2417,32 @@ outputRequirement
 
 ```json
 {
-  "volume": [],
-  "risk_strategy": [],
-  "price": [],
-  "valuation": [],
-  "sentiment": [],
-  "trend": []
+  "knowledgeContext": {
+    "volume": [
+      {
+        "chunkId": 101,
+        "scene": "volume",
+        "text": "放量上涨后需要观察成交量是否持续，不能只看当天涨幅。",
+        "matchedTags": ["volume_expand"]
+      }
+    ],
+    "risk_strategy": [
+      {
+        "chunkId": 205,
+        "scene": "risk_strategy",
+        "text": "接近高位时不要只看涨幅，需要等待确认。",
+        "matchedTags": ["chase_high_risk", "wait_confirm"]
+      }
+    ],
+    "price": [],
+    "valuation": [],
+    "sentiment": [],
+    "trend": []
+  }
 }
 ```
+
+LLM 输入版 `knowledgeContext` 不包含 `taskNo`、`chunkIndex`、`semanticScore`、`tagMatchScore`、`crossSceneScore`、`finalScore`。
 
 ---
 
@@ -2409,17 +2497,27 @@ Prompt 要求：
 
 ### 7.8 报告保存内容
 
-报告保存时建议保存：
+报告保存时建议至少保存本次 LLM 输入快照：
 
 ```text
 marketContext
 currentScenes
-chunkAllocation
 knowledgeContext
 reportContent
 model
 createdAt
 ```
+
+内部检索审计快照可以额外保存：
+
+```text
+chunkAllocation
+retrievalTasks
+retrievalEmbeddings
+knowledgeContextInternal
+```
+
+保存内容可以比 LLM 输入更完整，但最终传给 LLM 的报告上下文只保留 `marketContext`、`currentScenes`、`knowledgeContext`。
 
 这样后续可以复盘：
 
