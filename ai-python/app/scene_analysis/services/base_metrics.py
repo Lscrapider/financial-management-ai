@@ -91,9 +91,9 @@ class BaseMetricsCalculator:
         values["daily_count"] = len(klines)
         self._put(values, "current_price", current_price)
         self._put(values, "current_volume", current_volume)
-        values["ma5"] = self._mean_last(closes, 5)
-        values["ma10"] = self._mean_last(closes, 10)
-        values["ma20"] = self._mean_last(closes, 20)
+        values["ma5"] = self._kline_ma(klines, "ma5", closes, 5)
+        values["ma10"] = self._kline_ma(klines, "ma10", closes, 10)
+        values["ma20"] = self._kline_ma(klines, "ma20", closes, 20)
         values["recent_high_20d"] = self._max_last(highs, 20)
         values["recent_low_20d"] = self._min_last(lows, 20)
         values["prev_high_20d"] = self._max_last(highs[:-1], 20)
@@ -327,6 +327,19 @@ class BaseMetricsCalculator:
         if not isinstance(value, list):
             return []
         return self._numbers(value)
+
+    def _kline_ma(
+        self,
+        klines: list[dict[str, Any]],
+        key: str,
+        closes: list[float],
+        window: int,
+    ) -> float | None:
+        if klines:
+            value = self._number(klines[-1].get(key))
+            if value is not None:
+                return value
+        return self._mean_last(closes, window)
 
     def _mean_last(self, values: list[float], window: int) -> float | None:
         if len(values) < window:

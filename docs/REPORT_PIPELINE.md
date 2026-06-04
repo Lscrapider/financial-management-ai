@@ -550,11 +550,11 @@ Chunk 入库时，推荐 metadata 结构如下：
 | `pullback` | 回调 | 日K / 周K / 月K | 文本讨论上涨后的回调、回踩、调整，且原趋势尚未明显破坏。 |
 | `repair` | 修复 | 周K / 月K优先，日K可用 | 文本讨论下跌或弱势之后企稳、跌幅收敛、缓慢回升、修复结构等。 |
 | `breakout_from_range` | 横盘突破 | 日K / 周K / 月K | 文本讨论长期横盘后突破、箱体突破、平台突破等。 |
-| `breakdown` | 破位 | 日K / 周K / 月K | 文本讨论横盘或支撑之后向下脱离区间、跌破平台、跌破关键支撑等。 |
+| `breakdown_from_range` | 区间破位 | 日K / 周K / 月K | 文本讨论横盘或支撑之后向下脱离区间、跌破平台、跌破关键支撑等。 |
 | `trend_reversal` | 趋势反转 | 日K / 周K / 月K | 文本讨论趋势由弱转强、由强转弱、反转信号、拐点等。 |
 | `continuation` | 趋势延续 | 日K / 周K / 月K | 文本讨论前序趋势和当前趋势方向一致、上涨延续、下跌延续、趋势继续等。 |
-| `weakening` | 趋势转弱 | 周K / 月K优先，日K可用 | 文本讨论上涨后动能衰减、上攻乏力、跌破支撑、趋势开始走弱等。 |
-| `strengthening` | 趋势转强 | 周K / 月K优先，日K可用 | 文本讨论下跌或横盘后重心抬升、走势转强、弱势改善、开始抬升等。 |
+| `turn_weak` | 转弱 | 周K / 月K优先，日K可用 | 文本讨论上涨后动能衰减、上攻乏力、跌破支撑、趋势开始走弱等。 |
+| `turn_strong` | 转强 | 周K / 月K优先，日K可用 | 文本讨论下跌或横盘后重心抬升、走势转强、弱势改善、开始抬升等。 |
 | `failed_breakout` | 假突破 / 突破失败 | 日K / 周K / 月K | 文本讨论假突破、突破后回落、站不上去、冲高失败等。 |
 
 #### 3.8.5 valuation：估值 / 基本面标签
@@ -869,11 +869,11 @@ range_bound
 rebound
 pullback
 repair
-breakdown
+breakdown_from_range
 trend_reversal
 continuation
-weakening
-strengthening
+turn_weak
+turn_strong
 breakout_from_range
 failed_breakout
 ```

@@ -80,12 +80,14 @@ LLM 标签用于理解规则难以判断的语义场景。
 ```json
 {
   "price": ["price_rise"],
-  "trend": ["breakout"],
+  "trend": ["breakout_from_range"],
   "risk_strategy": ["wait_confirm", "observe_next_day"]
 }
 ```
 
 LLM 标签生成时，需要把 3.8 中定义的标签白名单和判断规则放入 prompt 中。LLM 只能从白名单中选择标签，不能创造新标签。
+
+`trend` 类当前白名单为 13 个标签：`uptrend`、`downtrend`、`range_bound`、`rebound`、`pullback`、`repair`、`trend_reversal`、`breakout_from_range`、`breakdown_from_range`、`continuation`、`turn_weak`、`turn_strong`、`failed_breakout`。规则标签、LLM 标签和标签回正必须使用同一套标准命名。
 
 ### 2.3 标签回正
 

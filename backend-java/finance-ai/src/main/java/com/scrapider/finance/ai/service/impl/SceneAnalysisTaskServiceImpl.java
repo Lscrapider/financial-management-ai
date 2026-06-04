@@ -59,9 +59,12 @@ import org.springframework.stereotype.Service;
 @Service
 public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
 
-    private static final int DAILY_KLINE_LIMIT = 250;
-    private static final int WEEKLY_KLINE_LIMIT = 250;
-    private static final int MONTHLY_KLINE_LIMIT = 250;
+    private static final int MARKET_DAILY_KLINE_LIMIT = 250;
+    private static final int DEFAULT_STOCK_DAILY_KLINE_LIMIT = 90;
+    private static final int DEFAULT_STOCK_WEEKLY_KLINE_LIMIT = 52;
+    private static final int DEFAULT_STOCK_MONTHLY_KLINE_LIMIT = 60;
+    private static final int MIN_STOCK_DAILY_KLINE_LIMIT = 60;
+    private static final int MAX_STOCK_KLINE_LIMIT = 250;
     private static final int INTRADAY_LIMIT = 240;
     private static final List<String> MESSAGE_OMITTED_FIELDS =
             List.of("id", "rawResponse", "createdAt", "updatedAt");
@@ -215,25 +218,26 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
                         config == null ? null : config.getExchangeCode()));
         StockSceneDataDTO sceneData = this.queryStockSceneData(config, missing);
         List<Map<String, Object>> intraday = this.queryStockIntraday(stockCode, missing);
+        StockKlineLimits klineLimits = this.stockKlineLimits(param);
         List<Map<String, Object>> dailyKlines =
                 this.fillDailyTurnoverRate(
                         this.queryStockKlines(
                                 stockCode,
                                 KlinePeriodTypeEnum.DAILY,
-                                DAILY_KLINE_LIMIT,
+                                klineLimits.daily(),
                                 "stock_daily_kline",
                                 missing),
                         sceneData.valuationHistory());
         List<Map<String, Object>> weeklyKlines = this.queryStockKlines(
                 stockCode,
                 KlinePeriodTypeEnum.WEEKLY,
-                WEEKLY_KLINE_LIMIT,
+                klineLimits.weekly(),
                 "stock_weekly_kline",
                 missing);
         List<Map<String, Object>> monthlyKlines = this.queryStockKlines(
                 stockCode,
                 KlinePeriodTypeEnum.MONTHLY,
-                MONTHLY_KLINE_LIMIT,
+                klineLimits.monthly(),
                 "stock_monthly_kline",
                 missing);
         return this.message(
@@ -282,7 +286,7 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
                         quote == null ? null : quote.getExchangeCode(),
                         config == null ? null : config.getExchangeCode()));
         List<Map<String, Object>> dailyKlines = this.indexDailyKlineManage
-                .listDailyKlines(indexCode, null, null, null, DAILY_KLINE_LIMIT)
+                .listDailyKlines(indexCode, null, null, null, MARKET_DAILY_KLINE_LIMIT)
                 .stream()
                 .map(this::toMap)
                 .toList();
@@ -335,7 +339,7 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
                         quote == null ? null : quote.getExchangeCode(),
                         config == null ? null : config.getExchangeCode()));
         List<Map<String, Object>> dailyKlines = this.bondDailyKlineManage
-                .listDailyKlines(bondCode, null, null, null, DAILY_KLINE_LIMIT)
+                .listDailyKlines(bondCode, null, null, null, MARKET_DAILY_KLINE_LIMIT)
                 .stream()
                 .map(this::toMap)
                 .toList();
@@ -429,6 +433,21 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
             missing.add("stock_intraday_trend");
         }
         return rows;
+    }
+
+    private StockKlineLimits stockKlineLimits(SceneAnalysisSubmitParam param) {
+        return new StockKlineLimits(
+                this.klineLimit(
+                        param.dailyKlineLimit(),
+                        DEFAULT_STOCK_DAILY_KLINE_LIMIT,
+                        MIN_STOCK_DAILY_KLINE_LIMIT),
+                this.klineLimit(param.weeklyKlineLimit(), DEFAULT_STOCK_WEEKLY_KLINE_LIMIT, 1),
+                this.klineLimit(param.monthlyKlineLimit(), DEFAULT_STOCK_MONTHLY_KLINE_LIMIT, 1));
+    }
+
+    private int klineLimit(Integer value, int defaultValue, int minValue) {
+        int limit = value == null || value <= 0 ? defaultValue : value;
+        return Math.min(Math.max(limit, minValue), MAX_STOCK_KLINE_LIMIT);
     }
 
     private List<Map<String, Object>> queryStockKlines(
@@ -648,5 +667,8 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
             throw new IllegalArgumentException("login user id is unavailable", ex);
         }
         throw new IllegalArgumentException("login user id is unavailable");
+    }
+
+    private record StockKlineLimits(int daily, int weekly, int monthly) {
     }
 }

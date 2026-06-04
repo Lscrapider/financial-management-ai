@@ -1,5 +1,6 @@
 package com.scrapider.finance.ai.domain.param;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 public record SceneAnalysisCurrentScenesParam(
@@ -9,7 +10,9 @@ public record SceneAnalysisCurrentScenesParam(
         SceneAnalysisSceneModuleParam trend,
         SceneAnalysisSceneModuleParam valuation,
         SceneAnalysisSceneModuleParam sentiment,
-        @JsonProperty("risk_strategy") SceneAnalysisSceneModuleParam riskStrategy) {
+        @JsonProperty("riskStrategy")
+        @JsonAlias("risk_strategy")
+        SceneAnalysisSceneModuleParam riskStrategy) {
 
     public SceneAnalysisSceneModuleParam module(String scene) {
         return switch (scene) {

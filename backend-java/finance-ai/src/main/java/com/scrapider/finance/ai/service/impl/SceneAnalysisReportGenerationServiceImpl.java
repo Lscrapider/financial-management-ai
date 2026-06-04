@@ -249,6 +249,7 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
             this.copyIfPresent(module, sanitized, "direction");
             this.copyIfPresent(module, sanitized, "tags");
             this.copyIfPresent(module, sanitized, "evidence");
+            this.copyIfPresent(module, sanitized, "periodTrends");
         });
         return result;
     }

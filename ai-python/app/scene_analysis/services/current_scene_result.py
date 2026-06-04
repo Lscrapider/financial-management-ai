@@ -4,6 +4,10 @@ from typing import Any
 
 from app.scene_analysis.models import SceneModuleResult
 
+SCENE_OUTPUT_KEYS = {
+    "risk_strategy": "riskStrategy",
+}
+
 
 def build_current_scenes_payload(
     *,
@@ -22,12 +26,16 @@ def build_current_scenes_payload(
         "reportType": report_type,
         "totalChunks": total_chunks,
         "marketContext": market_context or {},
-        "currentScenes": {result.module: _module_payload(result) for result in module_results},
+        "currentScenes": {_scene_output_key(result.module): _module_payload(result) for result in module_results},
     }
 
 
+def _scene_output_key(module: str) -> str:
+    return SCENE_OUTPUT_KEYS.get(module, module)
+
+
 def _module_payload(result: SceneModuleResult) -> dict[str, Any]:
-    return {
+    payload = {
         "score": result.score,
         "level": result.level,
         "direction": result.direction,
@@ -35,3 +43,5 @@ def _module_payload(result: SceneModuleResult) -> dict[str, Any]:
         "evidence": result.evidence,
         "queryText": result.query_text(),
     }
+    payload.update(result.extra)
+    return payload

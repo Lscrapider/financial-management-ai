@@ -45,11 +45,36 @@ def main():
     tagger = load_tagger_class()()
     reviewed_json = build_reviewed_json(
         [
-            "在现有新股发行条件下，新股可能成为风险厌恶型投资者的选择。"
-                ]
+            "上涨后的回调属于趋势回踩，只要回踩不破，原趋势没有明显破坏。",
+            "下跌后企稳回升，跌幅收敛，属于弱势修复。",
+            "跌破平台并破位下行，关键支撑失守。",
+            "上涨延续，趋势继续上行。",
+            "上涨后动能衰减，上攻乏力，趋势开始走弱。",
+            "长期横盘后重心抬升，走势转强。",
+            "箱体突破后又站不上去，属于假突破。",
+        ]
     )
     result = tagger.tag(reviewed_json)
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    trend_tags = {
+        tag
+        for chunk in result["chunks"]
+        for tag in chunk["ruleScenes"]["trend"]
+    }
+    expected = {
+        "pullback",
+        "repair",
+        "breakdown_from_range",
+        "continuation",
+        "turn_weak",
+        "turn_strong",
+        "failed_breakout",
+    }
+    missing = expected - trend_tags
+    assert not missing, json.dumps(
+        {"missing": sorted(missing), "trendTags": sorted(trend_tags)},
+        ensure_ascii=False,
+    )
+    print("chunk rule tagger test passed")
 
 
 if __name__ == "__main__":

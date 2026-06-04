@@ -6,6 +6,9 @@ public record SceneAnalysisSubmitParam(
         String targetName,
         String reportType,
         Integer totalChunks,
+        Integer dailyKlineLimit,
+        Integer weeklyKlineLimit,
+        Integer monthlyKlineLimit,
         String configProfile,
         SceneAnalysisUserConfigParam userOverrides) {
 }

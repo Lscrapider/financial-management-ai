@@ -209,7 +209,7 @@ Python embedding.index
 | `asset` | 资产类型，例如通用经验、股票、指数、可转债、基金、银行股、低价股等 |
 | `price` | 价格位置，例如上涨、下跌、横盘、接近高位、突破、回调等 |
 | `volume` | 成交量 / 换手，例如放量、缩量、高换手、量价配合、量价背离等 |
-| `trend` | 趋势结构，例如上升趋势、下降趋势、区间震荡、反弹、趋势反转等 |
+| `trend` | 趋势结构，例如上升趋势、下降趋势、区间震荡、反弹、回调、修复、突破、破位、趋势反转、延续、转弱、转强、假突破等 |
 | `valuation` | 估值 / 基本面，例如低 PE、低 PB、高股息、估值陷阱、基本面风险等 |
 | `sentiment` | 情绪 / 异动，例如短线情绪、消息驱动、板块轮动、机构行为等 |
 | `risk_strategy` | 风险 / 策略，例如追高风险、仓位控制、等待确认、止盈止损等 |
@@ -240,6 +240,8 @@ embedding.index
 ```
 
 不满足条件的 chunk 才进入 `chunk.tag.llm`。LLM 只能从标签白名单选择标签，不能创造新标签。
+
+`trend` 类白名单包含 13 个标签：`uptrend`、`downtrend`、`range_bound`、`rebound`、`pullback`、`repair`、`trend_reversal`、`breakout_from_range`、`breakdown_from_range`、`continuation`、`turn_weak`、`turn_strong`、`failed_breakout`。规则标签器和 LLM prompt 必须与该白名单保持一致。
 
 `chunk.tag.correct` 是标签进入向量库前的统一出口：
 

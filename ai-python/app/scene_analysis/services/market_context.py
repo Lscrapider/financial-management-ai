@@ -4,16 +4,20 @@ from math import sqrt
 from statistics import mean
 from typing import Any
 
+from app.scene_analysis.services.trend_kline_analysis import TrendKlineAnalyzer
+
 
 class MarketContextBuilder:
-    DAILY_KLINE_WINDOW = 120
     ZIGZAG_REVERSAL_THRESHOLD_PCT = 8.0
+
+    def __init__(self, analyzer: TrendKlineAnalyzer | None = None) -> None:
+        self._analyzer = analyzer or TrendKlineAnalyzer()
 
     def build(self, message: dict[str, Any]) -> dict[str, Any]:
         return {
             "snapshot": self._snapshot(message),
             "intraday": self._intraday(message),
-            "dailyKline": self._daily_kline(message),
+            "klineTrends": self._kline_trends(message),
         }
 
     def _snapshot(self, message: dict[str, Any]) -> dict[str, Any]:
@@ -80,20 +84,22 @@ class MarketContextBuilder:
 
     def _daily_kline(self, message: dict[str, Any]) -> dict[str, Any]:
         rows = self._sorted_rows(self._list(message.get("dailyKlines")), ("tradeDate",))
-        rows = rows[-self.DAILY_KLINE_WINDOW:]
         points = [
             {
                 "date": row.get("tradeDate"),
                 "close": self._number(row.get("closePrice")),
                 "high": self._number(row.get("highPrice")),
                 "low": self._number(row.get("lowPrice")),
+                "ma5": self._number(row.get("ma5")),
+                "ma10": self._number(row.get("ma10")),
+                "ma20": self._number(row.get("ma20")),
             }
             for row in rows
         ]
         points = [point for point in points if point["date"] and point["close"] is not None]
         if not points:
             return {
-                "windowDays": self.DAILY_KLINE_WINDOW,
+                "windowDays": 0,
                 "availableDays": 0,
                 "pathFeatures": self._empty_zigzag(),
             }
@@ -105,7 +111,7 @@ class MarketContextBuilder:
         window_high = max(highs or closes)
         window_low = min(lows or closes)
         result = {
-            "windowDays": self.DAILY_KLINE_WINDOW,
+            "windowDays": len(points),
             "availableDays": len(points),
             "startDate": points[0]["date"],
             "endDate": points[-1]["date"],
@@ -117,10 +123,29 @@ class MarketContextBuilder:
             "volatilityPct": self._volatility_pct(closes),
             "distanceToHighPct": self._distance_pct(latest_close, window_high),
             "distanceToLowPct": self._distance_pct(latest_close, window_low),
-            "movingAverages": self._moving_averages(closes),
+            "movingAverages": self._moving_averages(points, closes),
             "pathFeatures": self._zigzag_path_features(points),
         }
         return self._compact(result)
+
+    def _kline_trends(self, message: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "daily": self._market_kline_context(
+                self._analyzer.analyze("daily", self._list(message.get("dailyKlines"))),
+            ),
+            "weekly": self._market_kline_context(
+                self._analyzer.analyze("weekly", self._list(message.get("weeklyKlines"))),
+            ),
+            "monthly": self._market_kline_context(
+                self._analyzer.analyze("monthly", self._list(message.get("monthlyKlines"))),
+            ),
+        }
+
+    def _market_kline_context(self, trend: dict[str, Any]) -> dict[str, Any]:
+        context = dict(self._dict(trend.get("context")))
+        context.pop("latestSegment", None)
+        context.pop("previousSegment", None)
+        return context
 
     def _intraday_path_features(self, points: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if len(points) < 2:
@@ -219,12 +244,17 @@ class MarketContextBuilder:
             "segments": [],
         }
 
-    def _moving_averages(self, closes: list[float]) -> dict[str, float]:
+    def _moving_averages(self, points: list[dict[str, Any]], closes: list[float]) -> dict[str, float]:
+        latest = points[-1] if points else {}
         return self._compact({
-            "ma5": self._mean_last(closes, 5),
-            "ma20": self._mean_last(closes, 20),
+            "ma5": self._value_or_default(latest.get("ma5"), self._mean_last(closes, 5)),
+            "ma10": self._value_or_default(latest.get("ma10"), self._mean_last(closes, 10)),
+            "ma20": self._value_or_default(latest.get("ma20"), self._mean_last(closes, 20)),
             "ma60": self._mean_last(closes, 60),
         })
+
+    def _value_or_default(self, value: float | None, default: float | None) -> float | None:
+        return value if value is not None else default
 
     def _volume_concentration(self, points: list[dict[str, Any]]) -> dict[str, float]:
         volumes = [point["volume"] for point in points if point["volume"] is not None]

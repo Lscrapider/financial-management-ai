@@ -108,13 +108,20 @@ const parameterGroups = ref<ParameterGroup[]>([]);
 const parameterValues = ref<Record<string, number>>(defaultParameterValues());
 const customProfileName = ref('');
 const customProfileGroup = ref('自定义');
+const DEFAULT_DAILY_KLINE_LIMIT = 90;
+const DEFAULT_WEEKLY_KLINE_LIMIT = 52;
+const DEFAULT_MONTHLY_KLINE_LIMIT = 60;
+const MIN_DAILY_KLINE_LIMIT = 60;
 const newReportForm = ref({
   configProfile: 'system_recommended',
+  dailyKlineLimit: DEFAULT_DAILY_KLINE_LIMIT,
+  monthlyKlineLimit: DEFAULT_MONTHLY_KLINE_LIMIT,
   reportType: 'quick_analysis',
   targetCode: '',
   targetName: '',
   targetType: 'STOCK',
   totalChunks: 10,
+  weeklyKlineLimit: DEFAULT_WEEKLY_KLINE_LIMIT,
 });
 
 const pollingTaskNos = computed(() => Object.keys(pollingStore.tasks));
@@ -262,11 +269,14 @@ function applyProfile(profile?: SceneAnalysisConfigProfile) {
   const config = profile.configJson || {};
   newReportForm.value = {
     configProfile: textValue(config.configProfile, profile.configProfile),
+    dailyKlineLimit: numberValue(config.dailyKlineLimit, DEFAULT_DAILY_KLINE_LIMIT),
+    monthlyKlineLimit: numberValue(config.monthlyKlineLimit, DEFAULT_MONTHLY_KLINE_LIMIT),
     reportType: textValue(config.reportType, profile.reportType || 'quick_analysis'),
     targetCode: newReportForm.value.targetCode,
     targetName: newReportForm.value.targetName,
     targetType: textValue(config.targetType, profile.targetType || 'STOCK'),
     totalChunks: numberValue(config.totalChunks, 10),
+    weeklyKlineLimit: numberValue(config.weeklyKlineLimit, DEFAULT_WEEKLY_KLINE_LIMIT),
   };
   parameterValues.value = parameterValuesFromOverrides(config.userOverrides);
   void searchReportTargetOptions('');
@@ -301,11 +311,14 @@ async function createReportTask() {
   try {
     const result = await submitSceneAnalysisTask({
       configProfile: newReportForm.value.configProfile,
+      dailyKlineLimit: normalizedDailyKlineLimit(),
+      monthlyKlineLimit: normalizedMonthlyKlineLimit(),
       reportType: newReportForm.value.reportType,
       targetCode,
       targetName: newReportForm.value.targetName.trim() || undefined,
       targetType: newReportForm.value.targetType,
       totalChunks: newReportForm.value.totalChunks,
+      weeklyKlineLimit: normalizedWeeklyKlineLimit(),
       userOverrides,
     });
     pollingStore.start({
@@ -492,11 +505,29 @@ function formatDateTime(value?: null | string) {
 
 function currentConfigJson() {
   return {
+    dailyKlineLimit: normalizedDailyKlineLimit(),
+    monthlyKlineLimit: normalizedMonthlyKlineLimit(),
     reportType: newReportForm.value.reportType,
     targetType: newReportForm.value.targetType,
     totalChunks: newReportForm.value.totalChunks,
+    weeklyKlineLimit: normalizedWeeklyKlineLimit(),
     userOverrides: buildUserOverrides(),
   };
+}
+
+function normalizedDailyKlineLimit() {
+  return Math.max(
+    numberValue(newReportForm.value.dailyKlineLimit, DEFAULT_DAILY_KLINE_LIMIT),
+    MIN_DAILY_KLINE_LIMIT,
+  );
+}
+
+function normalizedWeeklyKlineLimit() {
+  return numberValue(newReportForm.value.weeklyKlineLimit, DEFAULT_WEEKLY_KLINE_LIMIT);
+}
+
+function normalizedMonthlyKlineLimit() {
+  return numberValue(newReportForm.value.monthlyKlineLimit, DEFAULT_MONTHLY_KLINE_LIMIT);
 }
 
 function buildUserOverrides() {
@@ -876,6 +907,36 @@ function escapeHtml(text: string) {
             </ElFormItem>
           </div>
 
+          <div class="form-grid three-columns">
+            <ElFormItem label="日线 K 线数">
+              <ElInputNumber
+                v-model="newReportForm.dailyKlineLimit"
+                :max="250"
+                :min="MIN_DAILY_KLINE_LIMIT"
+                :step="1"
+                controls-position="right"
+              />
+            </ElFormItem>
+            <ElFormItem label="周线 K 线数">
+              <ElInputNumber
+                v-model="newReportForm.weeklyKlineLimit"
+                :max="250"
+                :min="1"
+                :step="1"
+                controls-position="right"
+              />
+            </ElFormItem>
+            <ElFormItem label="月线 K 线数">
+              <ElInputNumber
+                v-model="newReportForm.monthlyKlineLimit"
+                :max="250"
+                :min="1"
+                :step="1"
+                controls-position="right"
+              />
+            </ElFormItem>
+          </div>
+
           <section v-loading="loadingParameterSchema" class="parameter-panel">
             <div class="parameter-panel-title">场景参数</div>
             <div v-if="parameterGroups.length > 0" class="parameter-groups">
@@ -1140,6 +1201,10 @@ function escapeHtml(text: string) {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
+.form-grid.three-columns {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .target-option {
   align-items: center;
   display: flex;
@@ -1376,6 +1441,7 @@ function escapeHtml(text: string) {
 
 @media (max-width: 768px) {
   .form-grid,
+  .form-grid.three-columns,
   .profile-save-row,
   .profile-edit-actions {
     grid-template-columns: 1fr;

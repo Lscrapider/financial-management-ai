@@ -3,125 +3,147 @@ from __future__ import annotations
 from typing import Any
 
 from app.scene_analysis.context import SceneAnalysisContext
-from app.scene_analysis.models import BaseMetrics, SceneModuleResult
-from app.scene_analysis.services.evidence import build_evidence
-from app.scene_analysis.services.module_scoring import active_tags, clamp, module_level, module_score, number, weighted_sum
+from app.scene_analysis.models import SceneModuleResult, TAG_NAMES
+from app.scene_analysis.services.module_scoring import clamp, module_level
+from app.scene_analysis.services.trend_kline_analysis import NEGATIVE_TAGS, POSITIVE_TAGS, TrendKlineAnalyzer
 
 
 class TrendProcessor:
     MODULE = "trend"
+    PERIOD_WEIGHTS = {
+        "daily": 0.2,
+        "weekly": 0.5,
+        "monthly": 0.3,
+    }
+    PERIOD_LABELS = {
+        "daily": "日线",
+        "weekly": "周线",
+        "monthly": "月线",
+    }
+
+    def __init__(self, analyzer: TrendKlineAnalyzer | None = None) -> None:
+        self._analyzer = analyzer or TrendKlineAnalyzer()
 
     def process(self, context: SceneAnalysisContext) -> SceneModuleResult:
-        metrics = context.base_metrics
-        uptrend = self._uptrend(metrics)
-        downtrend = self._downtrend(metrics)
-        range_bound = self._range_bound(metrics)
-        tags = {
-            "uptrend": uptrend,
-            "downtrend": downtrend,
-            "range_bound": range_bound,
-            "rebound": self._rebound(context, downtrend),
-            "trend_reversal": self._trend_reversal(metrics, uptrend, downtrend),
-            "breakout_from_range": self._breakout_from_range(context, range_bound),
-            "failed_breakout": self._failed_breakout(metrics),
+        period_trends = {
+            "daily": self._analyzer.analyze("daily", self._list(context.message.get("dailyKlines"))),
+            "weekly": self._analyzer.analyze("weekly", self._list(context.message.get("weeklyKlines"))),
+            "monthly": self._analyzer.analyze("monthly", self._list(context.message.get("monthlyKlines"))),
         }
-        tags = active_tags(tags)
-        score = module_score(tags)
+        tags = self._merge_tags(period_trends)
+        score = self._weighted_score(period_trends)
+        direction = self._direction(tags, period_trends)
         return SceneModuleResult(
             module=self.MODULE,
             score=score,
             level=module_level(score),
-            direction=self._direction(tags),
+            direction=direction,
             tags=tags,
-            evidence=self._evidence(tags),
+            evidence=[],
+            extra={"periodTrends": self._period_trends_payload(period_trends)},
+            query_text_override=self._query_text(tags, period_trends),
         )
 
-    def _uptrend(self, metrics: BaseMetrics) -> float:
-        current_price = number(metrics.get("current_price") or metrics.get("latest_price"))
-        ma5 = number(metrics.get("ma5"))
-        ma10 = number(metrics.get("ma10"))
-        ma20 = number(metrics.get("ma20"))
-        if None in (ma5, ma10, ma20):
-            return 0.0
-        score = 0.8 if ma5 > ma10 > ma20 else 0.0
-        if current_price is not None and ma5 is not None and current_price > ma5:
-            score += 0.1
-        if current_price is not None and ma20 is not None and current_price > ma20:
-            score += 0.1
-        return clamp(score)
+    def _merge_tags(self, period_trends: dict[str, dict[str, Any]]) -> dict[str, float]:
+        merged: dict[str, float] = {}
+        for trend in period_trends.values():
+            for tag, score in self._dict(trend.get("tags")).items():
+                numeric = score if isinstance(score, (int, float)) and not isinstance(score, bool) else None
+                if numeric is None:
+                    continue
+                merged[tag] = max(merged.get(tag, 0.0), clamp(float(numeric)))
+        return dict(sorted(merged.items(), key=lambda item: item[1], reverse=True))
 
-    def _downtrend(self, metrics: BaseMetrics) -> float:
-        current_price = number(metrics.get("current_price") or metrics.get("latest_price"))
-        ma5 = number(metrics.get("ma5"))
-        ma10 = number(metrics.get("ma10"))
-        ma20 = number(metrics.get("ma20"))
-        if None in (ma5, ma10, ma20):
-            return 0.0
-        score = 0.8 if ma5 < ma10 < ma20 else 0.0
-        if current_price is not None and ma5 is not None and current_price < ma5:
-            score += 0.1
-        if current_price is not None and ma20 is not None and current_price < ma20:
-            score += 0.1
-        return clamp(score)
+    def _weighted_score(self, period_trends: dict[str, dict[str, Any]]) -> float:
+        return clamp(sum(
+            self._score(period_trends.get(period)) * weight
+            for period, weight in self.PERIOD_WEIGHTS.items()
+        ))
 
-    def _range_bound(self, metrics: BaseMetrics) -> float | None:
-        range_pct_20d = number(metrics.get("range_pct_20d"))
-        if range_pct_20d is None:
-            return None
-        return clamp((0.10 - range_pct_20d) / 0.10)
-
-    def _rebound(self, context: SceneAnalysisContext, downtrend: float) -> float | None:
-        current_price = number(context.base_metrics.get("current_price") or context.base_metrics.get("latest_price"))
-        recent_low = number(context.base_metrics.get("recent_low_20d"))
-        price_rise = number(context.base_metrics.get("price_rise"))
-        threshold = number(context.trend_config.get("rebound_threshold"))
-        if None in (current_price, recent_low, price_rise) or not threshold or recent_low == 0:
-            return None
-        return clamp(downtrend * price_rise * clamp((current_price - recent_low) / recent_low / threshold))
-
-    def _trend_reversal(self, metrics: BaseMetrics, uptrend: float, downtrend: float) -> float:
-        current_price = number(metrics.get("current_price") or metrics.get("latest_price"))
-        ma5 = number(metrics.get("ma5"))
-        ma20 = number(metrics.get("ma20"))
-        price_return_5d = number(metrics.get("price_return_5d"))
-        if None in (current_price, ma5, ma20, price_return_5d):
-            return 0.0
-        down_to_up = (1 - downtrend) * clamp((current_price - ma20) / ma20 / 0.05) if ma20 and current_price > ma20 and price_return_5d > 0 else 0.0
-        up_to_down = (1 - uptrend) * clamp((ma20 - current_price) / ma20 / 0.05) if ma20 and current_price < ma20 and price_return_5d < 0 else 0.0
-        return clamp(max(down_to_up, up_to_down))
-
-    def _breakout_from_range(self, context: SceneAnalysisContext, range_bound: float | None) -> float | None:
-        breakout = number(context.base_metrics.get("breakout"))
-        volume_expand = number(context.base_metrics.get("volume_expand"))
-        weights = context.trend_config.get("breakout_from_range_confirm_weights")
-        confirm_score = weighted_sum({"base_confirm": 1.0, "volume_expand": volume_expand}, weights if isinstance(weights, dict) else {})
-        if range_bound is None or breakout is None or confirm_score is None:
-            return None
-        return clamp(range_bound * breakout * confirm_score)
-
-    def _failed_breakout(self, metrics: BaseMetrics) -> float | None:
-        breakout = number(metrics.get("breakout"))
-        close_weak = number(metrics.get("close_weak"))
-        upper_shadow = number(metrics.get("upper_shadow"))
-        if None in (breakout, close_weak, upper_shadow):
-            return None
-        return clamp(breakout * close_weak * upper_shadow)
-
-    def _direction(self, tags: dict[str, float]) -> str:
-        if tags.get("uptrend", 0.0) > tags.get("downtrend", 0.0) and tags.get("uptrend", 0.0) >= 0.3:
+    def _direction(self, tags: dict[str, float], period_trends: dict[str, dict[str, Any]]) -> str:
+        positive = max((tags.get(tag, 0.0) for tag in POSITIVE_TAGS), default=0.0)
+        negative = max((tags.get(tag, 0.0) for tag in NEGATIVE_TAGS), default=0.0)
+        continuation = tags.get("continuation", 0.0)
+        if continuation >= 0.3:
+            weighted_positive = sum(
+                self.PERIOD_WEIGHTS[period] * self._score(trend)
+                for period, trend in period_trends.items()
+                if trend.get("direction") == "positive"
+            )
+            weighted_negative = sum(
+                self.PERIOD_WEIGHTS[period] * self._score(trend)
+                for period, trend in period_trends.items()
+                if trend.get("direction") == "negative"
+            )
+            if weighted_negative > weighted_positive:
+                negative = max(negative, continuation)
+            else:
+                positive = max(positive, continuation)
+        if positive > negative and positive >= 0.3:
             return "positive"
-        if tags.get("downtrend", 0.0) >= 0.3:
+        if negative >= 0.3:
             return "negative"
         return "neutral"
 
-    def _evidence(self, tags: dict[str, float]) -> list[str]:
-        reasons = {
-            "uptrend": "短中期均线呈多头排列且价格位于均线之上，uptrend 标签触发",
-            "downtrend": "短中期均线呈空头排列且价格位于均线之下，downtrend 标签触发",
-            "range_bound": "近 20 日价格区间收敛，range_bound 标签触发",
-            "rebound": "下降趋势中价格从近期低位回升，rebound 标签触发",
-            "trend_reversal": "价格与均线关系出现趋势切换信号，trend_reversal 标签触发",
-            "breakout_from_range": "区间震荡后价格向上突破并获得成交确认，breakout_from_range 标签触发",
-            "failed_breakout": "突破后收盘偏弱且上影线明显，failed_breakout 标签触发",
+    def _query_text(self, tags: dict[str, float], period_trends: dict[str, dict[str, Any]]) -> str:
+        active_tag_names = [
+            TAG_NAMES.get(tag, tag)
+            for tag, score in tags.items()
+            if score >= 0.3
+        ]
+        parts = ["趋势分析"]
+        if active_tag_names:
+            parts[0] = f"{parts[0]}，{'、'.join(active_tag_names)}"
+        summaries = [
+            self._period_summary(period, trend)
+            for period, trend in period_trends.items()
+            if self._score(trend) >= 0.3
+        ]
+        if summaries:
+            return f"{parts[0]}。{'；'.join(summaries)}。"
+        return f"{parts[0]}。"
+
+    def _period_summary(self, period: str, trend: dict[str, Any]) -> str:
+        tags = self._dict(trend.get("tags"))
+        tag_names = [
+            TAG_NAMES.get(tag, tag)
+            for tag, score in tags.items()
+            if isinstance(score, (int, float)) and not isinstance(score, bool) and score >= 0.3
+        ]
+        label = self.PERIOD_LABELS.get(period, period)
+        direction = {
+            "positive": "偏强",
+            "negative": "偏弱",
+            "neutral": "中性",
+        }.get(str(trend.get("direction")), "中性")
+        if tag_names:
+            return f"{label}{direction}，主要标签为{'、'.join(tag_names[:4])}"
+        return f"{label}{direction}"
+
+    def _score(self, trend: dict[str, Any] | None) -> float:
+        if not trend:
+            return 0.0
+        value = trend.get("score")
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return 0.0
+        return clamp(float(value))
+
+    def _period_trends_payload(self, period_trends: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        return {
+            period: {
+                "score": trend.get("score", 0.0),
+                "level": trend.get("level", "low"),
+                "direction": trend.get("direction", "neutral"),
+                "tags": trend.get("tags", {}),
+                "evidence": trend.get("evidence", []),
+            }
+            for period, trend in period_trends.items()
         }
-        return build_evidence(tags, reasons)
+
+    def _dict(self, value: Any) -> dict[str, Any]:
+        return value if isinstance(value, dict) else {}
+
+    def _list(self, value: Any) -> list[dict[str, Any]]:
+        if not isinstance(value, list):
+            return []
+        return [row for row in value if isinstance(row, dict)]

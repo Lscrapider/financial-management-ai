@@ -9,5 +9,6 @@ public record SceneAnalysisSceneModuleParam(
         String direction,
         Map<String, Double> tags,
         List<String> evidence,
-        String queryText) {
+        String queryText,
+        Map<String, Object> periodTrends) {
 }

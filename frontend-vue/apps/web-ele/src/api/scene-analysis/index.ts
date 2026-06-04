@@ -78,11 +78,14 @@ export interface SceneAnalysisTaskReport {
 
 export interface SceneAnalysisTaskSubmitPayload {
   configProfile?: string;
+  dailyKlineLimit?: number;
+  monthlyKlineLimit?: number;
   reportType?: string;
   targetCode: string;
   targetName?: string;
   targetType: string;
   totalChunks: number;
+  weeklyKlineLimit?: number;
   userOverrides?: Record<string, unknown>;
 }
 

@@ -43,8 +43,13 @@ TAG_NAMES = {
     "downtrend": "下降趋势",
     "range_bound": "区间震荡",
     "rebound": "反弹",
+    "repair": "修复",
     "trend_reversal": "趋势反转",
     "breakout_from_range": "区间突破",
+    "breakdown_from_range": "区间破位",
+    "continuation": "趋势延续",
+    "turn_weak": "转弱",
+    "turn_strong": "转强",
     "failed_breakout": "突破失败",
     "low_pe": "低PE",
     "high_pe": "高PE",
@@ -96,9 +101,11 @@ class SceneModuleResult:
     direction: str
     tags: dict[str, float] = field(default_factory=dict)
     evidence: list[str] = field(default_factory=list)
+    extra: dict[str, Any] = field(default_factory=dict)
+    query_text_override: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "module": self.module,
             "score": self.score,
             "level": self.level,
@@ -107,8 +114,12 @@ class SceneModuleResult:
             "evidence": self.evidence,
             "queryText": self.query_text(),
         }
+        payload.update(self.extra)
+        return payload
 
     def query_text(self) -> str:
+        if self.query_text_override:
+            return self.query_text_override
         scene_name = SCENE_NAMES.get(self.module, self.module)
         evidence_tags = self._evidence_tags()
         tag_names = [
