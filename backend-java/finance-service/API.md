@@ -1,5 +1,16 @@
 # Java Backend API
 
+本文件保留主服务行情接口摘录。完整、最新的接口说明以项目根目录 [docs/API_DOCUMENTATION.md](../../docs/API_DOCUMENTATION.md) 为准。
+
+当前后端接口组包括：
+
+- `/api/auth/**`、`/api/user/**`：认证、用户资料、密码和通知设置。
+- `/api/stocks/**`、`/api/indices/**`、`/api/bonds/**`：股票、指数、可转债行情和同步接口。
+- `/api/watch-pool/**`：投资观察池。
+- `/api/stock-alerts/**`：预警配置。
+- `/api/ai/**`：AI Chat、OCR、手动知识导入、投资报告、Token 用量、控制台指标。
+- `/api/knowledge/**`：知识库浏览、概览和 chunk 编辑。
+
 ## 股票行情列表
 
 ```http

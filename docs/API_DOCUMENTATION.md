@@ -6,6 +6,7 @@
 - 请求与响应格式：`application/json`
 - Token 请求头：`Authorization: Bearer <accessToken>`
 - 匿名接口：`POST /api/auth/login`、`POST /api/auth/register`
+- OCR 复核图片代理：`GET /api/ai/ocr/reviews/{taskNo}/pages/{pageNo}/image` 匿名可访问，用于浏览器图片加载
 - `/api/ai/**`：需要登录
 - 其他接口：需要 `admin` 角色
 
@@ -112,6 +113,24 @@
 | `desc` | string | 用户描述 |
 | `homePath` | string | 默认首页 |
 | `token` | string | 当前 Token |
+
+### 更新当前用户资料
+
+`PUT /api/user/info`
+
+需要 Token 和 `admin` 角色。用于更新当前用户展示资料。
+
+### 修改密码
+
+`PUT /api/user/password`
+
+需要 Token 和 `admin` 角色。用于修改当前用户密码。
+
+### 更新通知设置
+
+`PUT /api/user/notification`
+
+需要 Token 和 `admin` 角色。用于更新当前用户通知偏好。
 
 ## 股票行情
 
@@ -225,12 +244,6 @@
 
 `bondCode`、`bondName`、`secid`、`marketCode`、`exchangeCode`、`latestPrice`、`openPrice`、`highPrice`、`lowPrice`、`previousClosePrice`、`changeAmount`、`changePercent`、`volume`、`averagePrice`、`currentVolume`、`turnoverAmount`、`amplitude`、`turnoverRate`、`bondRating`、`quoteDetails`、`syncedAt`。
 
-### 可转债分时走势
-
-`GET /api/bonds/intraday-trends?bondCode=xxx`
-
-需要 Token。返回：`BondIntradayTrendVO[]`。
-
 ### 可转债日 K
 
 `GET /api/bonds/daily-klines`
@@ -257,9 +270,11 @@
 
 返回 `MarketSyncStatusVO`。
 
-### 单只可转债分时手动同步
+### 单只股票日 K 手动同步
 
-`POST /api/bonds/sync/trends/{bondCode}`
+`POST /api/stocks/sync/daily-klines/{stockCode}`
+
+返回 `MarketSyncStatusVO`。
 
 ## 股票预警
 
@@ -275,7 +290,13 @@
 
 ### 删除预警
 
-`POST /api/stock-alerts/delete`
+`DELETE /api/stock-alerts/{id}`
+
+### 预警标的选项
+
+`GET /api/stock-alerts/target-options?targetType=STOCK`
+
+返回可创建预警的标的选项。
 
 ### 手动触发预警检查
 
@@ -293,7 +314,7 @@
 
 ### 删除分组
 
-`POST /api/watch-pool/groups/delete`
+`DELETE /api/watch-pool/groups/{id}`
 
 ### 新增/更新标的
 
@@ -301,7 +322,7 @@
 
 ### 删除标的
 
-`POST /api/watch-pool/items/delete`
+`DELETE /api/watch-pool/items/{id}`
 
 ## 知识库
 
@@ -534,6 +555,32 @@
 
 当前接口只负责上传文件、保存文件和创建待处理任务。
 
+## OCR 人工复核
+
+### 查询复核详情
+
+`GET /api/ai/ocr/reviews/{taskNo}`
+
+需要 Token。返回 `OcrReviewVO`，包含任务信息、页面列表和段落草稿。
+
+### 保存复核草稿
+
+`PUT /api/ai/ocr/reviews/{taskNo}/draft`
+
+需要 Token。请求体为 `OcrReviewDraftParam`，用于保存当前复核段落草稿。
+
+### 提交复核结果
+
+`POST /api/ai/ocr/reviews/{taskNo}/submit`
+
+需要 Token。请求体可为空；传入草稿时会先保存最终内容。提交后写入 `reviewed.json`，更新任务最终分段数，并发布 `ocr.chunk.tag.rule` 消息。
+
+### 查询复核页图片
+
+`GET /api/ai/ocr/reviews/{taskNo}/pages/{pageNo}/image`
+
+返回 PNG 图片字节，用于前端复核页加载标准化后的页面图片。
+
 ## 手动知识导入
 
 手动知识导入复用 `ocr_task` 和 `ocr_review`，任务来源为 `ocr_task.source_type = 'manual_text'`，不会出现在 OCR 处理进度列表中。草稿提交后跳过格式校验、OCR 识别和文本清洗，直接发布 `ocr.chunk.tag.rule`，继续复用场景打标、标签回正和向量入库流程。
@@ -586,6 +633,97 @@
 `POST /api/ai/manual-knowledge/tasks/delete`
 
 需要 Token。请求体：`{ "taskNo": "manual-xxx" }`。只允许删除 `source_type = 'manual_text'` 的任务，并同步删除对应知识库向量。
+
+## 投资报告 / 场景分析
+
+场景分析报告用于按标的生成结构化投资研究报告。当前流程为：Java 创建任务并组装行情上下文，Python 计算当前场景标签并回调 Java，Java 分配 chunk 召回数量并发布检索 embedding 任务，Python 回调 query embedding，Java 执行 pgvector 召回和重排，最后调用 DeepSeek 生成报告并写入历史表。
+
+### 提交报告任务
+
+`POST /api/ai/scene-analysis/tasks`
+
+需要 Token。
+
+请求体：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `targetType` | string | 是 | 标的类型：`STOCK`、`INDEX`、`CONVERTIBLE_BOND` |
+| `targetCode` | string | 是 | 标的代码 |
+| `targetName` | string | 否 | 标的名称 |
+| `reportType` | string | 否 | 报告类型：`quick_analysis`、`risk_check`、`valuation_report`，默认 `quick_analysis` |
+| `configProfile` | string | 否 | 配置档 code，默认系统推荐配置 |
+| `totalChunks` | number | 是 | 本次报告期望召回的知识库 chunk 数 |
+| `userOverrides` | object | 否 | 用户覆盖参数 |
+
+返回：`SceneAnalysisSubmitVO`，核心字段：`taskNo`、`targetType`、`targetCode`、`configProfile`、`status`。
+
+### Python 回调任务
+
+`POST /api/ai/scene-analysis/tasks/{taskNo}/callback`
+
+需要 Token。由 Python worker 回调 Java，提交 `currentScenesPayload` 或 `retrievalEmbeddings`，推动报告流水线继续执行。
+
+### 查询任务报告
+
+`GET /api/ai/scene-analysis/tasks/{taskNo}/report`
+
+需要 Token。前端轮询该接口获取报告状态和最终报告。
+
+返回：`SceneAnalysisReportVO`，核心字段：`taskNo`、`reportId`、`status`、`errorMessage`、`generationType`、`versionNo`、`reportContent`、`reportText`、`model`、`generatedAt`。
+
+### 重新生成报告
+
+`POST /api/ai/scene-analysis/tasks/{taskNo}/report/regenerate`
+
+需要 Token。基于已保存的 `currentScenesPayload` 和 `knowledgeContext` 重新调用模型生成新版本报告。
+
+### 报告标的分页
+
+`GET /api/ai/scene-analysis/tasks/reports/targets`
+
+需要 Token。
+
+查询参数：`pageNum`、`pageSize`、`targetName`、`targetCode`、`targetType`。
+
+返回：`SceneAnalysisReportTargetPageVO`，用于报告页面按标的聚合展示最新报告和报告数量。
+
+### 单标的报告历史
+
+`GET /api/ai/scene-analysis/tasks/reports?targetType=STOCK&targetCode=000001`
+
+需要 Token。返回 `SceneAnalysisReportHistoryVO[]`。
+
+### 报告详情
+
+`GET /api/ai/scene-analysis/tasks/reports/{reportId}`
+
+需要 Token。返回 `SceneAnalysisReportDetailVO`，包含结构化报告 JSON 和渲染文本。
+
+### 标的搜索
+
+`GET /api/ai/scene-analysis/targets/search`
+
+需要 Token。
+
+查询参数：
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+| --- | --- | --- | --- | --- |
+| `targetType` | string | 否 | `STOCK` | 标的类型：`STOCK`、`INDEX`、`CONVERTIBLE_BOND` |
+| `keyword` | string | 否 | 无 | 代码或名称关键字 |
+| `limit` | number | 否 | 无 | 返回数量限制 |
+
+### 报告配置档
+
+| 接口 | 方法 | 说明 |
+| --- | --- | --- |
+| `/api/ai/scene-analysis/config-profiles` | GET | 查询当前可用配置档 |
+| `/api/ai/scene-analysis/config-profiles/parameter-schema` | GET | 查询可配置参数 schema |
+| `/api/ai/scene-analysis/config-profiles/report-types` | GET | 查询报告类型 |
+| `/api/ai/scene-analysis/config-profiles` | POST | 新增配置档 |
+| `/api/ai/scene-analysis/config-profiles/{id}` | PUT | 更新配置档 |
+| `/api/ai/scene-analysis/config-profiles/{id}` | DELETE | 删除配置档 |
 
 ## AI Token 用量
 

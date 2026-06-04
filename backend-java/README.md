@@ -6,9 +6,9 @@
 
 | 模块 | 是否独立启动 | 主要职责 |
 | --- | --- | --- |
-| `finance-service` | 是 | Spring Boot 主应用、认证登录、行情查询接口、行情同步任务、安全配置和应用配置。 |
+| `finance-service` | 是 | Spring Boot 主应用、认证登录、用户设置、行情查询与同步、观察池、预警、安全配置和应用配置。 |
 | `finance-data` | 否 | 公共领域对象、请求参数、返回对象、MyBatis-Plus Mapper、Manage 封装、PostgreSQL 表映射和 InfluxDB 读写配置。 |
-| `finance-ai` | 否 | AI Chat 接口、Query Rewrite、行情数据上下文查询、DeepSeek/Spring AI 调用、Token 用量统计和 AI 控制台指标。 |
+| `finance-ai` | 否 | AI Chat、Query Rewrite、行情上下文、OCR、手动知识导入、知识库、投资报告、Token 用量统计和 AI 控制台指标。 |
 
 ## 调用关系
 
@@ -87,6 +87,7 @@ backend-java/finance-service/src/main/resources/application.yml
 - `deepseek.chat`：DeepSeek 思考模式相关配置。
 - `stock.sync`：股票行情同步任务配置。
 - `index.sync`：指数行情同步任务配置。
+- `bond.sync`：可转债行情同步任务配置。
 - `influxdb`：股票分钟走势 InfluxDB 配置。
 
 ## 接口范围
@@ -94,11 +95,17 @@ backend-java/finance-service/src/main/resources/application.yml
 后端当前暴露以下接口分组：
 
 - `/api/auth/**`：登录、注册、登出、刷新 Token。
-- `/api/user/info`：当前用户信息。
-- `/api/stocks/**`：股票行情和分时走势查询。
+- `/api/user/**`：当前用户信息、资料更新、密码修改和通知设置。
+- `/api/stocks/**`：股票行情、分时走势和日 K 同步。
 - `/api/indices/**`：指数行情和日 K 查询。
+- `/api/bonds/**`：可转债行情和日 K 查询。
+- `/api/watch-pool/**`：投资观察池分组和标的管理。
+- `/api/stock-alerts/**`：预警配置、标的选项和手动检查。
 - `/api/ai/chat`：理财分析 AI 对话。
-- `/api/ai/ocr/tasks`：OCR 文件上传任务提交。
+- `/api/ai/ocr/**`：OCR 文件任务和人工复核。
+- `/api/ai/manual-knowledge/**`：手动知识导入。
+- `/api/knowledge/**`：知识库查询、概览和 chunk 编辑。
+- `/api/ai/scene-analysis/**`：投资报告任务、配置、历史和重新生成。
 - `/api/ai/token-usage/**`：AI Token 用量记录与统计。
 - `/api/ai/console/**`：AI 控制台概览和访问趋势。
 
@@ -113,6 +120,6 @@ backend-java/finance-service/src/main/resources/application.yml
 
 ## 数据来源
 
-- 股票/指数最新行情、股票分时、指数日 K：腾讯行情接口。
-- 股票和指数快照、用户、Token 用量、访问日志：PostgreSQL。
+- 股票/指数/可转债最新行情、股票分时、股票/指数/可转债日 K：腾讯行情接口。
+- 行情快照、日 K、用户、观察池、预警、OCR、知识库、报告、Token 用量、访问日志：PostgreSQL。
 - 股票分钟分时走势：InfluxDB。

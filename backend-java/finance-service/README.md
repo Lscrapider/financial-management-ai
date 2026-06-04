@@ -28,7 +28,7 @@ backend-java/finance-service/
     │   ├── FinanceApplication.java            # Spring Boot 启动类
     │   ├── api/                               # 外部行情 API 调用
     │   ├── config/                            # 安全、RestTemplate、WebMvc、DeepSeek 请求配置
-    │   ├── controller/                        # Auth、股票行情、指数行情接口
+    │   ├── controller/                        # Auth、行情、观察池、预警接口
     │   ├── interceptor/                       # 访问日志拦截器
     │   ├── security/                          # 登录用户、Bearer Token 过滤器、TokenStore、密码编码
     │   ├── service/                           # 业务服务接口
@@ -43,10 +43,14 @@ backend-java/finance-service/
 | 分组 | 路径 | 说明 |
 | --- | --- | --- |
 | 认证 | `/api/auth/**` | 登录、注册、登出、刷新 Token、权限码占位接口。 |
-| 用户 | `/api/user/info` | 返回当前登录用户信息。 |
-| 股票 | `/api/stocks/**` | 股票最新行情列表、单只股票最新一批分时走势。 |
+| 用户 | `/api/user/**` | 当前用户信息、资料更新、密码修改和通知设置。 |
+| 股票 | `/api/stocks/**` | 股票最新行情列表、单只股票最新一批分时走势、单只股票日 K 同步。 |
 | 指数 | `/api/indices/**` | 指数最新行情列表、指数日 K。 |
+| 可转债 | `/api/bonds/**` | 可转债最新行情列表、可转债日 K、同步状态和手动同步。 |
+| 投资观察池 | `/api/watch-pool/**` | 观察池分组和标的管理。 |
+| 股票预警 | `/api/stock-alerts/**` | 股票/指数/可转债预警配置、标的选项和手动检查。 |
 | AI | `/api/ai/**` | 由 `finance-ai` 提供，随主应用启动后暴露，包括 Chat、OCR、Token 用量和控制台指标。 |
+| 知识库 | `/api/knowledge/**` | 由 `finance-ai` 提供，随主应用启动后暴露，包括知识库分页、统计、概览和 chunk 编辑。 |
 
 `docs/API_DOCUMENTATION.md` 中维护了接口级参数和返回字段说明。
 
@@ -87,6 +91,7 @@ role: admin
 - 登出会从内存 `TokenStore` 移除当前 Token。
 - 刷新 Token 接口当前返回原 Token。
 - 用户信息接口返回用户 ID、用户名、展示名、头像、角色、默认首页和当前 Token。
+- 支持更新用户资料、修改密码和更新通知设置。
 
 ### 股票行情
 
@@ -95,6 +100,7 @@ role: admin
 - 调用腾讯分时接口同步股票分钟走势到 InfluxDB。
 - 查询接口支持按市场过滤、限制数量、排序字段和排序方向。
 - 分时查询返回指定股票最新同步批次的数据。
+- 支持按需同步单只股票分时走势和日 K 数据。
 
 ### 指数行情
 
@@ -102,6 +108,26 @@ role: admin
 - 调用腾讯行情接口同步指数最新行情快照到 PostgreSQL。
 - 可同步指数日 K 到 PostgreSQL。
 - 查询接口支持指数行情列表和指定指数/`secid` 的日 K。
+
+### 可转债行情
+
+- 定时读取启用的 `bond_config` 可转债配置。
+- 调用腾讯行情接口同步可转债最新行情快照到 PostgreSQL。
+- 可同步可转债日 K 到 PostgreSQL。
+- 查询接口支持可转债行情列表和指定可转债/`secid` 的日 K。
+
+### 投资观察池
+
+- 支持用户维度的观察池分组新增、更新、删除。
+- 支持股票、指数、可转债多类型标的新增、更新、删除和排序。
+- 支持保存买入价和买入价格位置，便于前端展示标的观察状态。
+
+### 股票预警
+
+- 支持股票、指数、可转债预警配置列表、新增/更新、删除。
+- 支持按涨跌幅阈值设置预警。
+- 支持查询可创建预警的标的选项。
+- 支持定时检查和管理员手动触发检查。
 
 ### 访问日志
 
@@ -148,6 +174,15 @@ role: admin
 | `INDEX_DAILY_KLINE_SYNC_ENABLED` | `true` | 是否同步指数日 K。 |
 | `INDEX_DAILY_KLINE_LIMIT` | `250` | 指数日 K 同步条数。 |
 | `INDEX_SYNC_FIXED_DELAY_MS` | `300000` | 指数同步固定延迟。 |
+| `BOND_SYNC_ENABLED` | `true` | 是否启用可转债同步。 |
+| `BOND_DAILY_KLINE_SYNC_ENABLED` | `true` | 是否同步可转债日 K。 |
+| `BOND_DAILY_KLINE_LIMIT` | `250` | 可转债日 K 同步条数。 |
+| `BOND_SYNC_INITIAL_DELAY_MS` | `20000` | 可转债同步首次延迟。 |
+| `BOND_SYNC_FIXED_DELAY_MS` | `300000` | 可转债同步固定延迟。 |
+| `BOND_SYNC_REQUEST_INTERVAL_MS` | `1500` | 可转债接口请求间隔。 |
+| `BOND_SYNC_START_TIME` | `09:28` | 可转债同步窗口开始。 |
+| `BOND_SYNC_END_TIME` | `16:00` | 可转债同步窗口结束。 |
+| `BOND_SYNC_TIMEZONE` | `Asia/Shanghai` | 可转债同步时区。 |
 
 ## 启动方式
 

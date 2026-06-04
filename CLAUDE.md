@@ -82,10 +82,10 @@ docker compose -f docker/docker-compose.yml up --build finance-service  # 构建
 
 ### 服务边界
 
-- **Java `finance-service`**（端口 8081）：主应用，Spring Boot 3.x + Spring Security + MyBatis-Plus + Spring AI。对外暴露 `/api/**` 接口，包含认证、行情查询、AI Chat、OCR 任务、Token 用量、控制台指标。
+- **Java `finance-service`**（端口 8081）：主应用，Spring Boot 3.x + Spring Security + MyBatis-Plus + Spring AI。对外暴露 `/api/**` 接口，包含认证、行情查询、观察池、预警、AI Chat、OCR 任务、知识库、投资报告、Token 用量、控制台指标。
 - **Java `finance-data`**：公共数据层，PO/VO/Param/Mapper/Manage/InfluxDB 配置，不独立启动。
-- **Java `finance-ai`**：AI 编排层，Chat/Query Rewrite/行情上下文查询/Token 统计/OCR 复核/知识库浏览，不独立启动。
-- **Python worker**：独立进程，消费 RabbitMQ 执行 OCR 全链路（文档标准化 → OCR 识别 → 文本清洗 → 向量索引）。也处理 embedding 生成和 pgvector 写入。
+- **Java `finance-ai`**：AI 编排层，Chat/Query Rewrite/行情上下文查询/Token 统计/OCR 复核/手动知识导入/知识库浏览/投资报告，不独立启动。
+- **Python worker**：独立进程，消费 RabbitMQ 执行 OCR 全链路（文档标准化 → OCR 识别 → 文本清洗 → 向量索引）。也处理场景标签、embedding 生成、pgvector 写入和投资报告 currentScenes / retrieval embedding。
 - **前端**：Vben Admin v5 monorepo（Turborepo + pnpm），Element Plus 版本。`apps/web-ele/` 为主应用。
 
 ### Python 模块结构
@@ -93,6 +93,7 @@ docker compose -f docker/docker-compose.yml up --build finance-service  # 构建
 - `app/worker/`：RabbitMQ worker 入口，`main.py` 启动消费者
 - `app/messaging/`：消息队列基础设施（`rabbit_worker.py` 通用 worker、`base_handler.py` 处理器基类、`models.py` 消息模型、`registry.py` 阶段注册、`errors.py` 异常定义）
 - `app/ocr/`：OCR 全链路处理（`handlers/` 各阶段处理器、`services/` 业务逻辑、`engines/` OCR 引擎封装、`repository.py` 数据库操作、`storage.py` MinIO 操作）
+- `app/scene_analysis/`：投资报告场景分析处理（currentScenes、retrieval embedding、回调 Java）
 - `app/embeddings/`：embedding 生成与 pgvector 写入
 - `app/retrieval/`：知识库向量检索
 - `app/api/`：FastAPI 路由（内部接口）
@@ -128,19 +129,32 @@ docker compose -f docker/docker-compose.yml up --build finance-service  # 构建
 
 ### 数据存储分工
 
-- PostgreSQL：业务数据、行情快照（股票/指数/可转债）、日K线（指数/可转债）、用户、OCR 任务、Token 日志、访问日志
+- PostgreSQL：业务数据、行情快照（股票/指数/可转债）、日 K 线（股票/指数/可转债）、用户、观察池、预警、OCR 任务、知识库、投资报告任务和历史、Token 日志、访问日志
 - pgvector：知识库向量表 `knowledge_vector`
-- InfluxDB：股票/可转债分钟级分时走势
+- InfluxDB：股票分钟级分时走势
 - MinIO：OCR 原始文件和各阶段产物
 - RabbitMQ：OCR 阶段消息传递（topic exchange `finance.ocr.topic`，retry exchange `finance.ocr.retry.topic`，DLX `finance.ocr.dlx`）
 
 ### 行情数据流
 
-腾讯行情 API → Java 定时任务（`task/` 目录，三个市场：`StockMarketSyncTask`/`IndexMarketSyncTask`/`BondMarketSyncTask`）→ PostgreSQL（快照，批量拉取批量 upsert）/ InfluxDB（分时走势）→ Java 接口 → 前端
+腾讯行情 API → Java 定时任务（`task/` 目录，三个市场：`StockMarketSyncTask`/`IndexMarketSyncTask`/`BondMarketSyncTask`）→ PostgreSQL（快照和日 K，批量拉取批量 upsert）/ InfluxDB（股票分时走势）→ Java 接口 → 前端
 
 ### AI Chat 流程
 
 用户问题 → `AiChatController` → Query Rewrite（判断是否理财范围）→ 行情上下文查询 → Spring AI ChatClient（DeepSeek）→ Token 用量记录 → 返回结构化回答
+
+### 投资报告流程
+
+用户选择标的和报告类型 → `SceneAnalysisTaskController` 创建 `scene_analysis_task` → Java 发布 current scene 分析消息 → Python 计算 `currentScenes` 并回调 Java → Java 计算 `chunkAllocation` 和 `retrievalTasks` → Python 生成 query embedding 并回调 Java → Java 使用 pgvector 召回知识库、标签过滤、类内重排并构建 `knowledgeContext` → Java 调用 DeepSeek 生成结构化报告 → 写入 `scene_analysis_report`，前端轮询展示。
+
+当前报告接口：
+
+- `POST /api/ai/scene-analysis/tasks`
+- `GET /api/ai/scene-analysis/tasks/{taskNo}/report`
+- `POST /api/ai/scene-analysis/tasks/{taskNo}/report/regenerate`
+- `GET /api/ai/scene-analysis/tasks/reports/targets`
+- `GET /api/ai/scene-analysis/tasks/reports`
+- `GET /api/ai/scene-analysis/tasks/reports/{reportId}`
 
 ### OCR 流程
 
