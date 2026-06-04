@@ -2453,10 +2453,13 @@ Prompt 要求：
 ```text
 你是个人投资研究助手。
 请基于 marketContext、currentScenes 和 knowledgeContext 生成结构化分析报告。
+marketContext 负责事实，currentScenes 负责系统解释，knowledgeContext 负责可引用知识依据。
 不要提供确定性买卖建议。
 不要编造缺失数据。
 必须区分事实、推断和风险提示。
 引用知识库内容时必须带 chunkId。
+不要在报告正文直接暴露内部标签名、字段名、score 或系统术语。
+如果需要表达内部标签含义，必须改写成自然语言。
 ```
 
 ---
@@ -2497,12 +2500,30 @@ Prompt 要求：
 
 ### 7.8 报告保存内容
 
-报告保存时建议至少保存本次 LLM 输入快照：
+报告生成前会把本次实际传给 LLM 的业务上下文保存到 `scene_analysis_task.report_payload.llmInput`：
 
 ```text
-marketContext
-currentScenes
-knowledgeContext
+reportPayload.llmInput.marketContext
+reportPayload.llmInput.currentScenes
+reportPayload.llmInput.knowledgeContext
+```
+
+其中：
+
+```text
+llmInput.marketContext
+  Python 回调的客观市场上下文；缺失时 Java 会兜底最小 snapshot。
+
+llmInput.currentScenes
+  从 current_scenes_payload.currentScenes 裁剪而来，不包含 queryText。
+
+llmInput.knowledgeContext
+  从 report_payload.knowledgeContext 裁剪而来，不包含 taskNo、chunkIndex 和检索分数。
+```
+
+最终报告内容保存到 `scene_analysis_report`：
+
+```text
 reportContent
 model
 createdAt
@@ -2518,6 +2539,8 @@ knowledgeContextInternal
 ```
 
 保存内容可以比 LLM 输入更完整，但最终传给 LLM 的报告上下文只保留 `marketContext`、`currentScenes`、`knowledgeContext`。
+
+重新生成报告时优先复用 `report_payload.llmInput`，保证 regenerate 使用上一次保存的 LLM 输入快照。只有老任务没有 `llmInput` 时，才从 `current_scenes_payload` 和 `report_payload.knowledgeContext` 重新构建并写回 `llmInput`。
 
 这样后续可以复盘：
 
@@ -2660,7 +2683,7 @@ CREATE TABLE scene_analysis_config_profile (
 
 ### 8.6 报告引用关系存储
 
-当前实现把引用依据存入 `knowledgeContext` 和最终 `reportContent` 的 `chunkIds` 字段。报告生成阶段会校验 `chunkIds` 必须来自本次输入的 `knowledgeContext`，防止模型编造不存在的知识库引用。
+当前实现把内部引用依据存入 `report_payload.knowledgeContext`，把 LLM 输入版引用依据存入 `report_payload.llmInput.knowledgeContext`，最终报告引用存入 `reportContent` 的 `chunkIds` 字段。报告生成阶段会校验 `chunkIds` 必须来自本次实际 LLM 输入的 `knowledgeContext`，防止模型编造不存在的知识库引用。
 
 如果后续需要单独统计引用频率，可以新增引用关系表。
 
@@ -2753,7 +2776,8 @@ SceneReportPipelineServiceImpl.continueWithRetrievalEmbeddings
 
 ```text
 SceneAnalysisReportGenerationServiceImpl
-组装 marketContext、currentScenes、knowledgeContext，并调用 LLM 生成报告。
+初次生成时组装 marketContext、currentScenes、knowledgeContext，写入 report_payload.llmInput，并调用 LLM 生成报告。
+重新生成时优先读取 report_payload.llmInput 直接调用 LLM；老任务缺失 llmInput 时才兼容性重建。
 
 SceneAnalysisReportManage
 负责报告存储和查询。

@@ -32,22 +32,6 @@ LLM
 
 不把完整 120 天走势直接给 LLM，而是先压缩成趋势路径特征，再进入报告上下文。
 
-报告生成阶段的 LLM 输入先收敛为三块：`marketContext`、`currentScenes`、`knowledgeContext`。
-
-`currentScenes` 是 Python 计算后回调给 Java 的场景结果。LLM 输入版只保留 `score`、`level`、`direction`、`tags`、`evidence`。
-
-`queryText` 是检索 embedding 使用的内部字段，不传给 LLM。`evidence` 才是报告解释使用的标签触发依据。
-
-`knowledgeContext` 是 Java RAG 召回并重排后的知识库片段，LLM 输入版只保留 `chunkId`、`scene`、`text`、`matchedTags`。`taskNo`、`chunkIndex`、`semanticScore`、`tagMatchScore`、`crossSceneScore`、`finalScore` 等字段只作为内部检索调试和审计数据保留，不传给 LLM。
-
-`marketContext` 由 Python 统一计算并回调 Java，第一版先拆成 `snapshot`、`intraday`、`dailyKline`。它只放客观市场事实、原始数值和压缩后的客观特征，不放标签、建议、风险判断或“看多/看空”等解释性结论。
-
-`snapshot` 保存当前标的快照数据，包括标的类型、代码、名称、secid、最新价、涨跌额、涨跌幅、开高低收、成交量、成交额、换手率、振幅和同步时间。
-
-`intraday` 保存最新交易日分时线压缩特征，不传完整分钟点位数组。初始字段包括可用性、点位数、开盘到当前涨跌幅、最高/最低时间、当前价在日内区间位置、上午/下午涨跌幅、首尾 30 分钟成交集中度和分段路径特征。
-
-`dailyKline` 保存 120 天日 K 线压缩特征，不传完整 K 线数组。初始字段包括窗口天数、可用天数、起止日期、最新收盘、窗口高低点、区间涨跌幅、最大回撤、波动率、距高低点比例、均线和 ZigZag 路径特征。
-
 ### 需要扩展的 trend scene
 
 候选趋势上下文标签：
