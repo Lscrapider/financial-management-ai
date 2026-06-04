@@ -76,6 +76,13 @@ public class SceneAnalysisTaskManage extends ServiceImpl<SceneAnalysisTaskMapper
                 LocalDateTime.now());
     }
 
+    public void updateReportPayload(String taskNo, JsonNode reportPayload) {
+        this.baseMapper.updateReportPayload(
+                taskNo,
+                this.toJson(reportPayload),
+                LocalDateTime.now());
+    }
+
     public void markReportSucceeded(String taskNo) {
         LocalDateTime now = LocalDateTime.now();
         this.baseMapper.markReportSucceeded(

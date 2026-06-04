@@ -10,6 +10,7 @@ from app.scene_analysis.services.asset_processor import AssetProcessor
 from app.scene_analysis.services.base_metrics import BaseMetricsCalculator
 from app.scene_analysis.context import SceneAnalysisContext
 from app.scene_analysis.services.current_scene_result import build_current_scenes_payload
+from app.scene_analysis.services.market_context import MarketContextBuilder
 from app.scene_analysis.services.price_processor import PriceProcessor
 from app.scene_analysis.services.risk_strategy_processor import RiskStrategyProcessor
 from app.scene_analysis.services.sentiment_processor import SentimentProcessor
@@ -88,6 +89,7 @@ def main() -> None:
         target=target,
         report_type=message.get("reportType"),
         total_chunks=message.get("totalChunks") or 10,
+        market_context=MarketContextBuilder().build(message),
         module_results=module_results,
     )
 

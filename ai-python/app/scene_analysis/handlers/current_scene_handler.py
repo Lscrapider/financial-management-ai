@@ -9,6 +9,7 @@ from app.scene_analysis.services.asset_processor import AssetProcessor
 from app.scene_analysis.services.base_metrics import BaseMetricsCalculator
 from app.scene_analysis.services.callback_client import SceneAnalysisCallbackClient
 from app.scene_analysis.services.current_scene_result import build_current_scenes_payload
+from app.scene_analysis.services.market_context import MarketContextBuilder
 from app.scene_analysis.services.price_processor import PriceProcessor
 from app.scene_analysis.services.risk_strategy_processor import RiskStrategyProcessor
 from app.scene_analysis.services.sentiment_processor import SentimentProcessor
@@ -30,6 +31,7 @@ class CurrentSceneHandler(MessageHandler):
         valuation_processor: ValuationProcessor | None = None,
         sentiment_processor: SentimentProcessor | None = None,
         risk_strategy_processor: RiskStrategyProcessor | None = None,
+        market_context_builder: MarketContextBuilder | None = None,
         callback_client: SceneAnalysisCallbackClient | None = None,
     ) -> None:
         self._max_attempts = max_attempts
@@ -41,6 +43,7 @@ class CurrentSceneHandler(MessageHandler):
         self._valuation_processor = valuation_processor or ValuationProcessor()
         self._sentiment_processor = sentiment_processor or SentimentProcessor()
         self._risk_strategy_processor = risk_strategy_processor or RiskStrategyProcessor()
+        self._market_context_builder = market_context_builder or MarketContextBuilder()
         self._callback_client = callback_client or SceneAnalysisCallbackClient(settings.finance_api)
 
     def handle(self, message: IncomingMessage) -> HandlerResult:
@@ -81,6 +84,7 @@ class CurrentSceneHandler(MessageHandler):
             target=target,
             report_type=message.body.get("reportType"),
             total_chunks=total_chunks,
+            market_context=self._market_context_builder.build(message.body),
             module_results=module_results,
         )
         logger.info(

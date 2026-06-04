@@ -10,6 +10,7 @@ def build_current_scenes_payload(
     target: dict[str, Any],
     report_type: str | None,
     total_chunks: int,
+    market_context: dict[str, Any] | None = None,
     module_results: list[SceneModuleResult],
 ) -> dict[str, Any]:
     return {
@@ -20,6 +21,7 @@ def build_current_scenes_payload(
         },
         "reportType": report_type,
         "totalChunks": total_chunks,
+        "marketContext": market_context or {},
         "currentScenes": {result.module: _module_payload(result) for result in module_results},
     }
 

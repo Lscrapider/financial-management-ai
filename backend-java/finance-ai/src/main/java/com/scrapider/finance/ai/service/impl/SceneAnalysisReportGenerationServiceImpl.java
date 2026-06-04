@@ -34,11 +34,18 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
     private static final String GENERATION_TYPE_REGENERATE = "regenerate";
     private static final String SYSTEM_PROMPT = """
             你是一个面向个人投资研究的理财分析报告生成助手。
-            必须基于输入的 currentScenes 和 knowledgeContext 生成结构化 JSON 报告。
+            必须基于输入的 marketContext、currentScenes 和 knowledgeContext 生成结构化 JSON 报告。
+            输入字段说明：marketContext 是客观市场上下文，包含行情快照、分时线压缩特征、K 线压缩特征等事实和数值。
+            currentScenes 是系统计算出的当前场景结果，包含场景分数、方向、内部标签和 evidence，用于辅助理解当前状态。
+            knowledgeContext 是知识库召回内容，包含可引用的 chunk，使用其中观点、方法或经验时必须引用 chunkId。
+            三者边界：marketContext 负责事实，currentScenes 负责系统解释，knowledgeContext 负责可引用知识依据。
             可以给出买入、卖出、持有、观望或回避建议，但必须解释依据、适用条件和主要风险。
             不要承诺收益，不要编造缺失数据，不要把建议表述为确定性结论。
             必须区分事实、推断和风险提示。
             使用知识库内容时必须引用 chunkId，chunkId 只能来自输入的 knowledgeContext。
+            报告面向普通用户，不得在输出内容中直接暴露内部标签名、字段名、score 或系统术语。
+            例如不要写 price_drop、volume_expand、risk_control、currentScenes、knowledgeContext、score、标签触发等表达。
+            如果需要表达内部标签含义，必须改写成自然语言，例如把“price_drop 标签触发”改写为“当日价格回落”。
             只输出 JSON object，不要输出 Markdown，不要输出 JSON 之外的解释文本。
             """;
 
@@ -125,7 +132,7 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
 
     private void generateFromTaskSnapshotSafely(String taskNo, Long reportId, String generationType) {
         try {
-            GeneratedReport report = this.generateFromTaskSnapshot(taskNo);
+            GeneratedReport report = this.generateFromTaskSnapshot(taskNo, generationType);
             this.sceneAnalysisReportManage.markSuccess(
                     reportId,
                     report.reportContent(),
@@ -143,20 +150,36 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
         }
     }
 
-    private GeneratedReport generateFromTaskSnapshot(String taskNo) {
+    private GeneratedReport generateFromTaskSnapshot(String taskNo, String generationType) {
         SceneAnalysisTaskPO task = this.loadTask(taskNo);
         JsonNode currentScenesPayload = this.requiredObject(task.getCurrentScenesPayload(), "currentScenesPayload");
         ObjectNode reportPayload = this.mutableReportPayload(task.getReportPayload());
         JsonNode knowledgeContext = this.requiredObject(reportPayload.path("knowledgeContext"), "knowledgeContext");
-        Set<Long> allowedChunkIds = this.collectKnowledgeChunkIds(knowledgeContext);
-        JsonNode requestPayload = this.buildRequestPayload(task, currentScenesPayload, reportPayload, knowledgeContext);
+        JsonNode requestPayload = this.reportRequestPayload(task, currentScenesPayload, reportPayload, knowledgeContext, generationType);
+        Set<Long> allowedChunkIds = this.collectKnowledgeChunkIds(requestPayload.path("knowledgeContext"));
         JsonNode deepSeekResponse = this.deepSeekChatCompletionApi.generateJsonReport(
                 SYSTEM_PROMPT,
-                this.userPrompt(requestPayload, allowedChunkIds));
+                this.userPrompt(requestPayload, allowedChunkIds, this.outputRequirement()));
         this.recordTokenUsage(deepSeekResponse);
         JsonNode reportContent = this.reportContent(deepSeekResponse);
         this.validateChunkReferences(reportContent, allowedChunkIds);
         return new GeneratedReport(reportContent, this.renderReportText(reportContent, knowledgeContext));
+    }
+
+    private JsonNode reportRequestPayload(
+            SceneAnalysisTaskPO task,
+            JsonNode currentScenesPayload,
+            ObjectNode reportPayload,
+            JsonNode knowledgeContext,
+            String generationType) {
+        JsonNode storedLlmInput = reportPayload.path("llmInput");
+        if (GENERATION_TYPE_REGENERATE.equals(generationType) && storedLlmInput.isObject()) {
+            return storedLlmInput;
+        }
+        JsonNode requestPayload = this.buildRequestPayload(task, currentScenesPayload, knowledgeContext);
+        reportPayload.set("llmInput", requestPayload);
+        this.sceneAnalysisTaskManage.updateReportPayload(task.getTaskNo(), reportPayload);
+        return requestPayload;
     }
 
     private SceneAnalysisTaskPO loadTask(String taskNo) {
@@ -190,20 +213,24 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
     private JsonNode buildRequestPayload(
             SceneAnalysisTaskPO task,
             JsonNode currentScenesPayload,
-            JsonNode reportPayload,
             JsonNode knowledgeContext) {
         ObjectNode root = this.objectMapper.createObjectNode();
-        ObjectNode target = root.putObject("target");
-        target.put("type", task.getTargetType());
-        target.put("code", task.getTargetCode());
-        target.put("name", task.getTargetName());
-        root.put("reportType", task.getReportType());
+        root.set("marketContext", this.reportMarketContext(currentScenesPayload.path("marketContext"), task));
         root.set("currentScenes", this.reportCurrentScenes(currentScenesPayload.path("currentScenes")));
-        root.set("chunkAllocation", reportPayload.path("chunkAllocation"));
-        root.set("retrievalTasks", reportPayload.path("retrievalTasks"));
-        root.set("knowledgeContext", knowledgeContext);
-        root.set("outputRequirement", this.outputRequirement());
+        root.set("knowledgeContext", this.reportKnowledgeContext(knowledgeContext));
         return root;
+    }
+
+    private JsonNode reportMarketContext(JsonNode marketContext, SceneAnalysisTaskPO task) {
+        if (marketContext != null && marketContext.isObject()) {
+            return marketContext;
+        }
+        ObjectNode fallback = this.objectMapper.createObjectNode();
+        ObjectNode snapshot = fallback.putObject("snapshot");
+        snapshot.put("targetType", task.getTargetType());
+        snapshot.put("targetCode", task.getTargetCode());
+        snapshot.put("targetName", task.getTargetName());
+        return fallback;
     }
 
     private ObjectNode reportCurrentScenes(JsonNode currentScenes) {
@@ -221,7 +248,32 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
             this.copyIfPresent(module, sanitized, "level");
             this.copyIfPresent(module, sanitized, "direction");
             this.copyIfPresent(module, sanitized, "tags");
-            this.copyIfPresent(module, sanitized, "queryText");
+            this.copyIfPresent(module, sanitized, "evidence");
+        });
+        return result;
+    }
+
+    private ObjectNode reportKnowledgeContext(JsonNode knowledgeContext) {
+        ObjectNode result = this.objectMapper.createObjectNode();
+        if (knowledgeContext == null || !knowledgeContext.isObject()) {
+            return result;
+        }
+        knowledgeContext.properties().forEach(entry -> {
+            JsonNode chunks = entry.getValue();
+            if (!chunks.isArray()) {
+                return;
+            }
+            ArrayNode sanitizedChunks = result.putArray(entry.getKey());
+            chunks.forEach(chunk -> {
+                if (chunk == null || !chunk.isObject()) {
+                    return;
+                }
+                ObjectNode sanitized = sanitizedChunks.addObject();
+                this.copyIfPresent(chunk, sanitized, "chunkId");
+                this.copyIfPresent(chunk, sanitized, "scene");
+                this.copyIfPresent(chunk, sanitized, "text");
+                this.copyIfPresent(chunk, sanitized, "matchedTags");
+            });
         });
         return result;
     }
@@ -245,7 +297,7 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
         requirement.put("recommendedSchema", """
                 {
                   "summary": {"title": "", "conclusion": "", "confidence": "low|medium|high"},
-                  "marketFacts": [{"fact": "", "source": "currentScenes|knowledgeContext", "chunkIds": []}],
+                  "marketFacts": [{"fact": "", "source": "marketContext|currentScenes|knowledgeContext", "chunkIds": []}],
                   "sceneInterpretation": [{"scene": "", "view": "", "basis": [], "chunkIds": []}],
                   "knowledgeBasedAnalysis": [{"scene": "", "point": "", "chunkIds": []}],
                   "tradingSuggestions": [{
@@ -265,7 +317,7 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
         return requirement;
     }
 
-    private String userPrompt(JsonNode requestPayload, Set<Long> allowedChunkIds) {
+    private String userPrompt(JsonNode requestPayload, Set<Long> allowedChunkIds, JsonNode outputRequirement) {
         return """
                 请基于以下 JSON 输入生成投资研究报告 JSON。
 
@@ -280,9 +332,12 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
                 allowedChunkIds:
                 %s
 
+                输出格式要求:
+                %s
+
                 输入 JSON:
                 %s
-                """.formatted(allowedChunkIds, requestPayload);
+                """.formatted(allowedChunkIds, outputRequirement, requestPayload);
     }
 
     private JsonNode reportContent(JsonNode deepSeekResponse) {
