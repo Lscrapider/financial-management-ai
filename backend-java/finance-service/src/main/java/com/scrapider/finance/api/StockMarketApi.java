@@ -3,6 +3,8 @@ package com.scrapider.finance.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scrapider.finance.domain.dto.StockMarketDataDTO;
+import com.scrapider.finance.domain.enums.KlineAdjustTypeEnum;
+import com.scrapider.finance.domain.enums.KlinePeriodTypeEnum;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.List;
@@ -57,8 +59,22 @@ public class StockMarketApi {
     }
 
     public StockMarketDataDTO getDailyKlines(String secid, Integer limit) {
+        return this.getKlines(secid, KlinePeriodTypeEnum.DAILY, KlineAdjustTypeEnum.HFQ, limit);
+    }
+
+    public StockMarketDataDTO getKlines(
+            String secid,
+            KlinePeriodTypeEnum periodType,
+            KlineAdjustTypeEnum adjustType,
+            Integer limit) {
         String symbol = this.toTencentSymbol(secid);
-        String param = "%s,day,,,%d,qfq".formatted(symbol, limit == null || limit < 1 ? 250 : limit);
+        KlinePeriodTypeEnum normalizedPeriod = periodType == null ? KlinePeriodTypeEnum.DAILY : periodType;
+        KlineAdjustTypeEnum normalizedAdjust = adjustType == null ? KlineAdjustTypeEnum.HFQ : adjustType;
+        String param = "%s,%s,,,%d,%s".formatted(
+                symbol,
+                normalizedPeriod.getTencentCode(),
+                limit == null || limit < 1 ? 250 : limit,
+                normalizedAdjust.getCode());
         String url = UriComponentsBuilder.fromUriString(TENCENT_DAILY_KLINE_URL)
                 .queryParam("param", param)
                 .toUriString();

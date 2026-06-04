@@ -1,4 +1,6 @@
+import json
 import logging
+from pathlib import Path
 
 from app.core.config import settings
 from app.messaging.base_handler import MessageHandler
@@ -18,7 +20,7 @@ from app.scene_analysis.services.valuation_processor import ValuationProcessor
 from app.scene_analysis.services.volume_processor import VolumeProcessor
 
 logger = logging.getLogger(__name__)
-
+DEFAULT_TEST_DATA_PATH = Path(__file__).resolve().parents[3] / "test" / "data3.json"
 class CurrentSceneHandler(MessageHandler):
     def __init__(
         self,
@@ -57,6 +59,7 @@ class CurrentSceneHandler(MessageHandler):
         if not isinstance(config, dict) or not isinstance(config.get("parameters"), dict):
             raise PermanentMessageError(f"scene analysis config.parameters is required task_no={task_no}")
         total_chunks = self._total_chunks(message.body)
+        self._save_test_data(message.body)
         base_metrics = self._base_metrics_calculator.calculate(message.body)
         context = SceneAnalysisContext.from_message(message.body, base_metrics)
         asset_result = self._asset_processor.process(context)
@@ -113,3 +116,7 @@ class CurrentSceneHandler(MessageHandler):
         if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
             raise PermanentMessageError("scene analysis totalChunks is required and must be greater than 0")
         return value
+
+    def _save_test_data(self, payload: dict) -> None:
+        DEFAULT_TEST_DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
+        DEFAULT_TEST_DATA_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")

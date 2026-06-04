@@ -18,6 +18,8 @@ public record SceneAnalysisMessageDTO(
         List<Map<String, Object>> financialIndicators,
         List<Map<String, Object>> dividendHistory,
         List<Map<String, Object>> dailyKlines,
+        List<Map<String, Object>> weeklyKlines,
+        List<Map<String, Object>> monthlyKlines,
         List<Map<String, Object>> intradayData,
         Map<String, Object> dataCompleteness) {
 }

@@ -5,17 +5,20 @@ import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.scrapider.finance.api.StockMarketApi;
 import com.scrapider.finance.domain.dto.StockMarketDataDTO;
+import com.scrapider.finance.domain.enums.KlineAdjustTypeEnum;
+import com.scrapider.finance.domain.enums.KlinePeriodTypeEnum;
 import com.scrapider.finance.domain.po.StockConfigPO;
-import com.scrapider.finance.domain.po.StockDailyKlinePO;
+import com.scrapider.finance.domain.po.StockKlinePO;
 import com.scrapider.finance.domain.po.StockIntradayTrendPO;
 import com.scrapider.finance.domain.po.StockQuoteSnapshotPO;
 import com.scrapider.finance.domain.util.StockMarketJsonParser;
 import com.scrapider.finance.manage.StockConfigManage;
-import com.scrapider.finance.manage.StockDailyKlineManage;
+import com.scrapider.finance.manage.StockKlineManage;
 import com.scrapider.finance.manage.StockIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
 import com.scrapider.finance.service.StockAlertService;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -38,10 +41,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class StockMarketSyncTask {
 
+    private static final KlineAdjustTypeEnum DEFAULT_KLINE_ADJUST_TYPE = KlineAdjustTypeEnum.HFQ;
+
     private final StockMarketApi stockMarketApi;
     private final StockConfigManage stockConfigManage;
     private final StockQuoteSnapshotManage stockQuoteSnapshotManage;
-    private final StockDailyKlineManage stockDailyKlineManage;
+    private final StockKlineManage stockKlineManage;
     private final StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage;
     private final StockAlertService stockAlertService;
     private final AtomicBoolean syncing = new AtomicBoolean(false);
@@ -59,6 +64,18 @@ public class StockMarketSyncTask {
     @Value("${stock.sync.daily-kline-limit:250}")
     private Integer dailyKlineLimit;
 
+    @Value("${stock.sync.weekly-kline-enabled:true}")
+    private boolean weeklyKlineEnabled;
+
+    @Value("${stock.sync.weekly-kline-limit:250}")
+    private Integer weeklyKlineLimit;
+
+    @Value("${stock.sync.monthly-kline-enabled:true}")
+    private boolean monthlyKlineEnabled;
+
+    @Value("${stock.sync.monthly-kline-limit:250}")
+    private Integer monthlyKlineLimit;
+
     @Value("${stock.sync.start-time:09:29}")
     private String startTime;
 
@@ -75,13 +92,13 @@ public class StockMarketSyncTask {
             StockMarketApi stockMarketApi,
             StockConfigManage stockConfigManage,
             StockQuoteSnapshotManage stockQuoteSnapshotManage,
-            StockDailyKlineManage stockDailyKlineManage,
+            StockKlineManage stockKlineManage,
             StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage,
             StockAlertService stockAlertService) {
         this.stockMarketApi = stockMarketApi;
         this.stockConfigManage = stockConfigManage;
         this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
-        this.stockDailyKlineManage = stockDailyKlineManage;
+        this.stockKlineManage = stockKlineManage;
         this.stockIntradayTrendInfluxManage = stockIntradayTrendInfluxManage;
         this.stockAlertService = stockAlertService;
     }
@@ -225,14 +242,19 @@ public class StockMarketSyncTask {
         }
 
         if (this.dailyKlineEnabled) {
-            for (StockConfigPO stock : valid) {
-                try {
-                    this.doSyncDailyKlinesForStock(stock);
-                    this.sleepForRateLimit();
-                } catch (Exception ex) {
-                    log.warn("Failed to sync daily kline for stock: {}", stock.getStockCode(), ex);
-                }
-            }
+            this.batchSyncKlines(valid, new KlineSyncPlan(
+                    KlinePeriodTypeEnum.DAILY,
+                    this.dailyKlineLimit));
+        }
+        if (this.weeklyKlineEnabled) {
+            this.batchSyncKlines(valid, new KlineSyncPlan(
+                    KlinePeriodTypeEnum.WEEKLY,
+                    this.weeklyKlineLimit));
+        }
+        if (this.monthlyKlineEnabled) {
+            this.batchSyncKlines(valid, new KlineSyncPlan(
+                    KlinePeriodTypeEnum.MONTHLY,
+                    this.monthlyKlineLimit));
         }
     }
 
@@ -251,8 +273,57 @@ public class StockMarketSyncTask {
     }
 
     private void doSyncDailyKlinesForStock(StockConfigPO stock) {
-        StockMarketDataDTO dailyKlines = this.stockMarketApi.getDailyKlines(stock.getSecid(), this.dailyKlineLimit);
-        this.stockDailyKlineManage.saveDailyKlines(StockDailyKlinePO.fromApiResponse(stock, dailyKlines.data()));
+        this.doSyncKlinesForStock(stock, KlinePeriodTypeEnum.DAILY, this.dailyKlineLimit);
+    }
+
+    private void batchSyncKlines(List<StockConfigPO> stocks, KlineSyncPlan plan) {
+        for (StockConfigPO stock : stocks) {
+            try {
+                if (!this.shouldSyncKline(stock, plan.periodType())) {
+                    continue;
+                }
+                this.doSyncKlinesForStock(stock, plan.periodType(), plan.limit());
+                this.sleepForRateLimit();
+            } catch (Exception ex) {
+                log.warn(
+                        "Failed to sync {} kline for stock: {}",
+                        plan.periodType().getCode(),
+                        stock.getStockCode(),
+                        ex);
+            }
+        }
+    }
+
+    private boolean shouldSyncKline(StockConfigPO stock, KlinePeriodTypeEnum periodType) {
+        return !this.stockKlineManage.hasSyncedSince(
+                stock.getSecid(),
+                periodType,
+                DEFAULT_KLINE_ADJUST_TYPE,
+                this.currentPeriodStart(periodType));
+    }
+
+    private LocalDateTime currentPeriodStart(KlinePeriodTypeEnum periodType) {
+        LocalDate today = LocalDate.now(ZoneId.of(this.timezone));
+        if (KlinePeriodTypeEnum.WEEKLY.equals(periodType)) {
+            return today.minusDays(today.getDayOfWeek().getValue() - 1L).atStartOfDay();
+        }
+        if (KlinePeriodTypeEnum.MONTHLY.equals(periodType)) {
+            return today.withDayOfMonth(1).atStartOfDay();
+        }
+        return today.atStartOfDay();
+    }
+
+    private void doSyncKlinesForStock(StockConfigPO stock, KlinePeriodTypeEnum periodType, Integer limit) {
+        StockMarketDataDTO klines = this.stockMarketApi.getKlines(
+                stock.getSecid(),
+                periodType,
+                DEFAULT_KLINE_ADJUST_TYPE,
+                limit);
+        this.stockKlineManage.saveKlines(StockKlinePO.fromApiResponse(
+                stock,
+                klines.data(),
+                periodType,
+                DEFAULT_KLINE_ADJUST_TYPE));
     }
 
     private void saveTrends(StockConfigPO stock, JsonNode response, String syncBatchNo) {
@@ -311,5 +382,8 @@ public class StockMarketSyncTask {
             throw new IllegalArgumentException("invalid secid: " + secid);
         }
         return "1".equals(parts[0]) ? "sh" + parts[1] : "sz" + parts[1];
+    }
+
+    private record KlineSyncPlan(KlinePeriodTypeEnum periodType, Integer limit) {
     }
 }

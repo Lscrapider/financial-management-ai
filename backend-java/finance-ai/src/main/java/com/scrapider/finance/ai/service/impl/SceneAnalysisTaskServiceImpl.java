@@ -19,6 +19,8 @@ import com.scrapider.finance.ai.service.SceneAnalysisMessagePublisher;
 import com.scrapider.finance.ai.service.SceneReportPipelineService;
 import com.scrapider.finance.ai.service.StockSceneDataEnsureService;
 import com.scrapider.finance.ai.service.SceneAnalysisTaskService;
+import com.scrapider.finance.domain.enums.KlineAdjustTypeEnum;
+import com.scrapider.finance.domain.enums.KlinePeriodTypeEnum;
 import com.scrapider.finance.domain.enums.SceneAnalysisReportTypeEnum;
 import com.scrapider.finance.domain.enums.SceneAnalysisTaskStatusEnum;
 import com.scrapider.finance.domain.po.BondConfigPO;
@@ -37,7 +39,7 @@ import com.scrapider.finance.manage.IndexDailyKlineManage;
 import com.scrapider.finance.manage.IndexQuoteSnapshotManage;
 import com.scrapider.finance.manage.SceneAnalysisTaskManage;
 import com.scrapider.finance.manage.StockConfigManage;
-import com.scrapider.finance.manage.StockDailyKlineManage;
+import com.scrapider.finance.manage.StockKlineManage;
 import com.scrapider.finance.manage.StockIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
 import java.lang.reflect.Method;
@@ -58,6 +60,8 @@ import org.springframework.stereotype.Service;
 public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
 
     private static final int DAILY_KLINE_LIMIT = 250;
+    private static final int WEEKLY_KLINE_LIMIT = 250;
+    private static final int MONTHLY_KLINE_LIMIT = 250;
     private static final int INTRADAY_LIMIT = 240;
     private static final List<String> MESSAGE_OMITTED_FIELDS =
             List.of("id", "rawResponse", "createdAt", "updatedAt");
@@ -68,7 +72,7 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
     private final SceneAnalysisMessagePublisher sceneAnalysisMessagePublisher;
     private final StockQuoteSnapshotManage stockQuoteSnapshotManage;
     private final StockConfigManage stockConfigManage;
-    private final StockDailyKlineManage stockDailyKlineManage;
+    private final StockKlineManage stockKlineManage;
     private final StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage;
     private final IndexQuoteSnapshotManage indexQuoteSnapshotManage;
     private final IndexConfigManage indexConfigManage;
@@ -85,7 +89,7 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
             SceneAnalysisMessagePublisher sceneAnalysisMessagePublisher,
             StockQuoteSnapshotManage stockQuoteSnapshotManage,
             StockConfigManage stockConfigManage,
-            StockDailyKlineManage stockDailyKlineManage,
+            StockKlineManage stockKlineManage,
             StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage,
             IndexQuoteSnapshotManage indexQuoteSnapshotManage,
             IndexConfigManage indexConfigManage,
@@ -100,7 +104,7 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
         this.sceneAnalysisMessagePublisher = sceneAnalysisMessagePublisher;
         this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
         this.stockConfigManage = stockConfigManage;
-        this.stockDailyKlineManage = stockDailyKlineManage;
+        this.stockKlineManage = stockKlineManage;
         this.stockIntradayTrendInfluxManage = stockIntradayTrendInfluxManage;
         this.indexQuoteSnapshotManage = indexQuoteSnapshotManage;
         this.indexConfigManage = indexConfigManage;
@@ -212,7 +216,26 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
         StockSceneDataDTO sceneData = this.queryStockSceneData(config, missing);
         List<Map<String, Object>> intraday = this.queryStockIntraday(stockCode, missing);
         List<Map<String, Object>> dailyKlines =
-                this.fillDailyTurnoverRate(this.queryStockDailyKlines(stockCode, missing), sceneData.valuationHistory());
+                this.fillDailyTurnoverRate(
+                        this.queryStockKlines(
+                                stockCode,
+                                KlinePeriodTypeEnum.DAILY,
+                                DAILY_KLINE_LIMIT,
+                                "stock_daily_kline",
+                                missing),
+                        sceneData.valuationHistory());
+        List<Map<String, Object>> weeklyKlines = this.queryStockKlines(
+                stockCode,
+                KlinePeriodTypeEnum.WEEKLY,
+                WEEKLY_KLINE_LIMIT,
+                "stock_weekly_kline",
+                missing);
+        List<Map<String, Object>> monthlyKlines = this.queryStockKlines(
+                stockCode,
+                KlinePeriodTypeEnum.MONTHLY,
+                MONTHLY_KLINE_LIMIT,
+                "stock_monthly_kline",
+                missing);
         return this.message(
                 taskNo,
                 param,
@@ -224,6 +247,8 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
                 this.toMapList(sceneData.financialIndicators()),
                 this.toMapList(sceneData.dividendHistory()),
                 dailyKlines,
+                weeklyKlines,
+                monthlyKlines,
                 intraday,
                 missing);
     }
@@ -276,6 +301,8 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
                 List.of(),
                 dailyKlines,
                 List.of(),
+                List.of(),
+                List.of(),
                 missing);
     }
 
@@ -327,6 +354,8 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
                 List.of(),
                 dailyKlines,
                 List.of(),
+                List.of(),
+                List.of(),
                 missing);
     }
 
@@ -341,6 +370,8 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
             List<Map<String, Object>> financialIndicators,
             List<Map<String, Object>> dividendHistory,
             List<Map<String, Object>> dailyKlines,
+            List<Map<String, Object>> weeklyKlines,
+            List<Map<String, Object>> monthlyKlines,
             List<Map<String, Object>> intradayData,
             List<String> missing) {
         return new SceneAnalysisMessageDTO(
@@ -359,6 +390,8 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
                 financialIndicators,
                 dividendHistory,
                 dailyKlines,
+                weeklyKlines,
+                monthlyKlines,
                 intradayData,
                 this.dataCompleteness(missing));
     }
@@ -398,14 +431,19 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
         return rows;
     }
 
-    private List<Map<String, Object>> queryStockDailyKlines(String stockCode, List<String> missing) {
-        List<Map<String, Object>> rows = this.stockDailyKlineManage
-                .listDailyKlines(stockCode, null, null, null, DAILY_KLINE_LIMIT)
+    private List<Map<String, Object>> queryStockKlines(
+            String stockCode,
+            KlinePeriodTypeEnum periodType,
+            Integer limit,
+            String missingKey,
+            List<String> missing) {
+        List<Map<String, Object>> rows = this.stockKlineManage
+                .listKlines(stockCode, null, periodType, KlineAdjustTypeEnum.HFQ, null, null, limit)
                 .stream()
                 .map(this::toMap)
                 .toList();
         if (rows.isEmpty()) {
-            missing.add("stock_daily_kline");
+            missing.add(missingKey);
         }
         return rows;
     }
