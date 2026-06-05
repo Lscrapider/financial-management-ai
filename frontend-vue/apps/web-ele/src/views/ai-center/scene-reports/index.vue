@@ -1,4 +1,14 @@
 <script lang="ts" setup>
+import type {
+  SceneAnalysisConfigProfile,
+  SceneAnalysisReportDetail,
+  SceneAnalysisReportHistory,
+  SceneAnalysisReportTarget,
+  SceneAnalysisReportType,
+  SceneAnalysisTargetOption,
+  SceneReportStatus,
+} from '#/api/scene-analysis';
+
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
@@ -40,13 +50,6 @@ import {
   searchSceneAnalysisTargets,
   submitSceneAnalysisTask,
   updateSceneAnalysisConfigProfile,
-  type SceneAnalysisConfigProfile,
-  type SceneAnalysisReportDetail,
-  type SceneAnalysisReportHistory,
-  type SceneAnalysisReportTarget,
-  type SceneAnalysisReportType,
-  type SceneAnalysisTargetOption,
-  type SceneReportStatus,
 } from '#/api/scene-analysis';
 import { useReportPollingStore } from '#/store';
 
@@ -138,6 +141,9 @@ const filteredConfigProfiles = computed(() =>
 );
 const renderedReportHtml = computed(() =>
   renderMarkdown(selectedReport.value?.reportText || '暂无报告正文'),
+);
+const selectedReportPrintTitle = computed(() =>
+  selectedReport.value ? `${displayTarget(selectedReport.value)} 分析报告` : '标的分析报告',
 );
 
 onMounted(async () => {
@@ -439,7 +445,7 @@ async function openDetail(reportId?: null | number) {
   }
 }
 
-async function regenerate(row: SceneAnalysisReportTarget | SceneAnalysisReportHistory) {
+async function regenerate(row: SceneAnalysisReportHistory | SceneAnalysisReportTarget) {
   regeneratingTaskNo.value = taskNoOf(row);
   try {
     await regenerateSceneReport(regeneratingTaskNo.value);
@@ -454,7 +460,7 @@ async function regenerate(row: SceneAnalysisReportTarget | SceneAnalysisReportHi
   }
 }
 
-function taskNoOf(row: SceneAnalysisReportTarget | SceneAnalysisReportHistory) {
+function taskNoOf(row: SceneAnalysisReportHistory | SceneAnalysisReportTarget) {
   return 'taskNo' in row ? row.taskNo : row.latestTaskNo;
 }
 
@@ -555,13 +561,13 @@ function parameterValuesFromOverrides(value: unknown) {
 }
 
 function defaultParameterValues() {
-  return parameterGroups.value.flatMap((group) => group.fields).reduce<Record<string, number>>(
-    (result, field) => {
+  const result: Record<string, number> = {};
+  for (const group of parameterGroups.value) {
+    for (const field of group.fields) {
       result[field.key] = field.defaultValue;
-      return result;
-    },
-    {},
-  );
+    }
+  }
+  return result;
 }
 
 function objectValue(value: unknown) {
@@ -571,12 +577,14 @@ function objectValue(value: unknown) {
 }
 
 function getNestedValue(source: Record<string, unknown>, path: string[]) {
-  return path.reduce<unknown>((current, key) => {
+  let current: unknown = source;
+  for (const key of path) {
     if (!current || typeof current !== 'object' || Array.isArray(current)) {
       return undefined;
     }
-    return (current as Record<string, unknown>)[key];
-  }, source);
+    current = (current as Record<string, unknown>)[key];
+  }
+  return current;
 }
 
 function setNestedValue(target: Record<string, unknown>, path: string[], value: unknown) {
@@ -669,6 +677,116 @@ function renderInlineMarkdown(text: string) {
     /（引用：[^）]+）/g,
     (reference) => `<strong class="report-reference">${reference}</strong>`,
   );
+}
+
+function exportSelectedReportPdf() {
+  if (!selectedReport.value) {
+    ElMessage.warning('请先打开报告详情');
+    return;
+  }
+
+  const printWindow = window.open('', '_blank', 'width=960,height=720');
+  if (!printWindow) {
+    ElMessage.warning('浏览器阻止了弹窗，请允许弹窗后重试');
+    return;
+  }
+
+  const report = selectedReport.value;
+  const title = selectedReportPrintTitle.value;
+  printWindow.document.write(`
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(title)}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      color: #1f2937;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.75;
+      margin: 0;
+      padding: 32px;
+    }
+    .report-export { margin: 0 auto; max-width: 860px; }
+    .report-title {
+      border-bottom: 2px solid #111827;
+      font-size: 24px;
+      line-height: 1.35;
+      margin: 0 0 18px;
+      padding-bottom: 12px;
+    }
+    .report-meta {
+      border: 1px solid #d1d5db;
+      border-collapse: collapse;
+      margin-bottom: 24px;
+      width: 100%;
+    }
+    .report-meta th,
+    .report-meta td {
+      border: 1px solid #d1d5db;
+      font-size: 13px;
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .report-meta th {
+      background: #f3f4f6;
+      color: #374151;
+      font-weight: 600;
+      width: 96px;
+    }
+    .markdown-report h1 { font-size: 22px; line-height: 1.4; margin: 0 0 18px; }
+    .markdown-report h2 {
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 18px;
+      margin: 22px 0 10px;
+      padding-bottom: 6px;
+    }
+    .markdown-report h3 { font-size: 16px; margin: 18px 0 8px; }
+    .markdown-report p { margin: 0 0 10px; }
+    .markdown-report ul { margin: 0 0 14px; padding-left: 22px; }
+    .markdown-report li { margin: 4px 0; }
+    .report-reference { font-weight: 700; }
+    @page { margin: 16mm; size: A4; }
+    @media print {
+      body { padding: 0; }
+      .report-export { max-width: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="report-export">
+    <h1 class="report-title">${escapeHtml(title)}</h1>
+    <table class="report-meta">
+      <tbody>
+        <tr>
+          <th>标的</th>
+          <td>${escapeHtml(displayTarget(report))}</td>
+          <th>版本</th>
+          <td>${escapeHtml(`${generationLabel(report.generationType)} #${report.versionNo}`)}</td>
+        </tr>
+        <tr>
+          <th>状态</th>
+          <td>${escapeHtml(statusLabel(report.status))}</td>
+          <th>模型</th>
+          <td>${escapeHtml(report.model || '-')}</td>
+        </tr>
+        <tr>
+          <th>生成时间</th>
+          <td colspan="3">${escapeHtml(formatDateTime(report.generatedAt || report.createdAt))}</td>
+        </tr>
+      </tbody>
+    </table>
+    <article class="markdown-report">${renderedReportHtml.value}</article>
+  </main>
+</body>
+</html>`);
+  printWindow.document.close();
+  printWindow.focus();
+  window.setTimeout(() => {
+    printWindow.print();
+  }, 250);
 }
 
 function escapeHtml(text: string) {
@@ -1098,9 +1216,20 @@ function escapeHtml(text: string) {
       <template #header>
         <div class="drawer-header">
           <span>报告详情</span>
-          <ElButton link type="primary" @click="detailFullscreen = !detailFullscreen">
-            {{ detailFullscreen ? '退出全屏' : '全屏' }}
-          </ElButton>
+          <div class="drawer-header-actions">
+            <ElButton
+              :disabled="!selectedReport"
+              link
+              type="primary"
+              @click="exportSelectedReportPdf"
+            >
+              <IconifyIcon icon="lucide:file-down" />
+              导出 PDF
+            </ElButton>
+            <ElButton link type="primary" @click="detailFullscreen = !detailFullscreen">
+              {{ detailFullscreen ? '退出全屏' : '全屏' }}
+            </ElButton>
+          </div>
         </div>
       </template>
       <div v-loading="loadingDetail" class="detail-panel">
@@ -1382,6 +1511,12 @@ function escapeHtml(text: string) {
   display: flex;
   justify-content: space-between;
   width: 100%;
+}
+
+.drawer-header-actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
 }
 
 .markdown-report {

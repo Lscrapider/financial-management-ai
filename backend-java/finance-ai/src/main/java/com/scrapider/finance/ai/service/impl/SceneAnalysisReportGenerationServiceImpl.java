@@ -21,11 +21,14 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
+
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisReportGenerationService {
 
@@ -36,13 +39,12 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
             你是一个面向个人投资研究的理财分析报告生成助手。
             必须基于输入的 marketContext、currentScenes 和 knowledgeContext 生成结构化 JSON 报告。
             输入字段说明：marketContext 是客观市场上下文，包含行情快照、分时线压缩特征、K 线压缩特征等事实和数值。
+            marketContext 中各数据块统一包含 meta 和 data：meta 是中文数据口径、用途和限制说明，data 是可引用的客观事实数值。
+            生成报告时必须优先遵守每个 marketContext 数据块 meta.限制，不得跨数据范围滥用字段。
             currentScenes 是系统计算出的当前场景结果，包含场景分数、方向、内部标签和 evidence，用于辅助理解当前状态。
             knowledgeContext 是知识库召回内容，包含可引用的 chunk，使用其中观点、方法或经验时必须引用 chunkId。
             三者边界：marketContext 负责事实，currentScenes 负责系统解释，knowledgeContext 负责可引用知识依据。
-            marketContext.snapshot 中的现价、涨跌幅等是实时行情快照，按原始行情口径理解。
-            marketContext.klineTrends 和 currentScenes.trend.periodTrends 是基于日 K、周 K、月 K 的趋势压缩结果，K 线价格采用复权口径。
-            快照现价和 K 线最新收盘价可能因价格口径不同而不同，不得直接比较二者并判断“数据不一致”“数据时滞”或“某周期价格错误”。
-            需要提到价格差异时，只能说明“快照和 K 线趋势数据属于不同价格口径”，除非输入中明确提供了时滞或异常字段。
+            具体字段含义以 marketContext 各数据块 meta 为准，不得把不同数据范围或不同价格口径的数据直接比较为异常。
             可以给出买入、卖出、持有、观望或回避建议，但必须解释依据、适用条件和主要风险。
             不要承诺收益，不要编造缺失数据，不要把建议表述为确定性结论。
             必须区分事实、推断和风险提示。
@@ -161,9 +163,11 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
         JsonNode knowledgeContext = this.requiredObject(reportPayload.path("knowledgeContext"), "knowledgeContext");
         JsonNode requestPayload = this.reportRequestPayload(task, currentScenesPayload, reportPayload, knowledgeContext, generationType);
         Set<Long> allowedChunkIds = this.collectKnowledgeChunkIds(requestPayload.path("knowledgeContext"));
+        log.info("调用 deepseek 请求开始 {}", taskNo);
         JsonNode deepSeekResponse = this.deepSeekChatCompletionApi.generateJsonReport(
                 SYSTEM_PROMPT,
                 this.userPrompt(requestPayload, allowedChunkIds, this.outputRequirement()));
+        log.info("调用 deepseek 请求结束 {}", taskNo);
         this.recordTokenUsage(deepSeekResponse);
         JsonNode reportContent = this.reportContent(deepSeekResponse);
         this.validateChunkReferences(reportContent, allowedChunkIds);
@@ -231,9 +235,14 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
         }
         ObjectNode fallback = this.objectMapper.createObjectNode();
         ObjectNode snapshot = fallback.putObject("snapshot");
-        snapshot.put("targetType", task.getTargetType());
-        snapshot.put("targetCode", task.getTargetCode());
-        snapshot.put("targetName", task.getTargetName());
+        ObjectNode meta = snapshot.putObject("meta");
+        meta.put("数据范围", "任务标的基础信息");
+        meta.put("用途", "仅用于识别报告标的");
+        meta.putArray("限制").add("缺少实时行情快照，不能据此判断价格、趋势或估值");
+        ObjectNode data = snapshot.putObject("data");
+        data.put("targetType", task.getTargetType());
+        data.put("targetCode", task.getTargetCode());
+        data.put("targetName", task.getTargetName());
         return fallback;
     }
 
@@ -339,9 +348,9 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
                 5. 可以给出买入、卖出、持有、观望或回避建议，但必须同时说明 reason、conditions 和 risks。
                 6. 操作建议只能作为研究判断，不得承诺收益，不得使用“必涨”“必跌”“一定买入”等确定性表述。
                 7. 必须输出 periodTrendAnalysis，且包含 daily、weekly、monthly 三项，分别解释日 K、周 K、月 K 的趋势状态、主要依据和对当前判断的影响。
-                8. periodTrendAnalysis 必须优先使用 currentScenes.trend.periodTrends 与 marketContext.klineTrends 中对应周期的数据；只能用自然语言表达，不得暴露内部标签名、字段名或 score。
-                9. snapshot 是实时行情快照，K 线趋势数据可能是复权口径；不要把 snapshot 现价和 K 线 latestClose 的差异解释成月线价格、数据错误、数据时滞或多周期不一致。
-                10. 如果必须同时提到快照现价和 K 线价格，只能说明它们属于不同价格口径，趋势判断以 K 线趋势结构为准，现价用于描述当前行情快照。
+                8. periodTrendAnalysis 必须优先使用 currentScenes.trend.periodTrends 与 marketContext.klineTrends.<period>.data 中对应周期的数据；只能用自然语言表达，不得暴露内部标签名、字段名或 score。
+                9. 必须遵守 marketContext 各数据块 meta 中的“数据范围”“价格口径”“用途”“限制”；不得跨数据范围滥用字段，不得把不同价格口径的数据差异解释成数据错误、数据时滞或多周期不一致。
+                10. 不得输出输入中没有数据支持的内容，例如资金出逃、主力撤退、筹码松动；不得把短周期信号升级成长周期结论。
 
                 allowedChunkIds:
                 %s

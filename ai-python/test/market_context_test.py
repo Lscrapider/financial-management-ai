@@ -44,10 +44,13 @@ def test_market_context_includes_valuation_facts() -> None:
     }
 
     market_context = MarketContextBuilder().build(message)
+    valuation = market_context["valuation"]["data"]
 
-    assert market_context["valuation"]["current"]["peTtm"] == 6.4
-    assert market_context["valuation"]["current"]["peDynamic"] == 6.1
-    assert market_context["valuation"]["current"]["pbRatio"] == 0.79
-    assert market_context["valuation"]["historySummary"]["peTtm"]["count"] == 3
-    assert market_context["valuation"]["historySummary"]["pbMrq"]["percentileRank"] == 1 / 3
-    assert market_context["valuation"]["dividend"]["estimatedDividendYieldPct"] == 2.0
+    assert market_context["snapshot"]["meta"]["数据范围"] == "实时行情快照"
+    assert market_context["snapshot"]["data"]["latestPrice"] == 10
+    assert valuation["current"]["peTtm"] == 6.4
+    assert valuation["current"]["peDynamic"] == 6.1
+    assert valuation["current"]["pbRatio"] == 0.79
+    assert valuation["historySummary"]["peTtm"]["count"] == 3
+    assert valuation["historySummary"]["pbMrq"]["percentileRank"] == 1 / 3
+    assert valuation["dividend"]["estimatedDividendYieldPct"] == 2.0

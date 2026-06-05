@@ -55,11 +55,46 @@ export interface StockIntradayTrend {
   syncedAt?: string;
 }
 
+export interface StockKline {
+  stockCode: string;
+  stockName: string;
+  secid: string;
+  marketCode: string;
+  exchangeCode: string;
+  periodType: string;
+  adjustType: string;
+  tradeDate: string;
+  openPrice?: number | string;
+  closePrice?: number | string;
+  highPrice?: number | string;
+  lowPrice?: number | string;
+  changeAmount?: number | string;
+  changePercent?: number | string;
+  volume?: number;
+  turnoverAmount?: number | string;
+  amplitude?: number | string;
+  turnoverRate?: number | string;
+  ma5?: number | string;
+  ma10?: number | string;
+  ma20?: number | string;
+  syncedAt?: string;
+}
+
 export interface StockQuoteListParams {
   limit?: number;
   marketCode?: string;
   sortField?: string;
   sortOrder?: 'asc' | 'desc';
+}
+
+export interface StockKlineParams {
+  adjustType?: 'hfq' | 'none' | 'qfq';
+  endDate?: string;
+  limit?: number;
+  periodType?: 'daily' | 'monthly' | 'weekly';
+  secid?: string;
+  startDate?: string;
+  stockCode?: string;
 }
 
 export interface MarketSyncStatus {
@@ -77,6 +112,13 @@ export function listStockQuotes(params: StockQuoteListParams) {
 export function listStockIntradayTrends(stockCode: string) {
   return requestClient.get<StockIntradayTrend[]>('/stocks/intraday-trends', {
     params: { stockCode },
+    responseReturn: 'body',
+  });
+}
+
+export function listStockKlines(params: StockKlineParams) {
+  return requestClient.get<StockKline[]>('/stocks/klines', {
+    params,
     responseReturn: 'body',
   });
 }

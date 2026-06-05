@@ -15,9 +15,42 @@ class MarketContextBuilder:
 
     def build(self, message: dict[str, Any]) -> dict[str, Any]:
         return {
-            "snapshot": self._snapshot(message),
-            "valuation": self._valuation(message),
-            "intraday": self._intraday(message),
+            "snapshot": self._block(
+                {
+                    "数据范围": "实时行情快照",
+                    "价格口径": "原始行情价",
+                    "用途": "用于描述当前行情快照、当前价、当日涨跌幅、成交额和换手率等实时事实",
+                    "限制": [
+                        "不能用于判断日K、周K、月K趋势",
+                        "不能与复权K线收盘价直接比较",
+                    ],
+                },
+                self._snapshot(message),
+            ),
+            "valuation": self._block(
+                {
+                    "数据范围": "股票估值与分红数据",
+                    "用途": "用于分析PE、PB、股息率和历史估值位置",
+                    "限制": [
+                        "不能脱离PE、PB、股息率具体数值直接写估值有吸引力",
+                        "分红金额和股息率不能混为一谈",
+                    ],
+                },
+                self._valuation(message),
+            ),
+            "intraday": self._block(
+                {
+                    "数据范围": "最近一个交易日分时数据",
+                    "价格口径": "原始分时行情价",
+                    "用途": "用于描述盘中价格路径、盘中高低点、开盘至最新分时变化和成交集中度",
+                    "限制": [
+                        "不能表述为当前涨跌幅",
+                        "不能代表日K、周K或月K趋势",
+                        "不能与复权K线收盘价直接比较",
+                    ],
+                },
+                self._intraday(message),
+            ),
             "klineTrends": self._kline_trends(message),
         }
 
@@ -157,16 +190,40 @@ class MarketContextBuilder:
 
     def _kline_trends(self, message: dict[str, Any]) -> dict[str, Any]:
         return {
-            "daily": self._market_kline_context(
+            "daily": self._kline_block(
+                "日K",
                 self._analyzer.analyze("daily", self._list(message.get("dailyKlines"))),
             ),
-            "weekly": self._market_kline_context(
+            "weekly": self._kline_block(
+                "周K",
                 self._analyzer.analyze("weekly", self._list(message.get("weeklyKlines"))),
             ),
-            "monthly": self._market_kline_context(
+            "monthly": self._kline_block(
+                "月K",
                 self._analyzer.analyze("monthly", self._list(message.get("monthlyKlines"))),
             ),
         }
+
+    def _kline_block(self, period_label: str, trend: dict[str, Any]) -> dict[str, Any]:
+        data = self._market_kline_context(trend)
+        available_bars = data.get("availableBars")
+        window_text = f"{period_label}窗口"
+        if available_bars:
+            window_text = f"{period_label}窗口，最近{available_bars}根{period_label}"
+        return self._block(
+            {
+                "数据范围": window_text,
+                "周期": period_label,
+                "价格口径": "后复权K线价格",
+                "用途": f"只能用于分析{period_label}趋势结构、区间位置、均线关系和波动特征",
+                "限制": [
+                    "latestClose只能表述为K线后复权收盘价，不能表述为当前价",
+                    "不能与实时行情快照中的当前价直接比较",
+                    "不能代表其他K线周期的趋势",
+                ],
+            },
+            data,
+        )
 
     def _market_kline_context(self, trend: dict[str, Any]) -> dict[str, Any]:
         context = dict(self._dict(trend.get("context")))
@@ -443,6 +500,12 @@ class MarketContextBuilder:
             return None
         less_or_equal = sum(1 for item in history if item <= value)
         return less_or_equal / len(history)
+
+    def _block(self, meta: dict[str, Any], data: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "meta": self._compact(meta),
+            "data": data,
+        }
 
     def _compact(self, data: dict[str, Any]) -> dict[str, Any]:
         return {key: value for key, value in data.items() if value is not None and value != {}}

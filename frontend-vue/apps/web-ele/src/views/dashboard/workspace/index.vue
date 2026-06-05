@@ -1,10 +1,12 @@
 <script lang="ts" setup>
+import type { Sort } from 'element-plus';
+
 import type { EchartsUIType } from '@vben/plugins/echarts';
 
 import type { IndexQuote } from '#/api/index-market';
-import type { StockIntradayTrend, StockQuote } from '#/api/stock';
+import type { StockIntradayTrend, StockKline, StockQuote } from '#/api/stock';
 
-import { computed, nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { Page } from '@vben/common-ui';
@@ -22,16 +24,19 @@ import {
   ElTableColumn,
   ElTag,
 } from 'element-plus';
-import type { Sort } from 'element-plus';
 
 import { listIndexQuotes } from '#/api/index-market';
 import {
   getStockMarketSyncStatus,
   listStockIntradayTrends,
+  listStockKlines,
   listStockQuotes,
   syncStockMarketData,
   syncStockTrendData,
 } from '#/api/stock';
+
+type KlineAdjustType = 'hfq' | 'none' | 'qfq';
+type TrendPeriod = 'daily' | 'intraday' | 'monthly' | 'weekly';
 
 const marketOptions = [
   { label: '全部市场', relatedIndexSecids: [], value: '' },
@@ -45,10 +50,25 @@ const marketOptions = [
   { label: '深市主板', relatedIndexSecids: ['0.399001'], value: 'SZ_MAIN' },
 ];
 
+const trendPeriodOptions: Array<{ label: string; value: TrendPeriod }> = [
+  { label: '分时', value: 'intraday' },
+  { label: '日K', value: 'daily' },
+  { label: '周K', value: 'weekly' },
+  { label: '月K', value: 'monthly' },
+];
+
+const adjustTypeOptions: Array<{ label: string; value: KlineAdjustType }> = [
+  { label: '后复权', value: 'hfq' },
+  { label: '前复权', value: 'qfq' },
+  { label: '不复权', value: 'none' },
+];
+
 const chartRef = ref<EchartsUIType>();
 const { renderEcharts } = useEcharts(chartRef);
 const router = useRouter();
 
+const detailColumnRef = ref<HTMLElement>();
+const quotePanelRef = ref<InstanceType<typeof ElCard>>();
 const indexQuotes = ref<IndexQuote[]>([]);
 const loadingIndexQuotes = ref(false);
 const loadingQuotes = ref(false);
@@ -59,7 +79,14 @@ const quotes = ref<StockQuote[]>([]);
 const sortField = ref('changePercent');
 const sortOrder = ref<'asc' | 'desc'>('desc');
 const trends = ref<StockIntradayTrend[]>([]);
+const klines = ref<StockKline[]>([]);
 const selectedStockCode = ref('');
+const trendPeriod = ref<TrendPeriod>('intraday');
+const adjustType = ref<KlineAdjustType>('hfq');
+const klineLimit = ref(250);
+const quotePanelHeight = ref(0);
+const quoteTableBodyHeight = ref(580);
+const quoteTableHeight = ref(620);
 const quoteDetailVisible = ref(false);
 const quoteDetailTitle = ref('');
 const quoteDetailRows = ref<StockQuote['quoteDetails']>([]);
@@ -70,15 +97,25 @@ const selectedQuote = computed(() => {
   );
 });
 
+const quotePanelStyle = computed(() => {
+  return quotePanelHeight.value > 0
+    ? {
+        '--quote-table-body-height': `${quoteTableBodyHeight.value}px`,
+        height: `${quotePanelHeight.value}px`,
+      }
+    : {};
+});
+
 const relatedIndexQuotes = computed(() => {
   const option = marketOptions.find((item) => item.value === marketCode.value);
   const relatedSecids = option?.relatedIndexSecids ?? [];
   if (relatedSecids.length === 0) {
     return indexQuotes.value;
   }
-  const matched = relatedSecids
-    .map((secid) => indexQuotes.value.find((item) => item.secid === secid))
-    .filter((item): item is IndexQuote => Boolean(item));
+  const matched = relatedSecids.flatMap((secid) => {
+    const quote = indexQuotes.value.find((item) => item.secid === secid);
+    return quote ? [quote] : [];
+  });
   return matched.length > 0 ? matched : indexQuotes.value;
 });
 
@@ -108,7 +145,24 @@ const latestTrend = computed(() => {
   return trends.value.at(-1);
 });
 
+const latestKline = computed(() => {
+  return klines.value.at(-1);
+});
+
+const selectedTrendPeriodLabel = computed(() => {
+  return (
+    trendPeriodOptions.find((item) => item.value === trendPeriod.value)
+      ?.label ?? '走势'
+  );
+});
+
 const trendStatusText = computed(() => {
+  if (trendPeriod.value !== 'intraday') {
+    if (!latestKline.value) {
+      return `暂无${selectedTrendPeriodLabel.value}数据`;
+    }
+    return `${selectedTrendPeriodLabel.value}截至 ${latestKline.value.tradeDate} · 同步于 ${formatDateTime(latestKline.value.syncedAt)}`;
+  }
   if (!latestTrend.value) {
     return '暂无分时数据';
   }
@@ -120,9 +174,22 @@ const delay = (ms: number) =>
     setTimeout(resolve, ms);
   });
 
+let detailColumnResizeObserver: ResizeObserver | undefined;
+
 onMounted(() => {
   refreshIndexQuotes();
   refreshQuotes();
+  nextTick(() => {
+    syncQuoteTableHeights();
+    if (detailColumnRef.value) {
+      detailColumnResizeObserver = new ResizeObserver(syncQuoteTableHeights);
+      detailColumnResizeObserver.observe(detailColumnRef.value);
+    }
+  });
+});
+
+onBeforeUnmount(() => {
+  detailColumnResizeObserver?.disconnect();
 });
 
 async function refreshIndexQuotes() {
@@ -143,7 +210,7 @@ async function refreshQuotes() {
   loadingQuotes.value = true;
   try {
     quotes.value = await listStockQuotes({
-      limit: 100,
+      limit: 500,
       marketCode: marketCode.value || undefined,
       sortField: sortField.value,
       sortOrder: sortOrder.value,
@@ -154,15 +221,64 @@ async function refreshQuotes() {
     )
       ? selectedStockCode.value
       : firstStockCode;
-    await refreshTrends();
+    await refreshTrendData();
+    await nextTick();
+    syncQuoteTableHeights();
   } finally {
     loadingQuotes.value = false;
   }
 }
 
-async function refreshTrends() {
+async function refreshTrendData() {
+  if (trendPeriod.value === 'intraday') {
+    await refreshIntradayTrends();
+    await nextTick();
+    syncQuoteTableHeights();
+    return;
+  }
+  await refreshKlines();
+  await nextTick();
+  syncQuoteTableHeights();
+}
+
+function syncQuoteTableHeights() {
+  const detailHeight = detailColumnRef.value?.offsetHeight ?? 0;
+  const quotePanelElement = quotePanelRef.value?.$el as HTMLElement | undefined;
+  if (detailHeight <= 0 || !quotePanelElement) {
+    return;
+  }
+
+  const cardHeaderHeight =
+    quotePanelElement.querySelector<HTMLElement>('.el-card__header')
+      ?.offsetHeight ?? 56;
+  const cardBodyElement =
+    quotePanelElement.querySelector<HTMLElement>('.el-card__body');
+  const cardBodyStyle = cardBodyElement
+    ? getComputedStyle(cardBodyElement)
+    : undefined;
+  const cardBodyVerticalPadding =
+    Number.parseFloat(cardBodyStyle?.paddingTop ?? '0') +
+    Number.parseFloat(cardBodyStyle?.paddingBottom ?? '0');
+  const tableHeaderHeight =
+    quotePanelElement.querySelector<HTMLElement>(
+      '.quote-table .el-table__header-wrapper',
+    )?.offsetHeight ?? 40;
+
+  quotePanelHeight.value = detailHeight;
+  quoteTableHeight.value = Math.max(
+    Math.floor(detailHeight - cardHeaderHeight - cardBodyVerticalPadding),
+    320,
+  );
+  quoteTableBodyHeight.value = Math.max(
+    Math.floor(quoteTableHeight.value - tableHeaderHeight),
+    280,
+  );
+}
+
+async function refreshIntradayTrends() {
   if (!selectedStockCode.value) {
     trends.value = [];
+    klines.value = [];
     renderTrendChart();
     return;
   }
@@ -170,8 +286,33 @@ async function refreshTrends() {
   loadingTrends.value = true;
   try {
     trends.value = await listStockIntradayTrends(selectedStockCode.value);
+    klines.value = [];
     await nextTick();
+    renderIntradayChart();
+  } finally {
+    loadingTrends.value = false;
+  }
+}
+
+async function refreshKlines() {
+  if (!selectedStockCode.value) {
+    trends.value = [];
+    klines.value = [];
     renderTrendChart();
+    return;
+  }
+
+  loadingTrends.value = true;
+  try {
+    klines.value = await listStockKlines({
+      adjustType: adjustType.value,
+      limit: klineLimit.value,
+      periodType: trendPeriod.value === 'intraday' ? 'daily' : trendPeriod.value,
+      stockCode: selectedStockCode.value,
+    });
+    trends.value = [];
+    await nextTick();
+    renderKlineChart();
   } finally {
     loadingTrends.value = false;
   }
@@ -205,7 +346,7 @@ async function syncStockTrendForSelected() {
   if (!code) return;
   try {
     await syncStockTrendData(code);
-    await refreshTrends();
+    await refreshTrendData();
     ElMessage.success(`${code} 分时数据同步完成`);
   } catch {
     ElMessage.warning(`${code} 分时数据同步失败，可稍后重试`);
@@ -225,7 +366,7 @@ async function waitStockSyncCompleted() {
 
 function selectQuote(row: StockQuote) {
   selectedStockCode.value = row.stockCode;
-  refreshTrends();
+  refreshTrendData();
 }
 
 function openQuoteDetails(row: StockQuote) {
@@ -250,6 +391,14 @@ function openIndexMarket(indexQuote: IndexQuote) {
 }
 
 function renderTrendChart() {
+  if (trendPeriod.value === 'intraday') {
+    renderIntradayChart();
+    return;
+  }
+  renderKlineChart();
+}
+
+function renderIntradayChart() {
   const times = trends.value.map(
     (item) => item.trendMinute || formatTime(item.trendTime),
   );
@@ -322,6 +471,154 @@ function renderTrendChart() {
   });
 }
 
+function renderKlineChart() {
+  const dates = klines.value.map((item) => item.tradeDate);
+  const candleData = klines.value.map((item) => [
+    toNumber(item.openPrice),
+    toNumber(item.closePrice),
+    toNumber(item.lowPrice),
+    toNumber(item.highPrice),
+  ]);
+  const ma5 = klines.value.map((item) => toNullableNumber(item.ma5));
+  const ma10 = klines.value.map((item) => toNullableNumber(item.ma10));
+  const ma20 = klines.value.map((item) => toNullableNumber(item.ma20));
+  const volumes = klines.value.map((item) => {
+    const openPrice = toNumber(item.openPrice);
+    const closePrice = toNumber(item.closePrice);
+    return {
+      itemStyle: {
+        color: closePrice >= openPrice ? '#ef4444' : '#089981',
+      },
+      value: toNumber(item.volume),
+    };
+  });
+
+  renderEcharts({
+    color: ['#ef4444', '#f59e0b', '#3b82f6', '#8b5cf6'],
+    axisPointer: {
+      link: [
+        {
+          xAxisIndex: [0, 1],
+        },
+      ],
+    },
+    dataZoom: [
+      {
+        bottom: 10,
+        height: 20,
+        xAxisIndex: [0, 1],
+        type: 'slider',
+      },
+      {
+        xAxisIndex: [0, 1],
+        type: 'inside',
+      },
+    ],
+    grid: [
+      {
+        bottom: 124,
+        left: 48,
+        right: 24,
+        top: 36,
+      },
+      {
+        bottom: 48,
+        height: 52,
+        left: 48,
+        right: 24,
+      },
+    ],
+    legend: {
+      data: [selectedTrendPeriodLabel.value, 'MA5', 'MA10', 'MA20'],
+      top: 0,
+    },
+    series: [
+      {
+        data: candleData,
+        itemStyle: {
+          borderColor: '#ef4444',
+          borderColor0: '#089981',
+          color: '#ef4444',
+          color0: '#089981',
+        },
+        name: selectedTrendPeriodLabel.value,
+        type: 'candlestick',
+        xAxisIndex: 0,
+        yAxisIndex: 0,
+      },
+      {
+        data: ma5,
+        name: 'MA5',
+        showSymbol: false,
+        smooth: true,
+        type: 'line',
+        xAxisIndex: 0,
+        yAxisIndex: 0,
+      },
+      {
+        data: ma10,
+        name: 'MA10',
+        showSymbol: false,
+        smooth: true,
+        type: 'line',
+        xAxisIndex: 0,
+        yAxisIndex: 0,
+      },
+      {
+        data: ma20,
+        name: 'MA20',
+        showSymbol: false,
+        smooth: true,
+        type: 'line',
+        xAxisIndex: 0,
+        yAxisIndex: 0,
+      },
+      {
+        barWidth: '60%',
+        data: volumes,
+        name: '成交量',
+        type: 'bar',
+        xAxisIndex: 1,
+        yAxisIndex: 1,
+      },
+    ],
+    tooltip: {
+      axisPointer: {
+        type: 'cross',
+      },
+      trigger: 'axis',
+    },
+    xAxis: [
+      {
+        axisLabel: {
+          show: false,
+        },
+        data: dates,
+        type: 'category',
+      },
+      {
+        data: dates,
+        gridIndex: 1,
+        type: 'category',
+      },
+    ],
+    yAxis: [
+      {
+        scale: true,
+        type: 'value',
+      },
+      {
+        axisLabel: {
+          formatter: formatVolumeAxis,
+        },
+        gridIndex: 1,
+        splitNumber: 2,
+        type: 'value',
+      },
+    ],
+  });
+}
+
 function changeClass(value?: number | string) {
   const numberValue = toNumber(value);
   if (numberValue > 0) {
@@ -380,6 +677,19 @@ function formatTime(value?: string) {
   return value.replace('T', ' ').slice(11, 16);
 }
 
+function formatVolumeAxis(value?: number) {
+  if (!value) {
+    return '0';
+  }
+  if (value >= 100_000_000) {
+    return `${(value / 100_000_000).toFixed(1)}亿`;
+  }
+  if (value >= 10_000) {
+    return `${(value / 10_000).toFixed(1)}万`;
+  }
+  return String(value);
+}
+
 function formatVolume(value?: number) {
   if (!value) {
     return '-';
@@ -390,7 +700,7 @@ function formatVolume(value?: number) {
   return String(value);
 }
 
-function toNullableNumber(value?: number | string | null) {
+function toNullableNumber(value?: null | number | string) {
   if (value === null || value === undefined || value === '') {
     return null;
   }
@@ -398,7 +708,7 @@ function toNullableNumber(value?: number | string | null) {
   return Number.isFinite(numberValue) ? numberValue : null;
 }
 
-function toNumber(value?: number | string | null) {
+function toNumber(value?: null | number | string) {
   return toNullableNumber(value) ?? 0;
 }
 </script>
@@ -437,14 +747,14 @@ function toNumber(value?: number | string | null) {
               {{ formatPrice(item.latestPrice) }}
             </strong>
             <span
-              :class="['index-card-change', changeClass(item.changePercent)]"
+              class="index-card-change"
+              :class="changeClass(item.changePercent)"
             >
               {{ formatChangePercent(item.changePercent) }}
             </span>
-            <small
-              >{{ item.exchangeCode }} ·
-              {{ formatMoney(item.turnoverAmount) }}</small
-            >
+            <small>
+              {{ item.exchangeCode }} · {{ formatMoney(item.turnoverAmount) }}
+            </small>
           </button>
         </div>
         <ElEmpty v-else description="暂无指数数据" />
@@ -482,7 +792,12 @@ function toNumber(value?: number | string | null) {
       </section>
 
       <div class="content-grid">
-        <ElCard class="quote-panel" shadow="never">
+        <ElCard
+          ref="quotePanelRef"
+          class="quote-panel"
+          shadow="never"
+          :style="quotePanelStyle"
+        >
           <template #header>
             <div class="panel-header">
               <span>行情列表</span>
@@ -518,7 +833,8 @@ function toNumber(value?: number | string | null) {
             v-loading="loadingQuotes"
             :data="quotes"
             :default-sort="{ order: 'descending', prop: 'changePercent' }"
-            height="620"
+            class="quote-table"
+            :height="quoteTableHeight"
             highlight-current-row
             row-key="stockCode"
             @row-click="selectQuote"
@@ -606,7 +922,7 @@ function toNumber(value?: number | string | null) {
           </ElTable>
         </ElCard>
 
-        <div class="detail-column">
+        <div ref="detailColumnRef" class="detail-column">
           <ElCard class="quote-detail" shadow="never">
             <template #header>
               <div class="panel-header">
@@ -692,13 +1008,40 @@ function toNumber(value?: number | string | null) {
           <ElCard class="trend-panel" shadow="never">
             <template #header>
               <div class="panel-header">
-                <span>分时走势</span>
+                <span>走势</span>
                 <span class="muted trend-status">{{ trendStatusText }}</span>
+                <ElSelect
+                  v-model="trendPeriod"
+                  class="trend-period-select"
+                  size="small"
+                  @change="refreshTrendData"
+                >
+                  <ElOption
+                    v-for="item in trendPeriodOptions"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"
+                  />
+                </ElSelect>
+                <ElSelect
+                  v-if="trendPeriod !== 'intraday'"
+                  v-model="adjustType"
+                  class="adjust-type-select"
+                  size="small"
+                  @change="refreshTrendData"
+                >
+                  <ElOption
+                    v-for="item in adjustTypeOptions"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"
+                  />
+                </ElSelect>
                 <ElButton
                   :disabled="!selectedStockCode"
                   :loading="loadingTrends"
                   size="small"
-                  @click="refreshTrends"
+                  @click="refreshTrendData"
                 >
                   更新走势
                 </ElButton>
@@ -706,11 +1049,18 @@ function toNumber(value?: number | string | null) {
             </template>
             <div v-loading="loadingTrends" class="chart-wrap">
               <EchartsUI
-                v-if="trends.length > 0"
+                v-if="
+                  trendPeriod === 'intraday'
+                    ? trends.length > 0
+                    : klines.length > 0
+                "
                 ref="chartRef"
                 height="100%"
               />
-              <ElEmpty v-else description="暂无分时数据" />
+              <ElEmpty
+                v-else
+                :description="`暂无${selectedTrendPeriodLabel}数据`"
+              />
             </div>
           </ElCard>
         </div>
@@ -886,9 +1236,50 @@ function toNumber(value?: number | string | null) {
 }
 
 .content-grid {
+  align-items: start;
   display: grid;
   gap: 16px;
-  grid-template-columns: minmax(520px, 1.08fr) minmax(420px, 0.92fr);
+  grid-template-columns: minmax(470px, 0.92fr) minmax(500px, 1.08fr);
+}
+
+.quote-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.quote-panel :deep(.el-card__body) {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.quote-table {
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+}
+
+.quote-table :deep(.el-table__inner-wrapper) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.quote-table :deep(.el-table__body-wrapper),
+.quote-table :deep(.el-table__body-wrapper .el-scrollbar) {
+  flex: 1;
+  height: var(--quote-table-body-height) !important;
+  min-height: 0;
+}
+
+.quote-table :deep(.el-scrollbar__wrap) {
+  height: 100% !important;
 }
 
 .detail-column {
@@ -901,6 +1292,7 @@ function toNumber(value?: number | string | null) {
 .panel-header {
   align-items: center;
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   font-weight: 600;
   justify-content: space-between;
@@ -925,6 +1317,12 @@ function toNumber(value?: number | string | null) {
 
 .market-select {
   width: 128px;
+}
+
+.adjust-type-select,
+.trend-period-select {
+  flex: 0 0 auto;
+  width: 96px;
 }
 
 .stock-name-cell {
@@ -996,7 +1394,7 @@ function toNumber(value?: number | string | null) {
 }
 
 .chart-wrap {
-  height: 378px;
+  height: 460px;
   min-width: 0;
 }
 

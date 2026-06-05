@@ -2,10 +2,12 @@ package com.scrapider.finance.controller;
 
 import cn.hutool.core.util.StrUtil;
 import com.scrapider.finance.domain.param.StockIntradayTrendParam;
+import com.scrapider.finance.domain.param.StockKlineParam;
 import com.scrapider.finance.domain.param.StockQuoteListParam;
 import com.scrapider.finance.domain.vo.ApiResponseVO;
 import com.scrapider.finance.domain.vo.MarketSyncStatusVO;
 import com.scrapider.finance.domain.vo.StockIntradayTrendVO;
+import com.scrapider.finance.domain.vo.StockKlineVO;
 import com.scrapider.finance.domain.vo.StockQuoteVO;
 import com.scrapider.finance.service.StockMarketQueryService;
 import com.scrapider.finance.task.StockMarketSyncTask;
@@ -41,6 +43,11 @@ public class StockMarketController {
     public ResponseEntity<List<StockIntradayTrendVO>> listIntradayTrends(
             @ModelAttribute StockIntradayTrendParam param) {
         return ResponseEntity.ok(this.stockMarketQueryService.listIntradayTrends(param));
+    }
+
+    @GetMapping("/klines")
+    public ResponseEntity<List<StockKlineVO>> listKlines(@ModelAttribute StockKlineParam param) {
+        return ResponseEntity.ok(this.stockMarketQueryService.listKlines(param));
     }
 
     @PostMapping("/sync")
