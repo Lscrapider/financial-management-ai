@@ -18,12 +18,14 @@ import com.scrapider.finance.manage.StockIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
 import com.scrapider.finance.service.StockAlertService;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -263,6 +265,7 @@ public class StockMarketSyncTask {
                     KlinePeriodTypeEnum.MONTHLY,
                     this.monthlyKlineLimit));
         }
+        this.repairLatestPeriodKlinesFromDaily(valid);
     }
 
     private void doSyncTrendsForStock(StockConfigPO stock) {
@@ -280,6 +283,7 @@ public class StockMarketSyncTask {
 
     private void doSyncDailyKlinesForStock(StockConfigPO stock) {
         this.doSyncKlinesForStock(stock, KlinePeriodTypeEnum.DAILY, this.dailyKlineLimit);
+        this.repairLatestPeriodKlinesFromDaily(List.of(stock));
     }
 
     private void batchSyncKlines(List<StockConfigPO> stocks, KlineSyncPlan plan) {
@@ -330,6 +334,204 @@ public class StockMarketSyncTask {
                 klines.data(),
                 periodType,
                 DEFAULT_KLINE_ADJUST_TYPE));
+    }
+
+    private void repairLatestPeriodKlinesFromDaily(List<StockConfigPO> stocks) {
+        if (!this.dailyKlineEnabled || CollUtil.isEmpty(stocks)) {
+            return;
+        }
+        for (StockConfigPO stock : stocks) {
+            if (this.weeklyKlineEnabled) {
+                this.repairLatestPeriodKlineFromDaily(stock, KlinePeriodTypeEnum.WEEKLY);
+            }
+            if (this.monthlyKlineEnabled) {
+                this.repairLatestPeriodKlineFromDaily(stock, KlinePeriodTypeEnum.MONTHLY);
+            }
+        }
+    }
+
+    private void repairLatestPeriodKlineFromDaily(StockConfigPO stock, KlinePeriodTypeEnum periodType) {
+        try {
+            LocalDate today = LocalDate.now(ZoneId.of(this.timezone));
+            LocalDate periodStart = this.currentPeriodStartDate(periodType, today);
+            List<StockKlinePO> dailyKlines = this.stockKlineManage.listKlines(
+                            stock.getStockCode(),
+                            stock.getSecid(),
+                            KlinePeriodTypeEnum.DAILY,
+                            DEFAULT_KLINE_ADJUST_TYPE,
+                            periodStart,
+                            today,
+                            null)
+                    .stream()
+                    .sorted(Comparator.comparing(StockKlinePO::getTradeDate))
+                    .toList();
+            if (CollUtil.isEmpty(dailyKlines)) {
+                return;
+            }
+            StockKlinePO repaired = this.aggregateStockPeriodKline(stock, dailyKlines, periodType);
+            this.fillStockDerivedFields(repaired, this.previousStockPeriodClose(stock, periodType, repaired.getTradeDate()));
+            this.fillStockMovingAverages(repaired, periodType);
+            this.stockKlineManage.saveKlines(List.of(repaired));
+        } catch (Exception ex) {
+            log.warn(
+                    "Failed to repair {} kline for stock: {}",
+                    periodType.getCode(),
+                    stock.getStockCode(),
+                    ex);
+        }
+    }
+
+    private StockKlinePO aggregateStockPeriodKline(
+            StockConfigPO stock,
+            List<StockKlinePO> dailyKlines,
+            KlinePeriodTypeEnum periodType) {
+        StockKlinePO first = dailyKlines.get(0);
+        StockKlinePO last = dailyKlines.get(dailyKlines.size() - 1);
+        StockKlinePO repaired = new StockKlinePO();
+        repaired.setStockCode(stock.getStockCode());
+        repaired.setStockName(stock.getStockName());
+        repaired.setSecid(stock.getSecid());
+        repaired.setMarketCode(stock.getMarketCode());
+        repaired.setExchangeCode(stock.getExchangeCode());
+        repaired.setPeriodType(periodType.getCode());
+        repaired.setAdjustType(DEFAULT_KLINE_ADJUST_TYPE.getCode());
+        repaired.setTradeDate(last.getTradeDate());
+        repaired.setOpenPrice(first.getOpenPrice());
+        repaired.setClosePrice(last.getClosePrice());
+        repaired.setHighPrice(maxStock(dailyKlines));
+        repaired.setLowPrice(minStock(dailyKlines));
+        repaired.setVolume(sumStockVolume(dailyKlines));
+        repaired.setTurnoverAmount(sumStockAmount(dailyKlines));
+        repaired.setTurnoverRate(sumStockTurnoverRate(dailyKlines));
+        repaired.setRawResponse("aggregated-from-daily");
+        repaired.setSyncedAt(LocalDateTime.now(ZoneId.of(this.timezone)));
+        return repaired;
+    }
+
+    private void fillStockDerivedFields(StockKlinePO kline, BigDecimal previousClose) {
+        if (kline.getClosePrice() == null || previousClose == null || previousClose.signum() == 0) {
+            return;
+        }
+        BigDecimal changeAmount = kline.getClosePrice().subtract(previousClose);
+        kline.setChangeAmount(changeAmount);
+        kline.setChangePercent(changeAmount
+                .multiply(BigDecimal.valueOf(100))
+                .divide(previousClose, 4, RoundingMode.HALF_UP));
+        if (kline.getHighPrice() != null && kline.getLowPrice() != null) {
+            kline.setAmplitude(kline.getHighPrice()
+                    .subtract(kline.getLowPrice())
+                    .multiply(BigDecimal.valueOf(100))
+                    .divide(previousClose, 4, RoundingMode.HALF_UP));
+        }
+    }
+
+    private BigDecimal previousStockPeriodClose(
+            StockConfigPO stock,
+            KlinePeriodTypeEnum periodType,
+            LocalDate tradeDate) {
+        return this.stockKlineManage.listKlines(
+                        stock.getStockCode(),
+                        stock.getSecid(),
+                        periodType,
+                        DEFAULT_KLINE_ADJUST_TYPE,
+                        null,
+                        tradeDate.minusDays(1),
+                        1)
+                .stream()
+                .findFirst()
+                .map(StockKlinePO::getClosePrice)
+                .orElse(null);
+    }
+
+    private void fillStockMovingAverages(StockKlinePO repaired, KlinePeriodTypeEnum periodType) {
+        List<StockKlinePO> rows = new ArrayList<>(this.stockKlineManage.listKlines(
+                repaired.getStockCode(),
+                repaired.getSecid(),
+                periodType,
+                DEFAULT_KLINE_ADJUST_TYPE,
+                null,
+                null,
+                20));
+        rows.removeIf(item -> repaired.getTradeDate().equals(item.getTradeDate()));
+        rows.add(repaired);
+        rows.sort(Comparator.comparing(StockKlinePO::getTradeDate));
+        int index = rows.indexOf(repaired);
+        repaired.setMa5(meanStockClose(rows, index, 5));
+        repaired.setMa10(meanStockClose(rows, index, 10));
+        repaired.setMa20(meanStockClose(rows, index, 20));
+    }
+
+    private LocalDate currentPeriodStartDate(KlinePeriodTypeEnum periodType, LocalDate today) {
+        if (KlinePeriodTypeEnum.WEEKLY.equals(periodType)) {
+            return today.minusDays(today.getDayOfWeek().getValue() - 1L);
+        }
+        if (KlinePeriodTypeEnum.MONTHLY.equals(periodType)) {
+            return today.withDayOfMonth(1);
+        }
+        return today;
+    }
+
+    private static BigDecimal maxStock(List<StockKlinePO> klines) {
+        return klines.stream()
+                .map(StockKlinePO::getHighPrice)
+                .filter(Objects::nonNull)
+                .max(BigDecimal::compareTo)
+                .orElse(null);
+    }
+
+    private static BigDecimal minStock(List<StockKlinePO> klines) {
+        return klines.stream()
+                .map(StockKlinePO::getLowPrice)
+                .filter(Objects::nonNull)
+                .min(BigDecimal::compareTo)
+                .orElse(null);
+    }
+
+    private static Long sumStockVolume(List<StockKlinePO> klines) {
+        long total = 0L;
+        boolean hasValue = false;
+        for (StockKlinePO kline : klines) {
+            if (kline.getVolume() != null) {
+                total += kline.getVolume();
+                hasValue = true;
+            }
+        }
+        return hasValue ? total : null;
+    }
+
+    private static BigDecimal sumStockAmount(List<StockKlinePO> klines) {
+        return sumStockDecimal(klines.stream().map(StockKlinePO::getTurnoverAmount).toList());
+    }
+
+    private static BigDecimal sumStockTurnoverRate(List<StockKlinePO> klines) {
+        return sumStockDecimal(klines.stream().map(StockKlinePO::getTurnoverRate).toList());
+    }
+
+    private static BigDecimal sumStockDecimal(List<BigDecimal> values) {
+        BigDecimal total = BigDecimal.ZERO;
+        boolean hasValue = false;
+        for (BigDecimal value : values) {
+            if (value != null) {
+                total = total.add(value);
+                hasValue = true;
+            }
+        }
+        return hasValue ? total : null;
+    }
+
+    private static BigDecimal meanStockClose(List<StockKlinePO> klines, int endIndex, int window) {
+        if (endIndex + 1 < window) {
+            return null;
+        }
+        BigDecimal total = BigDecimal.ZERO;
+        for (int index = endIndex - window + 1; index <= endIndex; index++) {
+            BigDecimal closePrice = klines.get(index).getClosePrice();
+            if (closePrice == null) {
+                return null;
+            }
+            total = total.add(closePrice);
+        }
+        return total.divide(BigDecimal.valueOf(window), 4, RoundingMode.HALF_UP);
     }
 
     private void saveTrends(StockConfigPO stock, JsonNode response) {

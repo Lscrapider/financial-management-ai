@@ -8,19 +8,15 @@ import {
   ElCard,
   ElInput,
   ElMessage,
-  ElOption,
-  ElSelect,
   ElTag,
 } from 'element-plus';
 
 import {
   getBondMarketSyncStatus,
-  syncBondKlineData,
   syncBondMarketData,
 } from '#/api/bond';
 import {
   getIndexMarketSyncStatus,
-  syncIndexKlineData,
   syncIndexMarketData,
 } from '#/api/index-market';
 import {
@@ -29,8 +25,7 @@ import {
   syncStockTrendData,
 } from '#/api/stock';
 
-type KlinePeriodType = 'daily' | 'monthly' | 'weekly';
-type SyncKind = 'bond' | 'bondKline' | 'index' | 'indexKline' | 'stock' | 'stockTrend';
+type SyncKind = 'bond' | 'index' | 'stock' | 'stockTrend';
 
 interface SyncItem {
   description: string;
@@ -47,38 +42,26 @@ const syncItems: SyncItem[] = [
     scope: '股票快照 / 分时 / K线',
   },
   {
-    description: '全量同步所有已启用指数的行情快照和默认日 K 数据。',
+    description: '全量同步所有已启用指数的行情快照、分时数据和日/周/月 K 线数据。',
     key: 'index',
     title: '指数行情同步',
-    scope: '指数快照 / K线',
+    scope: '指数快照 / 分时 / K线',
   },
   {
-    description: '全量同步所有已启用可转债的行情快照和默认日 K 数据。',
+    description: '全量同步所有已启用可转债的行情快照、分时数据和日/周/月 K 线数据。',
     key: 'bond',
     title: '可转债行情同步',
-    scope: '可转债快照 / K线',
+    scope: '可转债快照 / 分时 / K线',
   },
-];
-
-const periodOptions: Array<{ label: string; value: KlinePeriodType }> = [
-  { label: '日K', value: 'daily' },
-  { label: '周K', value: 'weekly' },
-  { label: '月K', value: 'monthly' },
 ];
 
 const loadingMap = ref<Record<SyncKind, boolean>>({
   bond: false,
-  bondKline: false,
   index: false,
-  indexKline: false,
   stock: false,
   stockTrend: false,
 });
 const stockTrendCode = ref('');
-const indexKlineCode = ref('');
-const indexKlinePeriod = ref<KlinePeriodType>('daily');
-const bondKlineCode = ref('');
-const bondKlinePeriod = ref<KlinePeriodType>('daily');
 
 const delay = (ms: number) =>
   new Promise((resolve) => {
@@ -145,38 +128,6 @@ async function runStockTrendSync() {
   }
 }
 
-async function runIndexKlineSync() {
-  const code = indexKlineCode.value.trim();
-  if (!code || loadingMap.value.indexKline) return;
-  loadingMap.value.indexKline = true;
-  try {
-    const status = await syncIndexKlineData(code, indexKlinePeriod.value);
-    if (status.started) {
-      ElMessage.success(`${code} 指数${periodLabel(indexKlinePeriod.value)}同步完成`);
-    } else {
-      ElMessage.warning(`${code} 指数配置不存在或未启用`);
-    }
-  } finally {
-    loadingMap.value.indexKline = false;
-  }
-}
-
-async function runBondKlineSync() {
-  const code = bondKlineCode.value.trim();
-  if (!code || loadingMap.value.bondKline) return;
-  loadingMap.value.bondKline = true;
-  try {
-    const status = await syncBondKlineData(code, bondKlinePeriod.value);
-    if (status.started) {
-      ElMessage.success(`${code} 可转债${periodLabel(bondKlinePeriod.value)}同步完成`);
-    } else {
-      ElMessage.warning(`${code} 可转债配置不存在或未启用`);
-    }
-  } finally {
-    loadingMap.value.bondKline = false;
-  }
-}
-
 function labelOf(kind: 'bond' | 'index' | 'stock') {
   if (kind === 'stock') {
     return '股票行情';
@@ -185,10 +136,6 @@ function labelOf(kind: 'bond' | 'index' | 'stock') {
     return '指数行情';
   }
   return '可转债行情';
-}
-
-function periodLabel(value: KlinePeriodType) {
-  return periodOptions.find((item) => item.value === value)?.label ?? 'K线';
 }
 </script>
 
@@ -227,31 +174,16 @@ function periodLabel(value: KlinePeriodType) {
         <ElCard class="trend-card" shadow="never">
           <div class="trend-card-body">
             <div class="trend-card-main">
-              <h2>单个指数 K 线同步</h2>
-              <p>按指数代码同步指定周期 K 线数据。</p>
+              <h2>指数 K 线全量同步</h2>
+              <p>手动触发指数定时任务，同步全部启用指数的快照、分时和日/周/月 K 线。</p>
             </div>
             <div class="trend-actions">
-              <ElInput
-                v-model="indexKlineCode"
-                clearable
-                placeholder="指数代码"
-                @keyup.enter="runIndexKlineSync"
-              />
-              <ElSelect v-model="indexKlinePeriod" class="period-select">
-                <ElOption
-                  v-for="item in periodOptions"
-                  :key="item.value"
-                  :label="item.label"
-                  :value="item.value"
-                />
-              </ElSelect>
               <ElButton
-                :disabled="!indexKlineCode.trim()"
-                :loading="loadingMap.indexKline"
+                :loading="loadingMap.index"
                 type="primary"
-                @click="runIndexKlineSync"
+                @click="runMarketSync('index')"
               >
-                同步K线
+                执行同步
               </ElButton>
             </div>
           </div>
@@ -260,31 +192,16 @@ function periodLabel(value: KlinePeriodType) {
         <ElCard class="trend-card" shadow="never">
           <div class="trend-card-body">
             <div class="trend-card-main">
-              <h2>单只可转债 K 线同步</h2>
-              <p>按可转债代码同步指定周期 K 线数据。</p>
+              <h2>可转债 K 线全量同步</h2>
+              <p>手动触发可转债定时任务，同步全部启用可转债的快照、分时和日/周/月 K 线。</p>
             </div>
             <div class="trend-actions">
-              <ElInput
-                v-model="bondKlineCode"
-                clearable
-                placeholder="可转债代码"
-                @keyup.enter="runBondKlineSync"
-              />
-              <ElSelect v-model="bondKlinePeriod" class="period-select">
-                <ElOption
-                  v-for="item in periodOptions"
-                  :key="item.value"
-                  :label="item.label"
-                  :value="item.value"
-                />
-              </ElSelect>
               <ElButton
-                :disabled="!bondKlineCode.trim()"
-                :loading="loadingMap.bondKline"
+                :loading="loadingMap.bond"
                 type="primary"
-                @click="runBondKlineSync"
+                @click="runMarketSync('bond')"
               >
-                同步K线
+                执行同步
               </ElButton>
             </div>
           </div>
@@ -397,10 +314,6 @@ p {
   max-width: 220px;
 }
 
-.period-select {
-  width: 92px;
-}
-
 @media (max-width: 640px) {
   .sync-card-body,
   .trend-actions {
@@ -412,8 +325,5 @@ p {
     max-width: none;
   }
 
-  .period-select {
-    width: 100%;
-  }
 }
 </style>

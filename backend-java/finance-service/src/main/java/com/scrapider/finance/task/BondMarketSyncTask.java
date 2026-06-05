@@ -17,12 +17,14 @@ import com.scrapider.finance.manage.BondIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.BondKlineManage;
 import com.scrapider.finance.manage.BondQuoteSnapshotManage;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -145,6 +147,9 @@ public class BondMarketSyncTask {
             return false;
         }
         this.doSyncKlinesForBond(bond, periodType, limit);
+        if (KlinePeriodTypeEnum.DAILY.equals(periodType)) {
+            this.repairLatestPeriodKlinesFromDaily(List.of(bond));
+        }
         return true;
     }
 
@@ -242,6 +247,7 @@ public class BondMarketSyncTask {
                     KlinePeriodTypeEnum.MONTHLY,
                     this.monthlyKlineLimit));
         }
+        this.repairLatestPeriodKlinesFromDaily(valid);
     }
 
     private void doSyncTrendsForBond(BondConfigPO bond) {
@@ -306,6 +312,200 @@ public class BondMarketSyncTask {
                 bond,
                 klines.data(),
                 periodType));
+    }
+
+    private void repairLatestPeriodKlinesFromDaily(List<BondConfigPO> bonds) {
+        if (!this.dailyKlineEnabled || CollUtil.isEmpty(bonds)) {
+            return;
+        }
+        for (BondConfigPO bond : bonds) {
+            if (this.weeklyKlineEnabled) {
+                this.repairLatestPeriodKlineFromDaily(bond, KlinePeriodTypeEnum.WEEKLY);
+            }
+            if (this.monthlyKlineEnabled) {
+                this.repairLatestPeriodKlineFromDaily(bond, KlinePeriodTypeEnum.MONTHLY);
+            }
+        }
+    }
+
+    private void repairLatestPeriodKlineFromDaily(BondConfigPO bond, KlinePeriodTypeEnum periodType) {
+        try {
+            LocalDate today = LocalDate.now(ZoneId.of(this.timezone));
+            LocalDate periodStart = this.currentPeriodStartDate(periodType, today);
+            List<BondKlinePO> dailyKlines = this.bondKlineManage.listKlines(
+                            bond.getBondCode(),
+                            bond.getSecid(),
+                            KlinePeriodTypeEnum.DAILY,
+                            periodStart,
+                            today,
+                            null)
+                    .stream()
+                    .sorted(Comparator.comparing(BondKlinePO::getTradeDate))
+                    .toList();
+            if (CollUtil.isEmpty(dailyKlines)) {
+                return;
+            }
+            BondKlinePO repaired = this.aggregateBondPeriodKline(bond, dailyKlines, periodType);
+            this.fillBondDerivedFields(repaired, this.previousBondPeriodClose(bond, periodType, repaired.getTradeDate()));
+            this.fillBondMovingAverages(repaired, periodType);
+            this.bondKlineManage.saveKlines(List.of(repaired));
+        } catch (Exception ex) {
+            log.warn(
+                    "Failed to repair {} kline for bond: {}",
+                    periodType.getCode(),
+                    bond.getBondCode(),
+                    ex);
+        }
+    }
+
+    private BondKlinePO aggregateBondPeriodKline(
+            BondConfigPO bond,
+            List<BondKlinePO> dailyKlines,
+            KlinePeriodTypeEnum periodType) {
+        BondKlinePO first = dailyKlines.get(0);
+        BondKlinePO last = dailyKlines.get(dailyKlines.size() - 1);
+        BondKlinePO repaired = new BondKlinePO();
+        repaired.setBondCode(bond.getBondCode());
+        repaired.setBondName(bond.getBondName());
+        repaired.setSecid(bond.getSecid());
+        repaired.setMarketCode(bond.getMarketCode());
+        repaired.setExchangeCode(bond.getExchangeCode());
+        repaired.setPeriodType(periodType.getCode());
+        repaired.setTradeDate(last.getTradeDate());
+        repaired.setOpenPrice(first.getOpenPrice());
+        repaired.setClosePrice(last.getClosePrice());
+        repaired.setHighPrice(maxBond(dailyKlines));
+        repaired.setLowPrice(minBond(dailyKlines));
+        repaired.setVolume(sumBondVolume(dailyKlines));
+        repaired.setTurnoverAmount(sumBondAmount(dailyKlines));
+        repaired.setTurnoverRate(sumBondTurnoverRate(dailyKlines));
+        repaired.setRawResponse("aggregated-from-daily");
+        repaired.setSyncedAt(LocalDateTime.now(ZoneId.of(this.timezone)));
+        return repaired;
+    }
+
+    private void fillBondDerivedFields(BondKlinePO kline, BigDecimal previousClose) {
+        if (kline.getClosePrice() == null || previousClose == null || previousClose.signum() == 0) {
+            return;
+        }
+        BigDecimal changeAmount = kline.getClosePrice().subtract(previousClose);
+        kline.setChangeAmount(changeAmount);
+        kline.setChangePercent(changeAmount
+                .multiply(BigDecimal.valueOf(100))
+                .divide(previousClose, 4, RoundingMode.HALF_UP));
+        if (kline.getHighPrice() != null && kline.getLowPrice() != null) {
+            kline.setAmplitude(kline.getHighPrice()
+                    .subtract(kline.getLowPrice())
+                    .multiply(BigDecimal.valueOf(100))
+                    .divide(previousClose, 4, RoundingMode.HALF_UP));
+        }
+    }
+
+    private BigDecimal previousBondPeriodClose(
+            BondConfigPO bond,
+            KlinePeriodTypeEnum periodType,
+            LocalDate tradeDate) {
+        return this.bondKlineManage.listKlines(
+                        bond.getBondCode(),
+                        bond.getSecid(),
+                        periodType,
+                        null,
+                        tradeDate.minusDays(1),
+                        1)
+                .stream()
+                .findFirst()
+                .map(BondKlinePO::getClosePrice)
+                .orElse(null);
+    }
+
+    private void fillBondMovingAverages(BondKlinePO repaired, KlinePeriodTypeEnum periodType) {
+        List<BondKlinePO> rows = new ArrayList<>(this.bondKlineManage.listKlines(
+                repaired.getBondCode(),
+                repaired.getSecid(),
+                periodType,
+                null,
+                null,
+                20));
+        rows.removeIf(item -> repaired.getTradeDate().equals(item.getTradeDate()));
+        rows.add(repaired);
+        rows.sort(Comparator.comparing(BondKlinePO::getTradeDate));
+        int index = rows.indexOf(repaired);
+        repaired.setMa5(meanBondClose(rows, index, 5));
+        repaired.setMa10(meanBondClose(rows, index, 10));
+        repaired.setMa20(meanBondClose(rows, index, 20));
+    }
+
+    private LocalDate currentPeriodStartDate(KlinePeriodTypeEnum periodType, LocalDate today) {
+        if (KlinePeriodTypeEnum.WEEKLY.equals(periodType)) {
+            return today.minusDays(today.getDayOfWeek().getValue() - 1L);
+        }
+        if (KlinePeriodTypeEnum.MONTHLY.equals(periodType)) {
+            return today.withDayOfMonth(1);
+        }
+        return today;
+    }
+
+    private static BigDecimal maxBond(List<BondKlinePO> klines) {
+        return klines.stream()
+                .map(BondKlinePO::getHighPrice)
+                .filter(Objects::nonNull)
+                .max(BigDecimal::compareTo)
+                .orElse(null);
+    }
+
+    private static BigDecimal minBond(List<BondKlinePO> klines) {
+        return klines.stream()
+                .map(BondKlinePO::getLowPrice)
+                .filter(Objects::nonNull)
+                .min(BigDecimal::compareTo)
+                .orElse(null);
+    }
+
+    private static Long sumBondVolume(List<BondKlinePO> klines) {
+        long total = 0L;
+        boolean hasValue = false;
+        for (BondKlinePO kline : klines) {
+            if (kline.getVolume() != null) {
+                total += kline.getVolume();
+                hasValue = true;
+            }
+        }
+        return hasValue ? total : null;
+    }
+
+    private static BigDecimal sumBondAmount(List<BondKlinePO> klines) {
+        return sumBondDecimal(klines.stream().map(BondKlinePO::getTurnoverAmount).toList());
+    }
+
+    private static BigDecimal sumBondTurnoverRate(List<BondKlinePO> klines) {
+        return sumBondDecimal(klines.stream().map(BondKlinePO::getTurnoverRate).toList());
+    }
+
+    private static BigDecimal sumBondDecimal(List<BigDecimal> values) {
+        BigDecimal total = BigDecimal.ZERO;
+        boolean hasValue = false;
+        for (BigDecimal value : values) {
+            if (value != null) {
+                total = total.add(value);
+                hasValue = true;
+            }
+        }
+        return hasValue ? total : null;
+    }
+
+    private static BigDecimal meanBondClose(List<BondKlinePO> klines, int endIndex, int window) {
+        if (endIndex + 1 < window) {
+            return null;
+        }
+        BigDecimal total = BigDecimal.ZERO;
+        for (int index = endIndex - window + 1; index <= endIndex; index++) {
+            BigDecimal closePrice = klines.get(index).getClosePrice();
+            if (closePrice == null) {
+                return null;
+            }
+            total = total.add(closePrice);
+        }
+        return total.divide(BigDecimal.valueOf(window), 4, RoundingMode.HALF_UP);
     }
 
     private void saveTrends(BondConfigPO bond, JsonNode response) {

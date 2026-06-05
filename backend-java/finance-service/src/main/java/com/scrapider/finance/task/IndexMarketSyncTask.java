@@ -17,12 +17,14 @@ import com.scrapider.finance.manage.IndexIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.IndexKlineManage;
 import com.scrapider.finance.manage.IndexQuoteSnapshotManage;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -145,6 +147,9 @@ public class IndexMarketSyncTask {
             return false;
         }
         this.doSyncKlinesForIndex(index, periodType, limit);
+        if (KlinePeriodTypeEnum.DAILY.equals(periodType)) {
+            this.repairLatestPeriodKlinesFromDaily(List.of(index));
+        }
         return true;
     }
 
@@ -242,6 +247,7 @@ public class IndexMarketSyncTask {
                     KlinePeriodTypeEnum.MONTHLY,
                     this.monthlyKlineLimit));
         }
+        this.repairLatestPeriodKlinesFromDaily(valid);
     }
 
     private void doSyncTrendsForIndex(IndexConfigPO index) {
@@ -306,6 +312,200 @@ public class IndexMarketSyncTask {
                 index,
                 klines.data(),
                 periodType));
+    }
+
+    private void repairLatestPeriodKlinesFromDaily(List<IndexConfigPO> indices) {
+        if (!this.dailyKlineEnabled || CollUtil.isEmpty(indices)) {
+            return;
+        }
+        for (IndexConfigPO index : indices) {
+            if (this.weeklyKlineEnabled) {
+                this.repairLatestPeriodKlineFromDaily(index, KlinePeriodTypeEnum.WEEKLY);
+            }
+            if (this.monthlyKlineEnabled) {
+                this.repairLatestPeriodKlineFromDaily(index, KlinePeriodTypeEnum.MONTHLY);
+            }
+        }
+    }
+
+    private void repairLatestPeriodKlineFromDaily(IndexConfigPO index, KlinePeriodTypeEnum periodType) {
+        try {
+            LocalDate today = LocalDate.now(ZoneId.of(this.timezone));
+            LocalDate periodStart = this.currentPeriodStartDate(periodType, today);
+            List<IndexKlinePO> dailyKlines = this.indexKlineManage.listKlines(
+                            index.getIndexCode(),
+                            index.getSecid(),
+                            KlinePeriodTypeEnum.DAILY,
+                            periodStart,
+                            today,
+                            null)
+                    .stream()
+                    .sorted(Comparator.comparing(IndexKlinePO::getTradeDate))
+                    .toList();
+            if (CollUtil.isEmpty(dailyKlines)) {
+                return;
+            }
+            IndexKlinePO repaired = this.aggregateIndexPeriodKline(index, dailyKlines, periodType);
+            this.fillIndexDerivedFields(repaired, this.previousIndexPeriodClose(index, periodType, repaired.getTradeDate()));
+            this.fillIndexMovingAverages(repaired, periodType);
+            this.indexKlineManage.saveKlines(List.of(repaired));
+        } catch (Exception ex) {
+            log.warn(
+                    "Failed to repair {} kline for index: {}",
+                    periodType.getCode(),
+                    index.getIndexCode(),
+                    ex);
+        }
+    }
+
+    private IndexKlinePO aggregateIndexPeriodKline(
+            IndexConfigPO index,
+            List<IndexKlinePO> dailyKlines,
+            KlinePeriodTypeEnum periodType) {
+        IndexKlinePO first = dailyKlines.get(0);
+        IndexKlinePO last = dailyKlines.get(dailyKlines.size() - 1);
+        IndexKlinePO repaired = new IndexKlinePO();
+        repaired.setIndexCode(index.getIndexCode());
+        repaired.setIndexName(index.getIndexName());
+        repaired.setSecid(index.getSecid());
+        repaired.setMarketCode(index.getMarketCode());
+        repaired.setExchangeCode(index.getExchangeCode());
+        repaired.setPeriodType(periodType.getCode());
+        repaired.setTradeDate(last.getTradeDate());
+        repaired.setOpenPrice(first.getOpenPrice());
+        repaired.setClosePrice(last.getClosePrice());
+        repaired.setHighPrice(maxIndex(dailyKlines));
+        repaired.setLowPrice(minIndex(dailyKlines));
+        repaired.setVolume(sumIndexVolume(dailyKlines));
+        repaired.setTurnoverAmount(sumIndexAmount(dailyKlines));
+        repaired.setTurnoverRate(sumIndexTurnoverRate(dailyKlines));
+        repaired.setRawResponse("aggregated-from-daily");
+        repaired.setSyncedAt(LocalDateTime.now(ZoneId.of(this.timezone)));
+        return repaired;
+    }
+
+    private void fillIndexDerivedFields(IndexKlinePO kline, BigDecimal previousClose) {
+        if (kline.getClosePrice() == null || previousClose == null || previousClose.signum() == 0) {
+            return;
+        }
+        BigDecimal changeAmount = kline.getClosePrice().subtract(previousClose);
+        kline.setChangeAmount(changeAmount);
+        kline.setChangePercent(changeAmount
+                .multiply(BigDecimal.valueOf(100))
+                .divide(previousClose, 4, RoundingMode.HALF_UP));
+        if (kline.getHighPrice() != null && kline.getLowPrice() != null) {
+            kline.setAmplitude(kline.getHighPrice()
+                    .subtract(kline.getLowPrice())
+                    .multiply(BigDecimal.valueOf(100))
+                    .divide(previousClose, 4, RoundingMode.HALF_UP));
+        }
+    }
+
+    private BigDecimal previousIndexPeriodClose(
+            IndexConfigPO index,
+            KlinePeriodTypeEnum periodType,
+            LocalDate tradeDate) {
+        return this.indexKlineManage.listKlines(
+                        index.getIndexCode(),
+                        index.getSecid(),
+                        periodType,
+                        null,
+                        tradeDate.minusDays(1),
+                        1)
+                .stream()
+                .findFirst()
+                .map(IndexKlinePO::getClosePrice)
+                .orElse(null);
+    }
+
+    private void fillIndexMovingAverages(IndexKlinePO repaired, KlinePeriodTypeEnum periodType) {
+        List<IndexKlinePO> rows = new ArrayList<>(this.indexKlineManage.listKlines(
+                repaired.getIndexCode(),
+                repaired.getSecid(),
+                periodType,
+                null,
+                null,
+                20));
+        rows.removeIf(item -> repaired.getTradeDate().equals(item.getTradeDate()));
+        rows.add(repaired);
+        rows.sort(Comparator.comparing(IndexKlinePO::getTradeDate));
+        int index = rows.indexOf(repaired);
+        repaired.setMa5(meanIndexClose(rows, index, 5));
+        repaired.setMa10(meanIndexClose(rows, index, 10));
+        repaired.setMa20(meanIndexClose(rows, index, 20));
+    }
+
+    private LocalDate currentPeriodStartDate(KlinePeriodTypeEnum periodType, LocalDate today) {
+        if (KlinePeriodTypeEnum.WEEKLY.equals(periodType)) {
+            return today.minusDays(today.getDayOfWeek().getValue() - 1L);
+        }
+        if (KlinePeriodTypeEnum.MONTHLY.equals(periodType)) {
+            return today.withDayOfMonth(1);
+        }
+        return today;
+    }
+
+    private static BigDecimal maxIndex(List<IndexKlinePO> klines) {
+        return klines.stream()
+                .map(IndexKlinePO::getHighPrice)
+                .filter(Objects::nonNull)
+                .max(BigDecimal::compareTo)
+                .orElse(null);
+    }
+
+    private static BigDecimal minIndex(List<IndexKlinePO> klines) {
+        return klines.stream()
+                .map(IndexKlinePO::getLowPrice)
+                .filter(Objects::nonNull)
+                .min(BigDecimal::compareTo)
+                .orElse(null);
+    }
+
+    private static Long sumIndexVolume(List<IndexKlinePO> klines) {
+        long total = 0L;
+        boolean hasValue = false;
+        for (IndexKlinePO kline : klines) {
+            if (kline.getVolume() != null) {
+                total += kline.getVolume();
+                hasValue = true;
+            }
+        }
+        return hasValue ? total : null;
+    }
+
+    private static BigDecimal sumIndexAmount(List<IndexKlinePO> klines) {
+        return sumIndexDecimal(klines.stream().map(IndexKlinePO::getTurnoverAmount).toList());
+    }
+
+    private static BigDecimal sumIndexTurnoverRate(List<IndexKlinePO> klines) {
+        return sumIndexDecimal(klines.stream().map(IndexKlinePO::getTurnoverRate).toList());
+    }
+
+    private static BigDecimal sumIndexDecimal(List<BigDecimal> values) {
+        BigDecimal total = BigDecimal.ZERO;
+        boolean hasValue = false;
+        for (BigDecimal value : values) {
+            if (value != null) {
+                total = total.add(value);
+                hasValue = true;
+            }
+        }
+        return hasValue ? total : null;
+    }
+
+    private static BigDecimal meanIndexClose(List<IndexKlinePO> klines, int endIndex, int window) {
+        if (endIndex + 1 < window) {
+            return null;
+        }
+        BigDecimal total = BigDecimal.ZERO;
+        for (int itemIndex = endIndex - window + 1; itemIndex <= endIndex; itemIndex++) {
+            BigDecimal closePrice = klines.get(itemIndex).getClosePrice();
+            if (closePrice == null) {
+                return null;
+            }
+            total = total.add(closePrice);
+        }
+        return total.divide(BigDecimal.valueOf(window), 4, RoundingMode.HALF_UP);
     }
 
     private void saveTrends(IndexConfigPO index, JsonNode response) {
