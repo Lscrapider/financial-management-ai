@@ -200,9 +200,9 @@
 
 `indexCode`、`indexName`、`secid`、`marketCode`、`exchangeCode`、`latestPrice`、`openPrice`、`highPrice`、`lowPrice`、`previousClosePrice`、`changeAmount`、`changePercent`、`volume`、`turnoverAmount`、`amplitude`、`syncedAt`。
 
-### 指数日 K
+### 指数 K 线
 
-`GET /api/indices/daily-klines`
+`GET /api/indices/klines`
 
 需要 Token 和 `admin` 角色。
 
@@ -216,7 +216,7 @@
 | `endDate` | string | 否 | 无 | 结束日期，格式 `yyyy-MM-dd` |
 | `limit` | number | 否 | `250` | 返回条数，最大 `500` |
 
-返回：`IndexDailyKlineVO[]`，按 `tradeDate` 升序。
+返回：`IndexKlineVO[]`，按 `tradeDate` 升序。
 
 核心字段：
 
@@ -244,9 +244,9 @@
 
 `bondCode`、`bondName`、`secid`、`marketCode`、`exchangeCode`、`latestPrice`、`openPrice`、`highPrice`、`lowPrice`、`previousClosePrice`、`changeAmount`、`changePercent`、`volume`、`averagePrice`、`currentVolume`、`turnoverAmount`、`amplitude`、`turnoverRate`、`bondRating`、`quoteDetails`、`syncedAt`。
 
-### 可转债日 K
+### 可转债 K 线
 
-`GET /api/bonds/daily-klines`
+`GET /api/bonds/klines`
 
 查询参数：`bondCode` 或 `secid`、`startDate`、`endDate`、`limit`。
 
@@ -424,7 +424,7 @@
 - `stock_quote_list`
 - `index_quote_by_code`
 - `index_quote_list`
-- `index_daily_kline_by_code`
+- `index_kline_by_code`
 
 ## OCR 任务
 

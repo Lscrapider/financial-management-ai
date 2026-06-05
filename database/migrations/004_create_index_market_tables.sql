@@ -65,7 +65,7 @@ CREATE INDEX IF NOT EXISTS idx_index_quote_snapshot_market_code
 CREATE INDEX IF NOT EXISTS idx_index_quote_snapshot_change_percent
     ON index_quote_snapshot (change_percent DESC);
 
-CREATE TABLE IF NOT EXISTS index_daily_kline (
+CREATE TABLE IF NOT EXISTS index_kline (
     id BIGSERIAL PRIMARY KEY,
     index_code VARCHAR(32) NOT NULL,
     index_name VARCHAR(100) NOT NULL,
@@ -87,15 +87,15 @@ CREATE TABLE IF NOT EXISTS index_daily_kline (
     synced_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uk_index_daily_kline_secid_trade_date UNIQUE (secid, trade_date)
+    CONSTRAINT uk_index_kline_secid_trade_date UNIQUE (secid, trade_date)
 );
 
-COMMENT ON TABLE index_daily_kline IS '指数日K线表';
-COMMENT ON COLUMN index_daily_kline.index_code IS '指数代码';
-COMMENT ON COLUMN index_daily_kline.index_name IS '指数名称';
-COMMENT ON COLUMN index_daily_kline.trade_date IS '交易日期';
-COMMENT ON COLUMN index_daily_kline.close_price IS '收盘点位';
-COMMENT ON COLUMN index_daily_kline.change_percent IS '涨跌幅百分比';
+COMMENT ON TABLE index_kline IS '指数K线表';
+COMMENT ON COLUMN index_kline.index_code IS '指数代码';
+COMMENT ON COLUMN index_kline.index_name IS '指数名称';
+COMMENT ON COLUMN index_kline.trade_date IS '交易日期';
+COMMENT ON COLUMN index_kline.close_price IS '收盘点位';
+COMMENT ON COLUMN index_kline.change_percent IS '涨跌幅百分比';
 
-CREATE INDEX IF NOT EXISTS idx_index_daily_kline_index_date
-    ON index_daily_kline (index_code, trade_date DESC);
+CREATE INDEX IF NOT EXISTS idx_index_kline_index_date
+    ON index_kline (index_code, trade_date DESC);

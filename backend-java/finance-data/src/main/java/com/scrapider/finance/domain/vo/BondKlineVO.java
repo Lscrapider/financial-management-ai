@@ -1,19 +1,20 @@
 package com.scrapider.finance.domain.vo;
 
-import com.scrapider.finance.domain.po.IndexDailyKlinePO;
+import com.scrapider.finance.domain.po.BondKlinePO;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.Data;
 
 @Data
-public class IndexDailyKlineVO {
+public class BondKlineVO {
 
-    private String indexCode;
-    private String indexName;
+    private String bondCode;
+    private String bondName;
     private String secid;
     private String marketCode;
     private String exchangeCode;
+    private String periodType;
     private LocalDate tradeDate;
     private BigDecimal openPrice;
     private BigDecimal closePrice;
@@ -25,15 +26,19 @@ public class IndexDailyKlineVO {
     private BigDecimal turnoverAmount;
     private BigDecimal amplitude;
     private BigDecimal turnoverRate;
+    private BigDecimal ma5;
+    private BigDecimal ma10;
+    private BigDecimal ma20;
     private LocalDateTime syncedAt;
 
-    public static IndexDailyKlineVO fromPO(IndexDailyKlinePO po) {
-        IndexDailyKlineVO vo = new IndexDailyKlineVO();
-        vo.setIndexCode(po.getIndexCode());
-        vo.setIndexName(po.getIndexName());
+    public static BondKlineVO fromPO(BondKlinePO po) {
+        BondKlineVO vo = new BondKlineVO();
+        vo.setBondCode(po.getBondCode());
+        vo.setBondName(po.getBondName());
         vo.setSecid(po.getSecid());
         vo.setMarketCode(po.getMarketCode());
         vo.setExchangeCode(po.getExchangeCode());
+        vo.setPeriodType(po.getPeriodType());
         vo.setTradeDate(po.getTradeDate());
         vo.setOpenPrice(po.getOpenPrice());
         vo.setClosePrice(po.getClosePrice());
@@ -45,6 +50,9 @@ public class IndexDailyKlineVO {
         vo.setTurnoverAmount(po.getTurnoverAmount());
         vo.setAmplitude(po.getAmplitude());
         vo.setTurnoverRate(po.getTurnoverRate());
+        vo.setMa5(po.getMa5());
+        vo.setMa10(po.getMa10());
+        vo.setMa20(po.getMa20());
         vo.setSyncedAt(po.getSyncedAt());
         return vo;
     }

@@ -1,15 +1,26 @@
 package com.scrapider.finance.service.impl;
 
 import cn.hutool.core.util.StrUtil;
+import com.scrapider.finance.api.StockMarketApi;
+import com.scrapider.finance.domain.dto.StockMarketDataDTO;
 import com.scrapider.finance.domain.enums.BondQuoteSortFieldEnum;
+import com.scrapider.finance.domain.enums.KlineAdjustTypeEnum;
+import com.scrapider.finance.domain.enums.KlinePeriodTypeEnum;
 import com.scrapider.finance.domain.enums.SortOrderEnum;
-import com.scrapider.finance.domain.param.BondDailyKlineParam;
+import com.scrapider.finance.domain.param.BondKlineParam;
+import com.scrapider.finance.domain.param.BondIntradayTrendParam;
 import com.scrapider.finance.domain.param.BondQuoteListParam;
-import com.scrapider.finance.domain.vo.BondDailyKlineVO;
+import com.scrapider.finance.domain.po.BondConfigPO;
+import com.scrapider.finance.domain.po.BondKlinePO;
+import com.scrapider.finance.domain.vo.BondKlineVO;
+import com.scrapider.finance.domain.vo.BondIntradayTrendVO;
 import com.scrapider.finance.domain.vo.BondQuoteVO;
-import com.scrapider.finance.manage.BondDailyKlineManage;
+import com.scrapider.finance.manage.BondConfigManage;
+import com.scrapider.finance.manage.BondIntradayTrendInfluxManage;
+import com.scrapider.finance.manage.BondKlineManage;
 import com.scrapider.finance.manage.BondQuoteSnapshotManage;
 import com.scrapider.finance.service.BondMarketQueryService;
+import com.scrapider.finance.task.BondMarketSyncTask;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
@@ -23,13 +34,25 @@ public class BondMarketQueryServiceImpl implements BondMarketQueryService {
     private static final int MAX_LIMIT = 500;
 
     private final BondQuoteSnapshotManage bondQuoteSnapshotManage;
-    private final BondDailyKlineManage bondDailyKlineManage;
+    private final BondIntradayTrendInfluxManage bondIntradayTrendInfluxManage;
+    private final BondKlineManage bondKlineManage;
+    private final BondConfigManage bondConfigManage;
+    private final StockMarketApi stockMarketApi;
+    private final BondMarketSyncTask bondMarketSyncTask;
 
     public BondMarketQueryServiceImpl(
             BondQuoteSnapshotManage bondQuoteSnapshotManage,
-            BondDailyKlineManage bondDailyKlineManage) {
+            BondIntradayTrendInfluxManage bondIntradayTrendInfluxManage,
+            BondKlineManage bondKlineManage,
+            BondConfigManage bondConfigManage,
+            StockMarketApi stockMarketApi,
+            BondMarketSyncTask bondMarketSyncTask) {
         this.bondQuoteSnapshotManage = bondQuoteSnapshotManage;
-        this.bondDailyKlineManage = bondDailyKlineManage;
+        this.bondIntradayTrendInfluxManage = bondIntradayTrendInfluxManage;
+        this.bondKlineManage = bondKlineManage;
+        this.bondConfigManage = bondConfigManage;
+        this.stockMarketApi = stockMarketApi;
+        this.bondMarketSyncTask = bondMarketSyncTask;
     }
 
     @Override
@@ -46,21 +69,89 @@ public class BondMarketQueryServiceImpl implements BondMarketQueryService {
     }
 
     @Override
-    public List<BondDailyKlineVO> listDailyKlines(BondDailyKlineParam param) {
+    public List<BondIntradayTrendVO> listIntradayTrends(BondIntradayTrendParam param) {
+        if (StrUtil.isBlank(param.getBondCode())) {
+            throw new IllegalArgumentException("bondCode must not be blank");
+        }
+        BondConfigPO bond = this.bondConfigManage.getEnabledByBondCode(param.getBondCode());
+        if (bond == null || StrUtil.isBlank(bond.getSecid())) {
+            return List.of();
+        }
+        List<BondIntradayTrendVO> trends = this.listIntradayTrendVOs(bond.getBondCode());
+        if (trends.isEmpty()) {
+            this.bondMarketSyncTask.syncTrendForBond(bond.getBondCode());
+            trends = this.listIntradayTrendVOs(bond.getBondCode());
+        }
+        return trends;
+    }
+
+    @Override
+    public List<BondKlineVO> listKlines(BondKlineParam param) {
         if (StrUtil.isBlank(param.getBondCode()) && StrUtil.isBlank(param.getSecid())) {
             throw new IllegalArgumentException("bondCode or secid must not be blank");
         }
-        return this.bondDailyKlineManage
-                .listDailyKlines(
-                        normalizeText(param.getBondCode()),
-                        normalizeText(param.getSecid()),
-                        parseDate(param.getStartDate()),
-                        parseDate(param.getEndDate()),
-                        this.normalizeLimit(param.getLimit(), DEFAULT_KLINE_LIMIT))
+        String bondCode = normalizeText(param.getBondCode());
+        String secid = normalizeText(param.getSecid());
+        KlinePeriodTypeEnum periodType = normalizePeriodType(param.getPeriodType());
+        LocalDate startDate = parseDate(param.getStartDate());
+        LocalDate endDate = parseDate(param.getEndDate());
+        int limit = this.normalizeLimit(param.getLimit(), DEFAULT_KLINE_LIMIT);
+        List<BondKlinePO> klines = this.listKlinePOs(
+                bondCode,
+                secid,
+                periodType,
+                startDate,
+                endDate,
+                limit);
+        if (klines.isEmpty() && StrUtil.isNotBlank(bondCode)) {
+            this.syncKlines(bondCode, periodType, limit);
+            klines = this.listKlinePOs(bondCode, secid, periodType, startDate, endDate, limit);
+        }
+        return klines
                 .stream()
-                .map(BondDailyKlineVO::fromPO)
-                .sorted(Comparator.comparing(BondDailyKlineVO::getTradeDate))
+                .map(BondKlineVO::fromPO)
+                .sorted(Comparator.comparing(BondKlineVO::getTradeDate))
                 .toList();
+    }
+
+    private List<BondKlinePO> listKlinePOs(
+            String bondCode,
+            String secid,
+            KlinePeriodTypeEnum periodType,
+            LocalDate startDate,
+            LocalDate endDate,
+            Integer limit) {
+        return this.bondKlineManage.listKlines(
+                bondCode,
+                secid,
+                periodType,
+                startDate,
+                endDate,
+                limit);
+    }
+
+    private List<BondIntradayTrendVO> listIntradayTrendVOs(String bondCode) {
+        return this.bondIntradayTrendInfluxManage
+                .listLatestTradingTrends(bondCode)
+                .stream()
+                .map(BondIntradayTrendVO::fromPO)
+                .toList();
+    }
+
+    private void syncKlines(String bondCode, KlinePeriodTypeEnum periodType, Integer limit) {
+        BondConfigPO bond = this.bondConfigManage.getEnabledByBondCode(bondCode);
+        if (bond == null || StrUtil.isBlank(bond.getSecid())) {
+            return;
+        }
+        StockMarketDataDTO klines = this.stockMarketApi.getKlines(
+                bond.getSecid(),
+                periodType,
+                KlineAdjustTypeEnum.NONE,
+                limit);
+        this.bondKlineManage.saveKlines(BondKlinePO.fromApiResponse(
+                bond,
+                klines.data(),
+                periodType));
     }
 
     private int normalizeLimit(Integer limit, int defaultLimit) {
@@ -72,6 +163,19 @@ public class BondMarketQueryServiceImpl implements BondMarketQueryService {
 
     private static String normalizeText(String value) {
         return StrUtil.isBlank(value) ? null : value.trim();
+    }
+
+    private static KlinePeriodTypeEnum normalizePeriodType(String value) {
+        if (StrUtil.isBlank(value)) {
+            return KlinePeriodTypeEnum.DAILY;
+        }
+        String code = value.trim();
+        for (KlinePeriodTypeEnum item : KlinePeriodTypeEnum.values()) {
+            if (item.getCode().equals(code)) {
+                return item;
+            }
+        }
+        return KlinePeriodTypeEnum.DAILY;
     }
 
     private static LocalDate parseDate(String value) {

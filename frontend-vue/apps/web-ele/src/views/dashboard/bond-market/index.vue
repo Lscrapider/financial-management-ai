@@ -2,7 +2,7 @@
 import type { EchartsUIType } from '@vben/plugins/echarts';
 
 import type { StockQuoteDetail } from '#/api/stock';
-import type { BondDailyKline, BondQuote } from '#/api/bond';
+import type { BondKline, BondQuote } from '#/api/bond';
 
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
@@ -24,7 +24,7 @@ import {
 import type { Sort } from 'element-plus';
 
 import {
-  listBondDailyKlines,
+  listBondKlines,
   listBondQuotes,
 } from '#/api/bond';
 
@@ -34,13 +34,19 @@ const rangeOptions = [
   { label: '近250日', value: 250 },
   { label: '近500日', value: 500 },
 ];
+const periodOptions = [
+  { label: '日K', value: 'daily' },
+  { label: '周K', value: 'weekly' },
+  { label: '月K', value: 'monthly' },
+] as const;
 
 const chartRef = ref<EchartsUIType>();
 const { renderEcharts } = useEcharts(chartRef);
 const route = useRoute();
 
 const klineLimit = ref(250);
-const klines = ref<BondDailyKline[]>([]);
+const klinePeriodType = ref<(typeof periodOptions)[number]['value']>('daily');
+const klines = ref<BondKline[]>([]);
 const loadingKlines = ref(false);
 const loadingQuotes = ref(false);
 const quotes = ref<BondQuote[]>([]);
@@ -57,6 +63,10 @@ const selectedQuote = computed(() => {
 
 const latestKline = computed(() => {
   return klines.value.at(-1);
+});
+
+const klinePeriodLabel = computed(() => {
+  return periodOptions.find((item) => item.value === klinePeriodType.value)?.label ?? 'K线';
 });
 
 const riseCount = computed(() => {
@@ -105,8 +115,10 @@ async function refreshKlines() {
 
   loadingKlines.value = true;
   try {
-    klines.value = await listBondDailyKlines({
+    klines.value = await listBondKlines({
+      bondCode: selectedQuote.value?.bondCode,
       limit: klineLimit.value,
+      periodType: klinePeriodType.value,
       secid: selectedSecid.value,
     });
     await nextTick();
@@ -163,7 +175,7 @@ function renderKlineChart() {
     axisPointer: {
       link: [{ xAxisIndex: 'all' }],
     },
-    color: ['#ef4444', '#089981', '#64748b'],
+    color: ['#ef4444', '#f59e0b', '#3b82f6', '#8b5cf6', '#64748b'],
     dataZoom: [
       {
         bottom: 12,
@@ -198,8 +210,29 @@ function renderKlineChart() {
           color: '#ef4444',
           color0: '#089981',
         },
-        name: '日K',
+        name: klinePeriodLabel.value,
         type: 'candlestick',
+      },
+      {
+        data: klines.value.map((item) => toLineNumber(item.ma5)),
+        name: 'MA5',
+        showSymbol: false,
+        smooth: true,
+        type: 'line',
+      },
+      {
+        data: klines.value.map((item) => toLineNumber(item.ma10)),
+        name: 'MA10',
+        showSymbol: false,
+        smooth: true,
+        type: 'line',
+      },
+      {
+        data: klines.value.map((item) => toLineNumber(item.ma20)),
+        name: 'MA20',
+        showSymbol: false,
+        smooth: true,
+        type: 'line',
       },
       {
         data: volumes,
@@ -211,6 +244,10 @@ function renderKlineChart() {
     ],
     tooltip: {
       trigger: 'axis',
+    },
+    legend: {
+      data: [klinePeriodLabel.value, 'MA5', 'MA10', 'MA20'],
+      top: 0,
     },
     xAxis: [
       {
@@ -324,6 +361,11 @@ function toNullableNumber(value?: number | string | null) {
 
 function toNumber(value?: number | string | null) {
   return toNullableNumber(value) ?? 0;
+}
+
+function toLineNumber(value?: number | string | null) {
+  const numberValue = toNullableNumber(value);
+  return numberValue && numberValue > 0 ? numberValue : null;
 }
 
 function normalizeRouteSecid(value: unknown) {
@@ -536,8 +578,21 @@ function normalizeRouteSecid(value: unknown) {
           <ElCard class="kline-panel" shadow="never">
             <template #header>
               <div class="panel-header">
-                <span>日K线</span>
+                <span>{{ klinePeriodLabel }}线</span>
                 <div class="header-actions">
+                  <ElSelect
+                    v-model="klinePeriodType"
+                    class="period-select"
+                    size="small"
+                    @change="refreshKlines"
+                  >
+                    <ElOption
+                      v-for="item in periodOptions"
+                      :key="item.value"
+                      :label="item.label"
+                      :value="item.value"
+                    />
+                  </ElSelect>
                   <ElSelect
                     v-model="klineLimit"
                     class="range-select"
@@ -568,7 +623,7 @@ function normalizeRouteSecid(value: unknown) {
                 ref="chartRef"
                 height="100%"
               />
-              <ElEmpty v-else description="暂无日K数据" />
+              <ElEmpty v-else :description="`暂无${klinePeriodLabel}数据`" />
             </div>
           </ElCard>
         </div>
@@ -724,6 +779,10 @@ function normalizeRouteSecid(value: unknown) {
 
 .range-select {
   width: 104px;
+}
+
+.period-select {
+  width: 88px;
 }
 
 .bond-name-cell {

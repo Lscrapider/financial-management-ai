@@ -1,15 +1,19 @@
 import type { WorkbenchTargetType } from './types';
 
-import type { BondDailyKline, BondIntradayTrend, BondQuote } from '#/api/bond';
-import type { IndexDailyKline, IndexQuote } from '#/api/index-market';
+import type { BondKline, BondIntradayTrend, BondQuote } from '#/api/bond';
+import type { IndexKline, IndexIntradayTrend, IndexQuote } from '#/api/index-market';
 import type { StockIntradayTrend, StockKline, StockQuote } from '#/api/stock';
 
 import {
-  listBondDailyKlines,
+  listBondKlines,
   listBondIntradayTrends,
   listBondQuotes,
 } from '#/api/bond';
-import { listIndexDailyKlines, listIndexQuotes } from '#/api/index-market';
+import {
+  listIndexKlines,
+  listIndexIntradayTrends,
+  listIndexQuotes,
+} from '#/api/index-market';
 import {
   listStockIntradayTrends,
   listStockKlines,
@@ -108,17 +112,19 @@ export async function listMarketKlines(
   adjustType: WorkbenchKlineAdjustType = 'hfq',
 ) {
   if (targetType === 'INDEX') {
-    const klines = await listIndexDailyKlines({
+    const klines = await listIndexKlines({
       indexCode: targetCode,
       limit: 250,
+      periodType,
       secid,
     });
     return klines.map((item) => indexKlineToMarketKline(item));
   }
   if (targetType === 'CONVERTIBLE_BOND') {
-    const klines = await listBondDailyKlines({
+    const klines = await listBondKlines({
       bondCode: targetCode,
       limit: 250,
+      periodType,
       secid,
     });
     return klines.map((item) => bondKlineToMarketKline(item));
@@ -139,6 +145,10 @@ export async function listMarketTrends(
   if (targetType === 'CONVERTIBLE_BOND') {
     const trends = await listBondIntradayTrends(targetCode);
     return trends.map((item) => bondTrendToMarketTrend(item));
+  }
+  if (targetType === 'INDEX') {
+    const trends = await listIndexIntradayTrends(targetCode);
+    return trends.map((item) => indexTrendToMarketTrend(item));
   }
   if (targetType === 'STOCK') {
     const trends = await listStockIntradayTrends(targetCode);
@@ -175,11 +185,14 @@ function baseQuoteFields(item: {
   ];
 }
 
-function bondKlineToMarketKline(item: BondDailyKline): MarketKlinePoint {
+function bondKlineToMarketKline(item: BondKline): MarketKlinePoint {
   return {
     closePrice: item.closePrice,
     highPrice: item.highPrice,
     lowPrice: item.lowPrice,
+    ma10: item.ma10,
+    ma20: item.ma20,
+    ma5: item.ma5,
     openPrice: item.openPrice,
     tradeDate: item.tradeDate,
     volume: item.volume,
@@ -214,11 +227,14 @@ function bondTrendToMarketTrend(item: BondIntradayTrend): MarketTrendPoint {
   };
 }
 
-function indexKlineToMarketKline(item: IndexDailyKline): MarketKlinePoint {
+function indexKlineToMarketKline(item: IndexKline): MarketKlinePoint {
   return {
     closePrice: item.closePrice,
     highPrice: item.highPrice,
     lowPrice: item.lowPrice,
+    ma10: item.ma10,
+    ma20: item.ma20,
+    ma5: item.ma5,
     openPrice: item.openPrice,
     tradeDate: item.tradeDate,
     volume: item.volume,
@@ -234,6 +250,15 @@ function indexQuoteToMarketQuote(item: IndexQuote): MarketQuote {
     name: item.indexName,
     quoteFields,
     targetType: 'INDEX',
+  };
+}
+
+function indexTrendToMarketTrend(item: IndexIntradayTrend): MarketTrendPoint {
+  return {
+    averagePrice: item.averagePrice,
+    closePrice: item.closePrice,
+    trendMinute: item.trendMinute,
+    trendTime: item.trendTime,
   };
 }
 

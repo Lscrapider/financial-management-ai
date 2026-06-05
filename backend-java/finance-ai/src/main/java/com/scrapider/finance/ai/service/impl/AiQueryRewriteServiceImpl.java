@@ -28,19 +28,19 @@ public class AiQueryRewriteServiceImpl implements AiQueryRewriteService {
             indexCode: string
             bondCode: string
             timeRange: intraday | recent_7d | recent_30d | recent_60d | recent_120d | recent_250d | none
-            dataScopes: string[]，可选值 quote, intraday_trend, daily_kline, financial_indicator, news, knowledge_base
+            dataScopes: string[]，可选值 quote, intraday_trend, kline, financial_indicator, news, knowledge_base
             dataRequests: object[]，只允许使用以下 queryType：
               stock_quote_by_code: 查询单只股票最新行情，targetCode 填 stockCode
               stock_intraday_by_code: 查询单只股票最新一批盘中分时，targetCode 填 stockCode，limit 不超过 240
               stock_quote_list: 查询股票最新行情列表
               index_quote_by_code: 查询单个指数最新行情，targetCode 填 indexCode
               index_quote_list: 查询指数最新行情列表
-              index_daily_kline_by_code: 查询指数日K，targetCode 填 indexCode
+              index_kline_by_code: 查询指数K线，targetCode 填 indexCode
               bond_quote_by_code: 查询单个可转债最新行情，targetCode 填 bondCode
               bond_quote_list: 查询可转债最新行情列表
-              bond_daily_kline_by_code: 查询可转债日K，targetCode 填 bondCode
+              bond_kline_by_code: 查询可转债K线，targetCode 填 bondCode
             dataRequests 每项字段：
-              source: stock_quote_snapshot | index_quote_snapshot | index_daily_kline | bond_quote_snapshot | bond_daily_kline
+              source: stock_quote_snapshot | index_quote_snapshot | index_kline | bond_quote_snapshot | bond_kline
               queryType: 上面列出的白名单 queryType
               targetCode: string
               targetName: string
@@ -53,7 +53,7 @@ public class AiQueryRewriteServiceImpl implements AiQueryRewriteService {
             如果用户指定可转债，优先生成按代码查询的 dataRequests。
             如果用户询问个股趋势、盘中走势、封板、开板、量价变化，应同时请求 stock_quote_by_code 和 stock_intraday_by_code。
             如果用户询问可转债趋势、正股走势、转债K线，应请求 bond_quote_by_code。
-            如果用户询问可转债历史K线、近期走势、支撑压力位，应请求 bond_daily_kline_by_code。
+            如果用户询问可转债历史K线、近期走势、支撑压力位，应请求 bond_kline_by_code。
             如果用户没有指定具体股票代码或股票名称，但询问股票整体、股票列表、股票排行或 A 股市场，生成 stock_quote_list，source=stock_quote_snapshot，limit 不超过 100。
             如果用户没有指定具体指数代码或指数名称，但询问指数整体、指数列表或指数行情，生成 index_quote_list，source=index_quote_snapshot，limit 不超过 100。
             如果用户没有指定具体可转债代码或可转债名称，但询问可转债整体、可转债列表、可转债排行或转债行情，生成 bond_quote_list，source=bond_quote_snapshot，limit 不超过 100。

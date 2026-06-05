@@ -121,7 +121,7 @@ backend-java/finance-ai/
 - `stock_quote_list`
 - `index_quote_by_code`
 - `index_quote_list`
-- `index_daily_kline_by_code`
+- `index_kline_by_code`
 
 ## 数据上下文
 
@@ -130,7 +130,7 @@ backend-java/finance-ai/
 - 股票最新行情快照：`stock_quote_snapshot`
 - 股票最新批次分时走势：InfluxDB `stock_minute`
 - 指数最新行情快照：`index_quote_snapshot`
-- 指数日 K：`index_daily_kline`
+- 指数 K 线：`index_kline`
 
 如果用户只给出股票或指数名称，服务会先尝试精确匹配名称，再尝试模糊匹配名称，找到后补齐代码。
 

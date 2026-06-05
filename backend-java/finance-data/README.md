@@ -11,7 +11,7 @@
 - 定义持久化对象：用户、股票/指数/可转债配置与行情、观察池、预警、知识库向量、OCR、AI Token、访问日志和报告任务。
 - 定义 OCR 任务持久化对象和 Mapper/Manage 封装。
 - 提供 MyBatis-Plus Mapper 和 Manage 封装，供业务服务查询、保存和统计数据。
-- 提供 InfluxDB 配置与股票分钟走势读写封装。
+- 提供 InfluxDB 配置与股票、指数、可转债分钟走势读写封装。
 - 提供股票/指数排序枚举和行情 JSON 解析工具。
 
 ## 目录结构
@@ -41,13 +41,15 @@ backend-java/finance-data/
 | `StockConfigPO` | `stock_config` | 启用的股票清单和腾讯行情 `secid` 配置。 |
 | `StockQuoteSnapshotPO` | `stock_quote_snapshot` | 股票最新行情快照。 |
 | `StockDailyKlinePO` | `stock_daily_kline` | 股票日 K 数据。 |
-| `StockIntradayTrendPO` | InfluxDB `stock_minute` | 股票分钟级分时走势。 |
+| `StockIntradayTrendPO` | InfluxDB `stock_intraday / stock_minute` | 股票分钟级分时走势。 |
 | `IndexConfigPO` | `index_config` | 启用的指数清单和腾讯行情 `secid` 配置。 |
 | `IndexQuoteSnapshotPO` | `index_quote_snapshot` | 指数最新行情快照。 |
-| `IndexDailyKlinePO` | `index_daily_kline` | 指数日 K 数据。 |
+| `IndexKlinePO` | `index_kline` | 指数 K 线数据。 |
+| `IndexIntradayTrendPO` | InfluxDB `index_intraday / index_minute` | 指数分钟级分时走势。 |
 | `BondConfigPO` | `bond_config` | 启用的可转债清单和腾讯行情 `secid` 配置。 |
 | `BondQuoteSnapshotPO` | `bond_quote_snapshot` | 可转债最新行情快照。 |
-| `BondDailyKlinePO` | `bond_daily_kline` | 可转债日 K 数据。 |
+| `BondKlinePO` | `bond_kline` | 可转债 K 线数据。 |
+| `BondIntradayTrendPO` | InfluxDB `bond_intraday / bond_minute` | 可转债分钟级分时走势。 |
 | `AiTokenUsageLogPO` | `ai_token_usage_log` | AI 模型 Token 用量日志。 |
 | `AppVisitLogPO` | `app_visit_log` | `/api/**` 访问日志。 |
 | `OcrTaskPO` | `ocr_task` | OCR 文件上传、手动文本导入和识别任务状态。 |
@@ -75,9 +77,9 @@ backend-java/finance-data/
 | `StockIntradayTrendParam` | 股票分时走势 | `stockCode` |
 | `StockDailyKlineParam` | 股票日 K | `stockCode`, `secid`, `startDate`, `endDate`, `limit` |
 | `IndexQuoteListParam` | 指数行情列表 | `marketCode`, `limit`, `sortField`, `sortOrder` |
-| `IndexDailyKlineParam` | 指数日 K | `indexCode`, `secid`, `startDate`, `endDate`, `limit` |
+| `IndexKlineParam` | 指数 K 线 | `indexCode`, `secid`, `startDate`, `endDate`, `limit` |
 | `BondQuoteListParam` | 可转债行情列表 | `limit`, `sortField`, `sortOrder` |
-| `BondDailyKlineParam` | 可转债日 K | `bondCode`, `secid`, `startDate`, `endDate`, `limit` |
+| `BondKlineParam` | 可转债 K 线 | `bondCode`, `secid`, `startDate`, `endDate`, `limit` |
 | `WatchGroupSaveParam` | 观察池分组新增/更新 | `id`, `groupName` |
 | `WatchGroupItemSaveParam` | 观察池标的新增/更新 | `id`, `groupId`, `targetType`, `targetCode`, `targetName`, `secid`, `remark`, `buyPrice`, `position` |
 | `StockAlertConfigSaveParam` | 预警配置新增/更新 | `id`, `targetType`, `stockCode`, `thresholdPercent`, `enabled` |

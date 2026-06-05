@@ -131,10 +131,10 @@ GET /api/indices/quotes
 ## 指数日K线
 
 ```http
-GET /api/indices/daily-klines
+GET /api/indices/klines
 ```
 
-用于前端绘制指数日K图，数据来自数据库表 `index_daily_kline`。
+用于前端绘制指数日K图，数据来自数据库表 `index_kline`。
 
 ### Query Parameters
 
@@ -149,7 +149,7 @@ GET /api/indices/daily-klines
 ### Example
 
 ```http
-GET /api/indices/daily-klines?secid=1.000001&limit=250
+GET /api/indices/klines?secid=1.000001&limit=250
 ```
 
 ### Response Fields

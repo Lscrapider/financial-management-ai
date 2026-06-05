@@ -8,16 +8,19 @@ import {
   ElCard,
   ElInput,
   ElMessage,
+  ElOption,
+  ElSelect,
   ElTag,
 } from 'element-plus';
 
 import {
   getBondMarketSyncStatus,
+  syncBondKlineData,
   syncBondMarketData,
-  syncBondTrendData,
 } from '#/api/bond';
 import {
   getIndexMarketSyncStatus,
+  syncIndexKlineData,
   syncIndexMarketData,
 } from '#/api/index-market';
 import {
@@ -26,7 +29,8 @@ import {
   syncStockTrendData,
 } from '#/api/stock';
 
-type SyncKind = 'bond' | 'bondTrend' | 'index' | 'stock' | 'stockTrend';
+type KlinePeriodType = 'daily' | 'monthly' | 'weekly';
+type SyncKind = 'bond' | 'bondKline' | 'index' | 'indexKline' | 'stock' | 'stockTrend';
 
 interface SyncItem {
   description: string;
@@ -43,28 +47,38 @@ const syncItems: SyncItem[] = [
     scope: '股票快照 / 分时 / K线',
   },
   {
-    description: '全量同步所有已启用指数的行情快照和日 K 数据。',
+    description: '全量同步所有已启用指数的行情快照和默认日 K 数据。',
     key: 'index',
     title: '指数行情同步',
-    scope: '指数快照 / 日K',
+    scope: '指数快照 / K线',
   },
   {
-    description: '全量同步所有已启用可转债的行情快照和日 K 数据。',
+    description: '全量同步所有已启用可转债的行情快照和默认日 K 数据。',
     key: 'bond',
     title: '可转债行情同步',
-    scope: '可转债快照 / 日K',
+    scope: '可转债快照 / K线',
   },
+];
+
+const periodOptions: Array<{ label: string; value: KlinePeriodType }> = [
+  { label: '日K', value: 'daily' },
+  { label: '周K', value: 'weekly' },
+  { label: '月K', value: 'monthly' },
 ];
 
 const loadingMap = ref<Record<SyncKind, boolean>>({
   bond: false,
-  bondTrend: false,
+  bondKline: false,
   index: false,
+  indexKline: false,
   stock: false,
   stockTrend: false,
 });
 const stockTrendCode = ref('');
-const bondTrendCode = ref('');
+const indexKlineCode = ref('');
+const indexKlinePeriod = ref<KlinePeriodType>('daily');
+const bondKlineCode = ref('');
+const bondKlinePeriod = ref<KlinePeriodType>('daily');
 
 const delay = (ms: number) =>
   new Promise((resolve) => {
@@ -131,15 +145,35 @@ async function runStockTrendSync() {
   }
 }
 
-async function runBondTrendSync() {
-  const code = bondTrendCode.value.trim();
-  if (!code || loadingMap.value.bondTrend) return;
-  loadingMap.value.bondTrend = true;
+async function runIndexKlineSync() {
+  const code = indexKlineCode.value.trim();
+  if (!code || loadingMap.value.indexKline) return;
+  loadingMap.value.indexKline = true;
   try {
-    await syncBondTrendData(code);
-    ElMessage.success(`${code} 可转债分时同步完成`);
+    const status = await syncIndexKlineData(code, indexKlinePeriod.value);
+    if (status.started) {
+      ElMessage.success(`${code} 指数${periodLabel(indexKlinePeriod.value)}同步完成`);
+    } else {
+      ElMessage.warning(`${code} 指数配置不存在或未启用`);
+    }
   } finally {
-    loadingMap.value.bondTrend = false;
+    loadingMap.value.indexKline = false;
+  }
+}
+
+async function runBondKlineSync() {
+  const code = bondKlineCode.value.trim();
+  if (!code || loadingMap.value.bondKline) return;
+  loadingMap.value.bondKline = true;
+  try {
+    const status = await syncBondKlineData(code, bondKlinePeriod.value);
+    if (status.started) {
+      ElMessage.success(`${code} 可转债${periodLabel(bondKlinePeriod.value)}同步完成`);
+    } else {
+      ElMessage.warning(`${code} 可转债配置不存在或未启用`);
+    }
+  } finally {
+    loadingMap.value.bondKline = false;
   }
 }
 
@@ -151,6 +185,10 @@ function labelOf(kind: 'bond' | 'index' | 'stock') {
     return '指数行情';
   }
   return '可转债行情';
+}
+
+function periodLabel(value: KlinePeriodType) {
+  return periodOptions.find((item) => item.value === value)?.label ?? 'K线';
 }
 </script>
 
@@ -189,6 +227,72 @@ function labelOf(kind: 'bond' | 'index' | 'stock') {
         <ElCard class="trend-card" shadow="never">
           <div class="trend-card-body">
             <div class="trend-card-main">
+              <h2>单个指数 K 线同步</h2>
+              <p>按指数代码同步指定周期 K 线数据。</p>
+            </div>
+            <div class="trend-actions">
+              <ElInput
+                v-model="indexKlineCode"
+                clearable
+                placeholder="指数代码"
+                @keyup.enter="runIndexKlineSync"
+              />
+              <ElSelect v-model="indexKlinePeriod" class="period-select">
+                <ElOption
+                  v-for="item in periodOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                />
+              </ElSelect>
+              <ElButton
+                :disabled="!indexKlineCode.trim()"
+                :loading="loadingMap.indexKline"
+                type="primary"
+                @click="runIndexKlineSync"
+              >
+                同步K线
+              </ElButton>
+            </div>
+          </div>
+        </ElCard>
+
+        <ElCard class="trend-card" shadow="never">
+          <div class="trend-card-body">
+            <div class="trend-card-main">
+              <h2>单只可转债 K 线同步</h2>
+              <p>按可转债代码同步指定周期 K 线数据。</p>
+            </div>
+            <div class="trend-actions">
+              <ElInput
+                v-model="bondKlineCode"
+                clearable
+                placeholder="可转债代码"
+                @keyup.enter="runBondKlineSync"
+              />
+              <ElSelect v-model="bondKlinePeriod" class="period-select">
+                <ElOption
+                  v-for="item in periodOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                />
+              </ElSelect>
+              <ElButton
+                :disabled="!bondKlineCode.trim()"
+                :loading="loadingMap.bondKline"
+                type="primary"
+                @click="runBondKlineSync"
+              >
+                同步K线
+              </ElButton>
+            </div>
+          </div>
+        </ElCard>
+
+        <ElCard class="trend-card" shadow="never">
+          <div class="trend-card-body">
+            <div class="trend-card-main">
               <h2>单只股票分时同步</h2>
               <p>仅同步输入股票代码对应的分时数据，不执行全量股票同步。</p>
             </div>
@@ -204,31 +308,6 @@ function labelOf(kind: 'bond' | 'index' | 'stock') {
                 :loading="loadingMap.stockTrend"
                 type="primary"
                 @click="runStockTrendSync"
-              >
-                同步分时
-              </ElButton>
-            </div>
-          </div>
-        </ElCard>
-
-        <ElCard class="trend-card" shadow="never">
-          <div class="trend-card-body">
-            <div class="trend-card-main">
-              <h2>单只可转债分时同步</h2>
-              <p>仅同步输入可转债代码对应的分时数据，不执行全量可转债同步。</p>
-            </div>
-            <div class="trend-actions">
-              <ElInput
-                v-model="bondTrendCode"
-                clearable
-                placeholder="可转债代码"
-                @keyup.enter="runBondTrendSync"
-              />
-              <ElButton
-                :disabled="!bondTrendCode.trim()"
-                :loading="loadingMap.bondTrend"
-                type="primary"
-                @click="runBondTrendSync"
               >
                 同步分时
               </ElButton>
@@ -318,6 +397,10 @@ p {
   max-width: 220px;
 }
 
+.period-select {
+  width: 92px;
+}
+
 @media (max-width: 640px) {
   .sync-card-body,
   .trend-actions {
@@ -327,6 +410,10 @@ p {
 
   .trend-actions :deep(.el-input) {
     max-width: none;
+  }
+
+  .period-select {
+    width: 100%;
   }
 }
 </style>

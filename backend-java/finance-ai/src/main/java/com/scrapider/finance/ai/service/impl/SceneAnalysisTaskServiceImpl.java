@@ -32,10 +32,10 @@ import com.scrapider.finance.domain.po.StockConfigPO;
 import com.scrapider.finance.domain.po.StockQuoteSnapshotPO;
 import com.scrapider.finance.domain.po.StockValuationHistoryPO;
 import com.scrapider.finance.manage.BondConfigManage;
-import com.scrapider.finance.manage.BondDailyKlineManage;
+import com.scrapider.finance.manage.BondKlineManage;
 import com.scrapider.finance.manage.BondQuoteSnapshotManage;
 import com.scrapider.finance.manage.IndexConfigManage;
-import com.scrapider.finance.manage.IndexDailyKlineManage;
+import com.scrapider.finance.manage.IndexKlineManage;
 import com.scrapider.finance.manage.IndexQuoteSnapshotManage;
 import com.scrapider.finance.manage.SceneAnalysisTaskManage;
 import com.scrapider.finance.manage.StockConfigManage;
@@ -79,10 +79,10 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
     private final StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage;
     private final IndexQuoteSnapshotManage indexQuoteSnapshotManage;
     private final IndexConfigManage indexConfigManage;
-    private final IndexDailyKlineManage indexDailyKlineManage;
+    private final IndexKlineManage indexKlineManage;
     private final BondQuoteSnapshotManage bondQuoteSnapshotManage;
     private final BondConfigManage bondConfigManage;
-    private final BondDailyKlineManage bondDailyKlineManage;
+    private final BondKlineManage bondKlineManage;
     private final SceneAnalysisTaskManage sceneAnalysisTaskManage;
     private final StockSceneDataEnsureService stockSceneDataEnsureService;
     private final SceneReportPipelineService sceneReportPipelineService;
@@ -96,10 +96,10 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
             StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage,
             IndexQuoteSnapshotManage indexQuoteSnapshotManage,
             IndexConfigManage indexConfigManage,
-            IndexDailyKlineManage indexDailyKlineManage,
+            IndexKlineManage indexKlineManage,
             BondQuoteSnapshotManage bondQuoteSnapshotManage,
             BondConfigManage bondConfigManage,
-            BondDailyKlineManage bondDailyKlineManage,
+            BondKlineManage bondKlineManage,
             SceneAnalysisTaskManage sceneAnalysisTaskManage,
             StockSceneDataEnsureService stockSceneDataEnsureService,
             SceneReportPipelineService sceneReportPipelineService) {
@@ -111,10 +111,10 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
         this.stockIntradayTrendInfluxManage = stockIntradayTrendInfluxManage;
         this.indexQuoteSnapshotManage = indexQuoteSnapshotManage;
         this.indexConfigManage = indexConfigManage;
-        this.indexDailyKlineManage = indexDailyKlineManage;
+        this.indexKlineManage = indexKlineManage;
         this.bondQuoteSnapshotManage = bondQuoteSnapshotManage;
         this.bondConfigManage = bondConfigManage;
-        this.bondDailyKlineManage = bondDailyKlineManage;
+        this.bondKlineManage = bondKlineManage;
         this.sceneAnalysisTaskManage = sceneAnalysisTaskManage;
         this.stockSceneDataEnsureService = stockSceneDataEnsureService;
         this.sceneReportPipelineService = sceneReportPipelineService;
@@ -285,13 +285,13 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
                 this.firstNotBlank(
                         quote == null ? null : quote.getExchangeCode(),
                         config == null ? null : config.getExchangeCode()));
-        List<Map<String, Object>> dailyKlines = this.indexDailyKlineManage
-                .listDailyKlines(indexCode, null, null, null, MARKET_DAILY_KLINE_LIMIT)
+        List<Map<String, Object>> dailyKlines = this.indexKlineManage
+                .listKlines(indexCode, null, KlinePeriodTypeEnum.DAILY, null, null, MARKET_DAILY_KLINE_LIMIT)
                 .stream()
                 .map(this::toMap)
                 .toList();
         if (dailyKlines.isEmpty()) {
-            missing.add("index_daily_kline");
+            missing.add("index_kline");
         }
         return this.message(
                 taskNo,
@@ -338,13 +338,13 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
                 this.firstNotBlank(
                         quote == null ? null : quote.getExchangeCode(),
                         config == null ? null : config.getExchangeCode()));
-        List<Map<String, Object>> dailyKlines = this.bondDailyKlineManage
-                .listDailyKlines(bondCode, null, null, null, MARKET_DAILY_KLINE_LIMIT)
+        List<Map<String, Object>> dailyKlines = this.bondKlineManage
+                .listKlines(bondCode, null, KlinePeriodTypeEnum.DAILY, null, null, MARKET_DAILY_KLINE_LIMIT)
                 .stream()
                 .map(this::toMap)
                 .toList();
         if (dailyKlines.isEmpty()) {
-            missing.add("bond_daily_kline");
+            missing.add("bond_kline");
         }
         return this.message(
                 taskNo,

@@ -11,6 +11,16 @@ import org.springframework.stereotype.Service;
 @Service
 public class BondConfigManage extends ServiceImpl<BondConfigMapper, BondConfigPO> {
 
+    public BondConfigPO getEnabledByBondCode(String bondCode) {
+        if (StrUtil.isBlank(bondCode)) {
+            return null;
+        }
+        return this.getOne(new LambdaQueryWrapper<BondConfigPO>()
+                .eq(BondConfigPO::getEnabled, true)
+                .eq(BondConfigPO::getBondCode, bondCode.trim())
+                .last("LIMIT 1"));
+    }
+
     public List<BondConfigPO> listEnabledBonds() {
         return this.list(new LambdaQueryWrapper<BondConfigPO>()
                 .eq(BondConfigPO::getEnabled, true)

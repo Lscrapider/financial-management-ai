@@ -9,17 +9,18 @@ import com.scrapider.finance.ai.domain.vo.AiQueryRewriteVO;
 import com.scrapider.finance.ai.service.AiMarketDataQueryService;
 import com.scrapider.finance.domain.enums.BondQuoteSortFieldEnum;
 import com.scrapider.finance.domain.enums.IndexQuoteSortFieldEnum;
+import com.scrapider.finance.domain.enums.KlinePeriodTypeEnum;
 import com.scrapider.finance.domain.enums.SortOrderEnum;
 import com.scrapider.finance.domain.enums.StockQuoteSortFieldEnum;
-import com.scrapider.finance.domain.po.BondDailyKlinePO;
+import com.scrapider.finance.domain.po.BondKlinePO;
 import com.scrapider.finance.domain.po.BondQuoteSnapshotPO;
-import com.scrapider.finance.domain.po.IndexDailyKlinePO;
+import com.scrapider.finance.domain.po.IndexKlinePO;
 import com.scrapider.finance.domain.po.IndexQuoteSnapshotPO;
 import com.scrapider.finance.domain.po.StockIntradayTrendPO;
 import com.scrapider.finance.domain.po.StockQuoteSnapshotPO;
-import com.scrapider.finance.manage.BondDailyKlineManage;
+import com.scrapider.finance.manage.BondKlineManage;
 import com.scrapider.finance.manage.BondQuoteSnapshotManage;
-import com.scrapider.finance.manage.IndexDailyKlineManage;
+import com.scrapider.finance.manage.IndexKlineManage;
 import com.scrapider.finance.manage.IndexQuoteSnapshotManage;
 import com.scrapider.finance.manage.StockIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
@@ -38,23 +39,23 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
     private final StockQuoteSnapshotManage stockQuoteSnapshotManage;
     private final StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage;
     private final IndexQuoteSnapshotManage indexQuoteSnapshotManage;
-    private final IndexDailyKlineManage indexDailyKlineManage;
+    private final IndexKlineManage indexKlineManage;
     private final BondQuoteSnapshotManage bondQuoteSnapshotManage;
-    private final BondDailyKlineManage bondDailyKlineManage;
+    private final BondKlineManage bondKlineManage;
 
     public AiMarketDataQueryServiceImpl(
             StockQuoteSnapshotManage stockQuoteSnapshotManage,
             StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage,
             IndexQuoteSnapshotManage indexQuoteSnapshotManage,
-            IndexDailyKlineManage indexDailyKlineManage,
+            IndexKlineManage indexKlineManage,
             BondQuoteSnapshotManage bondQuoteSnapshotManage,
-            BondDailyKlineManage bondDailyKlineManage) {
+            BondKlineManage bondKlineManage) {
         this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
         this.stockIntradayTrendInfluxManage = stockIntradayTrendInfluxManage;
         this.indexQuoteSnapshotManage = indexQuoteSnapshotManage;
-        this.indexDailyKlineManage = indexDailyKlineManage;
+        this.indexKlineManage = indexKlineManage;
         this.bondQuoteSnapshotManage = bondQuoteSnapshotManage;
-        this.bondDailyKlineManage = bondDailyKlineManage;
+        this.bondKlineManage = bondKlineManage;
     }
 
     @Override
@@ -82,10 +83,10 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
             case "stock_quote_list" -> this.queryStockQuoteList(request);
             case "index_quote_by_code" -> this.queryIndexQuoteByCode(request);
             case "index_quote_list" -> this.queryIndexQuoteList(request);
-            case "index_daily_kline_by_code" -> this.queryIndexDailyKlines(request);
+            case "index_kline_by_code" -> this.queryIndexKlines(request);
             case "bond_quote_by_code" -> this.queryBondQuoteByCode(request);
             case "bond_quote_list" -> this.queryBondQuoteList(request);
-            case "bond_daily_kline_by_code" -> this.queryBondDailyKlines(request);
+            case "bond_kline_by_code" -> this.queryBondKlines(request);
             default -> Map.of();
         };
     }
@@ -152,19 +153,20 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
         return this.result(request, rows);
     }
 
-    private Map<String, Object> queryIndexDailyKlines(AiDataRequestVO request) {
+    private Map<String, Object> queryIndexKlines(AiDataRequestVO request) {
         request = this.resolveIndexRequest(request);
         if (StrUtil.isBlank(request.targetCode())) {
             return Map.of();
         }
-        List<Map<String, Object>> rows = this.indexDailyKlineManage.listDailyKlines(
+        List<Map<String, Object>> rows = this.indexKlineManage.listKlines(
                         request.targetCode(),
                         null,
+                        KlinePeriodTypeEnum.DAILY,
                         null,
                         null,
                         this.normalizeLimit(request.limit()))
                 .stream()
-                .map(this::indexDailyKlineToMap)
+                .map(this::indexKlineToMap)
                 .toList();
         return this.result(request, rows);
     }
@@ -193,19 +195,20 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
         return this.result(request, rows);
     }
 
-    private Map<String, Object> queryBondDailyKlines(AiDataRequestVO request) {
+    private Map<String, Object> queryBondKlines(AiDataRequestVO request) {
         request = this.resolveBondRequest(request);
         if (StrUtil.isBlank(request.targetCode())) {
             return Map.of();
         }
-        List<Map<String, Object>> rows = this.bondDailyKlineManage.listDailyKlines(
+        List<Map<String, Object>> rows = this.bondKlineManage.listKlines(
                         request.targetCode(),
                         null,
+                        KlinePeriodTypeEnum.DAILY,
                         null,
                         null,
                         this.normalizeLimit(request.limit()))
                 .stream()
-                .map(this::bondDailyKlineToMap)
+                .map(this::bondKlineToMap)
                 .toList();
         return this.result(request, rows);
     }
@@ -351,7 +354,7 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
         return row;
     }
 
-    private Map<String, Object> indexDailyKlineToMap(IndexDailyKlinePO kline) {
+    private Map<String, Object> indexKlineToMap(IndexKlinePO kline) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("indexCode", kline.getIndexCode());
         row.put("indexName", kline.getIndexName());
@@ -379,7 +382,7 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
         return row;
     }
 
-    private Map<String, Object> bondDailyKlineToMap(BondDailyKlinePO kline) {
+    private Map<String, Object> bondKlineToMap(BondKlinePO kline) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("bondCode", kline.getBondCode());
         row.put("bondName", kline.getBondName());

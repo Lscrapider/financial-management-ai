@@ -114,8 +114,12 @@ const targetTypeOptions: Array<{ label: string; value: WorkbenchTargetType }> = 
 onMounted(() => {
   const reportId = Number(route.query.reportId);
   if (Number.isFinite(reportId) && reportId > 0) {
+    const firstItem = workbenchItems.value[0];
+    if (!firstItem) {
+      return;
+    }
     workbenchItems.value[0] = {
-      ...workbenchItems.value[0],
+      ...firstItem,
       componentType: 'report',
       reportId,
     };
@@ -125,6 +129,13 @@ onMounted(() => {
 function applyLayout(value: WorkbenchLayout) {
   layout.value = value;
   workbenchItems.value = createTemplateItems(value, workbenchItems.value);
+}
+
+function applyLayoutValue(value?: boolean | number | string) {
+  if (typeof value !== 'string' || !isWorkbenchLayout(value)) {
+    return;
+  }
+  applyLayout(value);
 }
 
 function componentLabel(value?: WorkbenchComponentType) {
@@ -294,6 +305,10 @@ function createTemplateItems(
 function findItem(itemId: string) {
   return workbenchItems.value.find((item) => item.i === itemId);
 }
+
+function isWorkbenchLayout(value: string): value is WorkbenchLayout {
+  return layoutOptions.some((item) => item.value === value);
+}
 </script>
 
 <template>
@@ -304,7 +319,11 @@ function findItem(itemId: string) {
           <h2>报告工作台</h2>
           <span>选择初始布局后，可拖动卡片位置并拖拽右下角调整大小</span>
         </div>
-        <ElRadioGroup :model-value="layout" size="small" @change="applyLayout">
+        <ElRadioGroup
+          :model-value="layout"
+          size="small"
+          @change="applyLayoutValue"
+        >
           <ElRadioButton
             v-for="item in layoutOptions"
             :key="item.value"

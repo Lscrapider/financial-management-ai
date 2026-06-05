@@ -11,6 +11,16 @@ import org.springframework.stereotype.Service;
 @Service
 public class IndexConfigManage extends ServiceImpl<IndexConfigMapper, IndexConfigPO> {
 
+    public IndexConfigPO getEnabledByIndexCode(String indexCode) {
+        if (StrUtil.isBlank(indexCode)) {
+            return null;
+        }
+        return this.getOne(new LambdaQueryWrapper<IndexConfigPO>()
+                .eq(IndexConfigPO::getEnabled, true)
+                .eq(IndexConfigPO::getIndexCode, indexCode.trim())
+                .last("LIMIT 1"));
+    }
+
     public List<IndexConfigPO> listEnabledIndices() {
         return this.list(new LambdaQueryWrapper<IndexConfigPO>()
                 .eq(IndexConfigPO::getEnabled, true)

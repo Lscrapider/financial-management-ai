@@ -47,12 +47,19 @@ const adjustTypeOptions: Array<{
 
 const periodOptions = computed(() => {
   if (props.targetType === 'INDEX') {
-    return [{ label: '日K', value: 'daily' as const }];
+    return [
+      { label: '分时', value: 'intraday' as const },
+      { label: '日K', value: 'daily' as const },
+      { label: '周K', value: 'weekly' as const },
+      { label: '月K', value: 'monthly' as const },
+    ];
   }
   if (props.targetType === 'CONVERTIBLE_BOND') {
     return [
       { label: '分时', value: 'intraday' as const },
       { label: '日K', value: 'daily' as const },
+      { label: '周K', value: 'weekly' as const },
+      { label: '月K', value: 'monthly' as const },
     ];
   }
   return [
@@ -350,20 +357,20 @@ function periodLabel(value: WorkbenchTrendPeriod) {
   return labels[value];
 }
 
-function toNullableNumber(value?: number | string) {
-  if (value === undefined || value === '') {
+function toNullableNumber(value?: null | number | string) {
+  if (value === null || value === undefined || value === '') {
     return null;
   }
   const numberValue = Number(value);
   return Number.isFinite(numberValue) ? numberValue : null;
 }
 
-function toLineNumber(value?: number | string) {
+function toLineNumber(value?: null | number | string) {
   const numberValue = toNullableNumber(value);
   return numberValue && numberValue > 0 ? numberValue : null;
 }
 
-function toNumber(value?: number | string) {
+function toNumber(value?: null | number | string) {
   return toNullableNumber(value) ?? 0;
 }
 </script>

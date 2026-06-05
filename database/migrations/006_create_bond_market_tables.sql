@@ -59,7 +59,7 @@ COMMENT ON COLUMN bond_quote_snapshot.conversion_premium_rate IS '转股溢价�
 CREATE INDEX IF NOT EXISTS idx_bond_quote_snapshot_market_code ON bond_quote_snapshot (market_code);
 CREATE INDEX IF NOT EXISTS idx_bond_quote_snapshot_change_percent ON bond_quote_snapshot (change_percent DESC);
 
-CREATE TABLE IF NOT EXISTS bond_daily_kline (
+CREATE TABLE IF NOT EXISTS bond_kline (
     id BIGSERIAL PRIMARY KEY,
     bond_code VARCHAR(32) NOT NULL,
     bond_name VARCHAR(100) NOT NULL,
@@ -81,12 +81,12 @@ CREATE TABLE IF NOT EXISTS bond_daily_kline (
     synced_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uk_bond_daily_kline_secid_trade_date UNIQUE (secid, trade_date)
+    CONSTRAINT uk_bond_kline_secid_trade_date UNIQUE (secid, trade_date)
 );
 
-COMMENT ON TABLE bond_daily_kline IS '可转债日K线表';
-COMMENT ON COLUMN bond_daily_kline.bond_code IS '可转债代码';
-COMMENT ON COLUMN bond_daily_kline.trade_date IS '交易日期';
-COMMENT ON COLUMN bond_daily_kline.close_price IS '收盘价';
+COMMENT ON TABLE bond_kline IS '可转债K线表';
+COMMENT ON COLUMN bond_kline.bond_code IS '可转债代码';
+COMMENT ON COLUMN bond_kline.trade_date IS '交易日期';
+COMMENT ON COLUMN bond_kline.close_price IS '收盘价';
 
-CREATE INDEX IF NOT EXISTS idx_bond_daily_kline_date ON bond_daily_kline (bond_code, trade_date DESC);
+CREATE INDEX IF NOT EXISTS idx_bond_kline_date ON bond_kline (bond_code, trade_date DESC);

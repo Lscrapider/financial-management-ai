@@ -39,12 +39,13 @@ export interface BondIntradayTrend {
   syncedAt?: string;
 }
 
-export interface BondDailyKline {
+export interface BondKline {
   bondCode: string;
   bondName: string;
   secid: string;
   marketCode: string;
   exchangeCode: string;
+  periodType?: string;
   tradeDate: string;
   openPrice?: number | string;
   closePrice?: number | string;
@@ -55,6 +56,10 @@ export interface BondDailyKline {
   volume?: number;
   turnoverAmount?: number | string;
   amplitude?: number | string;
+  turnoverRate?: number | string;
+  ma5?: number | string;
+  ma10?: number | string;
+  ma20?: number | string;
   syncedAt?: string;
 }
 
@@ -65,10 +70,11 @@ export interface BondQuoteListParams {
   sortOrder?: 'asc' | 'desc';
 }
 
-export interface BondDailyKlineParams {
+export interface BondKlineParams {
   endDate?: string;
   bondCode?: string;
   limit?: number;
+  periodType?: 'daily' | 'monthly' | 'weekly';
   secid?: string;
   startDate?: string;
 }
@@ -92,8 +98,8 @@ export function listBondIntradayTrends(bondCode: string) {
   });
 }
 
-export function listBondDailyKlines(params: BondDailyKlineParams) {
-  return requestClient.get<BondDailyKline[]>('/bonds/daily-klines', {
+export function listBondKlines(params: BondKlineParams) {
+  return requestClient.get<BondKline[]>('/bonds/klines', {
     params,
     responseReturn: 'body',
   });
@@ -105,16 +111,23 @@ export function syncBondMarketData() {
   });
 }
 
+export function syncBondKlineData(
+  bondCode: string,
+  periodType: BondKlineParams['periodType'] = 'daily',
+  limit = 250,
+) {
+  return requestClient.post<MarketSyncStatus>(
+    `/bonds/sync/klines/${bondCode}`,
+    undefined,
+    {
+      params: { limit, periodType },
+      timeout: 60_000,
+    },
+  );
+}
+
 export function getBondMarketSyncStatus() {
   return requestClient.get<MarketSyncStatus>('/bonds/sync/status', {
     timeout: 60_000,
   });
-}
-
-export function syncBondTrendData(bondCode: string) {
-  return requestClient.post<MarketSyncStatus>(
-    `/bonds/sync/trends/${bondCode}`,
-    undefined,
-    { timeout: 60_000 },
-  );
 }

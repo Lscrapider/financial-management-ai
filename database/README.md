@@ -40,7 +40,7 @@ docker compose -f database/docker-compose.yml up -d
 | `001_create_stock_config.sql` | 创建股票配置表 `stock_config`。 |
 | `002_create_stock_market_sync_tables.sql` | 创建股票最新行情快照表 `stock_quote_snapshot`。 |
 | `003_create_app_user.sql` | 创建系统用户表 `app_user`，并初始化 `admin / 123456`。 |
-| `004_create_index_market_tables.sql` | 创建指数配置、指数行情快照、指数日 K 表。 |
+| `004_create_index_market_tables.sql` | 创建指数配置、指数行情快照、指数 K 线表。 |
 | `005_insert_core_index_config.sql` | 初始化核心指数配置。 |
 | `006_create_ai_token_usage_log.sql` | 创建 AI Token 用量日志表。 |
 | `007_create_app_visit_log.sql` | 创建应用访问日志表。 |
@@ -87,10 +87,10 @@ docker compose -f database/docker-compose.yml up -d
 | `stock_dividend_history` | 股票分红股息历史。 |
 | `index_config` | 指数同步清单和腾讯行情 `secid`。 |
 | `index_quote_snapshot` | 指数最新行情快照。 |
-| `index_daily_kline` | 指数日 K 数据。 |
+| `index_kline` | 指数 K 线数据。 |
 | `bond_config` | 可转债同步清单和腾讯行情 `secid`。 |
 | `bond_quote_snapshot` | 可转债最新行情快照。 |
-| `bond_daily_kline` | 可转债日 K 数据。 |
+| `bond_kline` | 可转债 K 线数据。 |
 | `ai_token_usage_log` | AI 模型 Token 用量日志。 |
 | `app_visit_log` | 后端 API 访问日志。 |
 | `ocr_task` | OCR 文件上传、识别任务状态和手动文本导入任务状态。 |

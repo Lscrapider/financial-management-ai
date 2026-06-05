@@ -19,12 +19,13 @@ export interface IndexQuote {
   syncedAt?: string;
 }
 
-export interface IndexDailyKline {
+export interface IndexKline {
   indexCode: string;
   indexName: string;
   secid: string;
   marketCode: string;
   exchangeCode: string;
+  periodType?: string;
   tradeDate: string;
   openPrice?: number | string;
   closePrice?: number | string;
@@ -36,7 +37,25 @@ export interface IndexDailyKline {
   turnoverAmount?: number | string;
   amplitude?: number | string;
   turnoverRate?: number | string;
+  ma5?: number | string;
+  ma10?: number | string;
+  ma20?: number | string;
   syncedAt?: string;
+}
+
+export interface IndexIntradayTrend {
+  averagePrice?: number | string;
+  closePrice?: number | string;
+  indexCode: string;
+  indexName: string;
+  previousClosePrice?: number | string;
+  secid: string;
+  syncedAt?: string;
+  trendDate?: string;
+  trendMinute?: string;
+  trendTime: string;
+  turnoverAmount?: number | string;
+  volume?: number;
 }
 
 export interface IndexQuoteListParams {
@@ -46,10 +65,11 @@ export interface IndexQuoteListParams {
   sortOrder?: 'asc' | 'desc';
 }
 
-export interface IndexDailyKlineParams {
+export interface IndexKlineParams {
   endDate?: string;
   indexCode?: string;
   limit?: number;
+  periodType?: 'daily' | 'monthly' | 'weekly';
   secid?: string;
   startDate?: string;
 }
@@ -66,9 +86,16 @@ export function listIndexQuotes(params: IndexQuoteListParams) {
   });
 }
 
-export function listIndexDailyKlines(params: IndexDailyKlineParams) {
-  return requestClient.get<IndexDailyKline[]>('/indices/daily-klines', {
+export function listIndexKlines(params: IndexKlineParams) {
+  return requestClient.get<IndexKline[]>('/indices/klines', {
     params,
+    responseReturn: 'body',
+  });
+}
+
+export function listIndexIntradayTrends(indexCode: string) {
+  return requestClient.get<IndexIntradayTrend[]>('/indices/intraday-trends', {
+    params: { indexCode },
     responseReturn: 'body',
   });
 }
@@ -77,6 +104,21 @@ export function syncIndexMarketData() {
   return requestClient.post<MarketSyncStatus>('/indices/sync', undefined, {
     timeout: 60_000,
   });
+}
+
+export function syncIndexKlineData(
+  indexCode: string,
+  periodType: IndexKlineParams['periodType'] = 'daily',
+  limit = 250,
+) {
+  return requestClient.post<MarketSyncStatus>(
+    `/indices/sync/klines/${indexCode}`,
+    undefined,
+    {
+      params: { limit, periodType },
+      timeout: 60_000,
+    },
+  );
 }
 
 export function getIndexMarketSyncStatus() {

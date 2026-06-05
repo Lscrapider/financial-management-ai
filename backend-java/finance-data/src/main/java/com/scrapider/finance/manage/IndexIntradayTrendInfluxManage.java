@@ -8,7 +8,7 @@ import com.influxdb.client.write.Point;
 import com.influxdb.query.FluxRecord;
 import com.influxdb.query.FluxTable;
 import com.scrapider.finance.config.InfluxDbProperties;
-import com.scrapider.finance.domain.po.StockIntradayTrendPO;
+import com.scrapider.finance.domain.po.IndexIntradayTrendPO;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -22,7 +22,7 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 
 @Service
-public class StockIntradayTrendInfluxManage {
+public class IndexIntradayTrendInfluxManage {
 
     private static final LocalTime MORNING_START = LocalTime.of(9, 30);
     private static final LocalTime MORNING_END = LocalTime.of(11, 30);
@@ -34,7 +34,7 @@ public class StockIntradayTrendInfluxManage {
     private final WriteApiBlocking writeApiBlocking;
     private final ZoneId zoneId;
 
-    public StockIntradayTrendInfluxManage(
+    public IndexIntradayTrendInfluxManage(
             InfluxDbProperties influxDbProperties,
             QueryApi queryApi,
             WriteApiBlocking writeApiBlocking) {
@@ -44,35 +44,35 @@ public class StockIntradayTrendInfluxManage {
         this.zoneId = ZoneId.of(influxDbProperties.getTimezone());
     }
 
-    public void saveTrends(List<StockIntradayTrendPO> trends) {
+    public void saveTrends(List<IndexIntradayTrendPO> trends) {
         if (CollUtil.isEmpty(trends)) {
             return;
         }
         List<Point> points = trends.stream()
-                .map(trend -> StockIntradayTrendPO.toInfluxPoint(
+                .map(trend -> IndexIntradayTrendPO.toInfluxPoint(
                         trend,
-                        this.influxDbProperties.getStockMinuteMeasurement(),
+                        this.influxDbProperties.getIndexMinuteMeasurement(),
                         this.zoneId))
                 .toList();
         this.writeApiBlocking.writePoints(
-                this.stockMinuteBucket(),
+                this.minuteBucket(),
                 this.influxDbProperties.getOrg(),
                 points);
     }
 
-    public String getLatestBatchNo(String stockCode) {
+    public String getLatestBatchNo(String indexCode) {
         String flux = """
                 from(bucket: "%s")
                   |> range(start: -7d)
                   |> filter(fn: (r) => r["_measurement"] == "%s")
-                  |> filter(fn: (r) => r["stockCode"] == "%s")
+                  |> filter(fn: (r) => r["indexCode"] == "%s")
                   |> filter(fn: (r) => r["_field"] == "syncedAtEpoch")
                   |> sort(columns: ["_value"], desc: true)
                   |> limit(n: 1)
                 """.formatted(
-                escape(this.stockMinuteBucket()),
-                escape(this.influxDbProperties.getStockMinuteMeasurement()),
-                escape(stockCode));
+                escape(this.minuteBucket()),
+                escape(this.influxDbProperties.getIndexMinuteMeasurement()),
+                escape(indexCode));
         List<FluxTable> tables = this.queryApi.query(flux, this.influxDbProperties.getOrg());
         return tables.stream()
                 .flatMap(table -> table.getRecords().stream())
@@ -82,92 +82,39 @@ public class StockIntradayTrendInfluxManage {
                 .orElse(null);
     }
 
-    public String getLatestTodayBatchNo(String stockCode) {
-        return this.getLatestBatchNoByTrendDate(stockCode, LocalDate.now(this.zoneId));
-    }
-
-    public String getLatestBatchNoByTrendDate(String stockCode, LocalDate trendDate) {
-        String flux = """
-                from(bucket: "%s")
-                  |> range(start: %s, stop: %s)
-                  |> filter(fn: (r) => r["_measurement"] == "%s")
-                  |> filter(fn: (r) => r["stockCode"] == "%s")
-                  |> filter(fn: (r) => r["_field"] == "syncedAtEpoch")
-                  |> sort(columns: ["_value"], desc: true)
-                  |> limit(n: 1)
-                """.formatted(
-                escape(this.stockMinuteBucket()),
-                this.rangeStart(trendDate),
-                this.rangeEnd(trendDate),
-                escape(this.influxDbProperties.getStockMinuteMeasurement()),
-                escape(stockCode));
-        List<FluxTable> tables = this.queryApi.query(flux, this.influxDbProperties.getOrg());
-        return tables.stream()
-                .flatMap(table -> table.getRecords().stream())
-                .map(record -> String.valueOf(record.getValueByKey("syncBatchNo")))
-                .filter(StrUtil::isNotBlank)
-                .findFirst()
-                .orElse(null);
-    }
-
-    public List<StockIntradayTrendPO> listByBatchNo(String stockCode, String syncBatchNo) {
-        String flux = """
-                from(bucket: "%s")
-                  |> range(start: -7d)
-                  |> filter(fn: (r) => r["_measurement"] == "%s")
-                  |> filter(fn: (r) => r["stockCode"] == "%s")
-                  |> filter(fn: (r) => r["syncBatchNo"] == "%s")
-                  |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
-                  |> sort(columns: ["_time"])
-                """.formatted(
-                escape(this.stockMinuteBucket()),
-                escape(this.influxDbProperties.getStockMinuteMeasurement()),
-                escape(stockCode),
-                escape(syncBatchNo));
-        List<FluxTable> tables = this.queryApi.query(flux, this.influxDbProperties.getOrg());
-        return tables.stream()
-                .flatMap(table -> table.getRecords().stream())
-                .map(this::toTrend)
-                .toList();
-    }
-
-    public List<StockIntradayTrendPO> listTodayByBatchNo(String stockCode, String syncBatchNo) {
-        return this.listByBatchNoAndTrendDate(stockCode, syncBatchNo, LocalDate.now(this.zoneId));
-    }
-
-    public List<StockIntradayTrendPO> listLatestTradingTrends(String stockCode) {
-        List<StockIntradayTrendPO> todayTrends = this.latestTradingTrends(this.listTodayByStockCode(stockCode));
+    public List<IndexIntradayTrendPO> listLatestTradingTrends(String indexCode) {
+        List<IndexIntradayTrendPO> todayTrends = this.latestTradingTrends(this.listTodayByIndexCode(indexCode));
         if (CollUtil.isNotEmpty(todayTrends)) {
             return todayTrends;
         }
-        String latestBatchNo = this.getLatestBatchNo(stockCode);
+        String latestBatchNo = this.getLatestBatchNo(indexCode);
         if (StrUtil.isBlank(latestBatchNo)) {
             return List.of();
         }
-        return this.listByBatchNo(stockCode, latestBatchNo).stream()
+        return this.listByBatchNo(indexCode, latestBatchNo).stream()
                 .filter(this::isTradingTrend)
-                .sorted(Comparator.comparing(StockIntradayTrendPO::getTrendTime))
+                .sorted(Comparator.comparing(IndexIntradayTrendPO::getTrendTime))
                 .toList();
     }
 
-    public List<StockIntradayTrendPO> listTodayByStockCode(String stockCode) {
-        return this.listByStockCodeAndTrendDate(stockCode, LocalDate.now(this.zoneId));
+    public List<IndexIntradayTrendPO> listTodayByIndexCode(String indexCode) {
+        return this.listByIndexCodeAndTrendDate(indexCode, LocalDate.now(this.zoneId));
     }
 
-    public List<StockIntradayTrendPO> listByStockCodeAndTrendDate(String stockCode, LocalDate trendDate) {
+    public List<IndexIntradayTrendPO> listByIndexCodeAndTrendDate(String indexCode, LocalDate trendDate) {
         String flux = """
                 from(bucket: "%s")
                   |> range(start: %s, stop: %s)
                   |> filter(fn: (r) => r["_measurement"] == "%s")
-                  |> filter(fn: (r) => r["stockCode"] == "%s")
+                  |> filter(fn: (r) => r["indexCode"] == "%s")
                   |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
                   |> sort(columns: ["_time"])
                 """.formatted(
-                escape(this.stockMinuteBucket()),
+                escape(this.minuteBucket()),
                 this.rangeStart(trendDate),
                 this.rangeEnd(trendDate),
-                escape(this.influxDbProperties.getStockMinuteMeasurement()),
-                escape(stockCode));
+                escape(this.influxDbProperties.getIndexMinuteMeasurement()),
+                escape(indexCode));
         List<FluxTable> tables = this.queryApi.query(flux, this.influxDbProperties.getOrg());
         return tables.stream()
                 .flatMap(table -> table.getRecords().stream())
@@ -176,49 +123,44 @@ public class StockIntradayTrendInfluxManage {
     }
 
     public List<LocalDateTime> listTrendTimesByBatchNoAndTrendDate(
-            String stockCode,
+            String indexCode,
             String syncBatchNo,
             LocalDate trendDate) {
         String flux = """
                 from(bucket: "%s")
                   |> range(start: %s, stop: %s)
                   |> filter(fn: (r) => r["_measurement"] == "%s")
-                  |> filter(fn: (r) => r["stockCode"] == "%s")
+                  |> filter(fn: (r) => r["indexCode"] == "%s")
                   |> filter(fn: (r) => r["syncBatchNo"] == "%s")
                   |> filter(fn: (r) => r["_field"] == "closePrice")
                   |> sort(columns: ["_time"])
                 """.formatted(
-                escape(this.stockMinuteBucket()),
+                escape(this.minuteBucket()),
                 this.rangeStart(trendDate),
                 this.rangeEnd(trendDate),
-                escape(this.influxDbProperties.getStockMinuteMeasurement()),
-                escape(stockCode),
+                escape(this.influxDbProperties.getIndexMinuteMeasurement()),
+                escape(indexCode),
                 escape(syncBatchNo));
         List<FluxTable> tables = this.queryApi.query(flux, this.influxDbProperties.getOrg());
         return tables.stream()
                 .flatMap(table -> table.getRecords().stream())
-                .map(record -> StockIntradayTrendPO.fromInfluxRecord(record, this.zoneId).getTrendTime())
+                .map(record -> IndexIntradayTrendPO.fromInfluxRecord(record, this.zoneId).getTrendTime())
                 .toList();
     }
 
-    public List<StockIntradayTrendPO> listByBatchNoAndTrendDate(
-            String stockCode,
-            String syncBatchNo,
-            LocalDate trendDate) {
+    public List<IndexIntradayTrendPO> listByBatchNo(String indexCode, String syncBatchNo) {
         String flux = """
                 from(bucket: "%s")
-                  |> range(start: %s, stop: %s)
+                  |> range(start: -7d)
                   |> filter(fn: (r) => r["_measurement"] == "%s")
-                  |> filter(fn: (r) => r["stockCode"] == "%s")
+                  |> filter(fn: (r) => r["indexCode"] == "%s")
                   |> filter(fn: (r) => r["syncBatchNo"] == "%s")
                   |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
                   |> sort(columns: ["_time"])
                 """.formatted(
-                escape(this.stockMinuteBucket()),
-                this.rangeStart(trendDate),
-                this.rangeEnd(trendDate),
-                escape(this.influxDbProperties.getStockMinuteMeasurement()),
-                escape(stockCode),
+                escape(this.minuteBucket()),
+                escape(this.influxDbProperties.getIndexMinuteMeasurement()),
+                escape(indexCode),
                 escape(syncBatchNo));
         List<FluxTable> tables = this.queryApi.query(flux, this.influxDbProperties.getOrg());
         return tables.stream()
@@ -227,27 +169,27 @@ public class StockIntradayTrendInfluxManage {
                 .toList();
     }
 
-    private StockIntradayTrendPO toTrend(FluxRecord record) {
-        return StockIntradayTrendPO.fromInfluxRecord(record, this.zoneId);
+    private IndexIntradayTrendPO toTrend(FluxRecord record) {
+        return IndexIntradayTrendPO.fromInfluxRecord(record, this.zoneId);
     }
 
-    private List<StockIntradayTrendPO> latestTradingTrends(List<StockIntradayTrendPO> trends) {
-        Map<LocalDateTime, StockIntradayTrendPO> latestByMinute = new LinkedHashMap<>();
+    private List<IndexIntradayTrendPO> latestTradingTrends(List<IndexIntradayTrendPO> trends) {
+        Map<LocalDateTime, IndexIntradayTrendPO> latestByMinute = new LinkedHashMap<>();
         trends.stream()
                 .filter(this::isTradingTrend)
-                .sorted(Comparator.comparing(StockIntradayTrendPO::getTrendTime))
+                .sorted(Comparator.comparing(IndexIntradayTrendPO::getTrendTime))
                 .forEach(trend -> latestByMinute.merge(
                         trend.getTrendTime(),
                         trend,
                         this::latestSyncedTrend));
         return latestByMinute.values().stream()
-                .sorted(Comparator.comparing(StockIntradayTrendPO::getTrendTime))
+                .sorted(Comparator.comparing(IndexIntradayTrendPO::getTrendTime))
                 .toList();
     }
 
-    private StockIntradayTrendPO latestSyncedTrend(
-            StockIntradayTrendPO existing,
-            StockIntradayTrendPO candidate) {
+    private IndexIntradayTrendPO latestSyncedTrend(
+            IndexIntradayTrendPO existing,
+            IndexIntradayTrendPO candidate) {
         LocalDateTime existingSyncedAt = existing.getSyncedAt();
         LocalDateTime candidateSyncedAt = candidate.getSyncedAt();
         if (existingSyncedAt == null) {
@@ -259,7 +201,7 @@ public class StockIntradayTrendInfluxManage {
         return candidateSyncedAt.isAfter(existingSyncedAt) ? candidate : existing;
     }
 
-    private boolean isTradingTrend(StockIntradayTrendPO trend) {
+    private boolean isTradingTrend(IndexIntradayTrendPO trend) {
         LocalDateTime trendTime = trend.getTrendTime();
         if (trendTime == null) {
             return false;
@@ -269,10 +211,10 @@ public class StockIntradayTrendInfluxManage {
                 || (!minute.isBefore(AFTERNOON_START) && !minute.isAfter(AFTERNOON_END));
     }
 
-    private String stockMinuteBucket() {
+    private String minuteBucket() {
         return StrUtil.blankToDefault(
-                this.influxDbProperties.getStockMinuteBucket(),
-                this.influxDbProperties.getBucket());
+                this.influxDbProperties.getIndexMinuteBucket(),
+                "index_intraday");
     }
 
     private static String escape(String value) {

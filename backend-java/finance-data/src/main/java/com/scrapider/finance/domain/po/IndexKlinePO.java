@@ -2,18 +2,22 @@ package com.scrapider.finance.domain.po;
 
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.scrapider.finance.domain.enums.KlinePeriodTypeEnum;
 import com.scrapider.finance.domain.util.StockMarketJsonParser;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.StreamSupport;
 import lombok.Data;
 
 @Data
-@TableName("index_daily_kline")
-public class IndexDailyKlinePO {
+@TableName("index_kline")
+public class IndexKlinePO {
 
     private Long id;
     private String indexCode;
@@ -21,6 +25,7 @@ public class IndexDailyKlinePO {
     private String secid;
     private String marketCode;
     private String exchangeCode;
+    private String periodType;
     private LocalDate tradeDate;
     private BigDecimal openPrice;
     private BigDecimal closePrice;
@@ -32,36 +37,55 @@ public class IndexDailyKlinePO {
     private BigDecimal turnoverAmount;
     private BigDecimal amplitude;
     private BigDecimal turnoverRate;
+    private BigDecimal ma5;
+    private BigDecimal ma10;
+    private BigDecimal ma20;
     private String rawResponse;
     private LocalDateTime syncedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    public static List<IndexDailyKlinePO> fromApiResponse(IndexConfigPO indexConfig, JsonNode response) {
+    public static List<IndexKlinePO> fromApiResponse(
+            IndexConfigPO indexConfig,
+            JsonNode response,
+            KlinePeriodTypeEnum periodType) {
         String symbol = toTencentSymbol(indexConfig.getSecid());
         JsonNode data = response.path("data").path(symbol);
-        JsonNode lines = data.path("qfqday");
+        JsonNode lines = data.path(periodType.getTencentCode());
         if (!lines.isArray()) {
-            lines = data.path("day");
+            lines = data.path("hfq" + periodType.getTencentCode());
+        }
+        if (!lines.isArray()) {
+            lines = data.path("qfq" + periodType.getTencentCode());
         }
         LocalDateTime syncedAt = LocalDateTime.now();
-        return StreamSupport.stream(lines.spliterator(), false)
-                .map(line -> fromTencentLine(indexConfig, line, syncedAt))
+        List<IndexKlinePO> klines = StreamSupport.stream(lines.spliterator(), false)
+                .map(line -> fromTencentLine(indexConfig, line, periodType, syncedAt))
                 .filter(Objects::nonNull)
                 .toList();
+        return withMovingAverages(klines);
     }
 
-    private static IndexDailyKlinePO fromTencentLine(IndexConfigPO indexConfig, JsonNode line, LocalDateTime syncedAt) {
+    public static List<IndexKlinePO> fromApiResponse(IndexConfigPO indexConfig, JsonNode response) {
+        return fromApiResponse(indexConfig, response, KlinePeriodTypeEnum.DAILY);
+    }
+
+    private static IndexKlinePO fromTencentLine(
+            IndexConfigPO indexConfig,
+            JsonNode line,
+            KlinePeriodTypeEnum periodType,
+            LocalDateTime syncedAt) {
         if (!line.isArray() || line.size() < 5) {
             return null;
         }
 
-        IndexDailyKlinePO kline = new IndexDailyKlinePO();
+        IndexKlinePO kline = new IndexKlinePO();
         kline.setIndexCode(indexConfig.getIndexCode());
         kline.setIndexName(indexConfig.getIndexName());
         kline.setSecid(indexConfig.getSecid());
         kline.setMarketCode(indexConfig.getMarketCode());
         kline.setExchangeCode(indexConfig.getExchangeCode());
+        kline.setPeriodType(periodType.getCode());
         kline.setTradeDate(LocalDate.parse(line.path(0).asText()));
         kline.setOpenPrice(decimal(line, 1));
         kline.setClosePrice(decimal(line, 2));
@@ -76,6 +100,36 @@ public class IndexDailyKlinePO {
         kline.setRawResponse(line.toString());
         kline.setSyncedAt(syncedAt);
         return kline;
+    }
+
+    private static List<IndexKlinePO> withMovingAverages(List<IndexKlinePO> klines) {
+        if (klines.isEmpty()) {
+            return klines;
+        }
+        List<IndexKlinePO> sorted = new ArrayList<>(klines);
+        sorted.sort(Comparator.comparing(IndexKlinePO::getTradeDate));
+        for (int index = 0; index < sorted.size(); index++) {
+            IndexKlinePO current = sorted.get(index);
+            current.setMa5(meanClose(sorted, index, 5));
+            current.setMa10(meanClose(sorted, index, 10));
+            current.setMa20(meanClose(sorted, index, 20));
+        }
+        return sorted;
+    }
+
+    private static BigDecimal meanClose(List<IndexKlinePO> klines, int endIndex, int window) {
+        if (endIndex + 1 < window) {
+            return null;
+        }
+        BigDecimal total = BigDecimal.ZERO;
+        for (int index = endIndex - window + 1; index <= endIndex; index++) {
+            BigDecimal closePrice = klines.get(index).getClosePrice();
+            if (closePrice == null) {
+                return null;
+            }
+            total = total.add(closePrice);
+        }
+        return total.divide(BigDecimal.valueOf(window), 4, RoundingMode.HALF_UP);
     }
 
     private static BigDecimal decimal(JsonNode line, int index) {
