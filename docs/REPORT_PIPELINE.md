@@ -986,7 +986,7 @@ fundamental_risk
 
 #### 4.7.1 模块作用
 
-描述市场关注度、情绪热度和消息驱动特征。
+描述市场关注度、情绪热度和预留的消息驱动特征。
 
 它可以来自：
 
@@ -995,9 +995,9 @@ fundamental_risk
 成交量变化
 换手率
 涨停 / 大跌
-新闻 / 公告
-板块联动
-观察池热度
+新闻 / 公告（预留，当前 report 不接入）
+板块联动（预留，当前 report 不计算）
+观察池热度（预留，当前 report 不接入）
 ```
 
 #### 4.7.2 推荐小标签
@@ -1013,6 +1013,8 @@ weak_sentiment
 herding_effect
 institutional_behavior
 ```
+
+当前 report 代码只产出 `market_attention_rise`、`short_term_emotion`、`panic_selling`、`weak_sentiment`、`herding_effect`。其余标签保留在白名单中，作为后续接入外部文本、政策、板块和机构行为数据时使用。
 
 #### 4.7.3 输出示例
 
@@ -1065,6 +1067,8 @@ avoid_emotional_trade
 take_profit_plan
 stop_loss_plan
 ```
+
+当前 report 代码不产出 `valuation_trap_risk`，该标签保留为后续基本面风险增强使用。
 
 #### 4.8.3 输出示例
 
@@ -2338,13 +2342,32 @@ knowledgeContext
 
 `marketContext` 由 Python 统一计算并回调 Java，避免 Java 和 Python 对行情、分时、K 线特征各算一套导致口径漂移。
 
-第一版先拆成三块：
+当前代码由 `MarketContextBuilder` 构建，顶层包含：
 
 ```text
 snapshot
+valuation
 intraday
-dailyKline
+klineTrends.daily
+klineTrends.weekly
+klineTrends.monthly
 ```
+
+每个数据块统一是：
+
+```json
+{
+  "meta": {
+    "数据范围": "",
+    "价格口径": "",
+    "用途": "",
+    "限制": []
+  },
+  "data": {}
+}
+```
+
+其中 `meta` 是给 LLM 的中文数据口径、用途和限制说明，`data` 是可引用的客观事实数值。报告生成 prompt 明确要求优先遵守 `marketContext` 各数据块 `meta.限制`，不得跨数据范围滥用字段，也不得把不同价格口径的数据差异解释成数据错误或时滞。
 
 `marketContext` 只放客观事实、原始数值和压缩后的客观特征，不放场景标签、投资建议、风险判断或“看多/看空”等解释性结论。
 
@@ -2353,82 +2376,147 @@ dailyKline
 ```json
 {
   "snapshot": {
-    "targetType": "STOCK",
-    "targetCode": "000001",
-    "targetName": "平安银行",
-    "secid": "0.000001",
-    "latestPrice": 12.34,
-    "changeAmount": 0.56,
-    "changePercent": 4.76,
-    "openPrice": 11.8,
-    "highPrice": 12.5,
-    "lowPrice": 11.72,
-    "previousClosePrice": 11.78,
-    "volume": 123456789,
-    "turnoverAmount": 2345678901,
-    "turnoverRate": 3.21,
-    "amplitude": 6.62,
-    "syncedAt": "2026-06-04 14:55:00"
+    "meta": {
+      "数据范围": "实时行情快照",
+      "价格口径": "原始行情价",
+      "用途": "用于描述当前行情快照、当前价、当日涨跌幅、成交额和换手率等实时事实",
+      "限制": [
+        "不能用于判断日K、周K、月K趋势",
+        "不能与复权K线收盘价直接比较"
+      ]
+    },
+    "data": {
+      "targetType": "STOCK",
+      "targetCode": "000001",
+      "targetName": "平安银行",
+      "secid": "0.000001",
+      "latestPrice": 12.34,
+      "changeAmount": 0.56,
+      "changePercent": 4.76,
+      "openPrice": 11.8,
+      "highPrice": 12.5,
+      "lowPrice": 11.72,
+      "previousClosePrice": 11.78,
+      "volume": 123456789,
+      "turnoverAmount": 2345678901,
+      "turnoverRate": 3.21,
+      "amplitude": 6.62,
+      "syncedAt": "2026-06-04 14:55:00"
+    }
+  },
+  "valuation": {
+    "meta": {
+      "数据范围": "股票估值与分红数据",
+      "用途": "用于分析PE、PB、股息率和历史估值位置",
+      "限制": [
+        "不能脱离PE、PB、股息率具体数值直接写估值有吸引力",
+        "分红金额和股息率不能混为一谈"
+      ]
+    },
+    "data": {
+      "current": {
+        "peTtm": 6.8,
+        "pbRatio": 0.72,
+        "totalMarketValue": 123456789000
+      },
+      "historySummary": {
+        "peTtm": {"latest": 6.8, "count": 120, "percentileRank": 0.32},
+        "pbMrq": {"latest": 0.72, "count": 120, "percentileRank": 0.18}
+      },
+      "dividend": {
+        "estimatedDividendYieldPct": 5.1,
+        "historySummary": {"yieldPctLatest": 5.1, "count": 5}
+      }
+    }
   },
   "intraday": {
-    "available": true,
-    "window": "latest_trading_day",
-    "points": 241,
-    "openToLatestPct": 3.8,
-    "highTime": "10:34",
-    "lowTime": "09:42",
-    "latestPositionInDayRange": 0.82,
-    "morningReturnPct": 2.1,
-    "afternoonReturnPct": 1.6,
-    "volumeConcentration": {
-      "first30MinPct": 28.4,
-      "last30MinPct": 18.2
+    "meta": {
+      "数据范围": "最近一个交易日分时数据",
+      "价格口径": "原始分时行情价",
+      "用途": "用于描述盘中价格路径、盘中高低点、开盘至最新分时变化和成交集中度",
+      "限制": [
+        "不能表述为当前涨跌幅",
+        "不能代表日K、周K或月K趋势",
+        "不能与复权K线收盘价直接比较"
+      ]
     },
-    "pathFeatures": [
-      {
-        "startTime": "09:30",
-        "endTime": "10:35",
-        "direction": "up",
-        "returnPct": 3.2,
-        "durationMinutes": 65
-      }
-    ]
+    "data": {
+      "available": true,
+      "window": "latest_trading_day",
+      "points": 241,
+      "openToLatestPct": 3.8,
+      "highTime": "10:34",
+      "lowTime": "09:42",
+      "latestPositionInDayRange": 0.82,
+      "morningReturnPct": 2.1,
+      "afternoonReturnPct": 1.6,
+      "volumeConcentration": {
+        "first30MinPct": 28.4,
+        "last30MinPct": 18.2
+      },
+      "pathFeatures": [
+        {
+          "startTime": "09:30",
+          "endTime": "10:35",
+          "direction": "up",
+          "returnPct": 3.2,
+          "durationMinutes": 65
+        }
+      ]
+    }
   },
-  "dailyKline": {
-    "windowDays": 120,
-    "availableDays": 118,
-    "startDate": "2025-12-01",
-    "endDate": "2026-06-04",
-    "latestClose": 12.34,
-    "windowHigh": 13.2,
-    "windowLow": 9.8,
-    "returnPct": 18.4,
-    "maxDrawdownPct": -12.6,
-    "volatilityPct": 2.1,
-    "distanceToHighPct": -6.5,
-    "distanceToLowPct": 25.9,
-    "movingAverages": {
-      "ma5": 12.1,
-      "ma20": 11.5,
-      "ma60": 10.8
-    },
-    "pathFeatures": {
-      "method": "zigzag",
-      "reversalThresholdPct": 8,
-      "turningPoints": [],
-      "segments": []
+  "klineTrends": {
+    "daily": {
+      "meta": {
+        "数据范围": "日K窗口，最近120根日K",
+        "周期": "日K",
+        "价格口径": "后复权K线价格",
+        "用途": "只能用于分析日K趋势结构、区间位置、均线关系和波动特征",
+        "限制": [
+          "latestClose只能表述为K线后复权收盘价，不能表述为当前价",
+          "不能与实时行情快照中的当前价直接比较",
+          "不能代表其他K线周期的趋势"
+        ]
+      },
+      "data": {
+        "period": "daily",
+        "availableBars": 120,
+        "startDate": "2025-12-01",
+        "endDate": "2026-06-04",
+        "latestClose": 12.34,
+        "windowHigh": 13.2,
+        "windowLow": 9.8,
+        "rangePct": 0.34,
+        "position": 0.72,
+        "returnPct": 18.4,
+        "return5Bars": 3.1,
+        "return20Bars": 8.6,
+        "maxDrawdownPct": -12.6,
+        "volatilityPct": 2.1,
+        "movingAverages": {
+          "ma5": 12.1,
+          "ma10": 11.9,
+          "ma20": 11.5,
+          "ma60": 10.8
+        },
+        "pathFeatures": {
+          "method": "zigzag",
+          "reversalThresholdPct": 8,
+          "segments": []
+        }
+      }
     }
   }
 }
 ```
 
-分时线和 K 线不把完整点位数组直接传给 LLM，只传压缩后的摘要、位置、路径和统计特征。趋势标签和解释进入 `currentScenes`，不要写入 `marketContext`。
+分时线和 K 线不把完整点位数组直接传给 LLM，只传压缩后的摘要、位置、路径和统计特征。趋势标签和解释进入 `currentScenes`，`marketContext.klineTrends.<period>.data` 只保留对应周期的客观 K 线上下文。
 
 ---
 
 ### 7.3 currentScenes 结构
 
-LLM 输入版 `currentScenes` 只保留 Python 计算后的场景结论和解释依据：`score`、`level`、`direction`、`tags`、`evidence`。
+LLM 输入版 `currentScenes` 只保留 Python 计算后的场景结论和解释依据：`score`、`level`、`direction`、`tags`、`evidence`。如果模块中存在 `periodTrends`，也会保留；当前主要用于 `trend` 模块的日 K、周 K、月 K 分周期分析。
 
 `queryText` 是检索 embedding 使用的内部字段，不进入 LLM 输入。`evidence` 才是给 LLM 和报告解释使用的标签触发依据。
 
@@ -2462,7 +2550,7 @@ LLM 输入版 `currentScenes` 只保留 Python 计算后的场景结论和解释
       "当前换手率处于历史分布较高位置，high_turnover 标签触发"
     ]
   },
-  "risk_strategy": {
+  "riskStrategy": {
     "score": 0.76,
     "level": "high",
     "direction": "risk",
@@ -2488,28 +2576,26 @@ LLM 输入版 `currentScenes` 只保留 Python 计算后的场景结论和解释
 
 ```json
 {
-  "knowledgeContext": {
-    "volume": [
-      {
-        "chunkId": 101,
-        "scene": "volume",
-        "text": "放量上涨后需要观察成交量是否持续，不能只看当天涨幅。",
-        "matchedTags": ["volume_expand"]
-      }
-    ],
-    "risk_strategy": [
-      {
-        "chunkId": 205,
-        "scene": "risk_strategy",
-        "text": "接近高位时不要只看涨幅，需要等待确认。",
-        "matchedTags": ["chase_high_risk", "wait_confirm"]
-      }
-    ],
-    "price": [],
-    "valuation": [],
-    "sentiment": [],
-    "trend": []
-  }
+  "volume": [
+    {
+      "chunkId": 101,
+      "scene": "volume",
+      "text": "放量上涨后需要观察成交量是否持续，不能只看当天涨幅。",
+      "matchedTags": ["volume_expand"]
+    }
+  ],
+  "risk_strategy": [
+    {
+      "chunkId": 205,
+      "scene": "risk_strategy",
+      "text": "接近高位时不要只看涨幅，需要等待确认。",
+      "matchedTags": ["chase_high_risk", "wait_confirm"]
+    }
+  ],
+  "price": [],
+  "valuation": [],
+  "sentiment": [],
+  "trend": []
 }
 ```
 
@@ -2519,51 +2605,116 @@ LLM 输入版 `knowledgeContext` 不包含 `taskNo`、`chunkIndex`、`semanticSc
 
 ### 7.5 LLM Prompt 设计
 
-Prompt 要求：
+当前报告生成使用 `SYSTEM_PROMPT` 和 `userPrompt` 两部分。
+
+`SYSTEM_PROMPT` 核心要求：
 
 ```text
-你是个人投资研究助手。
-请基于 marketContext、currentScenes 和 knowledgeContext 生成结构化分析报告。
-marketContext 负责事实，currentScenes 负责系统解释，knowledgeContext 负责可引用知识依据。
-不要提供确定性买卖建议。
-不要编造缺失数据。
-必须区分事实、推断和风险提示。
-引用知识库内容时必须带 chunkId。
-不要在报告正文直接暴露内部标签名、字段名、score 或系统术语。
-如果需要表达内部标签含义，必须改写成自然语言。
+你是一个面向个人投资研究的理财分析报告生成助手。
+必须基于输入的 marketContext、currentScenes 和 knowledgeContext 生成结构化 JSON 报告。
+marketContext 中各数据块统一包含 meta 和 data：meta 是中文数据口径、用途和限制说明，data 是可引用的客观事实数值。
+生成报告时必须优先遵守每个 marketContext 数据块 meta.限制，不得跨数据范围滥用字段。
+三者边界：marketContext 负责事实，currentScenes 负责系统解释，knowledgeContext 负责可引用知识依据。
+可以给出买入、卖出、持有、观望或回避建议，但必须解释依据、适用条件和主要风险。
+不要承诺收益，不要编造缺失数据，不要把建议表述为确定性结论。
+使用知识库内容时必须引用 chunkId，chunkId 只能来自输入的 knowledgeContext。
+报告面向普通用户，不得在输出内容中直接暴露内部标签名、字段名、score 或系统术语。
+只输出 JSON object，不要输出 Markdown，不要输出 JSON 之外的解释文本。
+```
+
+`userPrompt` 会附加：
+
+```text
+1. 输出必须是 JSON object。
+2. 引用知识库内容时必须在对应对象里填写 chunkIds。
+3. chunkIds 只能来自 allowedChunkIds。
+4. 没有知识库依据的判断可以使用空数组 chunkIds: []，但不能编造 chunkId。
+5. 可以给出买入、卖出、持有、观望或回避建议，但必须同时说明 reason、conditions 和 risks。
+6. 操作建议只能作为研究判断，不得承诺收益，不得使用“必涨”“必跌”“一定买入”等确定性表述。
+7. 必须输出 periodTrendAnalysis，且包含 daily、weekly、monthly 三项，分别解释日 K、周 K、月 K 的趋势状态、主要依据和对当前判断的影响。
+8. periodTrendAnalysis 必须优先使用 currentScenes.trend.periodTrends 与 marketContext.klineTrends.<period>.data 中对应周期的数据；只能用自然语言表达，不得暴露内部标签名、字段名或 score。
+9. 必须遵守 marketContext 各数据块 meta 中的“数据范围”“价格口径”“用途”“限制”；不得跨数据范围滥用字段，不得把不同价格口径的数据差异解释成数据错误、数据时滞或多周期不一致。
+10. 不得输出输入中没有数据支持的内容，例如资金出逃、主力撤退、筹码松动；不得把短周期信号升级成长周期结论。
 ```
 
 ---
 
 ### 7.6 LLM 输出 JSON 结构
 
-推荐结构：
+当前 `outputRequirement.recommendedSchema`：
 
 ```json
 {
-  "summary": "",
-  "marketFacts": [],
-  "sceneInterpretation": [],
-  "knowledgeBasedAnalysis": [],
-  "riskWarnings": [],
-  "watchPoints": [],
+  "summary": {"title": "", "conclusion": "", "confidence": "low|medium|high"},
+  "marketFacts": [{"fact": "", "source": "marketContext|currentScenes|knowledgeContext", "chunkIds": []}],
+  "sceneInterpretation": [{"scene": "", "view": "", "basis": [], "chunkIds": []}],
+  "periodTrendAnalysis": [
+    {"period": "daily", "title": "日K趋势", "trend": "", "basis": [], "interpretation": "", "chunkIds": []},
+    {"period": "weekly", "title": "周K趋势", "trend": "", "basis": [], "interpretation": "", "chunkIds": []},
+    {"period": "monthly", "title": "月K趋势", "trend": "", "basis": [], "interpretation": "", "chunkIds": []}
+  ],
+  "knowledgeBasedAnalysis": [{"scene": "", "point": "", "chunkIds": []}],
+  "tradingSuggestions": [{
+    "action": "buy|sell|hold|watch|avoid",
+    "suggestion": "",
+    "reason": "",
+    "conditions": [],
+    "risks": [],
+    "chunkIds": []
+  }],
+  "riskWarnings": [{"risk": "", "reason": "", "chunkIds": []}],
+  "watchPoints": [{"item": "", "reason": "", "chunkIds": []}],
   "missingData": [],
   "conclusion": ""
 }
 ```
 
+当前输出结构中的新增重点：
+
+| 字段 | 当前用途 |
+|---|---|
+| `periodTrendAnalysis` | 周期趋势分析，必须包含 `daily`、`weekly`、`monthly` 三项。每项说明对应周期的趋势状态、依据和对当前判断的影响。 |
+| `tradingSuggestions` | 操作建议，允许输出买入、卖出、持有、观望或回避。每条建议必须包含 `action`、`suggestion`、`reason`、`conditions`、`risks`、`chunkIds`。 |
+
+`tradingSuggestions.action` 当前支持：
+
+| action | 渲染中文 |
+|---|---|
+| `buy` | 买入 |
+| `sell` | 卖出 |
+| `hold` | 持有 |
+| `watch` | 观望 |
+| `avoid` | 回避 |
+
+报告渲染当前读取这些字段生成 Markdown：
+
+| 输出字段 | Markdown 小节 |
+|---|---|
+| `summary.title` | 报告标题 |
+| `conclusion` | 结论 |
+| `marketFacts[].fact` | 市场事实 |
+| `sceneInterpretation[].view` | 场景解读 |
+| `periodTrendAnalysis` | 周期趋势分析 |
+| `knowledgeBasedAnalysis[].point` | 知识库分析 |
+| `tradingSuggestions` | 操作建议 |
+| `riskWarnings[].risk` | 风险提示 |
+| `watchPoints[].item` | 观察点 |
+
 ---
 
 ### 7.7 报告引用依据设计
 
-每条知识引用建议保留：
+当前最终报告不单独输出引用关系对象，而是在各报告段落对象中保留 `chunkIds` 数组。报告生成后 Java 会递归校验所有 `chunkIds` 必须来自本次 `allowedChunkIds`，避免模型编造不存在的知识库引用。
 
 ```json
 {
-  "chunkId": 123,
-  "category": "risk_strategy",
-  "text": "接近高位时不要只看涨幅，需要等待确认。",
-  "usedInSection": "riskWarnings"
+  "riskWarnings": [
+    {
+      "risk": "接近高位时需要关注追高风险。",
+      "reason": "相关知识库内容提示高位放量后应等待确认。",
+      "chunkIds": [205]
+    }
+  ]
 }
 ```
 
@@ -2929,9 +3080,9 @@ success / failed
 
 ```text
 1. 实现指数函数分配公式。
-2. 支持 alpha 配置。
+2. 使用当前代码常量 alpha = 6.0。
 3. 支持 reportType 权重。
-4. 支持 categoryScoreThreshold、min、max 限制。
+4. 使用当前代码常量 categoryScoreThreshold、min、max 限制。
 5. 输出每类 chunkCount。
 ```
 
