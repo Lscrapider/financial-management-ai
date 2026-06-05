@@ -658,7 +658,7 @@ function toNumber(value?: null | number | string) {
 </script>
 
 <template>
-  <Page title="行情总览">
+  <Page title="股票行情">
     <div class="stock-workspace">
       <section class="market-index-section">
         <div class="section-header">

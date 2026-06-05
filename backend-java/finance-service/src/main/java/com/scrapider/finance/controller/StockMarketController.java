@@ -63,7 +63,7 @@ public class StockMarketController {
 
     /**
      * 按需同步单只股票的分时走势数据。
-     * 前端在行情总览选择某只股票后可调用，只拉取该股的分时数据。
+     * 前端在股票行情选择某只股票后可调用，只拉取该股的分时数据。
      */
     @PostMapping("/sync/trends/{stockCode}")
     public ApiResponseVO<MarketSyncStatusVO> syncStockTrend(@PathVariable String stockCode) {

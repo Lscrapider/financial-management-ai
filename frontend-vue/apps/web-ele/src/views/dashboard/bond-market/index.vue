@@ -2,7 +2,7 @@
 import type { EchartsUIType } from '@vben/plugins/echarts';
 
 import type { StockQuoteDetail } from '#/api/stock';
-import type { BondKline, BondQuote } from '#/api/bond';
+import type { BondIntradayTrend, BondKline, BondQuote } from '#/api/bond';
 
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
@@ -24,6 +24,7 @@ import {
 import type { Sort } from 'element-plus';
 
 import {
+  listBondIntradayTrends,
   listBondKlines,
   listBondQuotes,
 } from '#/api/bond';
@@ -35,6 +36,7 @@ const rangeOptions = [
   { label: '近500日', value: 500 },
 ];
 const periodOptions = [
+  { label: '分时', value: 'intraday' },
   { label: '日K', value: 'daily' },
   { label: '周K', value: 'weekly' },
   { label: '月K', value: 'monthly' },
@@ -45,8 +47,9 @@ const { renderEcharts } = useEcharts(chartRef);
 const route = useRoute();
 
 const klineLimit = ref(250);
-const klinePeriodType = ref<(typeof periodOptions)[number]['value']>('daily');
+const klinePeriodType = ref<(typeof periodOptions)[number]['value']>('intraday');
 const klines = ref<BondKline[]>([]);
+const trends = ref<BondIntradayTrend[]>([]);
 const loadingKlines = ref(false);
 const loadingQuotes = ref(false);
 const quotes = ref<BondQuote[]>([]);
@@ -66,7 +69,7 @@ const latestKline = computed(() => {
 });
 
 const klinePeriodLabel = computed(() => {
-  return periodOptions.find((item) => item.value === klinePeriodType.value)?.label ?? 'K线';
+  return periodOptions.find((item) => item.value === klinePeriodType.value)?.label ?? '走势';
 });
 
 const riseCount = computed(() => {
@@ -115,12 +118,20 @@ async function refreshKlines() {
 
   loadingKlines.value = true;
   try {
-    klines.value = await listBondKlines({
-      bondCode: selectedQuote.value?.bondCode,
-      limit: klineLimit.value,
-      periodType: klinePeriodType.value,
-      secid: selectedSecid.value,
-    });
+    if (klinePeriodType.value === 'intraday') {
+      trends.value = selectedQuote.value?.bondCode
+        ? await listBondIntradayTrends(selectedQuote.value.bondCode)
+        : [];
+      klines.value = [];
+    } else {
+      klines.value = await listBondKlines({
+        bondCode: selectedQuote.value?.bondCode,
+        limit: klineLimit.value,
+        periodType: klinePeriodType.value,
+        secid: selectedSecid.value,
+      });
+      trends.value = [];
+    }
     await nextTick();
     renderKlineChart();
   } finally {
@@ -161,6 +172,10 @@ watch(
 );
 
 function renderKlineChart() {
+  if (klinePeriodType.value === 'intraday') {
+    renderIntradayChart();
+    return;
+  }
   const dates = klines.value.map((item) => item.tradeDate);
   const candleData = klines.value.map((item) => [
     toNumber(item.openPrice),
@@ -283,6 +298,62 @@ function renderKlineChart() {
   });
 }
 
+function renderIntradayChart() {
+  const times = trends.value.map(
+    (item) => item.trendMinute || formatTime(item.trendTime),
+  );
+  const prices = trends.value.map((item) => toNullableNumber(item.closePrice));
+  const averages = trends.value.map((item) => toNullableNumber(item.averagePrice));
+  const hasAverage = averages.some((item) => item !== null);
+
+  renderEcharts({
+    animation: false,
+    color: ['#089981', '#f59e0b'],
+    grid: {
+      bottom: 32,
+      left: 56,
+      right: 24,
+      top: 32,
+    },
+    legend: {
+      data: hasAverage ? ['价格', '均价'] : ['价格'],
+      top: 0,
+    },
+    series: [
+      {
+        data: prices,
+        name: '价格',
+        showSymbol: false,
+        smooth: true,
+        type: 'line',
+      },
+      ...(hasAverage
+        ? [
+            {
+              data: averages,
+              name: '均价',
+              showSymbol: false,
+              smooth: true,
+              type: 'line' as const,
+            },
+          ]
+        : []),
+    ],
+    tooltip: {
+      trigger: 'axis',
+    },
+    xAxis: {
+      boundaryGap: false,
+      data: times,
+      type: 'category',
+    },
+    yAxis: {
+      scale: true,
+      type: 'value',
+    },
+  });
+}
+
 function changeClass(value?: number | string) {
   const numberValue = toNumber(value);
   if (numberValue > 0) {
@@ -307,6 +378,13 @@ function formatDateTime(value?: string) {
     return '-';
   }
   return value.replace('T', ' ').slice(0, 19);
+}
+
+function formatTime(value?: string) {
+  if (!value) {
+    return '';
+  }
+  return value.replace('T', ' ').slice(11, 16);
 }
 
 function formatMoney(value?: number | string) {
@@ -578,7 +656,7 @@ function normalizeRouteSecid(value: unknown) {
           <ElCard class="kline-panel" shadow="never">
             <template #header>
               <div class="panel-header">
-                <span>{{ klinePeriodLabel }}线</span>
+                <span>{{ klinePeriodLabel === '分时' ? '分时走势' : `${klinePeriodLabel}线` }}</span>
                 <div class="header-actions">
                   <ElSelect
                     v-model="klinePeriodType"
@@ -594,6 +672,7 @@ function normalizeRouteSecid(value: unknown) {
                     />
                   </ElSelect>
                   <ElSelect
+                    v-if="klinePeriodType !== 'intraday'"
                     v-model="klineLimit"
                     class="range-select"
                     size="small"
@@ -619,7 +698,7 @@ function normalizeRouteSecid(value: unknown) {
             </template>
             <div v-loading="loadingKlines" class="chart-wrap">
               <EchartsUI
-                v-if="klines.length > 0"
+                v-if="klinePeriodType === 'intraday' ? trends.length > 0 : klines.length > 0"
                 ref="chartRef"
                 height="100%"
               />

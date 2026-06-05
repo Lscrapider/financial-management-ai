@@ -5,7 +5,6 @@ import com.scrapider.finance.domain.po.IndexConfigPO;
 import com.scrapider.finance.domain.po.IndexIntradayTrendPO;
 import com.scrapider.finance.domain.util.StockMarketJsonParser;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -87,7 +86,7 @@ public class IndexIntradayTrendVO {
         vo.setClosePrice(StockMarketJsonParser.decimal(parts[1]));
         vo.setVolume(StockMarketJsonParser.longValue(parts[2]));
         vo.setTurnoverAmount(StockMarketJsonParser.decimal(parts[3]));
-        vo.setAveragePrice(calculateAveragePrice(vo.getTurnoverAmount(), vo.getVolume()));
+        vo.setAveragePrice(null);
         vo.setPreviousClosePrice(previousClosePrice);
         vo.setSyncedAt(syncedAt);
         return vo;
@@ -96,13 +95,6 @@ public class IndexIntradayTrendVO {
     private static BigDecimal previousClosePrice(JsonNode response, String symbol) {
         JsonNode quote = response.path("data").path(symbol).path("qt").path(symbol);
         return StockMarketJsonParser.decimal(quote.path(4).asText());
-    }
-
-    private static BigDecimal calculateAveragePrice(BigDecimal turnoverAmount, Long volume) {
-        if (turnoverAmount == null || volume == null || volume <= 0) {
-            return null;
-        }
-        return turnoverAmount.divide(BigDecimal.valueOf(volume * 100L), 4, RoundingMode.HALF_UP);
     }
 
     private static String format(LocalDateTime value, DateTimeFormatter formatter) {

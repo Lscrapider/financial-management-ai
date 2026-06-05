@@ -85,12 +85,9 @@ public class BondIntradayTrendPO {
         trend.setSecid(stringValue(record.getValueByKey("secid")));
         trend.setTrendTime(toLocalDateTime(record.getTime(), zoneId));
         trend.setClosePrice(decimalValue(record.getValueByKey("closePrice")));
-        trend.setAveragePrice(decimalValue(record.getValueByKey("averagePrice")));
         trend.setVolume(longValue(record.getValueByKey("volume")));
         trend.setTurnoverAmount(decimalValue(record.getValueByKey("turnoverAmount")));
-        if (trend.getAveragePrice() == null) {
-            trend.setAveragePrice(calculateAveragePrice(trend.getTurnoverAmount(), trend.getVolume()));
-        }
+        trend.setAveragePrice(calculateAveragePrice(trend.getTurnoverAmount(), trend.getVolume()));
         trend.setPreviousClosePrice(decimalValue(record.getValueByKey("previousClosePrice")));
         trend.setSyncedAt(toSyncedAt(record.getValueByKey("syncedAtEpoch"), zoneId));
         return trend;
@@ -110,7 +107,7 @@ public class BondIntradayTrendPO {
         if (turnoverAmount == null || volume == null || volume <= 0) {
             return null;
         }
-        return turnoverAmount.divide(BigDecimal.valueOf(volume * 100L), 4, RoundingMode.HALF_UP);
+        return turnoverAmount.divide(BigDecimal.valueOf(volume * 10L), 4, RoundingMode.HALF_UP);
     }
 
     private static Long longValue(Object value) {

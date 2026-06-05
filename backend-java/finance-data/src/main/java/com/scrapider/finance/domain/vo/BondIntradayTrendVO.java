@@ -102,7 +102,7 @@ public class BondIntradayTrendVO {
         if (turnoverAmount == null || volume == null || volume <= 0) {
             return null;
         }
-        return turnoverAmount.divide(BigDecimal.valueOf(volume * 100L), 4, RoundingMode.HALF_UP);
+        return turnoverAmount.divide(BigDecimal.valueOf(volume * 10L), 4, RoundingMode.HALF_UP);
     }
 
     private static String format(LocalDateTime value, DateTimeFormatter formatter) {
