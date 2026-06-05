@@ -31,7 +31,7 @@ public class DeepSeekChatCompletionApi {
                     String completionsPath,
             @Value("${spring.ai.openai.chat.options.model:${DEEPSEEK_MODEL:deepseek-v4-pro}}") String model,
             @Value("${spring.ai.openai.chat.options.temperature:${DEEPSEEK_TEMPERATURE:0.3}}") double temperature,
-            @Value("${spring.ai.openai.chat.options.reasoning-effort:${DEEPSEEK_REASONING_EFFORT:high}}")
+            @Value("${spring.ai.openai.chat.options.reasoning-effort:${DEEPSEEK_REASONING_EFFORT:max}}")
                     String reasoningEffort,
             @Value("${deepseek.chat.thinking-enabled:${DEEPSEEK_THINKING_ENABLED:true}}") boolean thinkingEnabled,
             @Value("${deepseek.chat.thinking-type:${DEEPSEEK_THINKING_TYPE:enabled}}") String thinkingType) {
@@ -52,7 +52,6 @@ public class DeepSeekChatCompletionApi {
         }
         Map<String, Object> body = new java.util.LinkedHashMap<>();
         body.put("model", this.model);
-        body.put("temperature", this.temperature);
         body.put("reasoning_effort", this.reasoningEffort);
         if (this.thinkingEnabled) {
             body.put("thinking", Map.of("type", this.thinkingType));

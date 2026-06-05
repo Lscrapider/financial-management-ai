@@ -16,6 +16,7 @@ class MarketContextBuilder:
     def build(self, message: dict[str, Any]) -> dict[str, Any]:
         return {
             "snapshot": self._snapshot(message),
+            "valuation": self._valuation(message),
             "intraday": self._intraday(message),
             "klineTrends": self._kline_trends(message),
         }
@@ -42,6 +43,32 @@ class MarketContextBuilder:
             "syncedAt": market_data.get("syncedAt"),
         }
         return self._compact(snapshot)
+
+    def _valuation(self, message: dict[str, Any]) -> dict[str, Any]:
+        market_data = self._dict(message.get("marketData"))
+        valuation_data = self._dict(message.get("valuationData"))
+        current_price = self._number(market_data.get("latestPrice"))
+        latest_dividend = self._latest_dividend(message)
+        valuation = {
+            "current": self._compact({
+                "peTtm": self._first_number(valuation_data.get("peTtm"), market_data.get("peTtm")),
+                "peDynamic": self._first_number(valuation_data.get("peDynamic"), market_data.get("peDynamic")),
+                "peStatic": self._first_number(valuation_data.get("peStatic"), market_data.get("peStatic")),
+                "pbRatio": self._first_number(valuation_data.get("pbRatio"), market_data.get("pbRatio")),
+                "totalMarketValue": self._number(market_data.get("totalMarketValue")),
+                "floatMarketValue": self._number(market_data.get("floatMarketValue")),
+            }),
+            "historySummary": self._compact({
+                "peTtm": self._distribution_summary(message, "valuationHistory", "peTtm"),
+                "pbMrq": self._distribution_summary(message, "valuationHistory", "pbMrq"),
+            }),
+            "dividend": self._compact({
+                "latest": latest_dividend,
+                "estimatedDividendYieldPct": self._dividend_yield_pct(latest_dividend, current_price),
+                "historySummary": self._dividend_history_summary(message, current_price),
+            }),
+        }
+        return self._compact(valuation)
 
     def _intraday(self, message: dict[str, Any]) -> dict[str, Any]:
         rows = self._sorted_rows(
@@ -256,6 +283,62 @@ class MarketContextBuilder:
     def _value_or_default(self, value: float | None, default: float | None) -> float | None:
         return value if value is not None else default
 
+    def _distribution_summary(self, message: dict[str, Any], list_key: str, field_key: str) -> dict[str, Any]:
+        values = self._numbers(row.get(field_key) for row in self._list(message.get(list_key)))
+        if not values:
+            return {}
+        latest = values[0]
+        return self._compact({
+            "latest": latest,
+            "count": len(values),
+            "min": min(values),
+            "max": max(values),
+            "average": mean(values),
+            "percentileRank": self._percentile_rank(latest, values),
+        })
+
+    def _latest_dividend(self, message: dict[str, Any]) -> dict[str, Any]:
+        dividends = self._list(message.get("dividendHistory"))
+        if not dividends:
+            return {}
+        row = dividends[0]
+        return self._compact({
+            "reportDate": row.get("reportDate"),
+            "exDividendDate": row.get("exDividendDate"),
+            "pretaxBonusRmb": self._number(row.get("pretaxBonusRmb")),
+            "dividendRatio": self._number(row.get("dividendRatio")),
+            "implPlanProfile": row.get("implPlanProfile"),
+            "assignProgress": row.get("assignProgress"),
+        })
+
+    def _dividend_yield_pct(self, dividend: dict[str, Any], current_price: float | None) -> float | None:
+        if not dividend or not current_price:
+            return None
+        pretax_bonus = self._number(dividend.get("pretaxBonusRmb"))
+        if pretax_bonus is None:
+            return None
+        return pretax_bonus / 10 / current_price * 100
+
+    def _dividend_history_summary(self, message: dict[str, Any], current_price: float | None) -> dict[str, Any]:
+        if not current_price:
+            return {}
+        values = [
+            value / 10 / current_price * 100
+            for value in (self._number(row.get("pretaxBonusRmb")) for row in self._list(message.get("dividendHistory")))
+            if value is not None
+        ]
+        if not values:
+            return {}
+        latest = values[0]
+        return self._compact({
+            "yieldPctLatest": latest,
+            "count": len(values),
+            "yieldPctMin": min(values),
+            "yieldPctMax": max(values),
+            "yieldPctAverage": mean(values),
+            "yieldPctPercentileRank": self._percentile_rank(latest, values),
+        })
+
     def _volume_concentration(self, points: list[dict[str, Any]]) -> dict[str, float]:
         volumes = [point["volume"] for point in points if point["volume"] is not None]
         total_volume = sum(volumes)
@@ -344,6 +427,22 @@ class MarketContextBuilder:
             return float(value)
         except (TypeError, ValueError):
             return None
+
+    def _first_number(self, *values: Any) -> float | None:
+        for value in values:
+            number = self._number(value)
+            if number is not None:
+                return number
+        return None
+
+    def _numbers(self, values: Any) -> list[float]:
+        return [number for number in (self._number(value) for value in values) if number is not None]
+
+    def _percentile_rank(self, value: float | None, history: list[float]) -> float | None:
+        if value is None or not history:
+            return None
+        less_or_equal = sum(1 for item in history if item <= value)
+        return less_or_equal / len(history)
 
     def _compact(self, data: dict[str, Any]) -> dict[str, Any]:
         return {key: value for key, value in data.items() if value is not None and value != {}}

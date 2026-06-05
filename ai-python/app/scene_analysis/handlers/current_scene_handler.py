@@ -59,7 +59,7 @@ class CurrentSceneHandler(MessageHandler):
         if not isinstance(config, dict) or not isinstance(config.get("parameters"), dict):
             raise PermanentMessageError(f"scene analysis config.parameters is required task_no={task_no}")
         total_chunks = self._total_chunks(message.body)
-        self._save_test_data(message.body)
+        # self._save_test_data(message.body)
         base_metrics = self._base_metrics_calculator.calculate(message.body)
         context = SceneAnalysisContext.from_message(message.body, base_metrics)
         asset_result = self._asset_processor.process(context)
