@@ -1108,7 +1108,7 @@ stop_loss_plan
 | `weeklyKlineLimit` | 否 | 周 K 查询数量。股票默认 52，最小 1，最大 250；指数和可转债当前不查询周 K |
 | `monthlyKlineLimit` | 否 | 月 K 查询数量。股票默认 60，最小 1，最大 250；指数和可转债当前不查询月 K |
 | `configProfile` | 否 | 配置档 code，默认 `system_recommended` |
-| `userOverrides` | 否 | 用户覆盖参数，后端会和当前标的类型默认配置合并 |
+| `userOverrides` | 否 | 用户覆盖参数，后端会和当前标的类型默认配置合并；当前只保留 Python 实际参与计算的阈值、敏感度和权重配置 |
 
 用户选择标的后，系统先查询数据。
 

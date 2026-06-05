@@ -15,7 +15,6 @@ class SceneAnalysisContext:
     asset_config: dict[str, Any]
     price_config: dict[str, Any]
     volume_config: dict[str, Any]
-    trend_config: dict[str, Any]
     sentiment_config: dict[str, Any]
     risk_strategy_config: dict[str, Any]
     industry_data: dict[str, Any]
@@ -32,7 +31,6 @@ class SceneAnalysisContext:
             asset_config=_dict(config.get("asset_config")),
             price_config=_dict(config.get("price_config")),
             volume_config=_dict(config.get("volume_config")),
-            trend_config=_dict(config.get("trend_config")),
             sentiment_config=_dict(config.get("sentiment_config")),
             risk_strategy_config=_dict(config.get("risk_strategy_config")),
             industry_data=_dict(message.get("industryData")),

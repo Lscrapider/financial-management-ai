@@ -19,6 +19,7 @@ import {
   ElButton,
   ElDescriptions,
   ElDescriptionsItem,
+  ElDialog,
   ElDrawer,
   ElEmpty,
   ElForm,
@@ -72,6 +73,18 @@ interface ParameterGroup {
   name: string;
 }
 
+interface DisplayParameterGroup {
+  label: string;
+  name: string;
+  sections: DisplayParameterSection[];
+}
+
+interface DisplayParameterSection {
+  fields: ParameterField[];
+  key: string;
+  label: string;
+}
+
 const route = useRoute();
 const router = useRouter();
 const pollingStore = useReportPollingStore();
@@ -103,6 +116,7 @@ const configProfiles = ref<SceneAnalysisConfigProfile[]>([]);
 const selectedConfigGroup = ref('');
 const loadingTargetOptions = ref(false);
 const targetOptions = ref<SceneAnalysisTargetOption[]>([]);
+const advancedParameterVisible = ref(false);
 const reportTypeOptions = ref<SceneAnalysisReportType[]>([
   { code: 'quick_analysis', label: '快速分析' },
   { code: 'risk_check', label: '风险检查' },
@@ -116,6 +130,21 @@ const DEFAULT_DAILY_KLINE_LIMIT = 90;
 const DEFAULT_WEEKLY_KLINE_LIMIT = 52;
 const DEFAULT_MONTHLY_KLINE_LIMIT = 60;
 const MIN_DAILY_KLINE_LIMIT = 60;
+const CORE_PARAMETER_KEYS = new Set([
+  'attentionRiseCenter',
+  'gapThreshold',
+  'lowAttentionScale',
+  'lowPriceThreshold',
+  'priceDropCenter',
+  'priceDropScale',
+  'priceRiseCenter',
+  'priceRiseScale',
+  'pullbackThreshold',
+  'supportDistanceThreshold',
+  'volumeExpandCenter',
+  'volumeExpandScale',
+  'volumeSpikeCenter',
+]);
 const newReportForm = ref({
   configProfile: 'system_recommended',
   dailyKlineLimit: DEFAULT_DAILY_KLINE_LIMIT,
@@ -145,6 +174,26 @@ const renderedReportHtml = computed(() =>
 );
 const selectedReportPrintTitle = computed(() =>
   selectedReport.value ? `${displayTarget(selectedReport.value)} 分析报告` : '标的分析报告',
+);
+const displayParameterGroups = computed<DisplayParameterGroup[]>(() =>
+  parameterGroups.value.map((group) => ({
+    label: group.label,
+    name: group.name,
+    sections: parameterSections(group),
+  })),
+);
+const coreParameterGroups = computed<DisplayParameterGroup[]>(() =>
+  parameterGroups.value
+    .map((group) => ({
+      ...group,
+      fields: group.fields.filter((field) => CORE_PARAMETER_KEYS.has(field.key)),
+    }))
+    .filter((group) => group.fields.length > 0)
+    .map((group) => ({
+      label: group.label,
+      name: group.name,
+      sections: parameterSections(group),
+    })),
 );
 
 onMounted(async () => {
@@ -557,8 +606,6 @@ function buildUserOverrides() {
   parameterGroups.value.flatMap((group) => group.fields).forEach((field) => {
     setNestedValue(overrides, field.path, parameterValues.value[field.key] ?? field.defaultValue);
   });
-  setNestedValue(overrides, ['volume_config', 'volume_distribution_source'], 'asset_history_then_industry');
-  setNestedValue(overrides, ['volume_config', 'turnover_distribution_source'], 'asset_history_then_industry');
   return overrides;
 }
 
@@ -640,6 +687,43 @@ function parameterTooltip(field: ParameterField) {
 function parameterValueLabel(field: ParameterField) {
   const value = parameterValues.value[field.key] ?? field.defaultValue;
   return `${value}${field.unit || ''}`;
+}
+
+function parameterSectionKey(field: ParameterField) {
+  return field.path.length >= 3 ? (field.path[1] ?? 'basic') : 'basic';
+}
+
+function parameterSectionLabel(group: ParameterGroup, key: string) {
+  const labels: Record<string, string> = {
+    basic: '基础参数',
+    chase_high_risk_weights: '追高风险权重',
+    drawdown_risk_weights: '回撤风险权重',
+    false_breakout_risk_weights: '假突破风险权重',
+    liquidity_risk_weights: '流动性风险权重',
+    market_proxy_emotion_weights: '短线情绪权重',
+    market_proxy_herding_weights: '羊群效应权重',
+    market_proxy_panic_weights: '恐慌抛售权重',
+    market_proxy_weak_weights: '弱势情绪权重',
+    overheated_risk_weights: '过热风险权重',
+    position_control_weights: '仓位控制权重',
+    stop_loss_plan_weights: '止损计划权重',
+    take_profit_plan_weights: '止盈计划权重',
+    uncertainty_weights: '不确定性权重',
+  };
+  return labels[key] || group.label;
+}
+
+function parameterSections(group: ParameterGroup): DisplayParameterSection[] {
+  const sectionMap = new Map<string, ParameterField[]>();
+  for (const field of group.fields) {
+    const key = parameterSectionKey(field);
+    sectionMap.set(key, [...(sectionMap.get(key) || []), field]);
+  }
+  return [...sectionMap.entries()].map(([key, fields]) => ({
+    fields,
+    key,
+    label: parameterSectionLabel(group, key),
+  }));
 }
 
 function renderMarkdown(markdown: string) {
@@ -1073,45 +1157,69 @@ function escapeHtml(text: string) {
           </div>
 
           <section v-loading="loadingParameterSchema" class="parameter-panel">
-            <div class="parameter-panel-title">场景参数</div>
-            <div v-if="parameterGroups.length > 0" class="parameter-groups">
+            <div class="parameter-panel-heading">
+              <div class="parameter-panel-title">核心场景参数</div>
+              <ElButton
+                :disabled="displayParameterGroups.length === 0"
+                text
+                type="primary"
+                @click="advancedParameterVisible = true"
+              >
+                更多参数
+              </ElButton>
+            </div>
+            <div v-if="coreParameterGroups.length > 0" class="parameter-groups compact">
               <section
-                v-for="group in parameterGroups"
+                v-for="group in coreParameterGroups"
                 :key="group.name"
                 class="parameter-group"
               >
                 <div class="parameter-group-title">{{ group.label }}</div>
-                <div class="parameter-list">
-                  <div
-                    v-for="field in group.fields"
-                    :key="field.key"
-                    class="parameter-item"
+                <div class="parameter-section-list">
+                  <section
+                    v-for="section in group.sections"
+                    :key="section.key"
+                    class="parameter-section"
                   >
-                    <div class="parameter-header">
-                      <span>{{ field.label }}</span>
-                      <ElTooltip
-                        effect="dark"
-                        placement="top"
-                        :content="parameterTooltip(field)"
+                    <div
+                      v-if="group.sections.length > 1"
+                      class="parameter-section-title"
+                    >
+                      {{ section.label }}
+                    </div>
+                    <div class="parameter-list">
+                      <div
+                        v-for="field in section.fields"
+                        :key="field.key"
+                        class="parameter-item"
                       >
-                        <IconifyIcon class="parameter-info" icon="lucide:info" />
-                      </ElTooltip>
+                        <div class="parameter-header">
+                          <span>{{ field.label }}</span>
+                          <ElTooltip
+                            effect="dark"
+                            placement="top"
+                            :content="parameterTooltip(field)"
+                          >
+                            <IconifyIcon class="parameter-info" icon="lucide:info" />
+                          </ElTooltip>
+                        </div>
+                        <div class="parameter-control">
+                          <ElSlider
+                            v-model="parameterValues[field.key]"
+                            :max="field.max"
+                            :min="field.min"
+                            :step="field.step"
+                          />
+                          <span class="parameter-value">
+                            {{ parameterValueLabel(field) }}
+                          </span>
+                        </div>
+                        <div class="parameter-recommended">
+                          推荐 {{ field.recommended }}
+                        </div>
+                      </div>
                     </div>
-                    <div class="parameter-control">
-                      <ElSlider
-                        v-model="parameterValues[field.key]"
-                        :max="field.max"
-                        :min="field.min"
-                        :step="field.step"
-                      />
-                      <span class="parameter-value">
-                        {{ parameterValueLabel(field) }}
-                      </span>
-                    </div>
-                    <div class="parameter-recommended">
-                      推荐 {{ field.recommended }}
-                    </div>
-                  </div>
+                  </section>
                 </div>
               </section>
             </div>
@@ -1171,6 +1279,77 @@ function escapeHtml(text: string) {
         </div>
       </div>
     </ElDrawer>
+
+    <ElDialog
+      v-model="advancedParameterVisible"
+      class="advanced-parameter-dialog"
+      title="全部场景参数"
+      width="920px"
+    >
+      <section v-loading="loadingParameterSchema" class="parameter-dialog-body">
+        <div v-if="displayParameterGroups.length > 0" class="parameter-groups">
+          <section
+            v-for="group in displayParameterGroups"
+            :key="group.name"
+            class="parameter-group"
+          >
+            <div class="parameter-group-title">{{ group.label }}</div>
+            <div class="parameter-section-list">
+              <section
+                v-for="section in group.sections"
+                :key="section.key"
+                class="parameter-section"
+              >
+                <div
+                  v-if="group.sections.length > 1"
+                  class="parameter-section-title"
+                >
+                  {{ section.label }}
+                </div>
+                <div class="parameter-list">
+                  <div
+                    v-for="field in section.fields"
+                    :key="field.key"
+                    class="parameter-item"
+                  >
+                    <div class="parameter-header">
+                      <span>{{ field.label }}</span>
+                      <ElTooltip
+                        effect="dark"
+                        placement="top"
+                        :content="parameterTooltip(field)"
+                      >
+                        <IconifyIcon class="parameter-info" icon="lucide:info" />
+                      </ElTooltip>
+                    </div>
+                    <div class="parameter-control">
+                      <ElSlider
+                        v-model="parameterValues[field.key]"
+                        :max="field.max"
+                        :min="field.min"
+                        :step="field.step"
+                      />
+                      <span class="parameter-value">
+                        {{ parameterValueLabel(field) }}
+                      </span>
+                    </div>
+                    <div class="parameter-recommended">
+                      推荐 {{ field.recommended }}
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </section>
+        </div>
+        <ElEmpty v-else description="暂无参数配置" />
+      </section>
+      <template #footer>
+        <ElButton @click="advancedParameterVisible = false">
+          完成
+        </ElButton>
+      </template>
+    </ElDialog>
 
     <ElDrawer
       v-model="historyDrawerVisible"
@@ -1372,16 +1551,26 @@ function escapeHtml(text: string) {
   padding: 12px 14px 6px;
 }
 
+.parameter-panel-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
 .parameter-panel-title {
   font-size: 14px;
   font-weight: 600;
-  margin-bottom: 8px;
 }
 
 .parameter-groups {
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+
+.parameter-groups.compact {
+  gap: 14px;
 }
 
 .parameter-group {
@@ -1400,6 +1589,26 @@ function escapeHtml(text: string) {
   font-weight: 700;
   line-height: 18px;
   margin-bottom: 10px;
+}
+
+.parameter-section-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.parameter-section {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  padding: 10px 12px 2px;
+}
+
+.parameter-section-title {
+  color: var(--el-text-color-regular);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+  margin-bottom: 8px;
 }
 
 .parameter-list {
@@ -1450,6 +1659,12 @@ function escapeHtml(text: string) {
   font-size: 12px;
   line-height: 16px;
   margin-top: -4px;
+}
+
+.parameter-dialog-body {
+  max-height: min(70vh, 720px);
+  overflow-y: auto;
+  padding-right: 6px;
 }
 
 .profile-save-panel {

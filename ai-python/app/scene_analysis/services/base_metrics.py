@@ -284,16 +284,8 @@ class BaseMetricsCalculator:
                     values["trading_attention_rise"] = attention_rise
                     values["market_attention_rise"] = self._sigmoid_score(
                         attention_rise,
-                        self._config_number_any(
-                            sentiment_config,
-                            ("attention_rise_center", "attention_center"),
-                            1.5,
-                        ),
-                        self._config_number_any(
-                            sentiment_config,
-                            ("attention_rise_scale", "attention_scale"),
-                            0.4,
-                        ),
+                        self._config_number_any(sentiment_config, ("attention_rise_center",), 1.5),
+                        self._config_number_any(sentiment_config, ("attention_rise_scale",), 0.4),
                     )
                     values["low_attention"] = self._clamp(
                         (1 - attention_rise)

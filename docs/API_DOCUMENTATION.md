@@ -657,7 +657,7 @@
 | `dailyKlineLimit` | number | 否 | 日 K 查询数量。股票默认 90，最小 60，最大 250；指数和可转债当前使用固定 250 条日 K |
 | `weeklyKlineLimit` | number | 否 | 周 K 查询数量。股票默认 52，最小 1，最大 250；指数和可转债当前不查询周 K |
 | `monthlyKlineLimit` | number | 否 | 月 K 查询数量。股票默认 60，最小 1，最大 250；指数和可转债当前不查询月 K |
-| `userOverrides` | object | 否 | 用户覆盖参数 |
+| `userOverrides` | object | 否 | 用户覆盖参数；当前只保留 Python 实际参与计算的阈值、敏感度和权重配置 |
 
 返回：`SceneAnalysisSubmitVO`，核心字段：`taskNo`、`targetType`、`targetCode`、`configProfile`、`status`。
 
