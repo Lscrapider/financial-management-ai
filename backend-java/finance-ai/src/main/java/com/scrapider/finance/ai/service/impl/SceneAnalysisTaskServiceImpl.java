@@ -420,12 +420,7 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
     }
 
     private List<Map<String, Object>> queryStockIntraday(String stockCode, List<String> missing) {
-        String batchNo = this.stockIntradayTrendInfluxManage.getLatestBatchNo(stockCode);
-        if (StrUtil.isBlank(batchNo)) {
-            missing.add("stock_intraday_trend");
-            return List.of();
-        }
-        List<Map<String, Object>> rows = this.stockIntradayTrendInfluxManage.listByBatchNo(stockCode, batchNo).stream()
+        List<Map<String, Object>> rows = this.stockIntradayTrendInfluxManage.listLatestTradingTrends(stockCode).stream()
                 .limit(INTRADAY_LIMIT)
                 .map(this::toMap)
                 .toList();

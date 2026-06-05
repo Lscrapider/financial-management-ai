@@ -4,6 +4,7 @@ import com.influxdb.client.write.Point;
 import com.influxdb.query.FluxRecord;
 import com.scrapider.finance.domain.util.StockMarketJsonParser;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -55,6 +56,7 @@ public class StockIntradayTrendPO {
         trend.setClosePrice(StockMarketJsonParser.decimal(parts[1]));
         trend.setVolume(StockMarketJsonParser.longValue(parts[2]));
         trend.setTurnoverAmount(StockMarketJsonParser.decimal(parts[3]));
+        trend.setAveragePrice(calculateAveragePrice(trend.getTurnoverAmount(), trend.getVolume()));
         trend.setPreviousClosePrice(previousClosePrice);
         trend.setSyncedAt(syncedAt);
         return trend;
@@ -101,6 +103,9 @@ public class StockIntradayTrendPO {
         trend.setAveragePrice(decimalValue(record.getValueByKey("averagePrice")));
         trend.setVolume(longValue(record.getValueByKey("volume")));
         trend.setTurnoverAmount(decimalValue(record.getValueByKey("turnoverAmount")));
+        if (trend.getAveragePrice() == null) {
+            trend.setAveragePrice(calculateAveragePrice(trend.getTurnoverAmount(), trend.getVolume()));
+        }
         trend.setPreviousClosePrice(decimalValue(record.getValueByKey("previousClosePrice")));
         trend.setSyncedAt(toSyncedAt(record.getValueByKey("syncedAtEpoch"), zoneId));
         return trend;
@@ -114,6 +119,13 @@ public class StockIntradayTrendPO {
 
     private static BigDecimal decimalValue(Object value) {
         return value == null ? null : StockMarketJsonParser.decimal(String.valueOf(value));
+    }
+
+    private static BigDecimal calculateAveragePrice(BigDecimal turnoverAmount, Long volume) {
+        if (turnoverAmount == null || volume == null || volume <= 0) {
+            return null;
+        }
+        return turnoverAmount.divide(BigDecimal.valueOf(volume * 100L), 4, RoundingMode.HALF_UP);
     }
 
     private static Long longValue(Object value) {

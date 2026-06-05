@@ -13,7 +13,6 @@ import {
   ElButton,
   ElCard,
   ElEmpty,
-  ElMessage,
   ElOption,
   ElSelect,
   ElTable,
@@ -23,10 +22,8 @@ import {
 import type { Sort } from 'element-plus';
 
 import {
-  getIndexMarketSyncStatus,
   listIndexDailyKlines,
   listIndexQuotes,
-  syncIndexMarketData,
 } from '#/api/index-market';
 
 const rangeOptions = [
@@ -44,7 +41,6 @@ const klineLimit = ref(250);
 const klines = ref<IndexDailyKline[]>([]);
 const loadingKlines = ref(false);
 const loadingQuotes = ref(false);
-const loadingSync = ref(false);
 const quotes = ref<IndexQuote[]>([]);
 const selectedSecid = ref('');
 const sortField = ref('indexCode');
@@ -69,11 +65,6 @@ const fallCount = computed(() => {
 const syncedAt = computed(() => {
   return selectedQuote.value?.syncedAt ?? quotes.value[0]?.syncedAt ?? '-';
 });
-
-const delay = (ms: number) =>
-  new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 
 onMounted(() => {
   refreshQuotes();
@@ -119,37 +110,6 @@ async function refreshKlines() {
   } finally {
     loadingKlines.value = false;
   }
-}
-
-async function manualSyncIndices() {
-  if (loadingSync.value) return;
-  loadingSync.value = true;
-  try {
-    const status = await syncIndexMarketData();
-    ElMessage.info(
-      status.started ? '指数行情同步已开始' : '指数行情同步正在执行',
-    );
-    const completed = await waitIndexSyncCompleted();
-    await refreshQuotes();
-    if (completed) {
-      ElMessage.success('指数行情同步完成，数据已刷新');
-    } else {
-      ElMessage.warning('同步仍在后台执行，可稍后刷新查看');
-    }
-  } finally {
-    loadingSync.value = false;
-  }
-}
-
-async function waitIndexSyncCompleted() {
-  for (let i = 0; i < 120; i += 1) {
-    await delay(3000);
-    const status = await getIndexMarketSyncStatus();
-    if (!status.running) {
-      return true;
-    }
-  }
-  return false;
 }
 
 function selectQuote(row: IndexQuote) {
@@ -404,13 +364,6 @@ function normalizeRouteSecid(value: unknown) {
             <div class="panel-header">
               <span>指数快照</span>
               <div class="header-actions">
-                <ElButton
-                  :loading="loadingSync"
-                  size="small"
-                  @click="manualSyncIndices"
-                >
-                  手动同步
-                </ElButton>
                 <ElButton size="small" type="primary" @click="refreshQuotes">
                   刷新
                 </ElButton>

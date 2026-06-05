@@ -48,6 +48,7 @@
     "@vueuse/core": "catalog:",
     "dayjs": "catalog:",
     "element-plus": "catalog:",
+    "grid-layout-plus": "^1.1.1",
     "pinia": "catalog:",
     "vue": "catalog:",
     "vue-router": "catalog:"

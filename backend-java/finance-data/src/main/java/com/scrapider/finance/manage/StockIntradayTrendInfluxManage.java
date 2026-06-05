@@ -11,13 +11,23 @@ import com.scrapider.finance.config.InfluxDbProperties;
 import com.scrapider.finance.domain.po.StockIntradayTrendPO;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 
 @Service
 public class StockIntradayTrendInfluxManage {
+
+    private static final LocalTime MORNING_START = LocalTime.of(9, 30);
+    private static final LocalTime MORNING_END = LocalTime.of(11, 30);
+    private static final LocalTime AFTERNOON_START = LocalTime.of(13, 0);
+    private static final LocalTime AFTERNOON_END = LocalTime.of(15, 0);
 
     private final InfluxDbProperties influxDbProperties;
     private final QueryApi queryApi;
@@ -122,6 +132,72 @@ public class StockIntradayTrendInfluxManage {
         return this.listByBatchNoAndTrendDate(stockCode, syncBatchNo, LocalDate.now(this.zoneId));
     }
 
+    public List<StockIntradayTrendPO> listLatestTradingTrends(String stockCode) {
+        List<StockIntradayTrendPO> todayTrends = this.latestTradingTrends(this.listTodayByStockCode(stockCode));
+        if (CollUtil.isNotEmpty(todayTrends)) {
+            return todayTrends;
+        }
+        String latestBatchNo = this.getLatestBatchNo(stockCode);
+        if (StrUtil.isBlank(latestBatchNo)) {
+            return List.of();
+        }
+        return this.listByBatchNo(stockCode, latestBatchNo).stream()
+                .filter(this::isTradingTrend)
+                .sorted(Comparator.comparing(StockIntradayTrendPO::getTrendTime))
+                .toList();
+    }
+
+    public List<StockIntradayTrendPO> listTodayByStockCode(String stockCode) {
+        return this.listByStockCodeAndTrendDate(stockCode, LocalDate.now(this.zoneId));
+    }
+
+    public List<StockIntradayTrendPO> listByStockCodeAndTrendDate(String stockCode, LocalDate trendDate) {
+        String flux = """
+                from(bucket: "%s")
+                  |> range(start: %s, stop: %s)
+                  |> filter(fn: (r) => r["_measurement"] == "%s")
+                  |> filter(fn: (r) => r["stockCode"] == "%s")
+                  |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+                  |> sort(columns: ["_time"])
+                """.formatted(
+                escape(this.influxDbProperties.getBucket()),
+                this.rangeStart(trendDate),
+                this.rangeEnd(trendDate),
+                escape(this.influxDbProperties.getStockMinuteMeasurement()),
+                escape(stockCode));
+        List<FluxTable> tables = this.queryApi.query(flux, this.influxDbProperties.getOrg());
+        return tables.stream()
+                .flatMap(table -> table.getRecords().stream())
+                .map(this::toTrend)
+                .toList();
+    }
+
+    public List<LocalDateTime> listTrendTimesByBatchNoAndTrendDate(
+            String stockCode,
+            String syncBatchNo,
+            LocalDate trendDate) {
+        String flux = """
+                from(bucket: "%s")
+                  |> range(start: %s, stop: %s)
+                  |> filter(fn: (r) => r["_measurement"] == "%s")
+                  |> filter(fn: (r) => r["stockCode"] == "%s")
+                  |> filter(fn: (r) => r["syncBatchNo"] == "%s")
+                  |> filter(fn: (r) => r["_field"] == "closePrice")
+                  |> sort(columns: ["_time"])
+                """.formatted(
+                escape(this.influxDbProperties.getBucket()),
+                this.rangeStart(trendDate),
+                this.rangeEnd(trendDate),
+                escape(this.influxDbProperties.getStockMinuteMeasurement()),
+                escape(stockCode),
+                escape(syncBatchNo));
+        List<FluxTable> tables = this.queryApi.query(flux, this.influxDbProperties.getOrg());
+        return tables.stream()
+                .flatMap(table -> table.getRecords().stream())
+                .map(record -> StockIntradayTrendPO.fromInfluxRecord(record, this.zoneId).getTrendTime())
+                .toList();
+    }
+
     public List<StockIntradayTrendPO> listByBatchNoAndTrendDate(
             String stockCode,
             String syncBatchNo,
@@ -150,6 +226,44 @@ public class StockIntradayTrendInfluxManage {
 
     private StockIntradayTrendPO toTrend(FluxRecord record) {
         return StockIntradayTrendPO.fromInfluxRecord(record, this.zoneId);
+    }
+
+    private List<StockIntradayTrendPO> latestTradingTrends(List<StockIntradayTrendPO> trends) {
+        Map<LocalDateTime, StockIntradayTrendPO> latestByMinute = new LinkedHashMap<>();
+        trends.stream()
+                .filter(this::isTradingTrend)
+                .sorted(Comparator.comparing(StockIntradayTrendPO::getTrendTime))
+                .forEach(trend -> latestByMinute.merge(
+                        trend.getTrendTime(),
+                        trend,
+                        this::latestSyncedTrend));
+        return latestByMinute.values().stream()
+                .sorted(Comparator.comparing(StockIntradayTrendPO::getTrendTime))
+                .toList();
+    }
+
+    private StockIntradayTrendPO latestSyncedTrend(
+            StockIntradayTrendPO existing,
+            StockIntradayTrendPO candidate) {
+        LocalDateTime existingSyncedAt = existing.getSyncedAt();
+        LocalDateTime candidateSyncedAt = candidate.getSyncedAt();
+        if (existingSyncedAt == null) {
+            return candidateSyncedAt == null ? existing : candidate;
+        }
+        if (candidateSyncedAt == null) {
+            return existing;
+        }
+        return candidateSyncedAt.isAfter(existingSyncedAt) ? candidate : existing;
+    }
+
+    private boolean isTradingTrend(StockIntradayTrendPO trend) {
+        LocalDateTime trendTime = trend.getTrendTime();
+        if (trendTime == null) {
+            return false;
+        }
+        LocalTime minute = trendTime.toLocalTime();
+        return (!minute.isBefore(MORNING_START) && !minute.isAfter(MORNING_END))
+                || (!minute.isBefore(AFTERNOON_START) && !minute.isAfter(AFTERNOON_END));
     }
 
     private static String escape(String value) {

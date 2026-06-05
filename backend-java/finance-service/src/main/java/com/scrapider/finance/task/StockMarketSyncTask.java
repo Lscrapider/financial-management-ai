@@ -22,12 +22,14 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -42,6 +44,11 @@ import org.springframework.stereotype.Component;
 public class StockMarketSyncTask {
 
     private static final KlineAdjustTypeEnum DEFAULT_KLINE_ADJUST_TYPE = KlineAdjustTypeEnum.HFQ;
+    private static final DateTimeFormatter TRADE_DATE_FORMATTER = DateTimeFormatter.BASIC_ISO_DATE;
+    private static final LocalTime MORNING_START = LocalTime.of(9, 30);
+    private static final LocalTime MORNING_END = LocalTime.of(11, 30);
+    private static final LocalTime AFTERNOON_START = LocalTime.of(13, 0);
+    private static final LocalTime AFTERNOON_END = LocalTime.of(15, 0);
 
     private final StockMarketApi stockMarketApi;
     private final StockConfigManage stockConfigManage;
@@ -260,9 +267,8 @@ public class StockMarketSyncTask {
 
     private void doSyncTrendsForStock(StockConfigPO stock) {
         try {
-            String syncBatchNo = UUID.randomUUID().toString();
             StockMarketDataDTO trends = this.stockMarketApi.getTrends(stock.getSecid());
-            this.saveTrends(stock, trends.data(), syncBatchNo);
+            this.saveTrends(stock, trends.data());
         } catch (Exception ex) {
             log.warn(
                     "Failed to sync trend for stock, code: {}, name: {}",
@@ -326,14 +332,24 @@ public class StockMarketSyncTask {
                 DEFAULT_KLINE_ADJUST_TYPE));
     }
 
-    private void saveTrends(StockConfigPO stock, JsonNode response, String syncBatchNo) {
+    private void saveTrends(StockConfigPO stock, JsonNode response) {
         String tencentSymbol = this.toTencentSymbol(stock.getSecid());
         JsonNode data = response.path("data").path(tencentSymbol).path("data");
         String tradeDate = data.path("date").asText();
+        if (StrUtil.isBlank(tradeDate)) {
+            return;
+        }
+        LocalDate trendDate = LocalDate.parse(tradeDate, TRADE_DATE_FORMATTER);
+        String syncBatchNo = this.trendSyncBatchNo(stock, tradeDate);
         BigDecimal previousClosePrice = this.previousClosePrice(response, tencentSymbol);
         ZoneId zoneId = ZoneId.of(this.timezone);
         LocalDateTime now = LocalDateTime.now(zoneId);
         LocalDateTime syncedAt = now;
+        Set<LocalDateTime> existingTrendTimes = new HashSet<>(
+                this.stockIntradayTrendInfluxManage.listTrendTimesByBatchNoAndTrendDate(
+                        stock.getStockCode(),
+                        syncBatchNo,
+                        trendDate));
         List<StockIntradayTrendPO> trends = StreamSupport.stream(data.path("data").spliterator(), false)
                 .map(JsonNode::asText)
                 .map(line -> StockIntradayTrendPO.fromTrendLine(
@@ -345,6 +361,8 @@ public class StockMarketSyncTask {
                         syncBatchNo))
                 .filter(Objects::nonNull)
                 .filter(trend -> this.isNotFutureTrend(trend, now))
+                .filter(this::isTradingTrend)
+                .filter(trend -> this.shouldWriteTrend(trend, existingTrendTimes, now))
                 .toList();
 
         this.stockIntradayTrendInfluxManage.saveTrends(trends);
@@ -371,9 +389,38 @@ public class StockMarketSyncTask {
         return !trendTime.isAfter(now);
     }
 
+    private boolean isTradingTrend(StockIntradayTrendPO trend) {
+        LocalDateTime trendTime = trend.getTrendTime();
+        if (trendTime == null) {
+            return false;
+        }
+        LocalTime minute = trendTime.toLocalTime();
+        return (!minute.isBefore(MORNING_START) && !minute.isAfter(MORNING_END))
+                || (!minute.isBefore(AFTERNOON_START) && !minute.isAfter(AFTERNOON_END));
+    }
+
+    private boolean shouldWriteTrend(
+            StockIntradayTrendPO trend,
+            Set<LocalDateTime> existingTrendTimes,
+            LocalDateTime now) {
+        LocalDateTime trendTime = trend.getTrendTime();
+        return !existingTrendTimes.contains(trendTime) || this.isCurrentMinute(trendTime, now);
+    }
+
+    private boolean isCurrentMinute(LocalDateTime trendTime, LocalDateTime now) {
+        return trendTime.getYear() == now.getYear()
+                && trendTime.getDayOfYear() == now.getDayOfYear()
+                && trendTime.getHour() == now.getHour()
+                && trendTime.getMinute() == now.getMinute();
+    }
+
     private BigDecimal previousClosePrice(JsonNode response, String tencentSymbol) {
         JsonNode quote = response.path("data").path(tencentSymbol).path("qt").path(tencentSymbol);
         return StockMarketJsonParser.decimal(quote.path(4).asText());
+    }
+
+    private String trendSyncBatchNo(StockConfigPO stock, String tradeDate) {
+        return "%s-%s".formatted(stock.getStockCode(), tradeDate);
     }
 
     private String toTencentSymbol(String secid) {

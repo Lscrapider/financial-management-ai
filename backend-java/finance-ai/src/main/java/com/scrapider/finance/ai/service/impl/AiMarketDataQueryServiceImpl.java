@@ -119,19 +119,13 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
         if (StrUtil.isBlank(request.targetCode())) {
             return Map.of();
         }
-        String latestBatchNo = this.stockIntradayTrendInfluxManage.getLatestBatchNo(request.targetCode());
-        if (StrUtil.isBlank(latestBatchNo)) {
-            return this.result(request, List.of());
-        }
         List<Map<String, Object>> rows = this.stockIntradayTrendInfluxManage
-                .listByBatchNo(request.targetCode(), latestBatchNo)
+                .listLatestTradingTrends(request.targetCode())
                 .stream()
                 .limit(this.normalizeIntradayLimit(request.limit()))
                 .map(this::stockIntradayToMap)
                 .toList();
-        Map<String, Object> result = this.result(request, rows);
-        result.put("syncBatchNo", latestBatchNo);
-        return result;
+        return this.result(request, rows);
     }
 
     private Map<String, Object> queryIndexQuoteByCode(AiDataRequestVO request) {

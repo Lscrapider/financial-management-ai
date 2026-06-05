@@ -10,7 +10,7 @@ import type {
 } from '#/api/scene-analysis';
 
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 
 import { Page } from '@vben/common-ui';
 import { IconifyIcon } from '@vben/icons';
@@ -73,6 +73,7 @@ interface ParameterGroup {
 }
 
 const route = useRoute();
+const router = useRouter();
 const pollingStore = useReportPollingStore();
 
 const loadingTargets = ref(false);
@@ -443,6 +444,19 @@ async function openDetail(reportId?: null | number) {
   } finally {
     loadingDetail.value = false;
   }
+}
+
+function openReportWorkspace(reportId?: null | number) {
+  if (!reportId) {
+    ElMessage.warning('暂无可打开的报告');
+    return;
+  }
+  router.push({
+    name: 'AiReportWorkspace',
+    query: {
+      reportId,
+    },
+  });
 }
 
 async function regenerate(row: SceneAnalysisReportHistory | SceneAnalysisReportTarget) {
@@ -888,10 +902,13 @@ function escapeHtml(text: string) {
             <span class="preview-text">{{ row.latestReportPreview || '-' }}</span>
           </template>
         </ElTableColumn>
-        <ElTableColumn fixed="right" label="操作" width="250">
+        <ElTableColumn fixed="right" label="操作" width="310">
           <template #default="{ row }">
             <ElButton link type="primary" @click="openDetail(row.latestReportId)">
               查看
+            </ElButton>
+            <ElButton link type="primary" @click="openReportWorkspace(row.latestReportId)">
+              工作台
             </ElButton>
             <ElButton link type="primary" @click="openHistory(row)">
               历史
@@ -1184,10 +1201,13 @@ function escapeHtml(text: string) {
             {{ formatDateTime(row.generatedAt || row.createdAt) }}
           </template>
         </ElTableColumn>
-        <ElTableColumn fixed="right" label="操作" width="160">
+        <ElTableColumn fixed="right" label="操作" width="220">
           <template #default="{ row }">
             <ElButton link type="primary" @click="openDetail(row.reportId)">
               查看
+            </ElButton>
+            <ElButton link type="primary" @click="openReportWorkspace(row.reportId)">
+              工作台
             </ElButton>
             <ElPopconfirm
               title="基于这条报告关联的上下文重新生成？"

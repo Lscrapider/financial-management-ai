@@ -21,7 +21,8 @@
     "knowledgeProcessing": "知识库OCR导入",
     "ocrReview": "OCR人工复核",
     "manualKnowledge": "知识库手动导入",
-    "sceneReports": "标的分析报告"
+    "sceneReports": "标的分析报告",
+    "reportWorkspace": "报告工作台"
   },
   "knowledge": {
     "title": "知识库",
@@ -29,6 +30,7 @@
     "base": "知识库浏览"
   },
   "systemConfig": {
-    "title": "系统配置"
+    "title": "系统配置",
+    "dataSync": "数据同步"
   }
 }

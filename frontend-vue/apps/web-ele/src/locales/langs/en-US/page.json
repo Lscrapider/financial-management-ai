@@ -21,7 +21,8 @@
     "knowledgeProcessing": "Knowledge Processing",
     "ocrReview": "OCR Review",
     "manualKnowledge": "Manual Knowledge",
-    "sceneReports": "Scene Reports"
+    "sceneReports": "Scene Reports",
+    "reportWorkspace": "Report Workspace"
   },
   "knowledge": {
     "title": "Knowledge Base",
@@ -29,6 +30,7 @@
     "overview": "Knowledge Overview"
   },
   "systemConfig": {
-    "title": "System Config"
+    "title": "System Config",
+    "dataSync": "Data Sync"
   }
 }

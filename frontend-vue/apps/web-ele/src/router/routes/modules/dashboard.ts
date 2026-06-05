@@ -78,6 +78,15 @@ const routes: RouteRecordRaw[] = [
           title: $t('page.dashboard.analytics'),
         },
       },
+      {
+        name: 'DataSync',
+        path: '/data-sync',
+        component: () => import('#/views/system-config/data-sync/index.vue'),
+        meta: {
+          icon: 'lucide:refresh-cw',
+          title: $t('page.systemConfig.dataSync'),
+        },
+      },
     ],
   },
 ];

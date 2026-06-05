@@ -1,6 +1,8 @@
 package com.scrapider.finance.service.impl;
 
 import cn.hutool.core.util.StrUtil;
+import com.scrapider.finance.api.StockMarketApi;
+import com.scrapider.finance.domain.dto.StockMarketDataDTO;
 import com.scrapider.finance.domain.enums.KlineAdjustTypeEnum;
 import com.scrapider.finance.domain.enums.KlinePeriodTypeEnum;
 import com.scrapider.finance.domain.enums.SortOrderEnum;
@@ -8,9 +10,12 @@ import com.scrapider.finance.domain.enums.StockQuoteSortFieldEnum;
 import com.scrapider.finance.domain.param.StockIntradayTrendParam;
 import com.scrapider.finance.domain.param.StockKlineParam;
 import com.scrapider.finance.domain.param.StockQuoteListParam;
+import com.scrapider.finance.domain.po.StockConfigPO;
+import com.scrapider.finance.domain.po.StockKlinePO;
 import com.scrapider.finance.domain.vo.StockIntradayTrendVO;
 import com.scrapider.finance.domain.vo.StockKlineVO;
 import com.scrapider.finance.domain.vo.StockQuoteVO;
+import com.scrapider.finance.manage.StockConfigManage;
 import com.scrapider.finance.manage.StockIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.StockKlineManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
@@ -30,14 +35,20 @@ public class StockMarketQueryServiceImpl implements StockMarketQueryService {
     private final StockQuoteSnapshotManage stockQuoteSnapshotManage;
     private final StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage;
     private final StockKlineManage stockKlineManage;
+    private final StockConfigManage stockConfigManage;
+    private final StockMarketApi stockMarketApi;
 
     public StockMarketQueryServiceImpl(
             StockQuoteSnapshotManage stockQuoteSnapshotManage,
             StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage,
-            StockKlineManage stockKlineManage) {
+            StockKlineManage stockKlineManage,
+            StockConfigManage stockConfigManage,
+            StockMarketApi stockMarketApi) {
         this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
         this.stockIntradayTrendInfluxManage = stockIntradayTrendInfluxManage;
         this.stockKlineManage = stockKlineManage;
+        this.stockConfigManage = stockConfigManage;
+        this.stockMarketApi = stockMarketApi;
     }
 
     @Override
@@ -59,15 +70,8 @@ public class StockMarketQueryServiceImpl implements StockMarketQueryService {
             throw new IllegalArgumentException("stockCode must not be blank");
         }
         String stockCode = param.getStockCode().trim();
-        String latestBatchNo = this.stockIntradayTrendInfluxManage.getLatestTodayBatchNo(stockCode);
-        if (StrUtil.isBlank(latestBatchNo)) {
-            latestBatchNo = this.stockIntradayTrendInfluxManage.getLatestBatchNo(stockCode);
-        }
-        if (StrUtil.isBlank(latestBatchNo)) {
-            return List.of();
-        }
         return this.stockIntradayTrendInfluxManage
-                .listByBatchNo(stockCode, latestBatchNo)
+                .listLatestTradingTrends(stockCode)
                 .stream()
                 .map(StockIntradayTrendVO::fromPO)
                 .toList();
@@ -78,19 +82,76 @@ public class StockMarketQueryServiceImpl implements StockMarketQueryService {
         if (StrUtil.isBlank(param.getStockCode()) && StrUtil.isBlank(param.getSecid())) {
             throw new IllegalArgumentException("stockCode or secid must not be blank");
         }
-        return this.stockKlineManage
-                .listKlines(
-                        normalizeText(param.getStockCode()),
-                        normalizeText(param.getSecid()),
-                        normalizePeriodType(param.getPeriodType()),
-                        normalizeAdjustType(param.getAdjustType()),
-                        parseDate(param.getStartDate()),
-                        parseDate(param.getEndDate()),
-                        this.normalizeLimit(param.getLimit(), DEFAULT_KLINE_LIMIT))
+        String stockCode = normalizeText(param.getStockCode());
+        String secid = normalizeText(param.getSecid());
+        KlinePeriodTypeEnum periodType = normalizePeriodType(param.getPeriodType());
+        KlineAdjustTypeEnum adjustType = normalizeAdjustType(param.getAdjustType());
+        LocalDate startDate = parseDate(param.getStartDate());
+        LocalDate endDate = parseDate(param.getEndDate());
+        int limit = this.normalizeLimit(param.getLimit(), DEFAULT_KLINE_LIMIT);
+        List<StockKlinePO> klines = this.listKlinePOs(
+                stockCode,
+                secid,
+                periodType,
+                adjustType,
+                startDate,
+                endDate,
+                limit);
+        if (klines.isEmpty() && StrUtil.isNotBlank(stockCode)) {
+            this.syncKlines(stockCode, periodType, adjustType, limit);
+            klines = this.listKlinePOs(
+                    stockCode,
+                    secid,
+                    periodType,
+                    adjustType,
+                    startDate,
+                    endDate,
+                    limit);
+        }
+        return klines
                 .stream()
                 .map(StockKlineVO::fromPO)
                 .sorted(Comparator.comparing(StockKlineVO::getTradeDate))
                 .toList();
+    }
+
+    private List<StockKlinePO> listKlinePOs(
+            String stockCode,
+            String secid,
+            KlinePeriodTypeEnum periodType,
+            KlineAdjustTypeEnum adjustType,
+            LocalDate startDate,
+            LocalDate endDate,
+            Integer limit) {
+        return this.stockKlineManage.listKlines(
+                stockCode,
+                secid,
+                periodType,
+                adjustType,
+                startDate,
+                endDate,
+                limit);
+    }
+
+    private void syncKlines(
+            String stockCode,
+            KlinePeriodTypeEnum periodType,
+            KlineAdjustTypeEnum adjustType,
+            Integer limit) {
+        StockConfigPO stock = this.stockConfigManage.getEnabledByStockCode(stockCode);
+        if (stock == null || StrUtil.isBlank(stock.getSecid())) {
+            return;
+        }
+        StockMarketDataDTO klines = this.stockMarketApi.getKlines(
+                stock.getSecid(),
+                periodType,
+                adjustType,
+                limit);
+        this.stockKlineManage.saveKlines(StockKlinePO.fromApiResponse(
+                stock,
+                klines.data(),
+                periodType,
+                adjustType));
     }
 
     private int normalizeLimit(Integer limit, int defaultLimit) {

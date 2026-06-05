@@ -633,6 +633,9 @@ importers:
       element-plus:
         specifier: 'catalog:'
         version: 2.14.0(vue@3.5.34(typescript@6.0.3))
+      grid-layout-plus:
+        specifier: ^1.1.1
+        version: 1.1.1(vue@3.5.34(typescript@6.0.3))
       pinia:
         specifier: ^3.0.4
         version: 3.0.4(typescript@6.0.3)(vue@3.5.34(typescript@6.0.3))
@@ -3144,6 +3147,9 @@ packages:
     peerDependencies:
       vue: ^3.5.34
 
+  '@interactjs/types@1.10.27':
+    resolution: {integrity: sha512-BUdv0cvs4H5ODuwft2Xp4eL8Vmi3LcihK42z0Ft/FbVJZoRioBsxH+LlsBdK4tAie7PqlKGy+1oyOncu1nQ6eA==}
+
   '@internationalized/date@3.12.1':
     resolution: {integrity: sha512-6IedsVWXyq4P9Tj+TxuU8WGWM70hYLl12nbYU8jkikVpa6WXapFazPUcHUMDMoWftIDE2ILDkFFte6W2nFCkRQ==}
 
@@ -3294,6 +3300,9 @@ packages:
 
   '@jspm/import-map@1.5.0':
     resolution: {integrity: sha512-wvjrSEB2MCrpicc/tA0mYEsQ1Jgusnz+4ALwbp5IqGFcnxcTamU/VaVbodmEXFFg4GaPmC2LupUl7Bks6nWOhg==}
+
+  '@juggle/resize-observer@3.4.0':
+    resolution: {integrity: sha512-dfLbk+PwWvFzSxwk3n5ySL0hfBog779o8h68wK/7/APo/7cgyWp5jcXockbxdk5kFRkbeXWm4Fbi9FrdN381sA==}
 
   '@keyv/bigmap@1.3.1':
     resolution: {integrity: sha512-WbzE9sdmQtKy8vrNPa9BRnwZh5UF4s1KTmSK0KUVLo3eff5BlQNNWDnFOouNpKfPKDnms9xynJjsMYjMaT/aFQ==}
@@ -4996,6 +5005,14 @@ packages:
     resolution: {integrity: sha512-IWTDeIoWhQ7ZtRO/JRKH+jhmeQvZYhtGPmzw/QGDY+wDCQqfm25P9yIdoAFagu4fWsK4IwZXDFIjrmp5rRm/sA==}
     engines: {node: '>=20'}
     hasBin: true
+
+  '@vexip-ui/hooks@2.9.4':
+    resolution: {integrity: sha512-dGUiBAeHIsnSVigGSPHcuHBVqrSGW8LV+zGohvOpBfXs8Ynn5ZcSmybIWJ3G826NsicPu9rqwcJG8uvSgG4k4Q==}
+    peerDependencies:
+      vue: ^3.5.34
+
+  '@vexip-ui/utils@2.16.4':
+    resolution: {integrity: sha512-KX+Q4EsuwDp6ZlRJ7OAkiYxu52D5CVM8zpqQz/FXYV+JUtzl9T3dvxgtA8gQ0wm5Sh/xT6jp8Wo4X7tLAzRh/A==}
 
   '@vitejs/plugin-vue-jsx@5.1.5':
     resolution: {integrity: sha512-jIAsvHOEtWpslLOI2MeElGFxH7M8pM83BU/Tor4RLyiwH0FM4nUW3xdvbw20EeU9wc5IspQwMq225K3CMnJEpA==}
@@ -6795,6 +6812,11 @@ packages:
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
 
+  grid-layout-plus@1.1.1:
+    resolution: {integrity: sha512-7CWehJubrVC8Ps5QFUlnDsp0kiREvKfi3Pdjp21EyY8BNzSusqI3Utcxvu1Y9UUKe3YExvbhJzIxHK6rorbRaQ==}
+    peerDependencies:
+      vue: ^3.5.34
+
   gzip-size@7.0.0:
     resolution: {integrity: sha512-O1Ld7Dr+nqPnmGpdhzLmMTQ4vAsD+rHwMm1NLUmoUFFymBOMKxCCrtDxqdBRYXdeEPEi3SyoR4TizJLQrnKBNA==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
@@ -6951,6 +6973,9 @@ packages:
   ini@6.0.0:
     resolution: {integrity: sha512-IBTdIkzZNOpqm7q3dRqJvMaldXjDHWkEDfrwGEQTs5eaQMWV+djAhR+wahyNNMAa+qpbDUhBMVt4ZKNwpPm7xQ==}
     engines: {node: ^20.17.0 || >=22.9.0}
+
+  interactjs@1.10.27:
+    resolution: {integrity: sha512-y/8RcCftGAF24gSp76X2JS3XpHiUvDQyhF8i7ujemBz77hwiHDuJzftHx7thY8cxGogwGiPJ+o97kWB6eAXnsA==}
 
   internal-slot@1.1.0:
     resolution: {integrity: sha512-4gd7VpWNQNB4UKKCFFVcp1AVv+FMOgs9NKzjHKusc8jTMhd5eL1NqQqOpE0KzMds804/yHlglp3uxgluOqAPLw==}
@@ -11561,6 +11586,8 @@ snapshots:
       '@iconify/types': 2.0.0
       vue: 3.5.34(typescript@6.0.3)
 
+  '@interactjs/types@1.10.27': {}
+
   '@internationalized/date@3.12.1':
     dependencies:
       '@swc/helpers': 0.5.21
@@ -11796,6 +11823,8 @@ snapshots:
       - supports-color
 
   '@jspm/import-map@1.5.0': {}
+
+  '@juggle/resize-observer@3.4.0': {}
 
   '@keyv/bigmap@1.3.1(keyv@5.6.0)':
     dependencies:
@@ -13118,6 +13147,15 @@ snapshots:
       - encoding
       - rollup
       - supports-color
+
+  '@vexip-ui/hooks@2.9.4(vue@3.5.34(typescript@6.0.3))':
+    dependencies:
+      '@floating-ui/dom': 1.7.6
+      '@juggle/resize-observer': 3.4.0
+      '@vexip-ui/utils': 2.16.4
+      vue: 3.5.34(typescript@6.0.3)
+
+  '@vexip-ui/utils@2.16.4': {}
 
   '@vitejs/plugin-vue-jsx@5.1.5(vite@8.0.10(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.48.0)(yaml@2.9.0))(vue@3.5.34(typescript@6.0.3))':
     dependencies:
@@ -15155,6 +15193,13 @@ snapshots:
 
   graceful-fs@4.2.11: {}
 
+  grid-layout-plus@1.1.1(vue@3.5.34(typescript@6.0.3)):
+    dependencies:
+      '@vexip-ui/hooks': 2.9.4(vue@3.5.34(typescript@6.0.3))
+      '@vexip-ui/utils': 2.16.4
+      interactjs: 1.10.27
+      vue: 3.5.34(typescript@6.0.3)
+
   gzip-size@7.0.0:
     dependencies:
       duplexer: 0.1.2
@@ -15311,6 +15356,10 @@ snapshots:
   ini@4.1.1: {}
 
   ini@6.0.0: {}
+
+  interactjs@1.10.27:
+    dependencies:
+      '@interactjs/types': 1.10.27
 
   internal-slot@1.1.0:
     dependencies:

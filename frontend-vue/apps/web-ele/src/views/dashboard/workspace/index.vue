@@ -17,7 +17,6 @@ import {
   ElCard,
   ElDialog,
   ElEmpty,
-  ElMessage,
   ElOption,
   ElSelect,
   ElTable,
@@ -27,12 +26,9 @@ import {
 
 import { listIndexQuotes } from '#/api/index-market';
 import {
-  getStockMarketSyncStatus,
   listStockIntradayTrends,
   listStockKlines,
   listStockQuotes,
-  syncStockMarketData,
-  syncStockTrendData,
 } from '#/api/stock';
 
 type KlineAdjustType = 'hfq' | 'none' | 'qfq';
@@ -72,7 +68,6 @@ const quotePanelRef = ref<InstanceType<typeof ElCard>>();
 const indexQuotes = ref<IndexQuote[]>([]);
 const loadingIndexQuotes = ref(false);
 const loadingQuotes = ref(false);
-const loadingSync = ref(false);
 const loadingTrends = ref(false);
 const marketCode = ref('');
 const quotes = ref<StockQuote[]>([]);
@@ -168,11 +163,6 @@ const trendStatusText = computed(() => {
   }
   return `分时截至 ${formatDateTime(latestTrend.value.trendTime)} · 同步于 ${formatDateTime(latestTrend.value.syncedAt)}`;
 });
-
-const delay = (ms: number) =>
-  new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 
 let detailColumnResizeObserver: ResizeObserver | undefined;
 
@@ -316,52 +306,6 @@ async function refreshKlines() {
   } finally {
     loadingTrends.value = false;
   }
-}
-
-async function manualSyncStocks() {
-  if (loadingSync.value) return;
-  loadingSync.value = true;
-  try {
-    const status = await syncStockMarketData();
-    ElMessage.info(
-      status.started ? '股票行情快照同步已开始' : '股票行情快照同步正在执行',
-    );
-    const completed = await waitStockSyncCompleted();
-    if (completed) {
-      await refreshQuotes();
-      ElMessage.success('股票行情快照同步完成，数据已刷新');
-      if (selectedStockCode.value) {
-        await syncStockTrendForSelected();
-      }
-    } else {
-      ElMessage.warning('同步仍在后台执行，可稍后刷新查看');
-    }
-  } finally {
-    loadingSync.value = false;
-  }
-}
-
-async function syncStockTrendForSelected() {
-  const code = selectedStockCode.value;
-  if (!code) return;
-  try {
-    await syncStockTrendData(code);
-    await refreshTrendData();
-    ElMessage.success(`${code} 分时数据同步完成`);
-  } catch {
-    ElMessage.warning(`${code} 分时数据同步失败，可稍后重试`);
-  }
-}
-
-async function waitStockSyncCompleted() {
-  for (let i = 0; i < 120; i += 1) {
-    await delay(3000);
-    const status = await getStockMarketSyncStatus();
-    if (!status.running) {
-      return true;
-    }
-  }
-  return false;
 }
 
 function selectQuote(row: StockQuote) {
@@ -815,13 +759,6 @@ function toNumber(value?: null | number | string) {
                     :value="item.value"
                   />
                 </ElSelect>
-                <ElButton
-                  :loading="loadingSync"
-                  size="small"
-                  @click="manualSyncStocks"
-                >
-                  手动同步
-                </ElButton>
                 <ElButton size="small" type="primary" @click="refreshQuotes">
                   刷新
                 </ElButton>
