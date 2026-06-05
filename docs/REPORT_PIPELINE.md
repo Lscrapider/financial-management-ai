@@ -1095,6 +1095,21 @@ stop_loss_plan
 
 ### 5.1 数据查询范围
 
+创建报告任务时，前端提交 `POST /api/ai/scene-analysis/tasks`，当前请求体字段如下：
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `targetType` | 是 | 标的类型：`STOCK`、`INDEX`、`CONVERTIBLE_BOND` |
+| `targetCode` | 是 | 标的代码 |
+| `targetName` | 否 | 标的名称，前端可不传；后端会优先使用传入名称，缺省时尝试从行情或配置数据补充 |
+| `reportType` | 否 | 报告类型：`quick_analysis`、`risk_check`、`valuation_report`，默认 `quick_analysis` |
+| `totalChunks` | 是 | 本次报告期望召回的知识库 chunk 数，必须大于 0 |
+| `dailyKlineLimit` | 否 | 日 K 查询数量。股票默认 90，最小 60，最大 250；指数和可转债当前固定查询 250 条日 K |
+| `weeklyKlineLimit` | 否 | 周 K 查询数量。股票默认 52，最小 1，最大 250；指数和可转债当前不查询周 K |
+| `monthlyKlineLimit` | 否 | 月 K 查询数量。股票默认 60，最小 1，最大 250；指数和可转债当前不查询月 K |
+| `configProfile` | 否 | 配置档 code，默认 `system_recommended` |
+| `userOverrides` | 否 | 用户覆盖参数，后端会和当前标的类型默认配置合并 |
+
 用户选择标的后，系统先查询数据。
 
 根据资产类型不同，查询内容不同。
