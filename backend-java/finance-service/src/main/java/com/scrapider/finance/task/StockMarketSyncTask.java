@@ -16,6 +16,7 @@ import com.scrapider.finance.manage.StockConfigManage;
 import com.scrapider.finance.manage.StockKlineManage;
 import com.scrapider.finance.manage.StockIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
+import com.scrapider.finance.service.MarketTradingCalendarService;
 import com.scrapider.finance.service.StockAlertService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -58,6 +59,7 @@ public class StockMarketSyncTask {
     private final StockKlineManage stockKlineManage;
     private final StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage;
     private final StockAlertService stockAlertService;
+    private final MarketTradingCalendarService marketTradingCalendarService;
     private final AtomicBoolean syncing = new AtomicBoolean(false);
     private final ExecutorService manualSyncExecutor = Executors.newSingleThreadExecutor();
 
@@ -103,12 +105,14 @@ public class StockMarketSyncTask {
             StockQuoteSnapshotManage stockQuoteSnapshotManage,
             StockKlineManage stockKlineManage,
             StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage,
+            MarketTradingCalendarService marketTradingCalendarService,
             StockAlertService stockAlertService) {
         this.stockMarketApi = stockMarketApi;
         this.stockConfigManage = stockConfigManage;
         this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
         this.stockKlineManage = stockKlineManage;
         this.stockIntradayTrendInfluxManage = stockIntradayTrendInfluxManage;
+        this.marketTradingCalendarService = marketTradingCalendarService;
         this.stockAlertService = stockAlertService;
     }
 
@@ -118,6 +122,10 @@ public class StockMarketSyncTask {
     public void syncStockMarketData() {
         if (!this.enabled) {
             log.debug("Stock market sync task is disabled.");
+            return;
+        }
+        if (!this.marketTradingCalendarService.isTradingDay(ZoneId.of(this.timezone))) {
+            log.debug("Stock market sync task is outside trading day.");
             return;
         }
         if (!this.isInSyncWindow()) {

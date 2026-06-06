@@ -16,6 +16,7 @@ import com.scrapider.finance.manage.IndexConfigManage;
 import com.scrapider.finance.manage.IndexIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.IndexKlineManage;
 import com.scrapider.finance.manage.IndexQuoteSnapshotManage;
+import com.scrapider.finance.service.MarketTradingCalendarService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -55,6 +56,7 @@ public class IndexMarketSyncTask {
     private final IndexQuoteSnapshotManage indexQuoteSnapshotManage;
     private final IndexKlineManage indexKlineManage;
     private final IndexIntradayTrendInfluxManage indexIntradayTrendInfluxManage;
+    private final MarketTradingCalendarService marketTradingCalendarService;
     private final AtomicBoolean syncing = new AtomicBoolean(false);
     private final ExecutorService manualSyncExecutor = Executors.newSingleThreadExecutor();
 
@@ -99,12 +101,14 @@ public class IndexMarketSyncTask {
             IndexConfigManage indexConfigManage,
             IndexQuoteSnapshotManage indexQuoteSnapshotManage,
             IndexKlineManage indexKlineManage,
-            IndexIntradayTrendInfluxManage indexIntradayTrendInfluxManage) {
+            IndexIntradayTrendInfluxManage indexIntradayTrendInfluxManage,
+            MarketTradingCalendarService marketTradingCalendarService) {
         this.stockMarketApi = stockMarketApi;
         this.indexConfigManage = indexConfigManage;
         this.indexQuoteSnapshotManage = indexQuoteSnapshotManage;
         this.indexKlineManage = indexKlineManage;
         this.indexIntradayTrendInfluxManage = indexIntradayTrendInfluxManage;
+        this.marketTradingCalendarService = marketTradingCalendarService;
     }
 
     @Scheduled(
@@ -113,6 +117,10 @@ public class IndexMarketSyncTask {
     public void syncIndexMarketData() {
         if (!this.enabled) {
             log.debug("Index market sync task is disabled.");
+            return;
+        }
+        if (!this.marketTradingCalendarService.isTradingDay(ZoneId.of(this.timezone))) {
+            log.debug("Index market sync task is outside trading day.");
             return;
         }
         if (!this.isInSyncWindow()) {

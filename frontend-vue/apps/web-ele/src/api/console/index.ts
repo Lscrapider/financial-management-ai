@@ -30,7 +30,7 @@ export function getAiConsoleOverview(days = 7) {
   });
 }
 
-export function listAiTokenUsageTrends(days = 7) {
+export function listAiTokenUsageTrends(days = 20) {
   return requestClient.get<AiTokenUsageTrend[]>('/ai/token-usage/trends', {
     params: { days },
     responseReturn: 'body',

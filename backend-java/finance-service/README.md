@@ -170,6 +170,7 @@ role: admin
 | `STOCK_SYNC_REQUEST_INTERVAL_MS` | `1500` | 股票接口请求间隔。 |
 | `STOCK_SYNC_START_TIME` | `09:29` | 股票同步窗口开始。 |
 | `STOCK_SYNC_END_TIME` | `16:00` | 股票同步窗口结束。 |
+| `MARKET_TRADING_CLOSED_DATES` | 2026 年沪深交易所公告休市日 | 自动同步闭市日期，逗号分隔，格式 `yyyy-MM-dd`；周六、周日会自动跳过。 |
 | `INDEX_SYNC_ENABLED` | `true` | 是否启用指数同步。 |
 | `INDEX_DAILY_KLINE_SYNC_ENABLED` | `true` | 是否同步指数日 K。 |
 | `INDEX_DAILY_KLINE_LIMIT` | `250` | 指数日 K 同步条数。 |

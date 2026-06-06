@@ -16,6 +16,7 @@ import com.scrapider.finance.manage.BondConfigManage;
 import com.scrapider.finance.manage.BondIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.BondKlineManage;
 import com.scrapider.finance.manage.BondQuoteSnapshotManage;
+import com.scrapider.finance.service.MarketTradingCalendarService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -55,6 +56,7 @@ public class BondMarketSyncTask {
     private final BondQuoteSnapshotManage bondQuoteSnapshotManage;
     private final BondKlineManage bondKlineManage;
     private final BondIntradayTrendInfluxManage bondIntradayTrendInfluxManage;
+    private final MarketTradingCalendarService marketTradingCalendarService;
     private final AtomicBoolean syncing = new AtomicBoolean(false);
     private final ExecutorService manualSyncExecutor = Executors.newSingleThreadExecutor();
 
@@ -99,12 +101,14 @@ public class BondMarketSyncTask {
             BondConfigManage bondConfigManage,
             BondQuoteSnapshotManage bondQuoteSnapshotManage,
             BondKlineManage bondKlineManage,
-            BondIntradayTrendInfluxManage bondIntradayTrendInfluxManage) {
+            BondIntradayTrendInfluxManage bondIntradayTrendInfluxManage,
+            MarketTradingCalendarService marketTradingCalendarService) {
         this.stockMarketApi = stockMarketApi;
         this.bondConfigManage = bondConfigManage;
         this.bondQuoteSnapshotManage = bondQuoteSnapshotManage;
         this.bondKlineManage = bondKlineManage;
         this.bondIntradayTrendInfluxManage = bondIntradayTrendInfluxManage;
+        this.marketTradingCalendarService = marketTradingCalendarService;
     }
 
     @Scheduled(
@@ -113,6 +117,10 @@ public class BondMarketSyncTask {
     public void syncBondMarketData() {
         if (!this.enabled) {
             log.debug("Bond market sync task is disabled.");
+            return;
+        }
+        if (!this.marketTradingCalendarService.isTradingDay(ZoneId.of(this.timezone))) {
+            log.debug("Bond market sync task is outside trading day.");
             return;
         }
         if (!this.isInSyncWindow()) {

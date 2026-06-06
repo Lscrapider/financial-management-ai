@@ -48,8 +48,8 @@ onMounted(() => {
 
 async function loadConsoleMetrics() {
   const [overviewResult, trendResult] = await Promise.all([
-    getAiConsoleOverview(7),
-    listAiTokenUsageTrends(7),
+    getAiConsoleOverview(30),
+    listAiTokenUsageTrends(30),
   ]);
   overview.value = overviewResult;
   tokenTrends.value = trendResult;
