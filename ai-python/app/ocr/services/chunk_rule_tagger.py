@@ -3,7 +3,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from app.ocr.services.chunk_tag_schema import SCENE_CATEGORIES
+from app.ocr.services.chunk_tag_schema import SCENE_CATEGORIES, asset_scopes_from_tags, tag_matches_asset_scope
 
 NEGATION_WORDS = ("不是", "不能", "不要", "别", "不宜", "避免", "无法", "没有", "未能", "并非")
 
@@ -105,9 +105,27 @@ class ChunkRuleTagger:
             if score <= 0:
                 continue
             result[rule.category][rule.tag] = score
+        result = self._filter_asset_applicable_tags(result)
         return {
             category: dict(sorted(tags.items(), key=lambda item: item[1], reverse=True))
             for category, tags in result.items()
+        }
+
+    def _filter_asset_applicable_tags(
+        self,
+        scenes: dict[str, dict[str, float]],
+    ) -> dict[str, dict[str, float]]:
+        asset_tags = set(scenes.get("asset", {}))
+        asset_scopes = asset_scopes_from_tags(asset_tags)
+        if not asset_scopes:
+            return scenes
+        return {
+            category: {
+                tag: score
+                for tag, score in tags.items()
+                if tag_matches_asset_scope(category, tag, asset_scopes)
+            }
+            for category, tags in scenes.items()
         }
 
     def _score_rule(self, text: str, rule: TagRule) -> float:
@@ -202,12 +220,14 @@ class ChunkRuleTagger:
             *self._build_valuation_rules(),
             *self._build_sentiment_rules(),
             *self._build_risk_strategy_rules(),
+            *self._build_convertible_bond_rules(),
+            *self._build_fund_rules(),
         )
 
     def _build_asset_rules(self) -> tuple[TagRule, ...]:
         return (
             self._tag("asset", "general", phrases=(("通用投资经验", 0.80), ("投资纪律", 0.78), ("交易纪律", 0.78))),
-            self._tag("asset", "stock", phrases=(("个股走势", 0.86), ("低价股", 0.86), ("买股", 0.82), ("卖股", 0.82), ("这只票", 0.78), ("这只股", 0.78), ("持有股票", 0.78), ("股权投资", 0.84), ("做股票", 0.84), ("一只股票", 0.82), ("某个股", 0.80)), keywords=("股票", "个股", "股价", "正股", "持股")),
+            self._tag("asset", "stock", phrases=(("个股走势", 0.86), ("低价股", 0.86), ("买股", 0.82), ("卖股", 0.82), ("这只票", 0.78), ("这只股", 0.78), ("持有股票", 0.78), ("股权投资", 0.84), ("做股票", 0.84), ("一只股票", 0.82), ("某个股", 0.80)), keywords=("股票", "个股", "股价", "持股")),
             self._tag("asset", "index", phrases=(("板块指数", 0.88),), keywords=("指数", "大盘", "上证", "深成指", "创业板", "科创板")),
             self._tag(
                 "asset",
@@ -216,6 +236,13 @@ class ChunkRuleTagger:
                 keywords=("可转债", "转债", "转辨", "溢价率", "强赎"),
             ),
             self._tag("asset", "fund", phrases=(("基金定投", 0.90), ("基金配置", 0.88), ("场内基金", 0.86), ("投资基金", 0.86), ("证券投资基金", 0.86), ("基金持仓", 0.82), ("基金中报", 0.80), ("基金年报", 0.80), ("互助基金", 0.78)), keywords=("基金", "ETF")),
+            self._tag("asset", "etf", phrases=(("交易型开放式指数基金", 0.90), ("场内 ETF", 0.88), ("ETF 买卖", 0.84)), keywords=("ETF",)),
+            self._tag("asset", "lof", phrases=(("上市开放式基金", 0.90), ("场内外套利", 0.84)), keywords=("LOF",)),
+            self._tag("asset", "index_fund", phrases=(("指数基金", 0.88), ("被动跟踪", 0.84), ("指数增强", 0.82), ("跟踪指数", 0.82))),
+            self._tag("asset", "active_fund", phrases=(("主动管理基金", 0.88), ("主动权益基金", 0.86), ("基金经理选股", 0.84))),
+            self._tag("asset", "bond_fund", phrases=(("债券基金", 0.90), ("纯债基金", 0.88), ("一级债基", 0.84), ("二级债基", 0.84)), keywords=("债基",)),
+            self._tag("asset", "money_fund", phrases=(("货币基金", 0.90), ("现金管理", 0.82), ("七日年化", 0.82), ("万份收益", 0.82))),
+            self._tag("asset", "qdii_fund", phrases=(("海外基金", 0.84), ("海外市场", 0.80), ("额度限制", 0.78)), keywords=("QDII",)),
             self._tag("asset", "bank_stock", phrases=(("银行股", 0.90), ("银行板块", 0.88), ("低 PB 银行", 0.88)), keywords=("息差", "分红")),
             self._tag("asset", "low_price_stock", phrases=(("低价股", 0.88), ("几元股", 0.86), ("低价小票", 0.86), ("低价补涨", 0.84), ("便宜小票", 0.80), ("低位小票", 0.80), ("几块钱的股", 0.80))),
             self._tag("asset", "large_cap_stock", phrases=(("大盘股", 0.88), ("机构重仓", 0.84), ("中大盘股", 0.84)), keywords=("大市值", "权重股", "蓝筹", "中盘股")),
@@ -304,6 +331,53 @@ class ChunkRuleTagger:
             self._tag("risk_strategy", "avoid_emotional_trade", phrases=(("不要冲动", 0.84), ("不要被情绪影响", 0.84), ("不要因为涨跌而乱操作", 0.84), ("避免情绪交易", 0.82), ("别被盘面带着走", 0.82), ("不要上头", 0.82), ("不要一激动就买", 0.82), ("冷静一点", 0.78), ("反人性", 0.86), ("多忍耐", 0.82), ("越想操作越要控制", 0.86), ("不甘心左右", 0.84), ("搏取运气", 0.82), ("靠运气", 0.80), ("高位不能贪", 0.82), ("高位绝不能贪", 0.84)), negation_sensitive=False),
             self._tag("risk_strategy", "take_profit_plan", phrases=(("涨到目标后减仓", 0.84), ("分批卖出", 0.82), ("落袋为安", 0.80), ("涨多了先卖一部分", 0.82), ("先止盈一部分", 0.82), ("有利润先保住", 0.80), ("定价卖出", 0.82), ("卖出点位", 0.80), ("卖出一半", 0.80), ("高抛", 0.80), ("利润点", 0.76)), keywords=("止盈", "减仓", "卖出")),
             self._tag("risk_strategy", "stop_loss_plan", numeric=((r"止损\s*([0-9]+(?:\.[0-9]+)?)\s*%", lambda value: 0.5 + value / 30),), phrases=(("跌破条件止损", 0.84), ("亏损控制", 0.82), ("设置退出条件", 0.80), ("跌破就走", 0.82), ("不对就退出", 0.80), ("亏了要及时处理", 0.80), ("到止损位就卖", 0.82), ("回落卖出", 0.80), ("反向智能", 0.80), ("条件触发卖出", 0.80)), keywords=("止损", "割肉", "退出条件")),
+        )
+
+    def _build_convertible_bond_rules(self) -> tuple[TagRule, ...]:
+        return (
+            self._tag("price", "convertible_high_price_risk", numeric=((r"转债价格\s*([0-9]+(?:\.[0-9]+)?)", lambda value: 0.85 if value >= 130 else 0),), phrases=(("高价转债", 0.88), ("高价债", 0.84), ("130 元以上", 0.82), ("转债价格较高", 0.82), ("高价转债波动", 0.82))),
+            self._tag("price", "convertible_low_price_defensive", phrases=(("低价转债", 0.88), ("低价债", 0.84), ("接近债底", 0.84), ("下行空间相对有限", 0.82), ("防御性", 0.76))),
+            self._tag("valuation", "convertible_low_premium", numeric=((r"溢价率\s*([0-9]+(?:\.[0-9]+)?)\s*%", lambda value: 0.85 if value <= 15 else 0),), phrases=(("低溢价", 0.88), ("转股低溢价", 0.88), ("溢价率较低", 0.84), ("股性较强", 0.80))),
+            self._tag("valuation", "convertible_high_premium", numeric=((r"溢价率\s*([0-9]+(?:\.[0-9]+)?)\s*%", lambda value: 0.85 if value >= 40 else 0),), phrases=(("高溢价", 0.88), ("转股高溢价", 0.88), ("溢价率较高", 0.84), ("估值偏贵", 0.82), ("正股上涨难以覆盖溢价", 0.84))),
+            self._tag("valuation", "convertible_premium_compression", phrases=(("溢价压缩", 0.88), ("溢价率下降", 0.84), ("估值压缩", 0.82), ("高溢价回落", 0.82), ("债价跟不上正股", 0.80))),
+            self._tag("valuation", "convertible_premium_expansion", phrases=(("溢价扩张", 0.88), ("溢价率上升", 0.84), ("推高转债估值", 0.82), ("脱离正股上涨", 0.80))),
+            self._tag("valuation", "convertible_debt_floor_support", phrases=(("债底支撑", 0.90), ("纯债价值", 0.88), ("债底", 0.84), ("到期价值提供支撑", 0.82), ("下修支撑", 0.80))),
+            self._tag("valuation", "convertible_high_ytm", phrases=(("到期收益率较高", 0.88), ("持有到期收益", 0.84), ("债性价值更突出", 0.82), ("YTM 较高", 0.82))),
+            self._tag("valuation", "convertible_low_ytm", phrases=(("到期收益率低", 0.86), ("负收益率", 0.86), ("YTM 较低", 0.82), ("透支债性收益", 0.82))),
+            self._tag("valuation", "convertible_high_conversion_value", phrases=(("转股价值较高", 0.88), ("转股价值高", 0.86), ("接近平价", 0.82), ("超过面值", 0.80), ("转股价值支撑", 0.82))),
+            self._tag("sentiment", "convertible_stock_linkage", phrases=(("正股联动", 0.90), ("正股驱动转债", 0.88), ("正股拉转债", 0.86), ("转债与正股同涨同跌", 0.86), ("股性增强", 0.82))),
+            self._tag("sentiment", "convertible_independent_strength", phrases=(("转债独立走强", 0.90), ("脱离正股独立上涨", 0.88), ("资金炒作转债", 0.84), ("转债独立上涨", 0.84))),
+            self._tag("risk_strategy", "convertible_forced_redeem_risk", phrases=(("强赎风险", 0.92), ("强赎公告", 0.90), ("满足强赎条件", 0.88), ("赎回触发进度", 0.86), ("接近强赎", 0.86), ("强制赎回", 0.88))),
+            self._tag("risk_strategy", "convertible_putback_risk", phrases=(("回售风险", 0.88), ("回售条款", 0.86), ("回售触发", 0.86), ("回售失败", 0.84))),
+            self._tag("risk_strategy", "convertible_low_rating_risk", phrases=(("评级偏低", 0.86), ("低评级转债", 0.88), ("主体资质弱", 0.84), ("信用下修风险", 0.84), ("信用风险", 0.80))),
+            self._tag("risk_strategy", "convertible_small_balance_risk", phrases=(("剩余规模小", 0.88), ("剩余规模过小", 0.90), ("小规模转债", 0.84), ("容易被炒作", 0.80), ("波动放大", 0.78))),
+            self._tag("risk_strategy", "convertible_liquidity_risk", phrases=(("转债成交清淡", 0.88), ("转债流动性风险", 0.88), ("买卖价差", 0.82), ("转债退出困难", 0.84))),
+        )
+
+    def _build_fund_rules(self) -> tuple[TagRule, ...]:
+        return (
+            self._tag("price", "fund_nav_rise", phrases=(("基金净值上涨", 0.86), ("净值修复", 0.84), ("组合收益回升", 0.82))),
+            self._tag("price", "fund_nav_drop", phrases=(("基金净值下跌", 0.86), ("净值回撤", 0.84), ("组合收益走弱", 0.82))),
+            self._tag("volume", "fund_share_growth", phrases=(("基金份额增长", 0.88), ("申购增加", 0.84), ("份额持续流入", 0.84), ("规模持续流入", 0.82))),
+            self._tag("volume", "fund_share_shrink", phrases=(("基金份额下降", 0.88), ("赎回压力", 0.84), ("份额持续流出", 0.84), ("规模持续流出", 0.82))),
+            self._tag("trend", "fund_nav_uptrend", phrases=(("基金净值趋势向上", 0.88), ("基金曲线持续修复", 0.86), ("净值创新高", 0.82))),
+            self._tag("trend", "fund_nav_downtrend", phrases=(("基金净值趋势向下", 0.88), ("净值持续回撤", 0.86), ("基金曲线走弱", 0.84))),
+            self._tag("valuation", "fund_premium", phrases=(("基金场内溢价", 0.90), ("场内溢价", 0.86), ("ETF 溢价", 0.88), ("LOF 溢价", 0.88), ("溢价交易", 0.84))),
+            self._tag("valuation", "fund_discount", phrases=(("基金场内折价", 0.90), ("场内折价", 0.86), ("ETF 折价", 0.88), ("LOF 折价", 0.88), ("折价套利", 0.84))),
+            self._tag("valuation", "fund_high_fee", phrases=(("费率偏高", 0.86), ("管理费较高", 0.84), ("托管费较高", 0.82), ("申赎费较高", 0.82), ("费率侵蚀收益", 0.84))),
+            self._tag("valuation", "fund_large_scale", phrases=(("基金规模大", 0.82), ("规模较大", 0.80), ("流动性好", 0.76), ("跟踪稳定", 0.76))),
+            self._tag("valuation", "fund_small_scale", phrases=(("基金规模小", 0.84), ("规模较小", 0.82), ("清盘风险", 0.86), ("成交不足", 0.80))),
+            self._tag("valuation", "fund_tracking_error", phrases=(("跟踪误差", 0.90), ("跑输基准", 0.86), ("复制偏差", 0.84), ("跟踪偏离", 0.84))),
+            self._tag("valuation", "fund_high_drawdown", phrases=(("基金最大回撤大", 0.88), ("最大回撤大", 0.84), ("净值波动大", 0.82), ("持有体验差", 0.80))),
+            self._tag("valuation", "fund_stable_nav", phrases=(("净值稳定", 0.84), ("波动较小", 0.80), ("货基净值稳定", 0.84), ("低波基金", 0.80))),
+            self._tag("sentiment", "fund_flow_in", phrases=(("ETF 资金流入", 0.88), ("基金申购增加", 0.86), ("份额上升", 0.82), ("基金净流入", 0.84))),
+            self._tag("sentiment", "fund_flow_out", phrases=(("ETF 资金流出", 0.88), ("基金赎回", 0.84), ("份额下降", 0.82), ("基金净流出", 0.84))),
+            self._tag("risk_strategy", "fund_tracking_deviation_risk", phrases=(("跟踪偏离风险", 0.88), ("基金跟踪偏离", 0.86), ("跟踪误差风险", 0.86), ("跑输基准", 0.80))),
+            self._tag("risk_strategy", "fund_concentration_risk", phrases=(("持仓集中风险", 0.88), ("重仓单一行业", 0.86), ("前十大持仓集中", 0.84), ("单一风格暴露", 0.82))),
+            self._tag("risk_strategy", "fund_credit_risk", phrases=(("债基信用风险", 0.90), ("信用债违约", 0.86), ("低评级债暴露", 0.86), ("信用债占比", 0.80))),
+            self._tag("risk_strategy", "fund_duration_risk", phrases=(("债基久期风险", 0.90), ("长久期债基", 0.86), ("利率上行导致净值波动", 0.86), ("久期风险", 0.84))),
+            self._tag("risk_strategy", "fund_qdii_fx_risk", phrases=(("QDII 汇率风险", 0.90), ("汇率波动", 0.84), ("海外市场和汇率", 0.84), ("海外资产敞口", 0.82))),
+            self._tag("risk_strategy", "fund_liquidity_risk", phrases=(("基金流动性风险", 0.88), ("ETF 成交不足", 0.86), ("限购限赎", 0.84), ("巨额赎回", 0.84), ("基金清盘", 0.84))),
         )
 
     def _tag(

@@ -1,6 +1,12 @@
 from typing import Any
 
-from app.ocr.services.chunk_tag_schema import SCENE_CATEGORIES, VALID_TAGS, empty_scenes
+from app.ocr.services.chunk_tag_schema import (
+    SCENE_CATEGORIES,
+    VALID_TAGS,
+    asset_scopes_from_tags,
+    empty_scenes,
+    tag_matches_asset_scope,
+)
 
 
 class ChunkTagCorrector:
@@ -18,6 +24,7 @@ class ChunkTagCorrector:
         rule_scores = rule_tagging.get("ruleScenesWithConfidence") or {}
         if isinstance(rule_scores, dict):
             self._append_high_confidence_rule_tags(final_scenes, rule_scores, threshold)
+        self._filter_asset_applicable_tags(final_scenes)
         deleted = self._is_empty_scenes(final_scenes)
 
         return {
@@ -68,6 +75,17 @@ class ChunkTagCorrector:
             return
         if tag not in final_scenes[category]:
             final_scenes[category].append(tag)
+
+    def _filter_asset_applicable_tags(self, scenes: dict[str, list[str]]) -> None:
+        asset_scopes = asset_scopes_from_tags(set(scenes.get("asset") or []))
+        if not asset_scopes:
+            return
+        for category in SCENE_CATEGORIES:
+            scenes[category] = [
+                tag
+                for tag in scenes.get(category, [])
+                if tag_matches_asset_scope(category, tag, asset_scopes)
+            ]
 
     def _confidence_threshold(self, rule_tagging: dict) -> float:
         quality_gate = rule_tagging.get("qualityGate") if isinstance(rule_tagging, dict) else None
