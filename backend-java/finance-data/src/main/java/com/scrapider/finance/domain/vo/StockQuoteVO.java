@@ -24,11 +24,32 @@ public class StockQuoteVO {
             Map.entry(6, "成交量"),
             Map.entry(7, "外盘"),
             Map.entry(8, "内盘"),
+            Map.entry(9, "买一价"),
+            Map.entry(10, "买一量"),
+            Map.entry(11, "买二价"),
+            Map.entry(12, "买二量"),
+            Map.entry(13, "买三价"),
+            Map.entry(14, "买三量"),
+            Map.entry(15, "买四价"),
+            Map.entry(16, "买四量"),
+            Map.entry(17, "买五价"),
+            Map.entry(18, "买五量"),
+            Map.entry(19, "卖一价"),
+            Map.entry(20, "卖一量"),
+            Map.entry(21, "卖二价"),
+            Map.entry(22, "卖二量"),
+            Map.entry(23, "卖三价"),
+            Map.entry(24, "卖三量"),
+            Map.entry(25, "卖四价"),
+            Map.entry(26, "卖四量"),
+            Map.entry(27, "卖五价"),
+            Map.entry(28, "卖五量"),
             Map.entry(30, "行情时间"),
             Map.entry(31, "涨跌额"),
             Map.entry(32, "涨跌幅"),
             Map.entry(33, "最高价"),
             Map.entry(34, "最低价"),
+            Map.entry(35, "价格/成交量/成交额"),
             Map.entry(36, "成交量"),
             Map.entry(37, "成交额"),
             Map.entry(38, "换手率"),
@@ -40,13 +61,18 @@ public class StockQuoteVO {
             Map.entry(47, "涨停价"),
             Map.entry(48, "跌停价"),
             Map.entry(49, "量比"),
+            Map.entry(50, "现手"),
             Map.entry(51, "均价"),
+            Map.entry(52, "动态市盈率"),
+            Map.entry(53, "静态市盈率"),
             Map.entry(57, "成交额"),
+            Map.entry(59, "交易状态"),
             Map.entry(61, "类型"),
             Map.entry(82, "币种"));
 
     private static final Set<Integer> DECIMAL_FIELD_INDEXES = Set.of(
-            3, 4, 5, 31, 32, 33, 34, 37, 38, 39, 43, 44, 45, 46, 47, 48, 49, 51);
+            3, 4, 5, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27,
+            31, 32, 33, 34, 37, 38, 39, 43, 44, 45, 46, 47, 48, 49, 51, 52, 53, 57);
 
     private String stockCode;
     private String stockName;

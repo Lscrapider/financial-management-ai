@@ -36,6 +36,7 @@ export interface StockQuote {
   peDynamic?: number | string;
   peStatic?: number | string;
   pbRatio?: number | string;
+  tradeStatus?: number;
   quoteDetails?: StockQuoteDetail[];
   syncedAt?: string;
 }

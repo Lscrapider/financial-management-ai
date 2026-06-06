@@ -270,6 +270,7 @@ public class SceneReportPipelineServiceImpl implements SceneReportPipelineServic
                         (left, right) -> left,
                         LinkedHashMap::new));
         Map<String, List<SceneKnowledgeChunkDTO>> context = new LinkedHashMap<>();
+        Set<Long> selectedChunkIds = new java.util.LinkedHashSet<>();
         for (SceneRetrievalEmbeddingParam task : retrievalEmbeddings) {
             Map<String, Double> currentTags = this.safeTags(task.currentTags());
             // 6.5 queryText -> queryEmbedding：queryEmbedding 由 Python 使用入库同款模型生成后回调。
@@ -303,9 +304,14 @@ public class SceneReportPipelineServiceImpl implements SceneReportPipelineServic
                         JACCARD_THRESHOLD);
             }
             // 6.8 每个 scene 取 TopN：按 6.2 分配到的 chunkCount 截断当前 scene 候选。
-            context.put(task.scene(), ranked.stream()
+            List<SceneKnowledgeChunkDTO> selected = ranked.stream()
+                    .filter(chunk -> chunk.chunkId() != null && !selectedChunkIds.contains(chunk.chunkId()))
                     .limit(task.chunkCount())
-                    .toList());
+                    .toList();
+            selected.stream()
+                    .map(SceneKnowledgeChunkDTO::chunkId)
+                    .forEach(selectedChunkIds::add);
+            context.put(task.scene(), selected);
         }
         return context;
     }

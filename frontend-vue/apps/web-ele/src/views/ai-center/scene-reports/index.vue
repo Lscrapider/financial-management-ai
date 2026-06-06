@@ -221,7 +221,9 @@ watch(
     newReportForm.value.targetCode = '';
     newReportForm.value.targetName = '';
     targetOptions.value = [];
-    void searchReportTargetOptions('');
+    if (createDrawerVisible.value) {
+      void searchReportTargetOptions('');
+    }
   },
 );
 
@@ -287,15 +289,17 @@ function changeTargetPageSize(value: number) {
   void loadTargets();
 }
 
-function openCreateReport() {
+async function openCreateReport() {
   createDrawerVisible.value = true;
+  const previousTargetType = newReportForm.value.targetType;
   if (configProfiles.value.length === 0) {
-    void loadProfiles();
-    return;
+    await loadProfiles();
+  } else {
+    selectProfile(selectedProfileId.value);
   }
-  selectProfile(selectedProfileId.value);
-  applyProfile(selectedProfile.value);
-  void searchReportTargetOptions('');
+  if (newReportForm.value.targetType === previousTargetType) {
+    void searchReportTargetOptions('');
+  }
 }
 
 function changeProfile(profileId: number) {
@@ -335,7 +339,6 @@ function applyProfile(profile?: SceneAnalysisConfigProfile) {
     weeklyKlineLimit: numberValue(config.weeklyKlineLimit, DEFAULT_WEEKLY_KLINE_LIMIT),
   };
   parameterValues.value = parameterValuesFromOverrides(config.userOverrides);
-  void searchReportTargetOptions('');
 }
 
 async function searchReportTargetOptions(keyword: string) {

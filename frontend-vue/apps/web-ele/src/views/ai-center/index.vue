@@ -357,11 +357,11 @@ async function openStage(stageKey: string) {
   await loadStageDetail();
 }
 
-function canOpenReviewDialog(row: ProcessingTask) {
-  return ['finished', 'manual_review_required'].includes(row.status);
+function canOpenRetagDialog(row: ProcessingTask) {
+  return row.status === 'finished';
 }
 
-async function openReviewDialog(row: ProcessingTask) {
+async function openRetagDialog(row: ProcessingTask) {
   reviewTask.value = row;
   reviewDetail.value = undefined;
   reviewDialogVisible.value = true;
@@ -662,12 +662,12 @@ function formatDateTime(value?: string) {
               <template #default="{ row }">
                 <div class="table-actions" @click.stop>
                   <ElButton
-                    v-if="canOpenReviewDialog(row)"
+                    v-if="canOpenRetagDialog(row)"
                     link
                     type="primary"
-                    @click="openReviewDialog(row)"
+                    @click="openRetagDialog(row)"
                   >
-                    {{ row.status === 'finished' ? '重新打标' : '复核' }}
+                    重新打标
                   </ElButton>
                   <ElButton
                     v-if="row.status === 'manual_review_required'"

@@ -37,8 +37,10 @@ public class EastMoneyStockFundamentalProvider implements StockFundamentalProvid
 
     @Override
     public StockIndustryInfoPO getIndustryInfo(StockConfigPO stockConfig) {
-        StockMarketDataDTO response = this.eastMoneyStockApi.getStockInfo(stockConfig.getSecid());
-        return StockIndustryInfoPO.fromEastMoneyStockGetResponse(stockConfig, response.data());
+//        StockMarketDataDTO response = this.eastMoneyStockApi.getStockInfo(stockConfig.getSecid());
+//        return StockIndustryInfoPO.fromEastMoneyStockGetResponse(stockConfig, response.data());
+        // 这个接口不稳定，不使用
+        return null;
     }
 
     @Override
