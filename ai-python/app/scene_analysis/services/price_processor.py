@@ -6,6 +6,7 @@ from app.scene_analysis.context import SceneAnalysisContext
 from app.scene_analysis.models import BaseMetrics, SceneModuleResult
 from app.scene_analysis.services.evidence import build_evidence
 from app.scene_analysis.services.module_scoring import active_tags, clamp, module_level, module_score, number, score_value
+from app.scene_analysis.services.tag_applicability import apply_tag_applicability
 
 
 class PriceProcessor:
@@ -24,8 +25,10 @@ class PriceProcessor:
             "pullback": self._pullback(base_metrics, context.price_config),
             "gap_up": self._gap_up(base_metrics, context.price_config),
             "gap_down": self._gap_down(base_metrics, context.price_config),
+            "convertible_high_price_risk": self._convertible_high_price_risk(context),
+            "convertible_low_price_defensive": self._convertible_low_price_defensive(context),
         }
-        tags = active_tags(tags)
+        tags = apply_tag_applicability(context, active_tags(tags))
         score = module_score(tags)
         return SceneModuleResult(
             module=self.MODULE,
@@ -74,6 +77,24 @@ class PriceProcessor:
             return 0.0
         return clamp((previous_low - open_price) / previous_close / threshold)
 
+    def _convertible_high_price_risk(self, context: SceneAnalysisContext) -> float | None:
+        if not context.is_asset("convertible_bond"):
+            return None
+        bond_price = number(context.base_metrics.get("bond_price") or context.base_metrics.get("latest_price"))
+        threshold = number(context.convertible_bond_config.get("high_price_threshold"))
+        if bond_price is None or threshold is None or threshold <= 0:
+            return None
+        return clamp(bond_price / threshold - 1)
+
+    def _convertible_low_price_defensive(self, context: SceneAnalysisContext) -> float | None:
+        if not context.is_asset("convertible_bond"):
+            return None
+        bond_price = number(context.base_metrics.get("bond_price") or context.base_metrics.get("latest_price"))
+        threshold = number(context.convertible_bond_config.get("low_price_threshold"))
+        if bond_price is None or threshold is None or threshold <= 0:
+            return None
+        return clamp((threshold - bond_price) / threshold)
+
     def _is_uptrend(self, base_metrics: BaseMetrics) -> bool:
         ma5 = number(base_metrics.get("ma5"))
         ma10 = number(base_metrics.get("ma10"))
@@ -104,5 +125,7 @@ class PriceProcessor:
             "pullback": "上升趋势中价格从近期高位回落，pullback 标签触发",
             "gap_up": "开盘价高于前期高点并形成向上跳空，gap_up 标签触发",
             "gap_down": "开盘价低于前期低点并形成向下跳空，gap_down 标签触发",
+            "convertible_high_price_risk": "转债价格高于高价风险阈值，convertible_high_price_risk 标签触发",
+            "convertible_low_price_defensive": "转债价格低于低价防御阈值，convertible_low_price_defensive 标签触发",
         }
         return build_evidence(tags, reasons)

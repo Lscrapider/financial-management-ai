@@ -21,5 +21,6 @@ public record SceneAnalysisMessageDTO(
         List<Map<String, Object>> weeklyKlines,
         List<Map<String, Object>> monthlyKlines,
         List<Map<String, Object>> intradayData,
+        Map<String, Object> assetSpecificData,
         Map<String, Object> dataCompleteness) {
 }

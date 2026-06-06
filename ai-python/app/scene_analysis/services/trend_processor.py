@@ -5,6 +5,7 @@ from typing import Any
 from app.scene_analysis.context import SceneAnalysisContext
 from app.scene_analysis.models import SceneModuleResult, TAG_NAMES
 from app.scene_analysis.services.module_scoring import clamp, module_level
+from app.scene_analysis.services.tag_applicability import apply_tag_applicability
 from app.scene_analysis.services.trend_kline_analysis import NEGATIVE_TAGS, POSITIVE_TAGS, TrendKlineAnalyzer
 
 
@@ -30,7 +31,7 @@ class TrendProcessor:
             "weekly": self._analyzer.analyze("weekly", self._list(context.message.get("weeklyKlines"))),
             "monthly": self._analyzer.analyze("monthly", self._list(context.message.get("monthlyKlines"))),
         }
-        tags = self._merge_tags(period_trends)
+        tags = apply_tag_applicability(context, self._merge_tags(period_trends))
         score = self._weighted_score(period_trends)
         direction = self._direction(tags, period_trends)
         return SceneModuleResult(

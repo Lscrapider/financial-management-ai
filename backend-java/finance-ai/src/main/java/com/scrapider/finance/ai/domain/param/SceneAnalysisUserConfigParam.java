@@ -10,7 +10,9 @@ public record SceneAnalysisUserConfigParam(
         @JsonProperty("price_config") PriceConfigParam priceConfig,
         @JsonProperty("volume_config") VolumeConfigParam volumeConfig,
         @JsonProperty("sentiment_config") SentimentConfigParam sentimentConfig,
-        @JsonProperty("risk_strategy_config") RiskStrategyConfigParam riskStrategyConfig) {
+        @JsonProperty("risk_strategy_config") RiskStrategyConfigParam riskStrategyConfig,
+        @JsonProperty("convertible_bond_config") ConvertibleBondConfigParam convertibleBondConfig,
+        @JsonProperty("fund_config") FundConfigParam fundConfig) {
 
     public static SceneAnalysisUserConfigParam effective(
             SceneAnalysisUserConfigParam overrides,
@@ -25,7 +27,9 @@ public record SceneAnalysisUserConfigParam(
                 merge(defaults.priceConfig(), overrides.priceConfig()),
                 merge(defaults.volumeConfig(), overrides.volumeConfig()),
                 merge(defaults.sentimentConfig(), overrides.sentimentConfig()),
-                merge(defaults.riskStrategyConfig(), overrides.riskStrategyConfig()));
+                merge(defaults.riskStrategyConfig(), overrides.riskStrategyConfig()),
+                merge(defaults.convertibleBondConfig(), overrides.convertibleBondConfig()),
+                merge(defaults.fundConfig(), overrides.fundConfig()));
     }
 
     private static SceneAnalysisUserConfigParam defaultsFor(String targetType, String assetTypeOverride) {
@@ -53,7 +57,18 @@ public record SceneAnalysisUserConfigParam(
                         new TakeProfitPlanWeightsParam(0.30, 0.25, 0.25, 0.20),
                         new StopLossPlanWeightsParam(0.35, 0.25, 0.20, 0.20),
                         0.08,
-                        new UncertaintyWeightsParam(1.00)));
+                        new UncertaintyWeightsParam(1.00)),
+                new ConvertibleBondConfigParam(
+                        10.0,
+                        30.0,
+                        120.0,
+                        100.0,
+                        3.0,
+                        0.0,
+                        3.0,
+                        0.7,
+                        new String[] {"A-", "A", "A+"}),
+                new FundConfigParam(1.0, 1.0, 1.5, 1.0, 50.0, 3.0, 20.0));
     }
 
     private static String defaultAssetType(String targetType) {
@@ -63,6 +78,7 @@ public record SceneAnalysisUserConfigParam(
         return switch (targetType.trim().toUpperCase(Locale.ROOT)) {
             case "INDEX" -> "index";
             case "CONVERTIBLE_BOND", "BOND" -> "convertible_bond";
+            case "FUND", "ETF", "LOF" -> "fund";
             default -> "stock";
         };
     }
@@ -131,6 +147,38 @@ public record SceneAnalysisUserConfigParam(
                 merge(defaults.stopLossPlanWeights(), overrides.stopLossPlanWeights()),
                 value(overrides.supportDistanceThreshold(), defaults.supportDistanceThreshold()),
                 merge(defaults.uncertaintyWeights(), overrides.uncertaintyWeights()));
+    }
+
+    private static ConvertibleBondConfigParam merge(
+            ConvertibleBondConfigParam defaults,
+            ConvertibleBondConfigParam overrides) {
+        if (overrides == null) {
+            return defaults;
+        }
+        return new ConvertibleBondConfigParam(
+                value(overrides.premiumLowThreshold(), defaults.premiumLowThreshold()),
+                value(overrides.premiumHighThreshold(), defaults.premiumHighThreshold()),
+                value(overrides.highPriceThreshold(), defaults.highPriceThreshold()),
+                value(overrides.lowPriceThreshold(), defaults.lowPriceThreshold()),
+                value(overrides.highYtmThreshold(), defaults.highYtmThreshold()),
+                value(overrides.lowYtmThreshold(), defaults.lowYtmThreshold()),
+                value(overrides.smallBalanceThreshold(), defaults.smallBalanceThreshold()),
+                value(overrides.redeemProgressThreshold(), defaults.redeemProgressThreshold()),
+                overrides.lowRatingLevels() == null ? defaults.lowRatingLevels() : overrides.lowRatingLevels());
+    }
+
+    private static FundConfigParam merge(FundConfigParam defaults, FundConfigParam overrides) {
+        if (overrides == null) {
+            return defaults;
+        }
+        return new FundConfigParam(
+                value(overrides.premiumThreshold(), defaults.premiumThreshold()),
+                value(overrides.discountThreshold(), defaults.discountThreshold()),
+                value(overrides.highFeeThreshold(), defaults.highFeeThreshold()),
+                value(overrides.smallScaleThreshold(), defaults.smallScaleThreshold()),
+                value(overrides.largeScaleThreshold(), defaults.largeScaleThreshold()),
+                value(overrides.trackingErrorThreshold(), defaults.trackingErrorThreshold()),
+                value(overrides.highDrawdownThreshold(), defaults.highDrawdownThreshold()));
     }
 
     private static MarketProxyEmotionWeightsParam merge(
@@ -334,6 +382,28 @@ public record SceneAnalysisUserConfigParam(
             @JsonProperty("stop_loss_plan_weights") StopLossPlanWeightsParam stopLossPlanWeights,
             @JsonProperty("support_distance_threshold") Double supportDistanceThreshold,
             @JsonProperty("uncertainty_weights") UncertaintyWeightsParam uncertaintyWeights) {
+    }
+
+    public record ConvertibleBondConfigParam(
+            @JsonProperty("premium_low_threshold") Double premiumLowThreshold,
+            @JsonProperty("premium_high_threshold") Double premiumHighThreshold,
+            @JsonProperty("high_price_threshold") Double highPriceThreshold,
+            @JsonProperty("low_price_threshold") Double lowPriceThreshold,
+            @JsonProperty("high_ytm_threshold") Double highYtmThreshold,
+            @JsonProperty("low_ytm_threshold") Double lowYtmThreshold,
+            @JsonProperty("small_balance_threshold") Double smallBalanceThreshold,
+            @JsonProperty("redeem_progress_threshold") Double redeemProgressThreshold,
+            @JsonProperty("low_rating_levels") String[] lowRatingLevels) {
+    }
+
+    public record FundConfigParam(
+            @JsonProperty("premium_threshold") Double premiumThreshold,
+            @JsonProperty("discount_threshold") Double discountThreshold,
+            @JsonProperty("high_fee_threshold") Double highFeeThreshold,
+            @JsonProperty("small_scale_threshold") Double smallScaleThreshold,
+            @JsonProperty("large_scale_threshold") Double largeScaleThreshold,
+            @JsonProperty("tracking_error_threshold") Double trackingErrorThreshold,
+            @JsonProperty("high_drawdown_threshold") Double highDrawdownThreshold) {
     }
 
     public record MarketProxyEmotionWeightsParam(

@@ -5,6 +5,7 @@ from typing import Any
 from app.scene_analysis.context import SceneAnalysisContext
 from app.scene_analysis.models import SceneModuleResult
 from app.scene_analysis.services.module_scoring import active_tags, module_level, module_score, number
+from app.scene_analysis.services.tag_applicability import apply_tag_applicability
 
 
 class AssetProcessor:
@@ -35,7 +36,7 @@ class AssetProcessor:
             tags["general"] = 1.0
             evidence.append("未识别到股票、指数、可转债或基金等更具体资产类型，使用 general 标签")
 
-        tags = active_tags(tags)
+        tags = apply_tag_applicability(context, active_tags(tags))
         score = module_score(tags)
         return SceneModuleResult(
             module=self.MODULE,

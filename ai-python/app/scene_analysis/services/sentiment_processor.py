@@ -4,6 +4,7 @@ from app.scene_analysis.context import SceneAnalysisContext
 from app.scene_analysis.models import SceneModuleResult
 from app.scene_analysis.services.evidence import active_signal_names, build_evidence, joined_signal_reason
 from app.scene_analysis.services.module_scoring import active_tags, module_level, module_score, number, weighted_sum
+from app.scene_analysis.services.tag_applicability import apply_tag_applicability
 
 
 class SentimentProcessor:
@@ -62,8 +63,10 @@ class SentimentProcessor:
                 "volume_expand": number(context.base_metrics.get("volume_expand")),
                 "market_attention_rise": number(context.base_metrics.get("market_attention_rise")),
             }),
+            "convertible_stock_linkage": self._convertible_stock_linkage(context),
+            "convertible_independent_strength": self._convertible_independent_strength(context),
         }
-        tags = active_tags(tags)
+        tags = apply_tag_applicability(context, active_tags(tags))
         score = module_score(tags)
         return SceneModuleResult(
             module=self.MODULE,
@@ -97,6 +100,10 @@ class SentimentProcessor:
             "break_recent_low": "跌破近期低位",
             "close_weak": "收盘偏弱",
             "low_attention": "交易关注度偏低",
+            "underlying_change_pct": "正股涨跌幅",
+            "underlying_trend_score": "正股趋势强度",
+            "stock_bond_linkage": "转债与正股联动",
+            "convertible_premium_expansion": "转股溢价扩张",
         }
         reasons = {
             "market_attention_rise": "基于成交额、换手率和振幅计算的交易关注度较近期均值上升，market_attention_rise 标签触发",
@@ -120,5 +127,43 @@ class SentimentProcessor:
                 "行情代理信号显示交易拥挤度提高，herding_effect 标签触发",
                 "显示交易拥挤度提高，herding_effect 标签触发",
             ),
+            "convertible_stock_linkage": joined_signal_reason(
+                active_signal_names({key: signals.get(key) for key in ["underlying_change_pct", "underlying_trend_score", "stock_bond_linkage"]}, labels),
+                "正股与转债代理信号显示联动增强，convertible_stock_linkage 标签触发",
+                "显示联动增强，convertible_stock_linkage 标签触发",
+            ),
+            "convertible_independent_strength": joined_signal_reason(
+                active_signal_names({key: signals.get(key) for key in ["price_rise", "stock_bond_linkage", "convertible_premium_expansion"]}, labels),
+                "转债价格或溢价表现强于正股联动，convertible_independent_strength 标签触发",
+                "显示转债独立走强，convertible_independent_strength 标签触发",
+            ),
         }
         return build_evidence(tags, reasons)
+
+    def _convertible_stock_linkage(self, context: SceneAnalysisContext) -> float | None:
+        if not context.is_asset("convertible_bond"):
+            return None
+        linkage = number(context.base_metrics.get("stock_bond_linkage"))
+        if linkage is not None:
+            return linkage
+        underlying_change = number(context.base_metrics.get("underlying_change_pct"))
+        bond_change = number(context.base_metrics.get("change_pct"))
+        if underlying_change is None or bond_change is None:
+            return None
+        return 1.0 if underlying_change * bond_change > 0 else 0.0
+
+    def _convertible_independent_strength(self, context: SceneAnalysisContext) -> float | None:
+        if not context.is_asset("convertible_bond"):
+            return None
+        price_rise = number(context.base_metrics.get("price_rise"))
+        linkage = number(context.base_metrics.get("stock_bond_linkage"))
+        premium_history = context.base_metrics.get("premium_rate_history") or []
+        premium_expansion = None
+        if len(premium_history) >= 2:
+            previous = number(premium_history[-2])
+            current = number(premium_history[-1])
+            if previous is not None and current is not None:
+                premium_expansion = max((current - previous) / max(abs(previous), 1.0), 0.0)
+        if price_rise is None and premium_expansion is None:
+            return None
+        return max((price_rise or 0.0) * (1 - (linkage or 0.0)), premium_expansion or 0.0)

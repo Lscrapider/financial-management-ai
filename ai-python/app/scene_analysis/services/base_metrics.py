@@ -20,6 +20,7 @@ class BaseMetricsCalculator:
         target_type = self._dict(message.get("target")).get("type")
 
         self._add_market_metrics(values, market_data, missing)
+        self._add_convertible_bond_metrics(values, self._dict(message.get("assetSpecificData")), missing)
         self._add_daily_kline_metrics(values, daily_klines, missing)
         self._add_intraday_metrics(values, intraday_data, missing)
         self._add_formula_metrics(values, config, missing)
@@ -57,6 +58,36 @@ class BaseMetricsCalculator:
             missing.append("market.latest_price")
         if previous_close_price is None:
             missing.append("market.previous_close_price")
+
+    def _add_convertible_bond_metrics(
+        self,
+        values: dict[str, Any],
+        asset_specific_data: dict[str, Any],
+        missing: list[str],
+    ) -> None:
+        bond_data = self._dict(asset_specific_data.get("convertibleBond"))
+        if not bond_data:
+            return
+
+        self._put(values, "bond_price", self._number(bond_data.get("bondPrice")))
+        self._put(values, "premium_rate", self._number(bond_data.get("premiumRate")))
+        self._put(values, "conversion_value", self._number(bond_data.get("conversionValue")))
+        self._put(values, "pure_bond_value", self._number(bond_data.get("pureBondValue")))
+        self._put(values, "ytm", self._number(bond_data.get("ytm")))
+        self._put(values, "remaining_size", self._number(bond_data.get("remainingSize")))
+        self._put(values, "maturity_days", self._number(bond_data.get("maturityDays")))
+        self._put(values, "redeem_trigger_progress", self._number(bond_data.get("redeemTriggerProgress")))
+        self._put(values, "underlying_change_pct", self._number(bond_data.get("underlyingChangePct")))
+        self._put(values, "underlying_trend_score", self._number(bond_data.get("underlyingTrendScore")))
+        self._put(values, "stock_bond_linkage", self._number(bond_data.get("stockBondLinkage")))
+        values["bond_rating"] = bond_data.get("bondRating")
+        values["redeem_status"] = bond_data.get("redeemStatus")
+        values["putback_status"] = bond_data.get("putbackStatus")
+        values["premium_rate_history"] = self._number_list(bond_data.get("premiumRateHistory"))
+        values["conversion_value_history"] = self._number_list(bond_data.get("conversionValueHistory"))
+
+        if values.get("bond_price") is None:
+            missing.append("convertible_bond.bond_price")
 
     def _add_daily_kline_metrics(
         self,

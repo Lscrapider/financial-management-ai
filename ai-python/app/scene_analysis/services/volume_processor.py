@@ -4,6 +4,7 @@ from app.scene_analysis.context import SceneAnalysisContext
 from app.scene_analysis.models import SceneModuleResult
 from app.scene_analysis.services.evidence import build_evidence
 from app.scene_analysis.services.module_scoring import active_tags, clamp, module_level, module_score, number, score_value
+from app.scene_analysis.services.tag_applicability import apply_tag_applicability
 
 
 class VolumeProcessor:
@@ -21,7 +22,7 @@ class VolumeProcessor:
             "volume_spike": score_value(metrics.get("volume_spike")),
             "volume_dry_up": self._volume_dry_up(context),
         }
-        tags = active_tags(tags)
+        tags = apply_tag_applicability(context, active_tags(tags))
         score = module_score(tags)
         return SceneModuleResult(
             module=self.MODULE,

@@ -4,6 +4,7 @@ from app.scene_analysis.context import SceneAnalysisContext
 from app.scene_analysis.models import SceneModuleResult
 from app.scene_analysis.services.evidence import active_signal_names, build_evidence, joined_signal_reason
 from app.scene_analysis.services.module_scoring import active_tags, clamp, module_level, module_score, noisy_or, number, weighted_sum
+from app.scene_analysis.services.tag_applicability import apply_tag_applicability
 
 
 class RiskStrategyProcessor:
@@ -62,7 +63,26 @@ class RiskStrategyProcessor:
             },
             self._weights(context, "overheated_risk_weights"),
         )
-        risk_control = noisy_or([chase_high_risk, false_breakout_risk, liquidity_risk, drawdown_risk, overheated_risk])
+        convertible_forced_redeem_risk = self._convertible_forced_redeem_risk(context)
+        convertible_low_rating_risk = self._convertible_low_rating_risk(context)
+        convertible_small_balance_risk = self._convertible_small_balance_risk(context)
+        convertible_liquidity_risk = self._convertible_liquidity_risk(
+            context,
+            low_turnover=number(base.get("low_turnover")),
+            low_volume=low_volume,
+            small_balance_risk=convertible_small_balance_risk,
+        )
+        risk_control = noisy_or([
+            chase_high_risk,
+            false_breakout_risk,
+            liquidity_risk,
+            drawdown_risk,
+            overheated_risk,
+            convertible_forced_redeem_risk,
+            convertible_low_rating_risk,
+            convertible_small_balance_risk,
+            convertible_liquidity_risk,
+        ])
         uncertainty = self._uncertainty(context, sentiment_tags)
         position_control = weighted_sum(
             {
@@ -102,7 +122,7 @@ class RiskStrategyProcessor:
             number(sentiment_tags.get("herding_effect")),
             overheated_risk,
         ])
-        tags = active_tags({
+        tags = apply_tag_applicability(context, active_tags({
             "chase_high_risk": chase_high_risk,
             "false_breakout_risk": false_breakout_risk,
             "liquidity_risk": liquidity_risk,
@@ -115,7 +135,11 @@ class RiskStrategyProcessor:
             "avoid_emotional_trade": avoid_emotional_trade,
             "take_profit_plan": take_profit_plan,
             "stop_loss_plan": stop_loss_plan,
-        })
+            "convertible_forced_redeem_risk": convertible_forced_redeem_risk,
+            "convertible_low_rating_risk": convertible_low_rating_risk,
+            "convertible_small_balance_risk": convertible_small_balance_risk,
+            "convertible_liquidity_risk": convertible_liquidity_risk,
+        }))
         score = module_score(tags)
         evidence_signals = {
             **context.base_metrics.values,
@@ -126,6 +150,9 @@ class RiskStrategyProcessor:
             "low_volume": low_volume,
             "uncertainty": uncertainty,
             "trend_confirmed": self._trend_confirmed(context),
+            "redeem_trigger_progress": number(base.get("redeem_trigger_progress")),
+            "bond_rating": base.get("bond_rating"),
+            "remaining_size": number(base.get("remaining_size")),
         }
         return SceneModuleResult(
             module=self.MODULE,
@@ -180,6 +207,52 @@ class RiskStrategyProcessor:
         price_rise = number(context.base_metrics.get("price_rise")) or 0.0
         return clamp(max(short_term_emotion * price_drop, panic_selling * price_rise))
 
+    def _convertible_forced_redeem_risk(self, context: SceneAnalysisContext) -> float | None:
+        if not context.is_asset("convertible_bond"):
+            return None
+        status = str(context.base_metrics.get("redeem_status") or "").lower()
+        if any(keyword in status for keyword in ["triggered", "announced", "已触发", "已公告", "强赎"]):
+            return 1.0
+        progress = number(context.base_metrics.get("redeem_trigger_progress"))
+        threshold = number(context.convertible_bond_config.get("redeem_progress_threshold"))
+        if progress is None:
+            return None
+        if threshold is None or threshold <= 0:
+            return clamp(progress)
+        return clamp(progress / threshold)
+
+    def _convertible_low_rating_risk(self, context: SceneAnalysisContext) -> float | None:
+        if not context.is_asset("convertible_bond"):
+            return None
+        rating = str(context.base_metrics.get("bond_rating") or "").strip().upper()
+        if not rating:
+            return None
+        low_levels = context.convertible_bond_config.get("low_rating_levels")
+        if not isinstance(low_levels, list):
+            return None
+        normalized_levels = {str(item).strip().upper() for item in low_levels}
+        return 1.0 if rating in normalized_levels else 0.0
+
+    def _convertible_small_balance_risk(self, context: SceneAnalysisContext) -> float | None:
+        if not context.is_asset("convertible_bond"):
+            return None
+        remaining_size = number(context.base_metrics.get("remaining_size"))
+        threshold = number(context.convertible_bond_config.get("small_balance_threshold"))
+        if remaining_size is None or threshold is None or threshold <= 0:
+            return None
+        return clamp((threshold - remaining_size) / threshold)
+
+    def _convertible_liquidity_risk(
+        self,
+        context: SceneAnalysisContext,
+        low_turnover: float | None,
+        low_volume: float | None,
+        small_balance_risk: float | None,
+    ) -> float | None:
+        if not context.is_asset("convertible_bond"):
+            return None
+        return noisy_or([low_turnover, low_volume, small_balance_risk])
+
     def _evidence(self, tags: dict[str, float], signals: dict) -> list[str]:
         labels = {
             "price_rise": "上涨强度",
@@ -208,6 +281,10 @@ class RiskStrategyProcessor:
             "chase_high_risk": "追高风险",
             "break_recent_low": "跌破近期低位",
             "downtrend": "下降趋势",
+            "redeem_trigger_progress": "强赎触发进度",
+            "bond_rating": "转债评级",
+            "remaining_size": "剩余规模",
+            "convertible_small_balance_risk": "剩余规模过小风险",
         }
         reasons = {
             "chase_high_risk": joined_signal_reason(
@@ -236,7 +313,7 @@ class RiskStrategyProcessor:
                 "提高过热风险，overheated_risk 标签触发",
             ),
             "risk_control": joined_signal_reason(
-                active_signal_names({key: signals.get(key) for key in ["chase_high_risk", "false_breakout_risk", "liquidity_risk", "drawdown_risk", "overheated_risk"]}, labels),
+                active_signal_names({key: signals.get(key) for key in ["chase_high_risk", "false_breakout_risk", "liquidity_risk", "drawdown_risk", "overheated_risk", "convertible_forced_redeem_risk", "convertible_low_rating_risk", "convertible_small_balance_risk", "convertible_liquidity_risk"]}, labels),
                 "多个风险子标签累计后达到风险控制阈值，risk_control 标签触发",
                 "累计后达到风险控制阈值，risk_control 标签触发",
             ),
@@ -269,6 +346,22 @@ class RiskStrategyProcessor:
                 active_signal_names({key: signals.get(key) for key in ["break_recent_low", "downtrend", "panic_selling", "drawdown_risk"]}, labels),
                 "下行风险代理信号提示需要预设止损计划，stop_loss_plan 标签触发",
                 "提示需要预设止损计划，stop_loss_plan 标签触发",
+            ),
+            "convertible_forced_redeem_risk": joined_signal_reason(
+                active_signal_names({key: signals.get(key) for key in ["redeem_trigger_progress"]}, labels),
+                "强赎状态或触发进度提高强赎风险，convertible_forced_redeem_risk 标签触发",
+                "提高强赎风险，convertible_forced_redeem_risk 标签触发",
+            ),
+            "convertible_low_rating_risk": "转债评级落入低评级配置范围，convertible_low_rating_risk 标签触发",
+            "convertible_small_balance_risk": joined_signal_reason(
+                active_signal_names({key: signals.get(key) for key in ["remaining_size"]}, labels),
+                "剩余规模低于配置阈值，convertible_small_balance_risk 标签触发",
+                "低于配置阈值，convertible_small_balance_risk 标签触发",
+            ),
+            "convertible_liquidity_risk": joined_signal_reason(
+                active_signal_names({key: signals.get(key) for key in ["low_turnover", "low_volume", "convertible_small_balance_risk"]}, labels),
+                "转债交易活跃度或剩余规模代理信号提高流动性风险，convertible_liquidity_risk 标签触发",
+                "提高转债流动性风险，convertible_liquidity_risk 标签触发",
             ),
         }
         return build_evidence(tags, reasons)
