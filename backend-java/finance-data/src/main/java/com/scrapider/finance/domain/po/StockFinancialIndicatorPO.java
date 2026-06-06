@@ -59,6 +59,14 @@ public class StockFinancialIndicatorPO {
                 .toList();
     }
 
+    public static List<StockFinancialIndicatorPO> fromTushareRows(StockConfigPO stockConfig, JsonNode rows) {
+        LocalDateTime syncedAt = LocalDateTime.now();
+        return StreamSupport.stream(rows.spliterator(), false)
+                .map(row -> fromTushareRow(stockConfig, row, syncedAt))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
     private static StockFinancialIndicatorPO fromEastMoneyRow(
             StockConfigPO stockConfig,
             JsonNode row,
@@ -102,10 +110,46 @@ public class StockFinancialIndicatorPO {
         return indicator;
     }
 
+    private static StockFinancialIndicatorPO fromTushareRow(
+            StockConfigPO stockConfig,
+            JsonNode row,
+            LocalDateTime syncedAt) {
+        LocalDate reportDate = date(row, "end_date");
+        if (reportDate == null) {
+            return null;
+        }
+
+        StockFinancialIndicatorPO indicator = new StockFinancialIndicatorPO();
+        indicator.setStockCode(stockConfig.getStockCode());
+        indicator.setStockName(stockConfig.getStockName());
+        indicator.setSecucode(StockMarketJsonParser.text(row, "ts_code", stockConfig.getStockCode()));
+        indicator.setReportDate(reportDate);
+        indicator.setReportType(StockMarketJsonParser.text(row, "report_type", "tushare"));
+        indicator.setReportDateName(StockMarketJsonParser.text(row, "end_date", null));
+        indicator.setNoticeDate(date(row, "ann_date"));
+        indicator.setEpsBasic(StockMarketJsonParser.decimal(row, "eps"));
+        indicator.setBps(StockMarketJsonParser.decimal(row, "bps"));
+        indicator.setTotalOperateRevenue(StockMarketJsonParser.decimal(row, "revenue"));
+        indicator.setParentNetProfit(StockMarketJsonParser.decimal(row, "profit_to_gr"));
+        indicator.setParentNetProfitYoy(StockMarketJsonParser.decimal(row, "q_profit_yoy"));
+        indicator.setRoeWeighted(StockMarketJsonParser.decimal(row, "roe"));
+        indicator.setDebtAssetRatio(StockMarketJsonParser.decimal(row, "debt_to_assets"));
+        indicator.setSource("tushare");
+        indicator.setRawResponse(row.toString());
+        indicator.setSyncedAt(syncedAt);
+        return indicator;
+    }
+
     private static LocalDate date(JsonNode row, String fieldName) {
         String value = StockMarketJsonParser.text(row, fieldName, null);
         if (StrUtil.isBlank(value)) {
             return null;
+        }
+        if (value.length() == 8) {
+            return LocalDate.parse("%s-%s-%s".formatted(
+                    value.substring(0, 4),
+                    value.substring(4, 6),
+                    value.substring(6, 8)));
         }
         return LocalDate.parse(value.substring(0, 10));
     }

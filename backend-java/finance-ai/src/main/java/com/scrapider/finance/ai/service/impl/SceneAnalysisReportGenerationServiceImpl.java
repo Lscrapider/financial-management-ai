@@ -510,7 +510,7 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
                 builder.append(trend);
             }
             if (!interpretation.isBlank() && !interpretation.equals(trend)) {
-                if (!trend.isBlank()) {
+                if (!trend.isBlank() && !this.endsWithSentencePunctuation(trend)) {
                     builder.append("。");
                 }
                 builder.append(interpretation);
@@ -528,6 +528,22 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
             builder.append("\n");
         }
         builder.append("\n");
+    }
+
+    private boolean endsWithSentencePunctuation(String text) {
+        if (text == null || text.isBlank()) {
+            return false;
+        }
+        String trimmedText = text.stripTrailing();
+        char lastChar = trimmedText.charAt(trimmedText.length() - 1);
+        return lastChar == '。'
+                || lastChar == '！'
+                || lastChar == '？'
+                || lastChar == '.'
+                || lastChar == '!'
+                || lastChar == '?'
+                || lastChar == '；'
+                || lastChar == ';';
     }
 
     private void appendTradingSuggestions(

@@ -8,9 +8,13 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.WeekFields;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.StreamSupport;
 import lombok.Data;
@@ -70,6 +74,21 @@ public class BondKlinePO {
         return fromApiResponse(bond, response, KlinePeriodTypeEnum.DAILY);
     }
 
+    public static List<BondKlinePO> fromTushareRows(
+            BondConfigPO bond,
+            JsonNode rows,
+            KlinePeriodTypeEnum periodType) {
+        LocalDateTime syncedAt = LocalDateTime.now();
+        List<BondKlinePO> dailyKlines = StreamSupport.stream(rows.spliterator(), false)
+                .map(row -> fromTushareRow(bond, row, KlinePeriodTypeEnum.DAILY, syncedAt))
+                .filter(Objects::nonNull)
+                .toList();
+        if (KlinePeriodTypeEnum.DAILY.equals(periodType)) {
+            return withMovingAverages(dailyKlines);
+        }
+        return withMovingAverages(aggregatePeriodKlines(bond, dailyKlines, periodType, syncedAt));
+    }
+
     private static BondKlinePO fromTencentLine(
             BondConfigPO bond,
             JsonNode line,
@@ -98,6 +117,162 @@ public class BondKlinePO {
         kline.setChangeAmount(decimal(line, 9));
         kline.setTurnoverRate(decimal(line, 10));
         kline.setRawResponse(line.toString());
+        kline.setSyncedAt(syncedAt);
+        return kline;
+    }
+
+    private static List<BondKlinePO> aggregatePeriodKlines(
+            BondConfigPO bond,
+            List<BondKlinePO> dailyKlines,
+            KlinePeriodTypeEnum periodType,
+            LocalDateTime syncedAt) {
+        List<BondKlinePO> sorted = new ArrayList<>(dailyKlines);
+        sorted.sort(Comparator.comparing(BondKlinePO::getTradeDate));
+        Map<String, List<BondKlinePO>> groups = new LinkedHashMap<>();
+        for (BondKlinePO kline : sorted) {
+            groups.computeIfAbsent(periodKey(kline.getTradeDate(), periodType), key -> new ArrayList<>()).add(kline);
+        }
+
+        List<BondKlinePO> aggregated = new ArrayList<>();
+        for (List<BondKlinePO> group : groups.values()) {
+            BondKlinePO row = aggregateOnePeriod(bond, group, periodType, syncedAt);
+            if (row != null) {
+                aggregated.add(row);
+            }
+        }
+        fillPeriodDerivedFields(aggregated);
+        return aggregated;
+    }
+
+    private static BondKlinePO aggregateOnePeriod(
+            BondConfigPO bond,
+            List<BondKlinePO> group,
+            KlinePeriodTypeEnum periodType,
+            LocalDateTime syncedAt) {
+        if (group.isEmpty()) {
+            return null;
+        }
+        BondKlinePO first = group.get(0);
+        BondKlinePO last = group.get(group.size() - 1);
+        BondKlinePO row = new BondKlinePO();
+        row.setBondCode(bond.getBondCode());
+        row.setBondName(bond.getBondName());
+        row.setSecid(bond.getSecid());
+        row.setMarketCode(bond.getMarketCode());
+        row.setExchangeCode(bond.getExchangeCode());
+        row.setPeriodType(periodType.getCode());
+        row.setTradeDate(last.getTradeDate());
+        row.setOpenPrice(first.getOpenPrice());
+        row.setClosePrice(last.getClosePrice());
+        row.setHighPrice(max(group));
+        row.setLowPrice(min(group));
+        row.setVolume(sumLong(group.stream().map(BondKlinePO::getVolume).toList()));
+        row.setTurnoverAmount(sumDecimal(group.stream().map(BondKlinePO::getTurnoverAmount).toList()));
+        row.setTurnoverRate(sumDecimal(group.stream().map(BondKlinePO::getTurnoverRate).toList()));
+        row.setRawResponse("aggregated-from-tushare-cb-daily");
+        row.setSyncedAt(syncedAt);
+        return row;
+    }
+
+    private static void fillPeriodDerivedFields(List<BondKlinePO> klines) {
+        klines.sort(Comparator.comparing(BondKlinePO::getTradeDate));
+        for (int index = 1; index < klines.size(); index++) {
+            BondKlinePO current = klines.get(index);
+            BigDecimal previousClose = klines.get(index - 1).getClosePrice();
+            if (current.getClosePrice() == null || previousClose == null || previousClose.signum() == 0) {
+                continue;
+            }
+            BigDecimal changeAmount = current.getClosePrice().subtract(previousClose);
+            current.setChangeAmount(changeAmount);
+            current.setChangePercent(changeAmount
+                    .multiply(BigDecimal.valueOf(100))
+                    .divide(previousClose, 4, RoundingMode.HALF_UP));
+            if (current.getHighPrice() != null && current.getLowPrice() != null) {
+                current.setAmplitude(current.getHighPrice()
+                        .subtract(current.getLowPrice())
+                        .multiply(BigDecimal.valueOf(100))
+                        .divide(previousClose, 4, RoundingMode.HALF_UP));
+            }
+        }
+    }
+
+    private static String periodKey(LocalDate tradeDate, KlinePeriodTypeEnum periodType) {
+        if (KlinePeriodTypeEnum.MONTHLY.equals(periodType)) {
+            return "%d-%02d".formatted(tradeDate.getYear(), tradeDate.getMonthValue());
+        }
+        WeekFields weekFields = WeekFields.of(Locale.CHINA);
+        return "%d-%02d".formatted(
+                tradeDate.get(weekFields.weekBasedYear()),
+                tradeDate.get(weekFields.weekOfWeekBasedYear()));
+    }
+
+    private static BigDecimal max(List<BondKlinePO> klines) {
+        return klines.stream()
+                .map(BondKlinePO::getHighPrice)
+                .filter(Objects::nonNull)
+                .max(BigDecimal::compareTo)
+                .orElse(null);
+    }
+
+    private static BigDecimal min(List<BondKlinePO> klines) {
+        return klines.stream()
+                .map(BondKlinePO::getLowPrice)
+                .filter(Objects::nonNull)
+                .min(BigDecimal::compareTo)
+                .orElse(null);
+    }
+
+    private static Long sumLong(List<Long> values) {
+        long total = 0L;
+        boolean hasValue = false;
+        for (Long value : values) {
+            if (value != null) {
+                total += value;
+                hasValue = true;
+            }
+        }
+        return hasValue ? total : null;
+    }
+
+    private static BigDecimal sumDecimal(List<BigDecimal> values) {
+        BigDecimal total = BigDecimal.ZERO;
+        boolean hasValue = false;
+        for (BigDecimal value : values) {
+            if (value != null) {
+                total = total.add(value);
+                hasValue = true;
+            }
+        }
+        return hasValue ? total : null;
+    }
+
+    private static BondKlinePO fromTushareRow(
+            BondConfigPO bond,
+            JsonNode row,
+            KlinePeriodTypeEnum periodType,
+            LocalDateTime syncedAt) {
+        String tradeDate = StockMarketJsonParser.text(row, "trade_date", null);
+        if (tradeDate == null || tradeDate.length() != 8) {
+            return null;
+        }
+        BondKlinePO kline = new BondKlinePO();
+        kline.setBondCode(bond.getBondCode());
+        kline.setBondName(bond.getBondName());
+        kline.setSecid(bond.getSecid());
+        kline.setMarketCode(bond.getMarketCode());
+        kline.setExchangeCode(bond.getExchangeCode());
+        kline.setPeriodType(periodType.getCode());
+        kline.setTradeDate(LocalDate.parse(
+                "%s-%s-%s".formatted(tradeDate.substring(0, 4), tradeDate.substring(4, 6), tradeDate.substring(6, 8))));
+        kline.setOpenPrice(StockMarketJsonParser.decimal(row, "open"));
+        kline.setClosePrice(StockMarketJsonParser.decimal(row, "close"));
+        kline.setHighPrice(StockMarketJsonParser.decimal(row, "high"));
+        kline.setLowPrice(StockMarketJsonParser.decimal(row, "low"));
+        kline.setVolume(StockMarketJsonParser.longValue(row, "vol"));
+        kline.setTurnoverAmount(StockMarketJsonParser.decimal(row, "amount"));
+        kline.setChangePercent(StockMarketJsonParser.decimal(row, "pct_chg"));
+        kline.setChangeAmount(StockMarketJsonParser.decimal(row, "change"));
+        kline.setRawResponse(row.toString());
         kline.setSyncedAt(syncedAt);
         return kline;
     }

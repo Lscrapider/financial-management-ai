@@ -1,8 +1,6 @@
 package com.scrapider.finance.service.impl;
 
 import cn.hutool.core.util.StrUtil;
-import com.scrapider.finance.api.StockMarketApi;
-import com.scrapider.finance.domain.dto.StockMarketDataDTO;
 import com.scrapider.finance.domain.enums.KlineAdjustTypeEnum;
 import com.scrapider.finance.domain.enums.KlinePeriodTypeEnum;
 import com.scrapider.finance.domain.enums.SortOrderEnum;
@@ -19,8 +17,10 @@ import com.scrapider.finance.manage.StockConfigManage;
 import com.scrapider.finance.manage.StockIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.StockKlineManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
+import com.scrapider.finance.service.HistoricalKlineProvider;
 import com.scrapider.finance.service.StockMarketQueryService;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -36,19 +36,19 @@ public class StockMarketQueryServiceImpl implements StockMarketQueryService {
     private final StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage;
     private final StockKlineManage stockKlineManage;
     private final StockConfigManage stockConfigManage;
-    private final StockMarketApi stockMarketApi;
+    private final HistoricalKlineProvider historicalKlineProvider;
 
     public StockMarketQueryServiceImpl(
             StockQuoteSnapshotManage stockQuoteSnapshotManage,
             StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage,
             StockKlineManage stockKlineManage,
             StockConfigManage stockConfigManage,
-            StockMarketApi stockMarketApi) {
+            HistoricalKlineProvider historicalKlineProvider) {
         this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
         this.stockIntradayTrendInfluxManage = stockIntradayTrendInfluxManage;
         this.stockKlineManage = stockKlineManage;
         this.stockConfigManage = stockConfigManage;
-        this.stockMarketApi = stockMarketApi;
+        this.historicalKlineProvider = historicalKlineProvider;
     }
 
     @Override
@@ -142,16 +142,9 @@ public class StockMarketQueryServiceImpl implements StockMarketQueryService {
         if (stock == null || StrUtil.isBlank(stock.getSecid())) {
             return;
         }
-        StockMarketDataDTO klines = this.stockMarketApi.getKlines(
-                stock.getSecid(),
-                periodType,
-                adjustType,
-                limit);
-        this.stockKlineManage.saveKlines(StockKlinePO.fromApiResponse(
-                stock,
-                klines.data(),
-                periodType,
-                adjustType));
+        Arrays.stream(KlineAdjustTypeEnum.values())
+                .map(item -> this.historicalKlineProvider.getStockKlines(stock, periodType, item, limit))
+                .forEach(this.stockKlineManage::saveKlines);
     }
 
     private int normalizeLimit(Integer limit, int defaultLimit) {

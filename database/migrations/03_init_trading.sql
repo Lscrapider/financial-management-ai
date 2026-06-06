@@ -22,7 +22,6 @@ CREATE TABLE IF NOT EXISTS stock_alert_config (
 );
 
 ALTER TABLE stock_alert_config ADD COLUMN IF NOT EXISTS target_type VARCHAR(16) NOT NULL DEFAULT 'STOCK';
-ALTER TABLE stock_alert_config DROP COLUMN IF EXISTS notify_email;
 
 COMMENT ON TABLE stock_alert_config IS '用户股票涨跌幅提醒配置表';
 COMMENT ON COLUMN stock_alert_config.user_id IS '用户 ID';
@@ -31,21 +30,6 @@ COMMENT ON COLUMN stock_alert_config.stock_name IS '标的名称';
 COMMENT ON COLUMN stock_alert_config.target_type IS '目标类型：STOCK/INDEX/BOND';
 COMMENT ON COLUMN stock_alert_config.threshold_percent IS '涨跌幅阈值百分比';
 COMMENT ON COLUMN stock_alert_config.alert_active IS '当前越界提醒是否已触发';
-
--- 清理旧约束，换新的三字段唯一约束
-ALTER TABLE stock_alert_config DROP CONSTRAINT IF EXISTS uk_stock_alert_config_user_stock;
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint WHERE conname = 'uk_alert_config_user_type_target'
-    ) THEN
-        ALTER TABLE stock_alert_config
-            ADD CONSTRAINT uk_alert_config_user_type_target UNIQUE (user_id, target_type, stock_code);
-    END IF;
-END $$;
-
-CREATE INDEX IF NOT EXISTS idx_stock_alert_config_user_id ON stock_alert_config (user_id);
-CREATE INDEX IF NOT EXISTS idx_stock_alert_config_enabled ON stock_alert_config (enabled);
 
 -- ================================================================================
 -- 2. 投资观察池
@@ -63,8 +47,6 @@ CREATE TABLE IF NOT EXISTS watch_group (
 COMMENT ON TABLE watch_group IS '投资观察池分组';
 COMMENT ON COLUMN watch_group.group_name IS '分组名称';
 COMMENT ON COLUMN watch_group.sort_order IS '分组排序';
-
-CREATE INDEX IF NOT EXISTS idx_watch_group_user_sort ON watch_group (user_id, sort_order, id);
 
 -- 含 021 追加字段 buy_price/position
 CREATE TABLE IF NOT EXISTS watch_group_item (
@@ -99,9 +81,6 @@ COMMENT ON COLUMN watch_group_item.buy_price IS '买入价格（用户建仓成�
 COMMENT ON COLUMN watch_group_item.position IS '持仓数量（股/张/份）';
 COMMENT ON COLUMN watch_group_item.remark IS '用户备注';
 
-CREATE INDEX IF NOT EXISTS idx_watch_group_item_group_sort ON watch_group_item (group_id, target_type, sort_order, id);
-CREATE INDEX IF NOT EXISTS idx_watch_group_item_user ON watch_group_item (user_id, target_type, target_code);
-
 -- ================================================================================
 -- 3. 股票行业/地域/概念信息
 -- ================================================================================
@@ -127,8 +106,6 @@ COMMENT ON TABLE stock_industry_info IS '股票行业、地域、概念信息';
 COMMENT ON COLUMN stock_industry_info.industry_name IS '行业名称';
 COMMENT ON COLUMN stock_industry_info.region_name IS '地域板块名称';
 COMMENT ON COLUMN stock_industry_info.concept_names IS '概念名称列表，逗号分隔';
-
-CREATE INDEX IF NOT EXISTS idx_stock_industry_info_stock_code ON stock_industry_info (stock_code);
 
 -- ================================================================================
 -- 4. 股票每日估值历史
@@ -164,9 +141,6 @@ CREATE TABLE IF NOT EXISTS stock_valuation_history (
 COMMENT ON TABLE stock_valuation_history IS '股票每日估值历史';
 COMMENT ON COLUMN stock_valuation_history.pe_ttm IS '滚动市盈率';
 COMMENT ON COLUMN stock_valuation_history.pb_mrq IS '市净率';
-
-CREATE INDEX IF NOT EXISTS idx_stock_valuation_history_stock_date ON stock_valuation_history (stock_code, trade_date DESC);
-CREATE INDEX IF NOT EXISTS idx_stock_valuation_history_board_date ON stock_valuation_history (board_name, trade_date DESC);
 
 -- ================================================================================
 -- 5. 股票财务主指标及银行专项指标
@@ -210,8 +184,6 @@ CREATE TABLE IF NOT EXISTS stock_financial_indicator (
 
 COMMENT ON TABLE stock_financial_indicator IS '股票财务主指标及银行专项指标';
 
-CREATE INDEX IF NOT EXISTS idx_stock_financial_indicator_stock_report ON stock_financial_indicator (stock_code, report_date DESC);
-
 -- ================================================================================
 -- 6. 股票分红股息历史
 -- ================================================================================
@@ -240,8 +212,6 @@ CREATE TABLE IF NOT EXISTS stock_dividend_history (
 );
 
 COMMENT ON TABLE stock_dividend_history IS '股票分红股息历史';
-
-CREATE INDEX IF NOT EXISTS idx_stock_dividend_history_stock_ex_date ON stock_dividend_history (stock_code, ex_dividend_date DESC);
 
 -- ================================================================================
 -- 7. 标的场景分析任务表
@@ -281,9 +251,6 @@ COMMENT ON COLUMN scene_analysis_task.current_scenes_payload IS 'Python 计算�
 COMMENT ON COLUMN scene_analysis_task.report_payload IS '结构化报告内容';
 COMMENT ON COLUMN scene_analysis_task.report_text IS '最终展示报告文本';
 
-CREATE INDEX IF NOT EXISTS idx_scene_analysis_task_user_created ON scene_analysis_task (user_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_scene_analysis_task_status_updated ON scene_analysis_task (status, updated_at DESC);
-
 -- ================================================================================
 -- 8. 标的场景分析报告历史表
 -- ================================================================================
@@ -319,10 +286,6 @@ COMMENT ON COLUMN scene_analysis_report.status IS '报告状态：generating_rep
 COMMENT ON COLUMN scene_analysis_report.report_content IS 'LLM 输出的结构化报告 JSON';
 COMMENT ON COLUMN scene_analysis_report.report_text IS '渲染后的 Markdown 报告文本';
 
-CREATE INDEX IF NOT EXISTS idx_scene_analysis_report_target_generated ON scene_analysis_report (target_type, target_code, generated_at DESC, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_scene_analysis_report_task_created ON scene_analysis_report (task_no, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_scene_analysis_report_status_updated ON scene_analysis_report (status, updated_at DESC);
-
 -- ================================================================================
 -- 9. 场景分析配置模板
 -- ================================================================================
@@ -340,15 +303,6 @@ CREATE TABLE IF NOT EXISTS scene_analysis_config_profile (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE UNIQUE INDEX IF NOT EXISTS uk_scene_analysis_config_profile_system_name
-    ON scene_analysis_config_profile (name) WHERE user_id IS NULL;
-
-CREATE UNIQUE INDEX IF NOT EXISTS uk_scene_analysis_config_profile_user_name
-    ON scene_analysis_config_profile (user_id, name) WHERE user_id IS NOT NULL;
-
-CREATE INDEX IF NOT EXISTS idx_scene_analysis_config_profile_user_enabled ON scene_analysis_config_profile (user_id, enabled);
-CREATE INDEX IF NOT EXISTS idx_scene_analysis_config_profile_group ON scene_analysis_config_profile (config_group);
 
 -- 系统默认配置
 INSERT INTO scene_analysis_config_profile (

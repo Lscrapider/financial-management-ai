@@ -16,6 +16,7 @@ import com.scrapider.finance.manage.IndexConfigManage;
 import com.scrapider.finance.manage.IndexIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.IndexKlineManage;
 import com.scrapider.finance.manage.IndexQuoteSnapshotManage;
+import com.scrapider.finance.service.HistoricalKlineProvider;
 import com.scrapider.finance.service.MarketTradingCalendarService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -56,6 +57,7 @@ public class IndexMarketSyncTask {
     private final IndexQuoteSnapshotManage indexQuoteSnapshotManage;
     private final IndexKlineManage indexKlineManage;
     private final IndexIntradayTrendInfluxManage indexIntradayTrendInfluxManage;
+    private final HistoricalKlineProvider historicalKlineProvider;
     private final MarketTradingCalendarService marketTradingCalendarService;
     private final AtomicBoolean syncing = new AtomicBoolean(false);
     private final ExecutorService manualSyncExecutor = Executors.newSingleThreadExecutor();
@@ -102,12 +104,14 @@ public class IndexMarketSyncTask {
             IndexQuoteSnapshotManage indexQuoteSnapshotManage,
             IndexKlineManage indexKlineManage,
             IndexIntradayTrendInfluxManage indexIntradayTrendInfluxManage,
+            HistoricalKlineProvider historicalKlineProvider,
             MarketTradingCalendarService marketTradingCalendarService) {
         this.stockMarketApi = stockMarketApi;
         this.indexConfigManage = indexConfigManage;
         this.indexQuoteSnapshotManage = indexQuoteSnapshotManage;
         this.indexKlineManage = indexKlineManage;
         this.indexIntradayTrendInfluxManage = indexIntradayTrendInfluxManage;
+        this.historicalKlineProvider = historicalKlineProvider;
         this.marketTradingCalendarService = marketTradingCalendarService;
     }
 
@@ -155,9 +159,9 @@ public class IndexMarketSyncTask {
             return false;
         }
         this.doSyncKlinesForIndex(index, periodType, limit);
-        if (KlinePeriodTypeEnum.DAILY.equals(periodType)) {
-            this.repairLatestPeriodKlinesFromDaily(List.of(index));
-        }
+//        if (KlinePeriodTypeEnum.DAILY.equals(periodType)) {
+//            this.repairLatestPeriodKlinesFromDaily(List.of(index));
+//        }
         return true;
     }
 
@@ -255,7 +259,7 @@ public class IndexMarketSyncTask {
                     KlinePeriodTypeEnum.MONTHLY,
                     this.monthlyKlineLimit));
         }
-        this.repairLatestPeriodKlinesFromDaily(valid);
+//        this.repairLatestPeriodKlinesFromDaily(valid);
     }
 
     private void doSyncTrendsForIndex(IndexConfigPO index) {
@@ -311,15 +315,7 @@ public class IndexMarketSyncTask {
             IndexConfigPO index,
             KlinePeriodTypeEnum periodType,
             Integer limit) {
-        StockMarketDataDTO klines = this.stockMarketApi.getKlines(
-                index.getSecid(),
-                periodType,
-                KlineAdjustTypeEnum.NONE,
-                limit);
-        this.indexKlineManage.saveKlines(IndexKlinePO.fromApiResponse(
-                index,
-                klines.data(),
-                periodType));
+        this.indexKlineManage.saveKlines(this.historicalKlineProvider.getIndexKlines(index, periodType, limit));
     }
 
     private void repairLatestPeriodKlinesFromDaily(List<IndexConfigPO> indices) {

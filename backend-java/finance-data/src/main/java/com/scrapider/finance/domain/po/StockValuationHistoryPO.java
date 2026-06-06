@@ -50,6 +50,14 @@ public class StockValuationHistoryPO {
                 .toList();
     }
 
+    public static List<StockValuationHistoryPO> fromTushareRows(StockConfigPO stockConfig, JsonNode rows) {
+        LocalDateTime syncedAt = LocalDateTime.now();
+        return StreamSupport.stream(rows.spliterator(), false)
+                .map(row -> fromTushareRow(stockConfig, row, syncedAt))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
     private static StockValuationHistoryPO fromEastMoneyRow(
             StockConfigPO stockConfig,
             JsonNode row,
@@ -84,10 +92,45 @@ public class StockValuationHistoryPO {
         return valuation;
     }
 
+    private static StockValuationHistoryPO fromTushareRow(
+            StockConfigPO stockConfig,
+            JsonNode row,
+            LocalDateTime syncedAt) {
+        LocalDate tradeDate = date(row, "trade_date");
+        if (tradeDate == null) {
+            return null;
+        }
+
+        StockValuationHistoryPO valuation = new StockValuationHistoryPO();
+        valuation.setStockCode(stockConfig.getStockCode());
+        valuation.setStockName(stockConfig.getStockName());
+        valuation.setSecid(stockConfig.getSecid());
+        valuation.setSecucode(StockMarketJsonParser.text(row, "ts_code", stockConfig.getStockCode()));
+        valuation.setTradeDate(tradeDate);
+        valuation.setTotalMarketCap(StockMarketJsonParser.decimal(row, "total_mv"));
+        valuation.setFloatMarketCap(StockMarketJsonParser.decimal(row, "circ_mv"));
+        valuation.setClosePrice(StockMarketJsonParser.decimal(row, "close"));
+        valuation.setTotalShares(StockMarketJsonParser.longValue(row, "total_share"));
+        valuation.setFreeSharesA(StockMarketJsonParser.longValue(row, "float_share"));
+        valuation.setPeTtm(StockMarketJsonParser.decimal(row, "pe_ttm"));
+        valuation.setPbMrq(StockMarketJsonParser.decimal(row, "pb"));
+        valuation.setPsTtm(StockMarketJsonParser.decimal(row, "ps_ttm"));
+        valuation.setSource("tushare");
+        valuation.setRawResponse(row.toString());
+        valuation.setSyncedAt(syncedAt);
+        return valuation;
+    }
+
     private static LocalDate date(JsonNode row, String fieldName) {
         String value = StockMarketJsonParser.text(row, fieldName, null);
         if (StrUtil.isBlank(value)) {
             return null;
+        }
+        if (value.length() == 8) {
+            return LocalDate.parse("%s-%s-%s".formatted(
+                    value.substring(0, 4),
+                    value.substring(4, 6),
+                    value.substring(6, 8)));
         }
         return LocalDate.parse(value.substring(0, 10));
     }

@@ -1,12 +1,9 @@
 package com.scrapider.finance.ai.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
-import com.scrapider.finance.ai.api.EastMoneyDividendApi;
-import com.scrapider.finance.ai.api.EastMoneyFinanceApi;
-import com.scrapider.finance.ai.api.EastMoneyValuationApi;
 import com.scrapider.finance.ai.domain.dto.StockSceneDataDTO;
+import com.scrapider.finance.ai.service.StockFundamentalProvider;
 import com.scrapider.finance.ai.service.StockSceneDataEnsureService;
-import com.scrapider.finance.domain.dto.StockMarketDataDTO;
 import com.scrapider.finance.domain.po.StockConfigPO;
 import com.scrapider.finance.domain.po.StockDividendHistoryPO;
 import com.scrapider.finance.domain.po.StockFinancialIndicatorPO;
@@ -30,25 +27,19 @@ public class StockSceneDataEnsureServiceImpl implements StockSceneDataEnsureServ
     private static final int FINANCIAL_FRESH_DAYS = 7;
     private static final int DIVIDEND_FRESH_DAYS = 30;
 
-    private final EastMoneyValuationApi eastMoneyValuationApi;
-    private final EastMoneyFinanceApi eastMoneyFinanceApi;
-    private final EastMoneyDividendApi eastMoneyDividendApi;
+    private final StockFundamentalProvider stockFundamentalProvider;
     private final StockIndustryInfoManage stockIndustryInfoManage;
     private final StockValuationHistoryManage stockValuationHistoryManage;
     private final StockFinancialIndicatorManage stockFinancialIndicatorManage;
     private final StockDividendHistoryManage stockDividendHistoryManage;
 
     public StockSceneDataEnsureServiceImpl(
-            EastMoneyValuationApi eastMoneyValuationApi,
-            EastMoneyFinanceApi eastMoneyFinanceApi,
-            EastMoneyDividendApi eastMoneyDividendApi,
+            StockFundamentalProvider stockFundamentalProvider,
             StockIndustryInfoManage stockIndustryInfoManage,
             StockValuationHistoryManage stockValuationHistoryManage,
             StockFinancialIndicatorManage stockFinancialIndicatorManage,
             StockDividendHistoryManage stockDividendHistoryManage) {
-        this.eastMoneyValuationApi = eastMoneyValuationApi;
-        this.eastMoneyFinanceApi = eastMoneyFinanceApi;
-        this.eastMoneyDividendApi = eastMoneyDividendApi;
+        this.stockFundamentalProvider = stockFundamentalProvider;
         this.stockIndustryInfoManage = stockIndustryInfoManage;
         this.stockValuationHistoryManage = stockValuationHistoryManage;
         this.stockFinancialIndicatorManage = stockFinancialIndicatorManage;
@@ -76,12 +67,9 @@ public class StockSceneDataEnsureServiceImpl implements StockSceneDataEnsureServ
         if (latest != null && latest.getSyncedAt() != null && latest.getSyncedAt().toLocalDate().equals(LocalDate.now())) {
             return;
         }
-        StockMarketDataDTO response = this.eastMoneyValuationApi.getValuationHistory(
-                stockConfig.getStockCode(),
-                VALUATION_LIMIT);
-        List<StockValuationHistoryPO> valuations = StockValuationHistoryPO.fromEastMoneyResponse(
+        List<StockValuationHistoryPO> valuations = this.stockFundamentalProvider.getValuationHistory(
                 stockConfig,
-                response.data());
+                VALUATION_LIMIT);
         if (CollUtil.isNotEmpty(valuations)) {
             this.stockValuationHistoryManage.saveValuationHistory(valuations);
         }
@@ -105,12 +93,9 @@ public class StockSceneDataEnsureServiceImpl implements StockSceneDataEnsureServ
         if (this.isFreshWithinDays(latest == null ? null : latest.getSyncedAt(), FINANCIAL_FRESH_DAYS)) {
             return;
         }
-        StockMarketDataDTO response = this.eastMoneyFinanceApi.getMainFinancialIndicators(
-                this.toSecucode(stockConfig),
-                FINANCIAL_LIMIT);
-        List<StockFinancialIndicatorPO> indicators = StockFinancialIndicatorPO.fromEastMoneyResponse(
+        List<StockFinancialIndicatorPO> indicators = this.stockFundamentalProvider.getFinancialIndicators(
                 stockConfig,
-                response.data());
+                FINANCIAL_LIMIT);
         if (CollUtil.isNotEmpty(indicators)) {
             this.stockFinancialIndicatorManage.saveFinancialIndicators(indicators);
         }
@@ -121,12 +106,9 @@ public class StockSceneDataEnsureServiceImpl implements StockSceneDataEnsureServ
         if (this.isFreshWithinDays(latest == null ? null : latest.getSyncedAt(), DIVIDEND_FRESH_DAYS)) {
             return;
         }
-        StockMarketDataDTO response = this.eastMoneyDividendApi.getDividendHistory(
-                stockConfig.getStockCode(),
-                DIVIDEND_LIMIT);
-        List<StockDividendHistoryPO> dividends = StockDividendHistoryPO.fromEastMoneyResponse(
+        List<StockDividendHistoryPO> dividends = this.stockFundamentalProvider.getDividendHistory(
                 stockConfig,
-                response.data());
+                DIVIDEND_LIMIT);
         if (CollUtil.isNotEmpty(dividends)) {
             this.stockDividendHistoryManage.saveDividendHistory(dividends);
         }
@@ -136,11 +118,4 @@ public class StockSceneDataEnsureServiceImpl implements StockSceneDataEnsureServ
         return syncedAt != null && !syncedAt.isBefore(LocalDateTime.now().minusDays(days));
     }
 
-    private String toSecucode(StockConfigPO stockConfig) {
-        String[] parts = stockConfig.getSecid().split("\\.");
-        if (parts.length != 2) {
-            throw new IllegalArgumentException("invalid secid: " + stockConfig.getSecid());
-        }
-        return "%s.%s".formatted(stockConfig.getStockCode(), "1".equals(parts[0]) ? "SH" : "SZ");
-    }
 }

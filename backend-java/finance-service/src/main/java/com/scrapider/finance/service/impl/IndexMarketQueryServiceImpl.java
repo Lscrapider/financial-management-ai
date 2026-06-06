@@ -1,9 +1,6 @@
 package com.scrapider.finance.service.impl;
 
 import cn.hutool.core.util.StrUtil;
-import com.scrapider.finance.api.StockMarketApi;
-import com.scrapider.finance.domain.dto.StockMarketDataDTO;
-import com.scrapider.finance.domain.enums.KlineAdjustTypeEnum;
 import com.scrapider.finance.domain.enums.KlinePeriodTypeEnum;
 import com.scrapider.finance.domain.enums.IndexQuoteSortFieldEnum;
 import com.scrapider.finance.domain.enums.SortOrderEnum;
@@ -19,6 +16,7 @@ import com.scrapider.finance.manage.IndexConfigManage;
 import com.scrapider.finance.manage.IndexIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.IndexKlineManage;
 import com.scrapider.finance.manage.IndexQuoteSnapshotManage;
+import com.scrapider.finance.service.HistoricalKlineProvider;
 import com.scrapider.finance.service.IndexMarketQueryService;
 import com.scrapider.finance.task.IndexMarketSyncTask;
 import java.time.LocalDate;
@@ -37,7 +35,7 @@ public class IndexMarketQueryServiceImpl implements IndexMarketQueryService {
     private final IndexIntradayTrendInfluxManage indexIntradayTrendInfluxManage;
     private final IndexKlineManage indexKlineManage;
     private final IndexConfigManage indexConfigManage;
-    private final StockMarketApi stockMarketApi;
+    private final HistoricalKlineProvider historicalKlineProvider;
     private final IndexMarketSyncTask indexMarketSyncTask;
 
     public IndexMarketQueryServiceImpl(
@@ -45,13 +43,13 @@ public class IndexMarketQueryServiceImpl implements IndexMarketQueryService {
             IndexIntradayTrendInfluxManage indexIntradayTrendInfluxManage,
             IndexKlineManage indexKlineManage,
             IndexConfigManage indexConfigManage,
-            StockMarketApi stockMarketApi,
+            HistoricalKlineProvider historicalKlineProvider,
             IndexMarketSyncTask indexMarketSyncTask) {
         this.indexQuoteSnapshotManage = indexQuoteSnapshotManage;
         this.indexIntradayTrendInfluxManage = indexIntradayTrendInfluxManage;
         this.indexKlineManage = indexKlineManage;
         this.indexConfigManage = indexConfigManage;
-        this.stockMarketApi = stockMarketApi;
+        this.historicalKlineProvider = historicalKlineProvider;
         this.indexMarketSyncTask = indexMarketSyncTask;
     }
 
@@ -143,15 +141,7 @@ public class IndexMarketQueryServiceImpl implements IndexMarketQueryService {
         if (index == null || StrUtil.isBlank(index.getSecid())) {
             return;
         }
-        StockMarketDataDTO klines = this.stockMarketApi.getKlines(
-                index.getSecid(),
-                periodType,
-                KlineAdjustTypeEnum.NONE,
-                limit);
-        this.indexKlineManage.saveKlines(IndexKlinePO.fromApiResponse(
-                index,
-                klines.data(),
-                periodType));
+        this.indexKlineManage.saveKlines(this.historicalKlineProvider.getIndexKlines(index, periodType, limit));
     }
 
     private int normalizeLimit(Integer limit, int defaultLimit) {

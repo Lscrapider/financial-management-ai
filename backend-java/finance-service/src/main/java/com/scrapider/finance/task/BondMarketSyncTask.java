@@ -16,6 +16,11 @@ import com.scrapider.finance.manage.BondConfigManage;
 import com.scrapider.finance.manage.BondIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.BondKlineManage;
 import com.scrapider.finance.manage.BondQuoteSnapshotManage;
+import com.scrapider.finance.manage.ConvertibleBondBasicManage;
+import com.scrapider.finance.manage.ConvertibleBondDailyValuationManage;
+import com.scrapider.finance.manage.ConvertibleBondShareManage;
+import com.scrapider.finance.service.ConvertibleBondDataProvider;
+import com.scrapider.finance.service.HistoricalKlineProvider;
 import com.scrapider.finance.service.MarketTradingCalendarService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -38,6 +43,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.StreamSupport;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -56,6 +62,11 @@ public class BondMarketSyncTask {
     private final BondQuoteSnapshotManage bondQuoteSnapshotManage;
     private final BondKlineManage bondKlineManage;
     private final BondIntradayTrendInfluxManage bondIntradayTrendInfluxManage;
+    private final HistoricalKlineProvider historicalKlineProvider;
+    private final ObjectProvider<ConvertibleBondDataProvider> convertibleBondDataProvider;
+    private final ConvertibleBondBasicManage convertibleBondBasicManage;
+    private final ConvertibleBondDailyValuationManage convertibleBondDailyValuationManage;
+    private final ConvertibleBondShareManage convertibleBondShareManage;
     private final MarketTradingCalendarService marketTradingCalendarService;
     private final AtomicBoolean syncing = new AtomicBoolean(false);
     private final ExecutorService manualSyncExecutor = Executors.newSingleThreadExecutor();
@@ -96,18 +107,37 @@ public class BondMarketSyncTask {
     @Value("${bond.sync.trend-enabled:true}")
     private boolean trendEnabled;
 
+    @Value("${bond.sync.convertible-data-enabled:true}")
+    private boolean convertibleDataEnabled;
+
+    @Value("${bond.sync.convertible-daily-limit:250}")
+    private Integer convertibleDailyLimit;
+
+    @Value("${bond.sync.convertible-share-limit:250}")
+    private Integer convertibleShareLimit;
+
     public BondMarketSyncTask(
             StockMarketApi stockMarketApi,
             BondConfigManage bondConfigManage,
             BondQuoteSnapshotManage bondQuoteSnapshotManage,
             BondKlineManage bondKlineManage,
             BondIntradayTrendInfluxManage bondIntradayTrendInfluxManage,
+            HistoricalKlineProvider historicalKlineProvider,
+            ObjectProvider<ConvertibleBondDataProvider> convertibleBondDataProvider,
+            ConvertibleBondBasicManage convertibleBondBasicManage,
+            ConvertibleBondDailyValuationManage convertibleBondDailyValuationManage,
+            ConvertibleBondShareManage convertibleBondShareManage,
             MarketTradingCalendarService marketTradingCalendarService) {
         this.stockMarketApi = stockMarketApi;
         this.bondConfigManage = bondConfigManage;
         this.bondQuoteSnapshotManage = bondQuoteSnapshotManage;
         this.bondKlineManage = bondKlineManage;
         this.bondIntradayTrendInfluxManage = bondIntradayTrendInfluxManage;
+        this.historicalKlineProvider = historicalKlineProvider;
+        this.convertibleBondDataProvider = convertibleBondDataProvider;
+        this.convertibleBondBasicManage = convertibleBondBasicManage;
+        this.convertibleBondDailyValuationManage = convertibleBondDailyValuationManage;
+        this.convertibleBondShareManage = convertibleBondShareManage;
         this.marketTradingCalendarService = marketTradingCalendarService;
     }
 
@@ -156,7 +186,7 @@ public class BondMarketSyncTask {
         }
         this.doSyncKlinesForBond(bond, periodType, limit);
         if (KlinePeriodTypeEnum.DAILY.equals(periodType)) {
-            this.repairLatestPeriodKlinesFromDaily(List.of(bond));
+//            this.repairLatestPeriodKlinesFromDaily(List.of(bond));
         }
         return true;
     }
@@ -255,7 +285,27 @@ public class BondMarketSyncTask {
                     KlinePeriodTypeEnum.MONTHLY,
                     this.monthlyKlineLimit));
         }
-        this.repairLatestPeriodKlinesFromDaily(valid);
+//        this.repairLatestPeriodKlinesFromDaily(valid);
+        this.syncConvertibleBondData(valid);
+    }
+
+    private void syncConvertibleBondData(List<BondConfigPO> bonds) {
+        ConvertibleBondDataProvider provider = this.convertibleBondDataProvider.getIfAvailable();
+        if (!this.convertibleDataEnabled || provider == null || CollUtil.isEmpty(bonds)) {
+            return;
+        }
+        for (BondConfigPO bond : bonds) {
+            try {
+                this.convertibleBondBasicManage.saveBasic(provider.getBasic(bond));
+                this.convertibleBondDailyValuationManage.saveValuations(
+                        provider.getDailyValuations(bond, this.convertibleDailyLimit));
+                this.convertibleBondShareManage.saveShares(
+                        provider.getShareChanges(bond, this.convertibleShareLimit));
+                this.sleepForRateLimit();
+            } catch (Exception ex) {
+                log.warn("Failed to sync convertible bond data for bond: {}", bond.getBondCode(), ex);
+            }
+        }
     }
 
     private void doSyncTrendsForBond(BondConfigPO bond) {
@@ -311,15 +361,7 @@ public class BondMarketSyncTask {
             BondConfigPO bond,
             KlinePeriodTypeEnum periodType,
             Integer limit) {
-        StockMarketDataDTO klines = this.stockMarketApi.getKlines(
-                bond.getSecid(),
-                periodType,
-                KlineAdjustTypeEnum.NONE,
-                limit);
-        this.bondKlineManage.saveKlines(BondKlinePO.fromApiResponse(
-                bond,
-                klines.data(),
-                periodType));
+        this.bondKlineManage.saveKlines(this.historicalKlineProvider.getBondKlines(bond, periodType, limit));
     }
 
     private void repairLatestPeriodKlinesFromDaily(List<BondConfigPO> bonds) {

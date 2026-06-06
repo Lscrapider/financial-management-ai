@@ -70,6 +70,18 @@ public class IndexKlinePO {
         return fromApiResponse(indexConfig, response, KlinePeriodTypeEnum.DAILY);
     }
 
+    public static List<IndexKlinePO> fromTushareRows(
+            IndexConfigPO indexConfig,
+            JsonNode rows,
+            KlinePeriodTypeEnum periodType) {
+        LocalDateTime syncedAt = LocalDateTime.now();
+        List<IndexKlinePO> klines = StreamSupport.stream(rows.spliterator(), false)
+                .map(row -> fromTushareRow(indexConfig, row, periodType, syncedAt))
+                .filter(Objects::nonNull)
+                .toList();
+        return withMovingAverages(klines);
+    }
+
     private static IndexKlinePO fromTencentLine(
             IndexConfigPO indexConfig,
             JsonNode line,
@@ -98,6 +110,37 @@ public class IndexKlinePO {
         kline.setChangeAmount(decimal(line, 9));
         kline.setTurnoverRate(decimal(line, 10));
         kline.setRawResponse(line.toString());
+        kline.setSyncedAt(syncedAt);
+        return kline;
+    }
+
+    private static IndexKlinePO fromTushareRow(
+            IndexConfigPO indexConfig,
+            JsonNode row,
+            KlinePeriodTypeEnum periodType,
+            LocalDateTime syncedAt) {
+        String tradeDate = StockMarketJsonParser.text(row, "trade_date", null);
+        if (tradeDate == null || tradeDate.length() != 8) {
+            return null;
+        }
+        IndexKlinePO kline = new IndexKlinePO();
+        kline.setIndexCode(indexConfig.getIndexCode());
+        kline.setIndexName(indexConfig.getIndexName());
+        kline.setSecid(indexConfig.getSecid());
+        kline.setMarketCode(indexConfig.getMarketCode());
+        kline.setExchangeCode(indexConfig.getExchangeCode());
+        kline.setPeriodType(periodType.getCode());
+        kline.setTradeDate(LocalDate.parse(
+                "%s-%s-%s".formatted(tradeDate.substring(0, 4), tradeDate.substring(4, 6), tradeDate.substring(6, 8))));
+        kline.setOpenPrice(StockMarketJsonParser.decimal(row, "open"));
+        kline.setClosePrice(StockMarketJsonParser.decimal(row, "close"));
+        kline.setHighPrice(StockMarketJsonParser.decimal(row, "high"));
+        kline.setLowPrice(StockMarketJsonParser.decimal(row, "low"));
+        kline.setVolume(StockMarketJsonParser.longValue(row, "vol"));
+        kline.setTurnoverAmount(StockMarketJsonParser.decimal(row, "amount"));
+        kline.setChangePercent(StockMarketJsonParser.decimal(row, "pct_chg"));
+        kline.setChangeAmount(StockMarketJsonParser.decimal(row, "change"));
+        kline.setRawResponse(row.toString());
         kline.setSyncedAt(syncedAt);
         return kline;
     }

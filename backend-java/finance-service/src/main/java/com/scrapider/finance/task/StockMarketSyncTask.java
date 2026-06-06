@@ -16,6 +16,7 @@ import com.scrapider.finance.manage.StockConfigManage;
 import com.scrapider.finance.manage.StockKlineManage;
 import com.scrapider.finance.manage.StockIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
+import com.scrapider.finance.service.HistoricalKlineProvider;
 import com.scrapider.finance.service.MarketTradingCalendarService;
 import com.scrapider.finance.service.StockAlertService;
 import java.math.BigDecimal;
@@ -26,6 +27,7 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -58,6 +60,7 @@ public class StockMarketSyncTask {
     private final StockQuoteSnapshotManage stockQuoteSnapshotManage;
     private final StockKlineManage stockKlineManage;
     private final StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage;
+    private final HistoricalKlineProvider historicalKlineProvider;
     private final StockAlertService stockAlertService;
     private final MarketTradingCalendarService marketTradingCalendarService;
     private final AtomicBoolean syncing = new AtomicBoolean(false);
@@ -105,6 +108,7 @@ public class StockMarketSyncTask {
             StockQuoteSnapshotManage stockQuoteSnapshotManage,
             StockKlineManage stockKlineManage,
             StockIntradayTrendInfluxManage stockIntradayTrendInfluxManage,
+            HistoricalKlineProvider historicalKlineProvider,
             MarketTradingCalendarService marketTradingCalendarService,
             StockAlertService stockAlertService) {
         this.stockMarketApi = stockMarketApi;
@@ -112,6 +116,7 @@ public class StockMarketSyncTask {
         this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
         this.stockKlineManage = stockKlineManage;
         this.stockIntradayTrendInfluxManage = stockIntradayTrendInfluxManage;
+        this.historicalKlineProvider = historicalKlineProvider;
         this.marketTradingCalendarService = marketTradingCalendarService;
         this.stockAlertService = stockAlertService;
     }
@@ -273,7 +278,7 @@ public class StockMarketSyncTask {
                     KlinePeriodTypeEnum.MONTHLY,
                     this.monthlyKlineLimit));
         }
-        this.repairLatestPeriodKlinesFromDaily(valid);
+//        this.repairLatestPeriodKlinesFromDaily(valid);
     }
 
     private void doSyncTrendsForStock(StockConfigPO stock) {
@@ -291,7 +296,7 @@ public class StockMarketSyncTask {
 
     private void doSyncDailyKlinesForStock(StockConfigPO stock) {
         this.doSyncKlinesForStock(stock, KlinePeriodTypeEnum.DAILY, this.dailyKlineLimit);
-        this.repairLatestPeriodKlinesFromDaily(List.of(stock));
+//        this.repairLatestPeriodKlinesFromDaily(List.of(stock));
     }
 
     private void batchSyncKlines(List<StockConfigPO> stocks, KlineSyncPlan plan) {
@@ -313,11 +318,13 @@ public class StockMarketSyncTask {
     }
 
     private boolean shouldSyncKline(StockConfigPO stock, KlinePeriodTypeEnum periodType) {
-        return !this.stockKlineManage.hasSyncedSince(
-                stock.getSecid(),
-                periodType,
-                DEFAULT_KLINE_ADJUST_TYPE,
-                this.currentPeriodStart(periodType));
+        LocalDateTime since = this.currentPeriodStart(periodType);
+        return Arrays.stream(KlineAdjustTypeEnum.values())
+                .anyMatch(adjustType -> !this.stockKlineManage.hasSyncedSince(
+                        stock.getSecid(),
+                        periodType,
+                        adjustType,
+                        since));
     }
 
     private LocalDateTime currentPeriodStart(KlinePeriodTypeEnum periodType) {
@@ -332,16 +339,13 @@ public class StockMarketSyncTask {
     }
 
     private void doSyncKlinesForStock(StockConfigPO stock, KlinePeriodTypeEnum periodType, Integer limit) {
-        StockMarketDataDTO klines = this.stockMarketApi.getKlines(
-                stock.getSecid(),
-                periodType,
-                DEFAULT_KLINE_ADJUST_TYPE,
-                limit);
-        this.stockKlineManage.saveKlines(StockKlinePO.fromApiResponse(
-                stock,
-                klines.data(),
-                periodType,
-                DEFAULT_KLINE_ADJUST_TYPE));
+        Arrays.stream(KlineAdjustTypeEnum.values())
+                .map(adjustType -> this.historicalKlineProvider.getStockKlines(
+                        stock,
+                        periodType,
+                        adjustType,
+                        limit))
+                .forEach(this.stockKlineManage::saveKlines);
     }
 
     private void repairLatestPeriodKlinesFromDaily(List<StockConfigPO> stocks) {

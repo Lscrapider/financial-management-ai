@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.StreamSupport;
 import lombok.Data;
@@ -74,6 +75,28 @@ public class StockKlinePO {
                 KlineAdjustTypeEnum.HFQ);
     }
 
+    public static List<StockKlinePO> fromTushareRows(
+            StockConfigPO stockConfig,
+            JsonNode rows,
+            KlinePeriodTypeEnum periodType,
+            KlineAdjustTypeEnum adjustType) {
+        return fromTushareRows(stockConfig, rows, periodType, adjustType, Map.of());
+    }
+
+    public static List<StockKlinePO> fromTushareRows(
+            StockConfigPO stockConfig,
+            JsonNode rows,
+            KlinePeriodTypeEnum periodType,
+            KlineAdjustTypeEnum adjustType,
+            Map<LocalDate, BigDecimal> adjustFactors) {
+        LocalDateTime syncedAt = LocalDateTime.now();
+        List<StockKlinePO> klines = StreamSupport.stream(rows.spliterator(), false)
+                .map(row -> fromTushareRow(stockConfig, row, periodType, adjustType, adjustFactors, syncedAt))
+                .filter(Objects::nonNull)
+                .toList();
+        return withMovingAverages(klines);
+    }
+
     private static StockKlinePO fromTencentLine(
             StockConfigPO stockConfig,
             JsonNode line,
@@ -106,6 +129,70 @@ public class StockKlinePO {
         kline.setRawResponse(line.toString());
         kline.setSyncedAt(syncedAt);
         return kline;
+    }
+
+    private static StockKlinePO fromTushareRow(
+            StockConfigPO stockConfig,
+            JsonNode row,
+            KlinePeriodTypeEnum periodType,
+            KlineAdjustTypeEnum adjustType,
+            Map<LocalDate, BigDecimal> adjustFactors,
+            LocalDateTime syncedAt) {
+        String tradeDate = StockMarketJsonParser.text(row, "trade_date", null);
+        if (tradeDate == null || tradeDate.length() != 8) {
+            return null;
+        }
+        StockKlinePO kline = new StockKlinePO();
+        kline.setStockCode(stockConfig.getStockCode());
+        kline.setStockName(stockConfig.getStockName());
+        kline.setSecid(stockConfig.getSecid());
+        kline.setMarketCode(stockConfig.getMarketCode());
+        kline.setExchangeCode(stockConfig.getExchangeCode());
+        kline.setPeriodType(periodType.getCode());
+        kline.setAdjustType(adjustType.getCode());
+        LocalDate parsedTradeDate = LocalDate.parse(
+                "%s-%s-%s".formatted(tradeDate.substring(0, 4), tradeDate.substring(4, 6), tradeDate.substring(6, 8)));
+        kline.setTradeDate(parsedTradeDate);
+        BigDecimal factor = adjustFactor(parsedTradeDate, adjustType, adjustFactors);
+        kline.setOpenPrice(adjust(StockMarketJsonParser.decimal(row, "open"), factor));
+        kline.setClosePrice(adjust(StockMarketJsonParser.decimal(row, "close"), factor));
+        kline.setHighPrice(adjust(StockMarketJsonParser.decimal(row, "high"), factor));
+        kline.setLowPrice(adjust(StockMarketJsonParser.decimal(row, "low"), factor));
+        kline.setVolume(StockMarketJsonParser.longValue(row, "vol"));
+        kline.setTurnoverAmount(StockMarketJsonParser.decimal(row, "amount"));
+        kline.setChangePercent(StockMarketJsonParser.decimal(row, "pct_chg"));
+        kline.setChangeAmount(adjust(StockMarketJsonParser.decimal(row, "change"), factor));
+        kline.setRawResponse(row.toString());
+        kline.setSyncedAt(syncedAt);
+        return kline;
+    }
+
+    private static BigDecimal adjustFactor(
+            LocalDate tradeDate,
+            KlineAdjustTypeEnum adjustType,
+            Map<LocalDate, BigDecimal> adjustFactors) {
+        if (KlineAdjustTypeEnum.NONE.equals(adjustType) || adjustFactors.isEmpty()) {
+            return BigDecimal.ONE;
+        }
+        BigDecimal current = adjustFactors.get(tradeDate);
+        if (current == null) {
+            return BigDecimal.ONE;
+        }
+        if (KlineAdjustTypeEnum.HFQ.equals(adjustType)) {
+            return current;
+        }
+        BigDecimal latest = adjustFactors.entrySet().stream()
+                .max(Map.Entry.comparingByKey())
+                .map(Map.Entry::getValue)
+                .orElse(BigDecimal.ONE);
+        if (latest.signum() == 0) {
+            return BigDecimal.ONE;
+        }
+        return current.divide(latest, 8, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal adjust(BigDecimal value, BigDecimal factor) {
+        return value == null ? null : value.multiply(factor).setScale(4, RoundingMode.HALF_UP);
     }
 
     private static List<StockKlinePO> withMovingAverages(List<StockKlinePO> klines) {

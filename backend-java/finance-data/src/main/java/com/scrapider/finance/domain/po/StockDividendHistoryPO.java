@@ -46,6 +46,14 @@ public class StockDividendHistoryPO {
                 .toList();
     }
 
+    public static List<StockDividendHistoryPO> fromTushareRows(StockConfigPO stockConfig, JsonNode rows) {
+        LocalDateTime syncedAt = LocalDateTime.now();
+        return StreamSupport.stream(rows.spliterator(), false)
+                .map(row -> fromTushareRow(stockConfig, row, syncedAt))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
     private static StockDividendHistoryPO fromEastMoneyRow(
             StockConfigPO stockConfig,
             JsonNode row,
@@ -77,10 +85,43 @@ public class StockDividendHistoryPO {
         return dividend;
     }
 
+    private static StockDividendHistoryPO fromTushareRow(
+            StockConfigPO stockConfig,
+            JsonNode row,
+            LocalDateTime syncedAt) {
+        LocalDate reportDate = date(row, "end_date");
+        LocalDate exDividendDate = date(row, "ex_date");
+        if (reportDate == null && exDividendDate == null) {
+            return null;
+        }
+
+        StockDividendHistoryPO dividend = new StockDividendHistoryPO();
+        dividend.setStockCode(stockConfig.getStockCode());
+        dividend.setStockName(stockConfig.getStockName());
+        dividend.setSecucode(StockMarketJsonParser.text(row, "ts_code", stockConfig.getStockCode()));
+        dividend.setReportDate(reportDate);
+        dividend.setExDividendDate(exDividendDate);
+        dividend.setPlanNoticeDate(date(row, "ann_date"));
+        dividend.setEquityRecordDate(date(row, "record_date"));
+        dividend.setPretaxBonusRmb(StockMarketJsonParser.decimal(row, "cash_div_tax"));
+        dividend.setDividendRatio(StockMarketJsonParser.decimal(row, "cash_div"));
+        dividend.setAssignProgress(StockMarketJsonParser.text(row, "div_proc", null));
+        dividend.setSource("tushare");
+        dividend.setRawResponse(row.toString());
+        dividend.setSyncedAt(syncedAt);
+        return dividend;
+    }
+
     private static LocalDate date(JsonNode row, String fieldName) {
         String value = StockMarketJsonParser.text(row, fieldName, null);
         if (StrUtil.isBlank(value)) {
             return null;
+        }
+        if (value.length() == 8) {
+            return LocalDate.parse("%s-%s-%s".formatted(
+                    value.substring(0, 4),
+                    value.substring(4, 6),
+                    value.substring(6, 8)));
         }
         return LocalDate.parse(value.substring(0, 10));
     }

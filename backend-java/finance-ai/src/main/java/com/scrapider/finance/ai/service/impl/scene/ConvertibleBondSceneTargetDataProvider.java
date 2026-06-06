@@ -9,9 +9,19 @@ import com.scrapider.finance.ai.service.SceneTargetDataProvider;
 import com.scrapider.finance.domain.enums.KlinePeriodTypeEnum;
 import com.scrapider.finance.domain.po.BondConfigPO;
 import com.scrapider.finance.domain.po.BondQuoteSnapshotPO;
+import com.scrapider.finance.domain.po.ConvertibleBondBasicPO;
+import com.scrapider.finance.domain.po.ConvertibleBondDailyValuationPO;
+import com.scrapider.finance.domain.po.ConvertibleBondSharePO;
 import com.scrapider.finance.manage.BondConfigManage;
 import com.scrapider.finance.manage.BondKlineManage;
 import com.scrapider.finance.manage.BondQuoteSnapshotManage;
+import com.scrapider.finance.manage.ConvertibleBondBasicManage;
+import com.scrapider.finance.manage.ConvertibleBondDailyValuationManage;
+import com.scrapider.finance.manage.ConvertibleBondShareManage;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,16 +34,25 @@ public class ConvertibleBondSceneTargetDataProvider extends AbstractSceneTargetD
     private final BondQuoteSnapshotManage bondQuoteSnapshotManage;
     private final BondConfigManage bondConfigManage;
     private final BondKlineManage bondKlineManage;
+    private final ConvertibleBondBasicManage convertibleBondBasicManage;
+    private final ConvertibleBondDailyValuationManage convertibleBondDailyValuationManage;
+    private final ConvertibleBondShareManage convertibleBondShareManage;
 
     public ConvertibleBondSceneTargetDataProvider(
             ObjectMapper objectMapper,
             BondQuoteSnapshotManage bondQuoteSnapshotManage,
             BondConfigManage bondConfigManage,
-            BondKlineManage bondKlineManage) {
+            BondKlineManage bondKlineManage,
+            ConvertibleBondBasicManage convertibleBondBasicManage,
+            ConvertibleBondDailyValuationManage convertibleBondDailyValuationManage,
+            ConvertibleBondShareManage convertibleBondShareManage) {
         super(objectMapper);
         this.bondQuoteSnapshotManage = bondQuoteSnapshotManage;
         this.bondConfigManage = bondConfigManage;
         this.bondKlineManage = bondKlineManage;
+        this.convertibleBondBasicManage = convertibleBondBasicManage;
+        this.convertibleBondDailyValuationManage = convertibleBondDailyValuationManage;
+        this.convertibleBondShareManage = convertibleBondShareManage;
     }
 
     @Override
@@ -99,7 +118,7 @@ public class ConvertibleBondSceneTargetDataProvider extends AbstractSceneTargetD
                 weeklyKlines,
                 monthlyKlines,
                 List.of(),
-                this.convertibleBondAssetSpecificData(quote),
+                this.convertibleBondAssetSpecificData(bondCode, quote),
                 missing);
     }
 
@@ -119,33 +138,89 @@ public class ConvertibleBondSceneTargetDataProvider extends AbstractSceneTargetD
         return rows;
     }
 
-    private Map<String, Object> convertibleBondAssetSpecificData(BondQuoteSnapshotPO quote) {
-        if (quote == null) {
-            return Map.of("convertibleBond", Map.of());
-        }
+    private Map<String, Object> convertibleBondAssetSpecificData(String bondCode, BondQuoteSnapshotPO quote) {
+        ConvertibleBondBasicPO basic = this.convertibleBondBasicManage.latestByBondCode(bondCode);
+        ConvertibleBondDailyValuationPO latestValuation =
+                this.convertibleBondDailyValuationManage.latestByBondCode(bondCode);
+        ConvertibleBondSharePO latestShare = this.convertibleBondShareManage.latestByBondCode(bondCode);
+        List<ConvertibleBondDailyValuationPO> valuations =
+                this.convertibleBondDailyValuationManage.listByBondCode(bondCode, MARKET_KLINE_LIMIT);
+
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put("bondPrice", quote.getLatestPrice());
-        data.put("turnoverRate", quote.getTurnoverRate());
-        data.put("bondRating", quote.getBondRating());
-        // 可转债专属字段契约：当前数据源未全部接入，补齐后 Python 会按这些 key 直接读取。
-        data.put("premiumRate", null);
-        data.put("premiumRateHistory", List.of());
-        data.put("conversionValue", null);
-        data.put("conversionValueHistory", List.of());
-        data.put("pureBondValue", null);
-        data.put("ytm", null);
-        data.put("remainingSize", null);
-        data.put("maturityDays", null);
-        data.put("redeemStatus", null);
+        data.put("bondPrice", this.firstNonNull(
+                quote == null ? null : quote.getLatestPrice(),
+                latestValuation == null ? null : latestValuation.getClosePrice()));
+        data.put("turnoverRate", quote == null ? null : quote.getTurnoverRate());
+        data.put("bondRating", this.firstNotBlank(
+                basic == null ? null : basic.getRating(),
+                quote == null ? null : quote.getBondRating()));
+        data.put("premiumRate", latestValuation == null ? null : latestValuation.getPremiumRate());
+        data.put("premiumRateHistory", valuations.stream()
+                .map(ConvertibleBondDailyValuationPO::getPremiumRate)
+                .toList());
+        data.put("conversionValue", latestValuation == null ? null : latestValuation.getConversionValue());
+        data.put("conversionValueHistory", valuations.stream()
+                .map(ConvertibleBondDailyValuationPO::getConversionValue)
+                .toList());
+        data.put("pureBondValue", latestValuation == null ? null : latestValuation.getPureBondValue());
+        data.put("ytm", this.firstNonNull(
+                latestValuation == null ? null : latestValuation.getYtm(),
+                this.estimatedYtm(data.get("bondPrice"), basic)));
+        data.put("remainingSize", this.firstNonNull(
+                basic == null ? null : basic.getRemainingSize(),
+                latestShare == null ? null : latestShare.getRemainingSize()));
+        data.put("maturityDays", this.maturityDays(basic));
+        data.put("redeemStatus", "DATA_INSUFFICIENT");
         data.put("redeemTriggerProgress", null);
-        data.put("putbackStatus", null);
-        data.put("underlyingStockCode", null);
-        data.put("underlyingStockName", null);
+        data.put("putbackStatus", "DATA_INSUFFICIENT");
+        data.put("underlyingStockCode", basic == null ? null : basic.getUnderlyingStockCode());
+        data.put("underlyingStockName", basic == null ? null : basic.getUnderlyingStockName());
+        data.put("conversionPrice", basic == null ? null : basic.getConversionPrice());
+        data.put("maturityDate", basic == null ? null : basic.getMaturityDate());
+        data.put("maturityCallPrice", basic == null ? null : basic.getMaturityCallPrice());
+        data.put("couponRate", basic == null ? null : basic.getCouponRate());
+        data.put("redeemClause", basic == null ? null : basic.getRedeemClause());
+        data.put("putbackClause", basic == null ? null : basic.getPutbackClause());
         data.put("underlyingQuote", Map.of());
         data.put("underlyingDailyKlines", List.of());
         data.put("underlyingChangePct", null);
         data.put("underlyingTrendScore", null);
         data.put("stockBondLinkage", null);
         return Map.of("convertibleBond", this.compactMap(data));
+    }
+
+    private Long maturityDays(ConvertibleBondBasicPO basic) {
+        if (basic == null || basic.getMaturityDate() == null) {
+            return null;
+        }
+        return ChronoUnit.DAYS.between(LocalDate.now(), basic.getMaturityDate());
+    }
+
+    private BigDecimal estimatedYtm(Object bondPriceValue, ConvertibleBondBasicPO basic) {
+        if (!(bondPriceValue instanceof BigDecimal bondPrice)
+                || basic == null
+                || basic.getMaturityDate() == null
+                || basic.getMaturityCallPrice() == null
+                || bondPrice.signum() <= 0) {
+            return null;
+        }
+        long days = this.maturityDays(basic);
+        if (days <= 0) {
+            return null;
+        }
+        // Tushare cb_daily 不直接给 YTM；这里先用到期赎回价做不含票息的保守近似，完整现金流 YTM 后续单独计算。
+        double years = days / 365.0D;
+        double value = Math.pow(basic.getMaturityCallPrice().doubleValue() / bondPrice.doubleValue(), 1.0D / years) - 1.0D;
+        return BigDecimal.valueOf(value * 100.0D).setScale(4, RoundingMode.HALF_UP);
+    }
+
+    @SafeVarargs
+    private final <T> T firstNonNull(T... values) {
+        for (T value : values) {
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
     }
 }

@@ -1,10 +1,7 @@
 package com.scrapider.finance.service.impl;
 
 import cn.hutool.core.util.StrUtil;
-import com.scrapider.finance.api.StockMarketApi;
-import com.scrapider.finance.domain.dto.StockMarketDataDTO;
 import com.scrapider.finance.domain.enums.BondQuoteSortFieldEnum;
-import com.scrapider.finance.domain.enums.KlineAdjustTypeEnum;
 import com.scrapider.finance.domain.enums.KlinePeriodTypeEnum;
 import com.scrapider.finance.domain.enums.SortOrderEnum;
 import com.scrapider.finance.domain.param.BondKlineParam;
@@ -20,6 +17,7 @@ import com.scrapider.finance.manage.BondIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.BondKlineManage;
 import com.scrapider.finance.manage.BondQuoteSnapshotManage;
 import com.scrapider.finance.service.BondMarketQueryService;
+import com.scrapider.finance.service.HistoricalKlineProvider;
 import com.scrapider.finance.task.BondMarketSyncTask;
 import java.time.LocalDate;
 import java.util.Comparator;
@@ -37,7 +35,7 @@ public class BondMarketQueryServiceImpl implements BondMarketQueryService {
     private final BondIntradayTrendInfluxManage bondIntradayTrendInfluxManage;
     private final BondKlineManage bondKlineManage;
     private final BondConfigManage bondConfigManage;
-    private final StockMarketApi stockMarketApi;
+    private final HistoricalKlineProvider historicalKlineProvider;
     private final BondMarketSyncTask bondMarketSyncTask;
 
     public BondMarketQueryServiceImpl(
@@ -45,13 +43,13 @@ public class BondMarketQueryServiceImpl implements BondMarketQueryService {
             BondIntradayTrendInfluxManage bondIntradayTrendInfluxManage,
             BondKlineManage bondKlineManage,
             BondConfigManage bondConfigManage,
-            StockMarketApi stockMarketApi,
+            HistoricalKlineProvider historicalKlineProvider,
             BondMarketSyncTask bondMarketSyncTask) {
         this.bondQuoteSnapshotManage = bondQuoteSnapshotManage;
         this.bondIntradayTrendInfluxManage = bondIntradayTrendInfluxManage;
         this.bondKlineManage = bondKlineManage;
         this.bondConfigManage = bondConfigManage;
-        this.stockMarketApi = stockMarketApi;
+        this.historicalKlineProvider = historicalKlineProvider;
         this.bondMarketSyncTask = bondMarketSyncTask;
     }
 
@@ -143,15 +141,7 @@ public class BondMarketQueryServiceImpl implements BondMarketQueryService {
         if (bond == null || StrUtil.isBlank(bond.getSecid())) {
             return;
         }
-        StockMarketDataDTO klines = this.stockMarketApi.getKlines(
-                bond.getSecid(),
-                periodType,
-                KlineAdjustTypeEnum.NONE,
-                limit);
-        this.bondKlineManage.saveKlines(BondKlinePO.fromApiResponse(
-                bond,
-                klines.data(),
-                periodType));
+        this.bondKlineManage.saveKlines(this.historicalKlineProvider.getBondKlines(bond, periodType, limit));
     }
 
     private int normalizeLimit(Integer limit, int defaultLimit) {
