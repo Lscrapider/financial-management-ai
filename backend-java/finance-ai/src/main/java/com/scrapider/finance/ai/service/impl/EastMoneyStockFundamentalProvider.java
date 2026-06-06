@@ -2,6 +2,7 @@ package com.scrapider.finance.ai.service.impl;
 
 import com.scrapider.finance.ai.api.EastMoneyDividendApi;
 import com.scrapider.finance.ai.api.EastMoneyFinanceApi;
+import com.scrapider.finance.ai.api.EastMoneyStockApi;
 import com.scrapider.finance.ai.api.EastMoneyValuationApi;
 import com.scrapider.finance.ai.service.StockFundamentalProvider;
 import com.scrapider.finance.domain.dto.StockMarketDataDTO;
@@ -21,19 +22,23 @@ public class EastMoneyStockFundamentalProvider implements StockFundamentalProvid
     private final EastMoneyValuationApi eastMoneyValuationApi;
     private final EastMoneyFinanceApi eastMoneyFinanceApi;
     private final EastMoneyDividendApi eastMoneyDividendApi;
+    private final EastMoneyStockApi eastMoneyStockApi;
 
     public EastMoneyStockFundamentalProvider(
             EastMoneyValuationApi eastMoneyValuationApi,
             EastMoneyFinanceApi eastMoneyFinanceApi,
-            EastMoneyDividendApi eastMoneyDividendApi) {
+            EastMoneyDividendApi eastMoneyDividendApi,
+            EastMoneyStockApi eastMoneyStockApi) {
         this.eastMoneyValuationApi = eastMoneyValuationApi;
         this.eastMoneyFinanceApi = eastMoneyFinanceApi;
         this.eastMoneyDividendApi = eastMoneyDividendApi;
+        this.eastMoneyStockApi = eastMoneyStockApi;
     }
 
     @Override
     public StockIndustryInfoPO getIndustryInfo(StockConfigPO stockConfig) {
-        return null;
+        StockMarketDataDTO response = this.eastMoneyStockApi.getStockInfo(stockConfig.getSecid());
+        return StockIndustryInfoPO.fromEastMoneyStockGetResponse(stockConfig, response.data());
     }
 
     @Override

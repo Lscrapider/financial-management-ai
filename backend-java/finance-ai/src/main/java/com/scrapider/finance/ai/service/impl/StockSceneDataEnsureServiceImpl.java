@@ -53,7 +53,8 @@ public class StockSceneDataEnsureServiceImpl implements StockSceneDataEnsureServ
         }
         this.ensureIndustryInfoFresh(stockConfig);
         this.ensureValuationHistoryFresh(stockConfig);
-        this.ensureIndustryInfoFromValuationHistory(stockConfig);
+        // 没用了，ensureIndustryInfoFresh 已经同步了
+//        this.ensureIndustryInfoFromValuationHistory(stockConfig);
         this.ensureFinancialIndicatorsFresh(stockConfig);
         this.ensureDividendHistoryFresh(stockConfig);
         return new StockSceneDataDTO(
