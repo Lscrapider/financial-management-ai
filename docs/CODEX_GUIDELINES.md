@@ -65,7 +65,7 @@ Controller -> Service -> Manage / API / Mapper -> Domain
 2. `Service` 负责业务逻辑。
 3. `Manage` 只负责最小数据库操作封装，优先基于 MyBatis Plus 完成基础查询、保存、批量保存、更新等动作，不放业务编排、参数归一化和 VO 转换。
 4. `Mapper` 只负责数据库访问；只有 MyBatis Plus 函数式查询无法表达或明显不适合时，才在 `Mapper` 中手写 SQL。
-5. `API` 只负责第三方接口调用。
+5. api 层只负责第三方接口调用与外部数据获取，不承载业务编排、业务判断或数据持久化逻辑。同一第三方数据源的接口应放在同一个 API 类中维护，无需按照业务场景拆分多个类。若单个 API 类过长，可按第三方接口模块或资源类型拆分，而不是按本系统业务逻辑拆分。
 6. 请求入参使用 `Param`。
 7. 返回前端使用 `VO`。
 8. 数据库对象使用 `PO`。
@@ -75,8 +75,10 @@ Controller -> Service -> Manage / API / Mapper -> Domain
 12. Java 类中调用本类方法时必须显式使用 `this`。
 13. Java 代码中优先使用 lambda 风格编写集合处理、回调和函数式接口逻辑。
 14. `JsonNode`、第三方响应、DTO 或中间数据构建具体 `PO` 时，构建逻辑优先放到对应实体类的静态方法中，例如 `StockQuoteSnapshotPO.fromApiResponse(...)`，不要散落在 `task`、`service` 或 `manage` 中。
-15. 常见判空、字符串处理、集合判断、数字转换、日期转换等通用操作优先使用 Hutool 工具包，例如 `StrUtil`、`CollUtil`、`NumberUtil`、`DateUtil`；不要重复手写通用工具逻辑，除非 Hutool 不适合当前场景。
+15. 常见判空、字符串处理、集合判断、数字转换、日期转换等通用操作优先使用 Hutool 工具包，例如 `Objects`、`StrUtil`、`CollUtil`、`NumberUtil`、`DateUtil`；不要重复手写通用工具逻辑，除非 Hutool 不适合当前场景。
 16. 未使用到的代码要及时删除，包括未使用的类、方法、字段、局部变量、import、配置项和依赖；不要为“以后可能用到”保留死代码。
 17. 分页查询接口使用 `pageSize` 和 `pageNum`，查询类接口使用 GET，提交类接口使用 POST。
 18. `Controller` 中不要编写局部 `@ExceptionHandler`。异常必须由模块级或全局 `@RestControllerAdvice` 统一处理，并且异常处理器必须使用日志打印异常对象，保留完整堆栈，避免吞掉真实报错原因。
 19. `Controller` 接收请求体必须使用 `domain/param` 包下的 Param 对象，不得使用 `Map`、`JsonNode` 等弱类型接收请求参数。
+20. 代码应保持简洁、干净、优雅。不要为了所谓的未来扩展性提前增加冗余判断、冗余抽象或多余设计。只有在存在重复逻辑、类似功能代码块，或单段逻辑过长影响可读性时，才允许抽离函数或类。禁止无意义的方法套方法。
+21. 对象拷贝、对象转 Map、Map 转对象时，优先使用项目已有依赖或框架提供的工具方法。若现有工具无法满足业务语义，需按业务场景创建明确的 Converter 转换类，并统一放在 converter 包下处理，避免在业务代码中散落手动转换逻辑。
