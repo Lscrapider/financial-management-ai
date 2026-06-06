@@ -21,6 +21,7 @@ export interface BondQuote {
   amplitude?: number | string;
   turnoverRate?: number | string;
   bondRating?: string;
+  conversionPremiumRate?: number | string;
   quoteDetails?: StockQuoteDetail[];
   syncedAt?: string;
 }

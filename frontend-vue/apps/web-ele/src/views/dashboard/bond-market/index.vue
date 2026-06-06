@@ -152,7 +152,7 @@ function sortQuotes(sort: Sort) {
 
 function openQuoteDetails(row: BondQuote) {
   quoteDetailTitle.value = `${row.bondName} ${row.bondCode}`;
-  quoteDetailRows.value = row.quoteDetails ?? [];
+  quoteDetailRows.value = quoteDetailsWithConversionPremium(row);
   quoteDetailVisible.value = true;
 }
 
@@ -373,6 +373,19 @@ function formatChangePercent(value?: number | string) {
   return `${numberValue > 0 ? '+' : ''}${numberValue.toFixed(2)}%`;
 }
 
+function quoteDetailsWithConversionPremium(row: BondQuote) {
+  const details = [...(row.quoteDetails ?? [])];
+  if (toNullableNumber(row.conversionPremiumRate) === null) {
+    return details;
+  }
+  details.push({
+    fieldIndex: -1,
+    fieldName: '转股溢价率',
+    fieldValue: formatChangePercent(row.conversionPremiumRate),
+  });
+  return details;
+}
+
 function formatDateTime(value?: string) {
   if (!value) {
     return '-';
@@ -590,7 +603,7 @@ function normalizeRouteSecid(value: unknown) {
           <ElCard class="quote-detail" shadow="never">
             <template #header>
               <div class="panel-header">
-                <span>可转债数据</span>
+                <span>盘口数据</span>
                 <span class="muted">
                   {{ latestKline?.tradeDate ?? '-' }}
                 </span>
@@ -638,6 +651,12 @@ function normalizeRouteSecid(value: unknown) {
                 }}</strong>
               </div>
               <div class="metric-item">
+                <span>转股溢价率</span>
+                <strong>{{
+                  formatChangePercent(selectedQuote.conversionPremiumRate)
+                }}</strong>
+              </div>
+              <div class="metric-item">
                 <span>成交量</span>
                 <strong>{{ formatVolume(selectedQuote.volume) }}</strong>
               </div>
@@ -650,7 +669,7 @@ function normalizeRouteSecid(value: unknown) {
                 <strong>{{ selectedQuote.bondRating }}</strong>
               </div>
             </div>
-            <ElEmpty v-else description="暂无可转债数据" />
+            <ElEmpty v-else description="暂无盘口数据" />
           </ElCard>
 
           <ElCard class="kline-panel" shadow="never">
