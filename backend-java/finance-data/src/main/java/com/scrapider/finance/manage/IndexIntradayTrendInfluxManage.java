@@ -2,6 +2,7 @@ package com.scrapider.finance.manage;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
+import com.influxdb.client.DeleteApi;
 import com.influxdb.client.QueryApi;
 import com.influxdb.client.WriteApiBlocking;
 import com.influxdb.client.write.Point;
@@ -13,7 +14,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -30,18 +33,36 @@ public class IndexIntradayTrendInfluxManage {
     private static final LocalTime AFTERNOON_END = LocalTime.of(15, 0);
 
     private final InfluxDbProperties influxDbProperties;
+    private final DeleteApi deleteApi;
     private final QueryApi queryApi;
     private final WriteApiBlocking writeApiBlocking;
     private final ZoneId zoneId;
 
     public IndexIntradayTrendInfluxManage(
             InfluxDbProperties influxDbProperties,
+            DeleteApi deleteApi,
             QueryApi queryApi,
             WriteApiBlocking writeApiBlocking) {
         this.influxDbProperties = influxDbProperties;
+        this.deleteApi = deleteApi;
         this.queryApi = queryApi;
         this.writeApiBlocking = writeApiBlocking;
         this.zoneId = ZoneId.of(influxDbProperties.getTimezone());
+    }
+
+    public void deleteByIndexCode(String indexCode) {
+        if (StrUtil.isBlank(indexCode)) {
+            return;
+        }
+        String predicate = "_measurement=\"%s\" AND indexCode=\"%s\"".formatted(
+                escape(this.influxDbProperties.getIndexMinuteMeasurement()),
+                escape(indexCode.trim()));
+        this.deleteApi.delete(
+                OffsetDateTime.of(1970, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC),
+                OffsetDateTime.now(ZoneOffset.UTC).plusYears(10),
+                predicate,
+                this.minuteBucket(),
+                this.influxDbProperties.getOrg());
     }
 
     public void saveTrends(List<IndexIntradayTrendPO> trends) {

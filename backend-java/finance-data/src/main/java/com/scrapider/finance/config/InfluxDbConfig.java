@@ -2,6 +2,7 @@ package com.scrapider.finance.config;
 
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.InfluxDBClientFactory;
+import com.influxdb.client.DeleteApi;
 import com.influxdb.client.QueryApi;
 import com.influxdb.client.WriteApiBlocking;
 import java.util.LinkedHashSet;
@@ -34,6 +35,11 @@ public class InfluxDbConfig {
     @Bean
     public QueryApi queryApi(InfluxDBClient influxDBClient) {
         return influxDBClient.getQueryApi();
+    }
+
+    @Bean
+    public DeleteApi deleteApi(InfluxDBClient influxDBClient) {
+        return influxDBClient.getDeleteApi();
     }
 
     @Bean

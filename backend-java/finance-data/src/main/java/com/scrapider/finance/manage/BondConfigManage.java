@@ -21,6 +21,23 @@ public class BondConfigManage extends ServiceImpl<BondConfigMapper, BondConfigPO
                 .last("LIMIT 1"));
     }
 
+    public BondConfigPO getBySecid(String secid) {
+        if (StrUtil.isBlank(secid)) {
+            return null;
+        }
+        return this.getOne(new LambdaQueryWrapper<BondConfigPO>()
+                .eq(BondConfigPO::getSecid, secid.trim())
+                .last("LIMIT 1"));
+    }
+
+    public void saveConfig(BondConfigPO bondConfig) {
+        BondConfigPO existing = this.getBySecid(bondConfig.getSecid());
+        if (existing != null) {
+            bondConfig.setId(existing.getId());
+        }
+        this.saveOrUpdate(bondConfig);
+    }
+
     public List<BondConfigPO> listEnabledBonds() {
         return this.list(new LambdaQueryWrapper<BondConfigPO>()
                 .eq(BondConfigPO::getEnabled, true)

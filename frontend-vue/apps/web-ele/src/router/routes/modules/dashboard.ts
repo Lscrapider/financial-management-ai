@@ -79,6 +79,15 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
+        name: 'TargetConfig',
+        path: '/target-config',
+        component: () => import('#/views/system-config/target-config/index.vue'),
+        meta: {
+          icon: 'lucide:list-plus',
+          title: $t('page.systemConfig.targetConfig'),
+        },
+      },
+      {
         name: 'DataSync',
         path: '/data-sync',
         component: () => import('#/views/system-config/data-sync/index.vue'),

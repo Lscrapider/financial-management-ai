@@ -84,6 +84,26 @@ export interface MarketSyncStatus {
   started: boolean;
 }
 
+export interface BondConfigAddParams {
+  bondCode: string;
+  bondName: string;
+}
+
+export interface BondConfigAddResult {
+  bondCode: string;
+  bondName: string;
+  secid: string;
+  marketCode: string;
+  exchangeCode: string;
+  underlyingStockCode?: string;
+  underlyingStockName?: string;
+  basicSynced: boolean;
+  underlyingStockSynced: boolean;
+  marketDataSynced: boolean;
+  dailyValuationSynced: boolean;
+  shareSynced: boolean;
+}
+
 export function listBondQuotes(params: BondQuoteListParams) {
   return requestClient.get<BondQuote[]>('/bonds/quotes', {
     params,
@@ -129,5 +149,11 @@ export function syncBondKlineData(
 export function getBondMarketSyncStatus() {
   return requestClient.get<MarketSyncStatus>('/bonds/sync/status', {
     timeout: 60_000,
+  });
+}
+
+export function addBondConfig(data: BondConfigAddParams) {
+  return requestClient.post<BondConfigAddResult>('/system-config/bonds', data, {
+    timeout: 120_000,
   });
 }

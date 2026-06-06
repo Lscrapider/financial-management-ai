@@ -213,6 +213,47 @@ public class BondMarketSyncTask {
         }
     }
 
+    public boolean syncMarketDataForBond(String bondCode) {
+        BondConfigPO bond = this.bondConfigManage.getEnabledByBondCode(bondCode);
+        if (bond == null || StrUtil.isBlank(bond.getSecid())) {
+            log.warn("Cannot sync bond market data: bond not found or no secid, code: {}", bondCode);
+            return false;
+        }
+        try {
+            this.syncQuoteForBond(bond);
+            this.doSyncTrendsForBond(bond);
+            this.doSyncKlinesForBond(bond, KlinePeriodTypeEnum.DAILY, this.dailyKlineLimit);
+            this.doSyncKlinesForBond(bond, KlinePeriodTypeEnum.WEEKLY, this.weeklyKlineLimit);
+            this.doSyncKlinesForBond(bond, KlinePeriodTypeEnum.MONTHLY, this.monthlyKlineLimit);
+            return true;
+        } catch (Exception ex) {
+            log.warn("Failed to sync market data for bond: {}", bondCode, ex);
+            return false;
+        }
+    }
+
+    public boolean syncConvertibleDataForBond(String bondCode, boolean includeBasic) {
+        BondConfigPO bond = this.bondConfigManage.getEnabledByBondCode(bondCode);
+        ConvertibleBondDataProvider provider = this.convertibleBondDataProvider.getIfAvailable();
+        if (!this.convertibleDataEnabled || bond == null || provider == null) {
+            log.warn("Cannot sync convertible bond data, bondCode: {}", bondCode);
+            return false;
+        }
+        try {
+            if (includeBasic) {
+                this.convertibleBondBasicManage.saveBasic(provider.getBasic(bond));
+            }
+            this.convertibleBondDailyValuationManage.saveValuations(
+                    provider.getDailyValuations(bond, this.convertibleDailyLimit));
+            this.convertibleBondShareManage.saveShares(
+                    provider.getShareChanges(bond, this.convertibleShareLimit));
+            return true;
+        } catch (Exception ex) {
+            log.warn("Failed to sync convertible bond data for bond: {}", bondCode, ex);
+            return false;
+        }
+    }
+
     private void runSyncIfIdle() {
         if (!this.syncing.compareAndSet(false, true)) {
             log.info("Bond market sync task is already running.");
@@ -358,6 +399,16 @@ public class BondMarketSyncTask {
                 .setScale(6, RoundingMode.HALF_UP);
         snapshot.setConversionValue(conversionValue);
         snapshot.setConversionPremiumRate(conversionPremiumRate);
+    }
+
+    private void syncQuoteForBond(BondConfigPO bond) {
+        StockMarketDataDTO quote = this.stockMarketApi.getQuote(bond.getSecid());
+        BondQuoteSnapshotPO snapshot = BondQuoteSnapshotPO.fromApiResponse(bond, quote.data());
+        if (StrUtil.isBlank(snapshot.getBondCode()) || snapshot.getLatestPrice() == null) {
+            throw new IllegalArgumentException("腾讯快照未返回有效可转债数据: " + bond.getBondCode());
+        }
+        this.fillRealtimeConversionMetrics(List.of(snapshot));
+        this.bondQuoteSnapshotManage.saveLatest(snapshot);
     }
 
     private ConvertibleBondBasicPO latestBasic(ConvertibleBondBasicPO left, ConvertibleBondBasicPO right) {

@@ -102,6 +102,22 @@ export interface MarketSyncStatus {
   started: boolean;
 }
 
+export interface StockConfigAddParams {
+  stockCode: string;
+  stockName: string;
+}
+
+export interface StockConfigAddResult {
+  stockCode: string;
+  stockName: string;
+  secid: string;
+  marketCode: string;
+  exchangeCode: string;
+  quoteSynced: boolean;
+  trendSynced: boolean;
+  quote: StockQuote;
+}
+
 export function listStockQuotes(params: StockQuoteListParams) {
   return requestClient.get<StockQuote[]>('/stocks/quotes', {
     params,
@@ -141,4 +157,10 @@ export function syncStockTrendData(stockCode: string) {
     undefined,
     { timeout: 60_000 },
   );
+}
+
+export function addStockConfig(data: StockConfigAddParams) {
+  return requestClient.post<StockConfigAddResult>('/system-config/stocks', data, {
+    timeout: 60_000,
+  });
 }

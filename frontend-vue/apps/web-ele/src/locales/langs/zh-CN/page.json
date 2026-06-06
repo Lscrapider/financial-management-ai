@@ -31,6 +31,7 @@
   },
   "systemConfig": {
     "title": "系统配置",
+    "targetConfig": "标的配置",
     "dataSync": "数据同步"
   }
 }

@@ -24,6 +24,20 @@ public class StockConfigManage extends ServiceImpl<StockConfigMapper, StockConfi
                 .last("LIMIT 1"));
     }
 
+    public StockConfigPO getByStockCode(String stockCode) {
+        return this.getOne(new LambdaQueryWrapper<StockConfigPO>()
+                .eq(StockConfigPO::getStockCode, stockCode)
+                .last("LIMIT 1"));
+    }
+
+    public void saveConfig(StockConfigPO stockConfig) {
+        StockConfigPO existing = this.getByStockCode(stockConfig.getStockCode());
+        if (existing != null) {
+            stockConfig.setId(existing.getId());
+        }
+        this.saveOrUpdate(stockConfig);
+    }
+
     public List<StockConfigPO> searchEnabledStocks(String keyword, int limit) {
         return this.list(new LambdaQueryWrapper<StockConfigPO>()
                 .eq(StockConfigPO::getEnabled, true)
