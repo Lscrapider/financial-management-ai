@@ -79,15 +79,6 @@ const sortDir = ref<'asc' | 'desc'>('desc');
 
 type SortKey = 'count' | 'categoryPercentage' | 'totalPercentage';
 
-function sortLabel(field: string): string {
-  const map: Record<string, string> = {
-    count: '条数',
-    categoryPercentage: '同类占比',
-    totalPercentage: '全局占比',
-  };
-  return map[field] ?? field;
-}
-
 function handleSort(field: string) {
   if (sortField.value === field) {
     sortDir.value = sortDir.value === 'desc' ? 'asc' : 'desc';

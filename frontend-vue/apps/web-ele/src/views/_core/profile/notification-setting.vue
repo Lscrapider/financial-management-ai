@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { Recordable } from '@vben/types';
+
 import { computed, onMounted, ref } from 'vue';
 
 import { ProfileNotificationSetting } from '@vben/common-ui';
@@ -25,7 +27,7 @@ onMounted(() => {
   emailNotification.value = userStore.userInfo?.emailNotification ?? true;
 });
 
-async function handleChange({ value }: { fieldName: string; value: boolean }) {
+async function handleChange({ value }: Recordable<any>) {
   emailNotification.value = value;
   await updateNotificationApi({ emailNotification: value });
 }
