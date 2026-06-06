@@ -51,6 +51,7 @@ public class StockSceneDataEnsureServiceImpl implements StockSceneDataEnsureServ
         if (stockConfig == null) {
             return new StockSceneDataDTO(null, List.of(), List.of(), List.of());
         }
+        this.ensureIndustryInfoFresh(stockConfig);
         this.ensureValuationHistoryFresh(stockConfig);
         this.ensureIndustryInfoFromValuationHistory(stockConfig);
         this.ensureFinancialIndicatorsFresh(stockConfig);
@@ -75,12 +76,26 @@ public class StockSceneDataEnsureServiceImpl implements StockSceneDataEnsureServ
         }
     }
 
+    private void ensureIndustryInfoFresh(StockConfigPO stockConfig) {
+        StockIndustryInfoPO existing = this.stockIndustryInfoManage.getBySecid(stockConfig.getSecid());
+        if (this.isFreshWithinDays(existing == null ? null : existing.getSyncedAt(), FINANCIAL_FRESH_DAYS)) {
+            return;
+        }
+        StockIndustryInfoPO industryInfo = this.stockFundamentalProvider.getIndustryInfo(stockConfig);
+        if (industryInfo != null) {
+            this.stockIndustryInfoManage.saveIndustryInfo(industryInfo);
+        }
+    }
+
     private void ensureIndustryInfoFromValuationHistory(StockConfigPO stockConfig) {
+        StockIndustryInfoPO existing = this.stockIndustryInfoManage.getBySecid(stockConfig.getSecid());
+        if (existing != null && existing.getIndustryName() != null && !existing.getIndustryName().isBlank()) {
+            return;
+        }
         StockValuationHistoryPO latest = this.stockValuationHistoryManage.latestByStockCode(stockConfig.getStockCode());
         if (latest == null || latest.getBoardName() == null || latest.getBoardName().isBlank()) {
             return;
         }
-        StockIndustryInfoPO existing = this.stockIndustryInfoManage.getBySecid(stockConfig.getSecid());
         if (existing != null && latest.getBoardName().equals(existing.getIndustryName())) {
             return;
         }

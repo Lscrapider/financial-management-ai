@@ -66,6 +66,8 @@ public class BondQuoteVO {
     private BigDecimal turnoverAmount;
     private BigDecimal turnoverRate;
     private BigDecimal amplitude;
+    private BigDecimal conversionValue;
+    private BigDecimal conversionPremiumRate;
     private BigDecimal averagePrice;
     private Long currentVolume;
     private String bondRating;
@@ -90,6 +92,8 @@ public class BondQuoteVO {
         vo.setTurnoverAmount(po.getTurnoverAmount());
         vo.setTurnoverRate(po.getTurnoverRate());
         vo.setAmplitude(po.getAmplitude());
+        vo.setConversionValue(po.getConversionValue());
+        vo.setConversionPremiumRate(po.getConversionPremiumRate());
         vo.setAveragePrice(po.getAveragePrice());
         vo.setCurrentVolume(po.getCurrentVolume());
         vo.setBondRating(po.getBondRating());

@@ -8,13 +8,14 @@ import com.scrapider.finance.domain.dto.StockMarketDataDTO;
 import com.scrapider.finance.domain.po.StockConfigPO;
 import com.scrapider.finance.domain.po.StockDividendHistoryPO;
 import com.scrapider.finance.domain.po.StockFinancialIndicatorPO;
+import com.scrapider.finance.domain.po.StockIndustryInfoPO;
 import com.scrapider.finance.domain.po.StockValuationHistoryPO;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Component
-@ConditionalOnProperty(name = "market.provider.stock-fundamental", havingValue = "eastmoney")
+@ConditionalOnProperty(name = "market.provider.stock-fundamental", havingValue = "eastmoney", matchIfMissing = true)
 public class EastMoneyStockFundamentalProvider implements StockFundamentalProvider {
 
     private final EastMoneyValuationApi eastMoneyValuationApi;
@@ -28,6 +29,11 @@ public class EastMoneyStockFundamentalProvider implements StockFundamentalProvid
         this.eastMoneyValuationApi = eastMoneyValuationApi;
         this.eastMoneyFinanceApi = eastMoneyFinanceApi;
         this.eastMoneyDividendApi = eastMoneyDividendApi;
+    }
+
+    @Override
+    public StockIndustryInfoPO getIndustryInfo(StockConfigPO stockConfig) {
+        return null;
     }
 
     @Override

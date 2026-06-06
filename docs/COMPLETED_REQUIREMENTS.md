@@ -26,6 +26,7 @@
 - 已创建股票日 K 表 `stock_daily_kline`。
 - 已创建场景分析任务表 `scene_analysis_task`、报告历史表 `scene_analysis_report`、报告配置档表 `scene_analysis_config_profile`。
 - 已创建股票行业、估值历史、财务指标和分红历史表，用于场景分析报告。
+- 已创建可转债基础资料、每日估值和份额变化表：`convertible_bond_basic`、`convertible_bond_daily_valuation`、`convertible_bond_share`。
 - 已提供默认关注股票和核心指数种子数据。
 - 已注册 MyBatis-Plus 分页插件 `MybatisPlusConfig`。
 
@@ -44,18 +45,21 @@
 ## 股票行情
 
 - 已接入腾讯行情接口，支持股票最新行情查询。
+- 已支持历史 K 线 provider 配置切换，当前默认 Tushare，腾讯实现保留为可配置数据源。
 - 已实现股票同步任务，按启用股票配置同步最新行情快照。
 - 已实现股票分钟级分时同步，将最新批次分时数据写入 InfluxDB。
 - 已实现股票行情列表接口，支持市场过滤、数量限制、排序字段和排序方向。
 - 已实现股票分时走势接口，返回指定股票最新同步批次的分钟数据。
-- 已实现股票日 K 数据表和单只股票日 K 手动同步接口。
+- 已实现股票日 K、周 K、月 K 数据同步和查询。
+- 已支持股票无复权、前复权、后复权三套 K 线落库；Tushare HTTP 场景下通过 `adj_factor` 本地计算复权价。
+- 已实现股票基本面 provider 配置切换，当前默认东方财富，支持行业、估值历史、财务指标和分红历史同步；Tushare 保留为可配置备选。
 - 已支持股票市场枚举：A 股、沪主板、深主板、科创板、创业板。
 
 ## 指数行情
 
 - 已接入腾讯行情接口，支持指数最新行情查询。
 - 已实现指数同步任务，按启用指数配置同步最新行情快照。
-- 已实现指数 K 线 同步能力。
+- 已实现指数日 K、周 K、月 K 同步能力；当前默认通过 Tushare `index_daily`、`index_weekly`、`index_monthly` 获取。
 - 已实现指数行情列表接口，支持市场过滤、数量限制、排序字段和排序方向。
 - 已实现指数 K 线 查询接口，支持按 `indexCode` 或 `secid` 查询，支持日期范围和数量限制。
 - 已初始化核心指数：上证指数、科创 50、深证成指、创业板指、沪深 300。
@@ -84,7 +88,8 @@
 
 - 已接入腾讯行情接口，支持可转债最新行情查询。
 - 已实现可转债同步任务，批量同步最新行情快照。
-- 已实现可转债 K 线 同步能力。
+- 已实现可转债日 K、周 K、月 K 同步能力；当前 Tushare 使用 `cb_daily`，周 K 和月 K 由日线聚合并重新计算 MA。
+- 已实现可转债基础资料、每日估值、份额变化数据同步和落表。
 - 已实现可转债行情列表接口、日 K 查询接口。
 - 已实现可转债手动同步和同步状态查询接口。
 
@@ -150,12 +155,14 @@
 - 已实现 DeepSeek 结构化 JSON 报告生成、chunkId 引用校验、Token 用量记录和 Markdown 文本渲染。
 - 已实现报告历史版本表 `scene_analysis_report`，支持报告目标分页、单标的历史、报告详情和重新生成。
 - 已实现报告配置档表 `scene_analysis_config_profile`，支持系统推荐配置和用户自定义配置。
+- 已支持可转债报告读取 `assetSpecificData.convertibleBond`，覆盖转股溢价率、转股价值、纯债价值、YTM、评级、剩余规模、强赎/回售状态占位和正股联动字段。
+- 已修复周期趋势分析 Markdown 渲染中 `trend` 和 `interpretation` 拼接导致的重复句号问题。
 - 已实现前端 AI 中心报告生成页面，支持提交、轮询、历史查看、详情展示和重新生成。
 
 ## 本地运行与配置
 
 - 已提供 `backend-java/finance-service/src/main/resources/application.yml` 作为主配置入口。
-- 已支持通过环境变量配置 PostgreSQL、InfluxDB、RabbitMQ、MinIO、DeepSeek、DashScope、股票/指数/可转债同步。
+- 已支持通过环境变量配置 PostgreSQL、InfluxDB、RabbitMQ、MinIO、DeepSeek、DashScope、Tushare、数据源 provider、股票/指数/可转债同步。
 - 已提供 `database/docker-compose.yml` 单独启动数据库依赖。
 - 已提供 `database/influxdb/docker-compose.yml` 单独启动 InfluxDB。
 - 已提供 `docker/docker-compose.yml` 启动完整后端环境。
@@ -182,8 +189,8 @@
 6. 在报告中区分事实、观点、模型推断和风险提示。
 
 第三阶段：可转债报告深化
-7. 完善可转债估值、转股溢价、纯债价值、评级、赎回/回售条款和正股联动分析。
-8. 为可转债维护差异化场景参数和展示结构。
+7. 完善可转债完整票息现金流 YTM、强赎/回售公告状态和触发进度。
+8. 继续优化可转债差异化展示结构和正股联动分析。
 
 第四阶段：引用溯源与复盘系统
 9. 报告引用支持点击 chunk 回到 OCR 原文和页面图片。

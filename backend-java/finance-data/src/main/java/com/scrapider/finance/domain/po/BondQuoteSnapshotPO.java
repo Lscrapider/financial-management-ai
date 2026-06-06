@@ -35,6 +35,8 @@ public class BondQuoteSnapshotPO {
     private BigDecimal turnoverAmount;
     private BigDecimal turnoverRate;
     private BigDecimal amplitude;
+    private BigDecimal conversionValue;
+    private BigDecimal conversionPremiumRate;
     private BigDecimal averagePrice;
     private Long currentVolume;
     private String bondRating;

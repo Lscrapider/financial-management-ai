@@ -72,6 +72,8 @@ class BaseMetricsCalculator:
         self._put(values, "bond_price", self._number(bond_data.get("bondPrice")))
         self._put(values, "premium_rate", self._number(bond_data.get("premiumRate")))
         self._put(values, "conversion_value", self._number(bond_data.get("conversionValue")))
+        self._put(values, "daily_premium_rate", self._number(bond_data.get("dailyPremiumRate")))
+        self._put(values, "daily_conversion_value", self._number(bond_data.get("dailyConversionValue")))
         self._put(values, "pure_bond_value", self._number(bond_data.get("pureBondValue")))
         self._put(values, "ytm", self._number(bond_data.get("ytm")))
         self._put(values, "remaining_size", self._number(bond_data.get("remainingSize")))

@@ -12,12 +12,14 @@ import com.scrapider.finance.domain.po.BondQuoteSnapshotPO;
 import com.scrapider.finance.domain.po.ConvertibleBondBasicPO;
 import com.scrapider.finance.domain.po.ConvertibleBondDailyValuationPO;
 import com.scrapider.finance.domain.po.ConvertibleBondSharePO;
+import com.scrapider.finance.domain.po.StockQuoteSnapshotPO;
 import com.scrapider.finance.manage.BondConfigManage;
 import com.scrapider.finance.manage.BondKlineManage;
 import com.scrapider.finance.manage.BondQuoteSnapshotManage;
 import com.scrapider.finance.manage.ConvertibleBondBasicManage;
 import com.scrapider.finance.manage.ConvertibleBondDailyValuationManage;
 import com.scrapider.finance.manage.ConvertibleBondShareManage;
+import com.scrapider.finance.manage.StockQuoteSnapshotManage;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -37,6 +39,7 @@ public class ConvertibleBondSceneTargetDataProvider extends AbstractSceneTargetD
     private final ConvertibleBondBasicManage convertibleBondBasicManage;
     private final ConvertibleBondDailyValuationManage convertibleBondDailyValuationManage;
     private final ConvertibleBondShareManage convertibleBondShareManage;
+    private final StockQuoteSnapshotManage stockQuoteSnapshotManage;
 
     public ConvertibleBondSceneTargetDataProvider(
             ObjectMapper objectMapper,
@@ -45,7 +48,8 @@ public class ConvertibleBondSceneTargetDataProvider extends AbstractSceneTargetD
             BondKlineManage bondKlineManage,
             ConvertibleBondBasicManage convertibleBondBasicManage,
             ConvertibleBondDailyValuationManage convertibleBondDailyValuationManage,
-            ConvertibleBondShareManage convertibleBondShareManage) {
+            ConvertibleBondShareManage convertibleBondShareManage,
+            StockQuoteSnapshotManage stockQuoteSnapshotManage) {
         super(objectMapper);
         this.bondQuoteSnapshotManage = bondQuoteSnapshotManage;
         this.bondConfigManage = bondConfigManage;
@@ -53,6 +57,7 @@ public class ConvertibleBondSceneTargetDataProvider extends AbstractSceneTargetD
         this.convertibleBondBasicManage = convertibleBondBasicManage;
         this.convertibleBondDailyValuationManage = convertibleBondDailyValuationManage;
         this.convertibleBondShareManage = convertibleBondShareManage;
+        this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
     }
 
     @Override
@@ -118,7 +123,7 @@ public class ConvertibleBondSceneTargetDataProvider extends AbstractSceneTargetD
                 weeklyKlines,
                 monthlyKlines,
                 List.of(),
-                this.convertibleBondAssetSpecificData(bondCode, quote),
+                this.convertibleBondAssetSpecificData(bondCode, quote, missing),
                 missing);
     }
 
@@ -138,27 +143,40 @@ public class ConvertibleBondSceneTargetDataProvider extends AbstractSceneTargetD
         return rows;
     }
 
-    private Map<String, Object> convertibleBondAssetSpecificData(String bondCode, BondQuoteSnapshotPO quote) {
+    private Map<String, Object> convertibleBondAssetSpecificData(
+            String bondCode,
+            BondQuoteSnapshotPO quote,
+            List<String> missing) {
         ConvertibleBondBasicPO basic = this.convertibleBondBasicManage.latestByBondCode(bondCode);
         ConvertibleBondDailyValuationPO latestValuation =
                 this.convertibleBondDailyValuationManage.latestByBondCode(bondCode);
         ConvertibleBondSharePO latestShare = this.convertibleBondShareManage.latestByBondCode(bondCode);
         List<ConvertibleBondDailyValuationPO> valuations =
                 this.convertibleBondDailyValuationManage.listByBondCode(bondCode, MARKET_KLINE_LIMIT);
+        StockQuoteSnapshotPO underlyingQuote = this.underlyingQuote(basic);
+
+        BigDecimal bondPrice = quote == null ? null : quote.getLatestPrice();
+        BigDecimal conversionPrice = basic == null ? null : basic.getConversionPrice();
+        BigDecimal underlyingPrice = underlyingQuote == null ? null : underlyingQuote.getLatestPrice();
+        BigDecimal realtimeConversionValue = quote == null ? null : quote.getConversionValue();
+        BigDecimal realtimePremiumRate = quote == null ? null : quote.getConversionPremiumRate();
+        this.collectRealtimePremiumMissingInputs(missing, bondPrice, underlyingPrice, conversionPrice);
 
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put("bondPrice", this.firstNonNull(
-                quote == null ? null : quote.getLatestPrice(),
-                latestValuation == null ? null : latestValuation.getClosePrice()));
+        data.put("bondPrice", bondPrice);
         data.put("turnoverRate", quote == null ? null : quote.getTurnoverRate());
         data.put("bondRating", this.firstNotBlank(
                 basic == null ? null : basic.getRating(),
                 quote == null ? null : quote.getBondRating()));
-        data.put("premiumRate", latestValuation == null ? null : latestValuation.getPremiumRate());
+        data.put("premiumRate", realtimePremiumRate);
+        data.put("premiumRateSource", realtimePremiumRate == null ? null : "quote_snapshot_calculated");
+        data.put("dailyPremiumRate", latestValuation == null ? null : latestValuation.getPremiumRate());
         data.put("premiumRateHistory", valuations.stream()
                 .map(ConvertibleBondDailyValuationPO::getPremiumRate)
                 .toList());
-        data.put("conversionValue", latestValuation == null ? null : latestValuation.getConversionValue());
+        data.put("conversionValue", realtimeConversionValue);
+        data.put("conversionValueSource", realtimeConversionValue == null ? null : "quote_snapshot_calculated");
+        data.put("dailyConversionValue", latestValuation == null ? null : latestValuation.getConversionValue());
         data.put("conversionValueHistory", valuations.stream()
                 .map(ConvertibleBondDailyValuationPO::getConversionValue)
                 .toList());
@@ -175,18 +193,60 @@ public class ConvertibleBondSceneTargetDataProvider extends AbstractSceneTargetD
         data.put("putbackStatus", "DATA_INSUFFICIENT");
         data.put("underlyingStockCode", basic == null ? null : basic.getUnderlyingStockCode());
         data.put("underlyingStockName", basic == null ? null : basic.getUnderlyingStockName());
-        data.put("conversionPrice", basic == null ? null : basic.getConversionPrice());
+        data.put("conversionPrice", conversionPrice);
         data.put("maturityDate", basic == null ? null : basic.getMaturityDate());
         data.put("maturityCallPrice", basic == null ? null : basic.getMaturityCallPrice());
         data.put("couponRate", basic == null ? null : basic.getCouponRate());
         data.put("redeemClause", basic == null ? null : basic.getRedeemClause());
         data.put("putbackClause", basic == null ? null : basic.getPutbackClause());
-        data.put("underlyingQuote", Map.of());
+        data.put("underlyingQuote", this.toMap(underlyingQuote));
         data.put("underlyingDailyKlines", List.of());
-        data.put("underlyingChangePct", null);
+        data.put("underlyingPrice", underlyingPrice);
+        data.put("underlyingChangePct", underlyingQuote == null ? null : underlyingQuote.getChangePercent());
         data.put("underlyingTrendScore", null);
         data.put("stockBondLinkage", null);
         return Map.of("convertibleBond", this.compactMap(data));
+    }
+
+    private StockQuoteSnapshotPO underlyingQuote(ConvertibleBondBasicPO basic) {
+        String stockCode = this.normalizeStockCode(basic == null ? null : basic.getUnderlyingStockCode());
+        if (stockCode == null) {
+            return null;
+        }
+        return this.stockQuoteSnapshotManage.getOne(new LambdaQueryWrapper<StockQuoteSnapshotPO>()
+                .eq(StockQuoteSnapshotPO::getStockCode, stockCode)
+                .last("LIMIT 1"));
+    }
+
+    private String normalizeStockCode(String stockCode) {
+        if (stockCode == null || stockCode.isBlank()) {
+            return null;
+        }
+        String trimmed = stockCode.trim();
+        int dotIndex = trimmed.indexOf('.');
+        if (dotIndex > 0) {
+            return trimmed.substring(0, dotIndex);
+        }
+        if ((trimmed.startsWith("SH") || trimmed.startsWith("SZ")) && trimmed.length() > 2) {
+            return trimmed.substring(2);
+        }
+        return trimmed;
+    }
+
+    private void collectRealtimePremiumMissingInputs(
+            List<String> missing,
+            BigDecimal bondPrice,
+            BigDecimal underlyingPrice,
+            BigDecimal conversionPrice) {
+        if (bondPrice == null) {
+            missing.add("convertible_bond.realtime_premium.bond_price");
+        }
+        if (underlyingPrice == null) {
+            missing.add("convertible_bond.realtime_premium.underlying_price");
+        }
+        if (conversionPrice == null || conversionPrice.signum() <= 0) {
+            missing.add("convertible_bond.realtime_premium.conversion_price");
+        }
     }
 
     private Long maturityDays(ConvertibleBondBasicPO basic) {

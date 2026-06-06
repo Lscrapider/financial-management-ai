@@ -292,6 +292,7 @@ CREATE TABLE IF NOT EXISTS bond_quote_snapshot (
     turnover_amount NUMERIC(24, 4),
     turnover_rate NUMERIC(10, 4),
     amplitude NUMERIC(10, 4),
+    conversion_value NUMERIC(18, 4),
     conversion_premium_rate NUMERIC(10, 4),
     bond_rating VARCHAR(16),
     average_price NUMERIC(18, 3),
@@ -306,9 +307,11 @@ CREATE TABLE IF NOT EXISTS bond_quote_snapshot (
 ALTER TABLE bond_quote_snapshot ADD COLUMN IF NOT EXISTS bond_rating VARCHAR(16);
 ALTER TABLE bond_quote_snapshot ADD COLUMN IF NOT EXISTS average_price NUMERIC(18, 3);
 ALTER TABLE bond_quote_snapshot ADD COLUMN IF NOT EXISTS current_volume BIGINT;
+ALTER TABLE bond_quote_snapshot ADD COLUMN IF NOT EXISTS conversion_value NUMERIC(18, 4);
 
 COMMENT ON TABLE bond_quote_snapshot IS '可转债最新行情快照表';
 COMMENT ON COLUMN bond_quote_snapshot.latest_price IS '最新价';
+COMMENT ON COLUMN bond_quote_snapshot.conversion_value IS '实时转股价值，按正股快照价和转股价计算';
 COMMENT ON COLUMN bond_quote_snapshot.conversion_premium_rate IS '转股溢价率';
 COMMENT ON COLUMN bond_quote_snapshot.average_price IS '均价';
 COMMENT ON COLUMN bond_quote_snapshot.current_volume IS '现手';
@@ -541,4 +544,3 @@ COMMENT ON COLUMN app_visit_log.username IS '访问用户';
 COMMENT ON COLUMN app_visit_log.request_uri IS '请求路径';
 COMMENT ON COLUMN app_visit_log.status_code IS '响应状态码';
 COMMENT ON COLUMN app_visit_log.duration_ms IS '请求耗时毫秒';
-

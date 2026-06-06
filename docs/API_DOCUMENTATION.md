@@ -242,7 +242,9 @@
 
 核心字段：
 
-`bondCode`、`bondName`、`secid`、`marketCode`、`exchangeCode`、`latestPrice`、`openPrice`、`highPrice`、`lowPrice`、`previousClosePrice`、`changeAmount`、`changePercent`、`volume`、`averagePrice`、`currentVolume`、`turnoverAmount`、`amplitude`、`turnoverRate`、`bondRating`、`quoteDetails`、`syncedAt`。
+`bondCode`、`bondName`、`secid`、`marketCode`、`exchangeCode`、`latestPrice`、`openPrice`、`highPrice`、`lowPrice`、`previousClosePrice`、`changeAmount`、`changePercent`、`volume`、`averagePrice`、`currentVolume`、`turnoverAmount`、`amplitude`、`turnoverRate`、`conversionValue`、`conversionPremiumRate`、`bondRating`、`quoteDetails`、`syncedAt`。
+
+其中 `conversionValue` 和 `conversionPremiumRate` 是系统在可转债快照同步时基于转债快照价、正股快照价和转股价计算后写入 `bond_quote_snapshot` 的实时字段，不来自腾讯原始快照字段。
 
 ### 可转债 K 线
 
@@ -654,12 +656,20 @@
 | `reportType` | string | 否 | 报告类型：`quick_analysis`、`risk_check`、`valuation_report`，默认 `quick_analysis` |
 | `configProfile` | string | 否 | 配置档 code，默认系统推荐配置 |
 | `totalChunks` | number | 是 | 本次报告期望召回的知识库 chunk 数，必须大于 0 |
-| `dailyKlineLimit` | number | 否 | 日 K 查询数量。股票默认 90，最小 60，最大 250；指数和可转债当前使用固定 250 条日 K |
-| `weeklyKlineLimit` | number | 否 | 周 K 查询数量。股票默认 52，最小 1，最大 250；指数和可转债当前不查询周 K |
-| `monthlyKlineLimit` | number | 否 | 月 K 查询数量。股票默认 60，最小 1，最大 250；指数和可转债当前不查询月 K |
+| `dailyKlineLimit` | number | 否 | 日 K 查询数量。股票默认 90，最小 60，最大 250；指数和可转债使用对应同步配置或请求值 |
+| `weeklyKlineLimit` | number | 否 | 周 K 查询数量。股票默认 52，最小 1，最大 250；指数和可转债使用对应同步配置或请求值 |
+| `monthlyKlineLimit` | number | 否 | 月 K 查询数量。股票默认 60，最小 1，最大 250；配置值按自然月理解，例如 320 表示向前取约 320 个月窗口 |
 | `userOverrides` | object | 否 | 用户覆盖参数；当前只保留 Python 实际参与计算的阈值、敏感度和权重配置 |
 
 返回：`SceneAnalysisSubmitVO`，核心字段：`taskNo`、`targetType`、`targetCode`、`configProfile`、`status`。
+
+数据源口径：
+
+- 快照和分时仍使用腾讯行情接口。
+- 历史 K 线通过 `HistoricalKlineProvider` 获取，当前默认 Tushare，可由 `MARKET_HISTORICAL_KLINE_PROVIDER` 切换。
+- 股票 K 线会落库无复权、前复权、后复权三套数据；Tushare HTTP 不直接调用 `pro_bar`，系统通过 `adj_factor` 本地计算复权价。
+- 股票、指数分别使用 Tushare 日/周/月接口；可转债使用 `cb_daily`，周 K、月 K 由日线聚合生成。
+- 股票基本面和可转债资料也通过 provider 获取；股票基本面当前默认东方财富，优先保证行业、估值历史、财务指标和分红历史字段完整度；可转债资料当前默认 Tushare。
 
 ### Python 回调任务
 

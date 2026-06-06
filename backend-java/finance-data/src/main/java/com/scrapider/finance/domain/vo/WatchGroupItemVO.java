@@ -32,6 +32,8 @@ public class WatchGroupItemVO {
     private BigDecimal turnoverAmount;
     private BigDecimal turnoverRate;
     private BigDecimal amplitude;
+    private BigDecimal conversionValue;
+    private BigDecimal conversionPremiumRate;
     private BigDecimal volumeRatio;
     private BigDecimal limitUpPrice;
     private BigDecimal limitDownPrice;
@@ -112,6 +114,8 @@ public class WatchGroupItemVO {
         this.turnoverAmount = quote.getTurnoverAmount();
         this.turnoverRate = quote.getTurnoverRate();
         this.amplitude = quote.getAmplitude();
+        this.conversionValue = quote.getConversionValue();
+        this.conversionPremiumRate = quote.getConversionPremiumRate();
         this.quoteDetails = BondQuoteVO.fromPO(quote).getQuoteDetails();
         this.syncedAt = quote.getSyncedAt();
     }

@@ -11,6 +11,8 @@ import com.scrapider.finance.domain.po.BondConfigPO;
 import com.scrapider.finance.domain.po.BondIntradayTrendPO;
 import com.scrapider.finance.domain.po.BondKlinePO;
 import com.scrapider.finance.domain.po.BondQuoteSnapshotPO;
+import com.scrapider.finance.domain.po.ConvertibleBondBasicPO;
+import com.scrapider.finance.domain.po.StockQuoteSnapshotPO;
 import com.scrapider.finance.domain.util.StockMarketJsonParser;
 import com.scrapider.finance.manage.BondConfigManage;
 import com.scrapider.finance.manage.BondIntradayTrendInfluxManage;
@@ -19,6 +21,7 @@ import com.scrapider.finance.manage.BondQuoteSnapshotManage;
 import com.scrapider.finance.manage.ConvertibleBondBasicManage;
 import com.scrapider.finance.manage.ConvertibleBondDailyValuationManage;
 import com.scrapider.finance.manage.ConvertibleBondShareManage;
+import com.scrapider.finance.manage.StockQuoteSnapshotManage;
 import com.scrapider.finance.service.ConvertibleBondDataProvider;
 import com.scrapider.finance.service.HistoricalKlineProvider;
 import com.scrapider.finance.service.MarketTradingCalendarService;
@@ -40,6 +43,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 import java.util.stream.StreamSupport;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -67,6 +71,7 @@ public class BondMarketSyncTask {
     private final ConvertibleBondBasicManage convertibleBondBasicManage;
     private final ConvertibleBondDailyValuationManage convertibleBondDailyValuationManage;
     private final ConvertibleBondShareManage convertibleBondShareManage;
+    private final StockQuoteSnapshotManage stockQuoteSnapshotManage;
     private final MarketTradingCalendarService marketTradingCalendarService;
     private final AtomicBoolean syncing = new AtomicBoolean(false);
     private final ExecutorService manualSyncExecutor = Executors.newSingleThreadExecutor();
@@ -127,6 +132,7 @@ public class BondMarketSyncTask {
             ConvertibleBondBasicManage convertibleBondBasicManage,
             ConvertibleBondDailyValuationManage convertibleBondDailyValuationManage,
             ConvertibleBondShareManage convertibleBondShareManage,
+            StockQuoteSnapshotManage stockQuoteSnapshotManage,
             MarketTradingCalendarService marketTradingCalendarService) {
         this.stockMarketApi = stockMarketApi;
         this.bondConfigManage = bondConfigManage;
@@ -138,6 +144,7 @@ public class BondMarketSyncTask {
         this.convertibleBondBasicManage = convertibleBondBasicManage;
         this.convertibleBondDailyValuationManage = convertibleBondDailyValuationManage;
         this.convertibleBondShareManage = convertibleBondShareManage;
+        this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
         this.marketTradingCalendarService = marketTradingCalendarService;
     }
 
@@ -251,6 +258,7 @@ public class BondMarketSyncTask {
             StockMarketDataDTO quote = this.stockMarketApi.getQuotes(secids);
             List<BondQuoteSnapshotPO> snapshots = BondQuoteSnapshotPO
                     .fromBatchApiResponse(quote.data().asText(), symbolToBond);
+            this.fillRealtimeConversionMetrics(snapshots);
             if (CollUtil.isNotEmpty(snapshots)) {
                 this.bondQuoteSnapshotManage.saveQuotesBatch(snapshots);
             }
@@ -287,6 +295,94 @@ public class BondMarketSyncTask {
         }
 //        this.repairLatestPeriodKlinesFromDaily(valid);
         this.syncConvertibleBondData(valid);
+    }
+
+    private void fillRealtimeConversionMetrics(List<BondQuoteSnapshotPO> snapshots) {
+        if (CollUtil.isEmpty(snapshots)) {
+            return;
+        }
+        Set<String> bondCodes = snapshots.stream()
+                .map(BondQuoteSnapshotPO::getBondCode)
+                .filter(StrUtil::isNotBlank)
+                .collect(java.util.stream.Collectors.toSet());
+        if (bondCodes.isEmpty()) {
+            return;
+        }
+
+        Map<String, ConvertibleBondBasicPO> basicMap = this.convertibleBondBasicManage
+                .list(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ConvertibleBondBasicPO>()
+                        .in(ConvertibleBondBasicPO::getBondCode, bondCodes))
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        ConvertibleBondBasicPO::getBondCode,
+                        Function.identity(),
+                        (left, right) -> this.latestBasic(left, right)));
+        Set<String> stockCodes = basicMap.values().stream()
+                .map(basic -> this.normalizeStockCode(basic.getUnderlyingStockCode()))
+                .filter(StrUtil::isNotBlank)
+                .collect(java.util.stream.Collectors.toSet());
+        Map<String, StockQuoteSnapshotPO> stockQuoteMap = this.stockQuoteSnapshotManage
+                .listByStockCodes(stockCodes)
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        StockQuoteSnapshotPO::getStockCode,
+                        Function.identity(),
+                        (left, right) -> left));
+
+        snapshots.forEach(snapshot -> this.fillRealtimeConversionMetrics(snapshot, basicMap, stockQuoteMap));
+    }
+
+    private void fillRealtimeConversionMetrics(
+            BondQuoteSnapshotPO snapshot,
+            Map<String, ConvertibleBondBasicPO> basicMap,
+            Map<String, StockQuoteSnapshotPO> stockQuoteMap) {
+        ConvertibleBondBasicPO basic = basicMap.get(snapshot.getBondCode());
+        if (basic == null || basic.getConversionPrice() == null || basic.getConversionPrice().signum() <= 0) {
+            return;
+        }
+        String stockCode = this.normalizeStockCode(basic.getUnderlyingStockCode());
+        StockQuoteSnapshotPO stockQuote = stockQuoteMap.get(stockCode);
+        if (stockQuote == null || stockQuote.getLatestPrice() == null || snapshot.getLatestPrice() == null) {
+            return;
+        }
+        BigDecimal conversionValue = stockQuote.getLatestPrice()
+                .multiply(BigDecimal.valueOf(100))
+                .divide(basic.getConversionPrice(), 6, RoundingMode.HALF_UP);
+        if (conversionValue.signum() <= 0) {
+            return;
+        }
+        BigDecimal conversionPremiumRate = snapshot.getLatestPrice()
+                .divide(conversionValue, 8, RoundingMode.HALF_UP)
+                .subtract(BigDecimal.ONE)
+                .multiply(BigDecimal.valueOf(100))
+                .setScale(6, RoundingMode.HALF_UP);
+        snapshot.setConversionValue(conversionValue);
+        snapshot.setConversionPremiumRate(conversionPremiumRate);
+    }
+
+    private ConvertibleBondBasicPO latestBasic(ConvertibleBondBasicPO left, ConvertibleBondBasicPO right) {
+        if (left.getSyncedAt() == null) {
+            return right;
+        }
+        if (right.getSyncedAt() == null) {
+            return left;
+        }
+        return left.getSyncedAt().isAfter(right.getSyncedAt()) ? left : right;
+    }
+
+    private String normalizeStockCode(String stockCode) {
+        if (StrUtil.isBlank(stockCode)) {
+            return null;
+        }
+        String trimmed = stockCode.trim();
+        int dotIndex = trimmed.indexOf('.');
+        if (dotIndex > 0) {
+            return trimmed.substring(0, dotIndex);
+        }
+        if ((trimmed.startsWith("SH") || trimmed.startsWith("SZ")) && trimmed.length() > 2) {
+            return trimmed.substring(2);
+        }
+        return trimmed;
     }
 
     private void syncConvertibleBondData(List<BondConfigPO> bonds) {
