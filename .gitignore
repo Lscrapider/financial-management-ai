@@ -109,3 +109,7 @@ docker-compose.override.yml
 /backend-java/finance-service/src/main/resources/application.yml
 /ai-python/app/core/config.py
 /database/seed/
+/.superpowers/
+/.impeccable
+/.claude/
+/.*/
