@@ -1,6 +1,9 @@
 package com.scrapider.finance.service.impl;
 
+import cn.hutool.core.date.LocalDateTimeUtil;
+import cn.hutool.core.util.EnumUtil;
 import cn.hutool.core.util.StrUtil;
+import com.scrapider.finance.converter.MarketQueryConverter;
 import com.scrapider.finance.domain.enums.BondQuoteSortFieldEnum;
 import com.scrapider.finance.domain.enums.KlinePeriodTypeEnum;
 import com.scrapider.finance.domain.enums.SortOrderEnum;
@@ -20,7 +23,6 @@ import com.scrapider.finance.service.BondMarketQueryService;
 import com.scrapider.finance.service.HistoricalKlineProvider;
 import com.scrapider.finance.task.BondMarketSyncTask;
 import java.time.LocalDate;
-import java.util.Comparator;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -55,15 +57,12 @@ public class BondMarketQueryServiceImpl implements BondMarketQueryService {
 
     @Override
     public List<BondQuoteVO> listQuotes(BondQuoteListParam param) {
-        return this.bondQuoteSnapshotManage
-                .listSnapshots(
+        return MarketQueryConverter.toBondQuoteVOList(
+                this.bondQuoteSnapshotManage.listSnapshots(
                         param.getMarketCode(),
                         this.normalizeLimit(param.getLimit(), DEFAULT_QUOTE_LIMIT),
                         BondQuoteSortFieldEnum.of(param.getSortField()),
-                        SortOrderEnum.of(param.getSortOrder()))
-                .stream()
-                .map(BondQuoteVO::fromPO)
-                .toList();
+                        SortOrderEnum.of(param.getSortOrder())));
     }
 
     @Override
@@ -88,11 +87,11 @@ public class BondMarketQueryServiceImpl implements BondMarketQueryService {
         if (StrUtil.isBlank(param.getBondCode()) && StrUtil.isBlank(param.getSecid())) {
             throw new IllegalArgumentException("bondCode or secid must not be blank");
         }
-        String bondCode = normalizeText(param.getBondCode());
-        String secid = normalizeText(param.getSecid());
-        KlinePeriodTypeEnum periodType = normalizePeriodType(param.getPeriodType());
-        LocalDate startDate = parseDate(param.getStartDate());
-        LocalDate endDate = parseDate(param.getEndDate());
+        String bondCode = StrUtil.trimToNull(param.getBondCode());
+        String secid = StrUtil.trimToNull(param.getSecid());
+        KlinePeriodTypeEnum periodType = this.normalizePeriodType(param.getPeriodType());
+        LocalDate startDate = this.parseDate(param.getStartDate());
+        LocalDate endDate = this.parseDate(param.getEndDate());
         int limit = this.normalizeLimit(param.getLimit(), DEFAULT_KLINE_LIMIT);
         List<BondKlinePO> klines = this.listKlinePOs(
                 bondCode,
@@ -105,11 +104,7 @@ public class BondMarketQueryServiceImpl implements BondMarketQueryService {
             this.syncKlines(bondCode, periodType, limit);
             klines = this.listKlinePOs(bondCode, secid, periodType, startDate, endDate, limit);
         }
-        return klines
-                .stream()
-                .map(BondKlineVO::fromPO)
-                .sorted(Comparator.comparing(BondKlineVO::getTradeDate))
-                .toList();
+        return MarketQueryConverter.toBondKlineVOList(klines);
     }
 
     private List<BondKlinePO> listKlinePOs(
@@ -129,11 +124,8 @@ public class BondMarketQueryServiceImpl implements BondMarketQueryService {
     }
 
     private List<BondIntradayTrendVO> listIntradayTrendVOs(String bondCode) {
-        return this.bondIntradayTrendInfluxManage
-                .listLatestTradingTrends(bondCode)
-                .stream()
-                .map(BondIntradayTrendVO::fromPO)
-                .toList();
+        return MarketQueryConverter.toBondIntradayTrendVOList(
+                this.bondIntradayTrendInfluxManage.listLatestTradingTrends(bondCode));
     }
 
     private void syncKlines(String bondCode, KlinePeriodTypeEnum periodType, Integer limit) {
@@ -151,24 +143,16 @@ public class BondMarketQueryServiceImpl implements BondMarketQueryService {
         return Math.min(limit, MAX_LIMIT);
     }
 
-    private static String normalizeText(String value) {
-        return StrUtil.isBlank(value) ? null : value.trim();
-    }
-
-    private static KlinePeriodTypeEnum normalizePeriodType(String value) {
+    private KlinePeriodTypeEnum normalizePeriodType(String value) {
         if (StrUtil.isBlank(value)) {
             return KlinePeriodTypeEnum.DAILY;
         }
-        String code = value.trim();
-        for (KlinePeriodTypeEnum item : KlinePeriodTypeEnum.values()) {
-            if (item.getCode().equals(code)) {
-                return item;
-            }
-        }
-        return KlinePeriodTypeEnum.DAILY;
+        String code = StrUtil.trim(value);
+        return EnumUtil.getBy(KlinePeriodTypeEnum.class, KlinePeriodTypeEnum::getCode, code, KlinePeriodTypeEnum.DAILY);
     }
 
-    private static LocalDate parseDate(String value) {
-        return StrUtil.isBlank(value) ? null : LocalDate.parse(value.trim());
+    private LocalDate parseDate(String value) {
+        String date = StrUtil.trimToNull(value);
+        return date == null ? null : LocalDateTimeUtil.parseDate(date);
     }
 }

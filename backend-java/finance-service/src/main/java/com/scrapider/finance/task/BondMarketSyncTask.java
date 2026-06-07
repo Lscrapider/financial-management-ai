@@ -542,7 +542,11 @@ public class BondMarketSyncTask {
             if (CollUtil.isEmpty(dailyKlines)) {
                 return;
             }
-            BondKlinePO repaired = this.aggregateBondPeriodKline(bond, dailyKlines, periodType);
+            BondKlinePO repaired = BondKlinePO.aggregateFromDaily(
+                    bond,
+                    dailyKlines,
+                    periodType,
+                    LocalDateTime.now(ZoneId.of(this.timezone)));
             this.fillBondDerivedFields(repaired, this.previousBondPeriodClose(bond, periodType, repaired.getTradeDate()));
             this.fillBondMovingAverages(repaired, periodType);
             this.bondKlineManage.saveKlines(List.of(repaired));
@@ -553,32 +557,6 @@ public class BondMarketSyncTask {
                     bond.getBondCode(),
                     ex);
         }
-    }
-
-    private BondKlinePO aggregateBondPeriodKline(
-            BondConfigPO bond,
-            List<BondKlinePO> dailyKlines,
-            KlinePeriodTypeEnum periodType) {
-        BondKlinePO first = dailyKlines.get(0);
-        BondKlinePO last = dailyKlines.get(dailyKlines.size() - 1);
-        BondKlinePO repaired = new BondKlinePO();
-        repaired.setBondCode(bond.getBondCode());
-        repaired.setBondName(bond.getBondName());
-        repaired.setSecid(bond.getSecid());
-        repaired.setMarketCode(bond.getMarketCode());
-        repaired.setExchangeCode(bond.getExchangeCode());
-        repaired.setPeriodType(periodType.getCode());
-        repaired.setTradeDate(last.getTradeDate());
-        repaired.setOpenPrice(first.getOpenPrice());
-        repaired.setClosePrice(last.getClosePrice());
-        repaired.setHighPrice(maxBond(dailyKlines));
-        repaired.setLowPrice(minBond(dailyKlines));
-        repaired.setVolume(sumBondVolume(dailyKlines));
-        repaired.setTurnoverAmount(sumBondAmount(dailyKlines));
-        repaired.setTurnoverRate(sumBondTurnoverRate(dailyKlines));
-        repaired.setRawResponse("aggregated-from-daily");
-        repaired.setSyncedAt(LocalDateTime.now(ZoneId.of(this.timezone)));
-        return repaired;
     }
 
     private void fillBondDerivedFields(BondKlinePO kline, BigDecimal previousClose) {
@@ -640,54 +618,6 @@ public class BondMarketSyncTask {
             return today.withDayOfMonth(1);
         }
         return today;
-    }
-
-    private static BigDecimal maxBond(List<BondKlinePO> klines) {
-        return klines.stream()
-                .map(BondKlinePO::getHighPrice)
-                .filter(Objects::nonNull)
-                .max(BigDecimal::compareTo)
-                .orElse(null);
-    }
-
-    private static BigDecimal minBond(List<BondKlinePO> klines) {
-        return klines.stream()
-                .map(BondKlinePO::getLowPrice)
-                .filter(Objects::nonNull)
-                .min(BigDecimal::compareTo)
-                .orElse(null);
-    }
-
-    private static Long sumBondVolume(List<BondKlinePO> klines) {
-        long total = 0L;
-        boolean hasValue = false;
-        for (BondKlinePO kline : klines) {
-            if (kline.getVolume() != null) {
-                total += kline.getVolume();
-                hasValue = true;
-            }
-        }
-        return hasValue ? total : null;
-    }
-
-    private static BigDecimal sumBondAmount(List<BondKlinePO> klines) {
-        return sumBondDecimal(klines.stream().map(BondKlinePO::getTurnoverAmount).toList());
-    }
-
-    private static BigDecimal sumBondTurnoverRate(List<BondKlinePO> klines) {
-        return sumBondDecimal(klines.stream().map(BondKlinePO::getTurnoverRate).toList());
-    }
-
-    private static BigDecimal sumBondDecimal(List<BigDecimal> values) {
-        BigDecimal total = BigDecimal.ZERO;
-        boolean hasValue = false;
-        for (BigDecimal value : values) {
-            if (value != null) {
-                total = total.add(value);
-                hasValue = true;
-            }
-        }
-        return hasValue ? total : null;
     }
 
     private static BigDecimal meanBondClose(List<BondKlinePO> klines, int endIndex, int window) {

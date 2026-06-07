@@ -1,6 +1,6 @@
 package com.scrapider.finance.ai.controller;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.scrapider.finance.ai.domain.param.AiTokenUsageDeepSeekResponseParam;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageLogVO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageOverviewVO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageTrendVO;
@@ -25,8 +25,9 @@ public class AiTokenUsageController {
     }
 
     @PostMapping("/deepseek-response")
-    public ResponseEntity<AiTokenUsageLogVO> recordDeepSeekResponse(@RequestBody JsonNode response) {
-        return ResponseEntity.ok(this.aiTokenUsageService.recordDeepSeekResponse(response));
+    public ResponseEntity<AiTokenUsageLogVO> recordDeepSeekResponse(
+            @RequestBody AiTokenUsageDeepSeekResponseParam param) {
+        return ResponseEntity.ok(this.aiTokenUsageService.recordDeepSeekResponse(param));
     }
 
     @GetMapping("/overview")

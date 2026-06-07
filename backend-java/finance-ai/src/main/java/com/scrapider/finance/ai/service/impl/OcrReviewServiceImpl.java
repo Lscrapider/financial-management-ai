@@ -2,7 +2,7 @@ package com.scrapider.finance.ai.service.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.scrapider.finance.ai.converter.OcrReviewConverter;
 import com.scrapider.finance.ai.domain.dto.OcrChunkTagRuleMessageDTO;
 import com.scrapider.finance.ai.domain.dto.OcrStorageRefDTO;
 import com.scrapider.finance.ai.domain.param.OcrReviewDraftParam;
@@ -18,7 +18,6 @@ import com.scrapider.finance.manage.OcrReviewManage;
 import com.scrapider.finance.manage.OcrTaskManage;
 import com.scrapider.finance.manage.OcrTaskStageManage;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -52,14 +51,7 @@ public class OcrReviewServiceImpl implements OcrReviewService {
     public OcrReviewVO detail(String taskNo) {
         OcrReviewPO review = this.ocrReviewManage.findByTaskNo(taskNo)
                 .orElseGet(() -> this.initializeFromTextCleanStage(taskNo));
-        return new OcrReviewVO(
-                review.getTaskNo(),
-                review.getStatus(),
-                review.getOverallConfidence(),
-                review.getParagraphCount(),
-                review.getWarningCount(),
-                review.getDraftContent(),
-                this.listPages(taskNo));
+        return OcrReviewConverter.toVO(review, this.listPages(taskNo));
     }
 
     @Override
@@ -84,15 +76,14 @@ public class OcrReviewServiceImpl implements OcrReviewService {
         }
         int reviewedParagraphCount = this.paragraphCount(finalContent);
 
-        JsonNode reviewedContent = this.reviewedContent(taskNo, finalContent);
+        JsonNode reviewedContent = OcrReviewConverter.reviewedContent(this.objectMapper, taskNo, finalContent);
         JsonNode cleanedRef = review.getCleanedRef();
         String bucket = cleanedRef.path("bucket").asText();
         String reviewedObjectKey = this.stageOutputPrefix(taskNo, 4) + "/review/reviewed.json";
         this.ocrFileStorageService.writeJson(bucket, reviewedObjectKey, reviewedContent);
 
-        OcrStorageRefDTO reviewedRef = new OcrStorageRefDTO("minio", bucket, reviewedObjectKey);
-        OcrStorageRefDTO chunkTagOutputPrefix = new OcrStorageRefDTO(
-                "minio",
+        OcrStorageRefDTO reviewedRef = OcrReviewConverter.minioRef(bucket, reviewedObjectKey);
+        OcrStorageRefDTO chunkTagOutputPrefix = OcrReviewConverter.minioRef(
                 bucket,
                 this.stageOutputPrefix(taskNo, 5) + "/chunk-tag/");
         this.ocrReviewManage.approve(taskNo, this.objectMapper.valueToTree(reviewedRef));
@@ -116,10 +107,7 @@ public class OcrReviewServiceImpl implements OcrReviewService {
         if (!pages.isArray()) {
             return result;
         }
-        pages.forEach(page -> result.add(new OcrReviewPageVO(
-                page.path("pageNo").asInt(),
-                page.path("imageRef"),
-                "/api/ai/ocr/reviews/" + taskNo + "/pages/" + page.path("pageNo").asInt() + "/image")));
+        pages.forEach(page -> result.add(OcrReviewConverter.toPageVO(taskNo, page)));
         return result;
     }
 
@@ -168,14 +156,6 @@ public class OcrReviewServiceImpl implements OcrReviewService {
         this.ocrTaskManage.markManualReviewRequired(taskNo);
         return this.ocrReviewManage.findByTaskNo(taskNo)
                 .orElseThrow(() -> new IllegalArgumentException("OCR 复核任务初始化失败"));
-    }
-
-    private JsonNode reviewedContent(String taskNo, JsonNode finalContent) {
-        ObjectNode root = this.objectMapper.createObjectNode();
-        root.put("taskNo", taskNo);
-        root.put("reviewedAt", LocalDateTime.now().toString());
-        root.set("content", finalContent);
-        return root;
     }
 
     private int paragraphCount(JsonNode finalContent) {

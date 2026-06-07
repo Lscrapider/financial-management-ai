@@ -1,5 +1,6 @@
 package com.scrapider.finance.ai.service.impl;
 
+import com.scrapider.finance.ai.converter.AiChatConverter;
 import com.scrapider.finance.ai.domain.param.AiChatParam;
 import com.scrapider.finance.ai.domain.vo.AiChatVO;
 import com.scrapider.finance.ai.domain.vo.AiDatabaseContextVO;
@@ -8,7 +9,6 @@ import com.scrapider.finance.ai.service.AiChatService;
 import com.scrapider.finance.ai.service.AiMarketDataQueryService;
 import com.scrapider.finance.ai.service.AiQueryRewriteService;
 import com.scrapider.finance.ai.service.AiTokenUsageService;
-import java.time.LocalDateTime;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.beans.factory.annotation.Value;
@@ -50,7 +50,7 @@ public class AiChatServiceImpl implements AiChatService {
             String answer = queryRewrite.disabledReason() == null || queryRewrite.disabledReason().isBlank()
                     ? "当前助手只处理理财分析、行情、指数、资产配置和投资研究相关问题。"
                     : queryRewrite.disabledReason();
-            return new AiChatVO(message, answer, this.model, queryRewrite, AiDatabaseContextVO.empty(), LocalDateTime.now());
+            return AiChatConverter.toVO(message, answer, this.model, queryRewrite, AiDatabaseContextVO.empty());
         }
         AiDatabaseContextVO databaseContext = this.aiMarketDataQueryService.query(queryRewrite);
         ChatResponse response = this.chatClient.prompt()
@@ -60,7 +60,7 @@ public class AiChatServiceImpl implements AiChatService {
                 .chatResponse();
         this.aiTokenUsageService.recordChatResponse(response);
         String answer = this.content(response);
-        return new AiChatVO(message, answer, this.model, queryRewrite, databaseContext, LocalDateTime.now());
+        return AiChatConverter.toVO(message, answer, this.model, queryRewrite, databaseContext);
     }
 
     private String content(ChatResponse response) {

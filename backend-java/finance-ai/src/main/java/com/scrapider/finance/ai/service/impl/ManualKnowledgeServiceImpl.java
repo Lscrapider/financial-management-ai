@@ -3,8 +3,8 @@ package com.scrapider.finance.ai.service.impl;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.scrapider.finance.ai.converter.ManualKnowledgeConverter;
+import com.scrapider.finance.ai.converter.OcrReviewConverter;
 import com.scrapider.finance.ai.domain.dto.OcrChunkTagRuleMessageDTO;
 import com.scrapider.finance.ai.domain.dto.OcrStorageRefDTO;
 import com.scrapider.finance.ai.domain.param.ManualKnowledgeDraftParam;
@@ -24,7 +24,6 @@ import com.scrapider.finance.manage.OcrReviewManage;
 import com.scrapider.finance.manage.OcrTaskManage;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
@@ -78,7 +77,7 @@ public class ManualKnowledgeServiceImpl implements ManualKnowledgeService {
         List<String> chunks = this.validChunks(param);
         String taskNo = "manual-" + UUID.randomUUID().toString().replace("-", "");
         String title = this.title(param, chunks);
-        JsonNode draftContent = this.draftContent(taskNo, chunks);
+        JsonNode draftContent = ManualKnowledgeConverter.draftContent(this.objectMapper, taskNo, chunks);
         OcrStorageRefDTO cleanedRef = this.writeCleanedJson(taskNo, draftContent);
         OcrReviewPO review = OcrReviewPO.createPending(
                 taskNo,
@@ -97,14 +96,7 @@ public class ManualKnowledgeServiceImpl implements ManualKnowledgeService {
         this.manualTask(taskNo);
         OcrReviewPO review = this.ocrReviewManage.findByTaskNo(taskNo)
                 .orElseThrow(() -> new IllegalArgumentException("手动导入草稿不存在"));
-        return new OcrReviewVO(
-                review.getTaskNo(),
-                review.getStatus(),
-                review.getOverallConfidence(),
-                review.getParagraphCount(),
-                review.getWarningCount(),
-                review.getDraftContent(),
-                List.of());
+        return OcrReviewConverter.toVO(review, List.of());
     }
 
     @Override
@@ -114,7 +106,7 @@ public class ManualKnowledgeServiceImpl implements ManualKnowledgeService {
         this.ocrReviewManage.findByTaskNo(taskNo)
                 .orElseThrow(() -> new IllegalArgumentException("手动导入草稿不存在"));
         String title = this.title(param, chunks);
-        JsonNode draftContent = this.draftContent(taskNo, chunks);
+        JsonNode draftContent = ManualKnowledgeConverter.draftContent(this.objectMapper, taskNo, chunks);
         OcrStorageRefDTO cleanedRef = this.writeCleanedJson(taskNo, draftContent);
         OcrReviewPO review = OcrReviewPO.createPending(
                 taskNo,
@@ -133,13 +125,12 @@ public class ManualKnowledgeServiceImpl implements ManualKnowledgeService {
         this.saveDraft(taskNo, param);
         OcrReviewPO review = this.ocrReviewManage.findByTaskNo(taskNo)
                 .orElseThrow(() -> new IllegalArgumentException("手动导入草稿不存在"));
-        JsonNode reviewedContent = this.reviewedContent(taskNo, review.getDraftContent());
+        JsonNode reviewedContent = OcrReviewConverter.reviewedContent(this.objectMapper, taskNo, review.getDraftContent());
         String reviewedObjectKey = this.stageOutputPrefix(taskNo, 4) + "/review/reviewed.json";
         this.ocrFileStorageService.writeJson(this.bucket, reviewedObjectKey, reviewedContent);
 
-        OcrStorageRefDTO reviewedRef = new OcrStorageRefDTO("minio", this.bucket, reviewedObjectKey);
-        OcrStorageRefDTO chunkTagOutputPrefix = new OcrStorageRefDTO(
-                "minio",
+        OcrStorageRefDTO reviewedRef = OcrReviewConverter.minioRef(this.bucket, reviewedObjectKey);
+        OcrStorageRefDTO chunkTagOutputPrefix = OcrReviewConverter.minioRef(
                 this.bucket,
                 this.stageOutputPrefix(taskNo, 5) + "/chunk-tag/");
         int paragraphCount = review.getDraftContent().path("paragraphs").size();
@@ -201,42 +192,10 @@ public class ManualKnowledgeServiceImpl implements ManualKnowledgeService {
         return first.length() > 5 ? first.substring(0, 5) + "..." : first;
     }
 
-    private JsonNode draftContent(String taskNo, List<String> chunks) {
-        ObjectNode root = this.objectMapper.createObjectNode();
-        root.put("taskNo", taskNo);
-        root.put("paragraphCount", chunks.size());
-        root.put("createdAt", LocalDateTime.now().toString());
-        ObjectNode metrics = root.putObject("metrics");
-        metrics.put("paragraphCount", chunks.size());
-        metrics.put("emptySegmentCount", 0);
-        metrics.put("warningCount", 0);
-        metrics.put("lowConfidenceParagraphCount", 0);
-        metrics.put("avgConfidence", 1);
-        ArrayNode paragraphs = root.putArray("paragraphs");
-        for (int index = 0; index < chunks.size(); index++) {
-            ObjectNode paragraph = paragraphs.addObject();
-            paragraph.put("paragraphNo", index + 1);
-            paragraph.put("text", chunks.get(index));
-            paragraph.putArray("sourcePages");
-            paragraph.putArray("sourceSegments");
-            paragraph.put("avgConfidence", 1);
-            paragraph.putArray("warnings");
-        }
-        return root;
-    }
-
     private OcrStorageRefDTO writeCleanedJson(String taskNo, JsonNode draftContent) {
         String objectKey = this.stageOutputPrefix(taskNo, 3) + "/text/clean/cleaned.json";
         this.ocrFileStorageService.writeJson(this.bucket, objectKey, draftContent);
-        return new OcrStorageRefDTO("minio", this.bucket, objectKey);
-    }
-
-    private JsonNode reviewedContent(String taskNo, JsonNode finalContent) {
-        ObjectNode root = this.objectMapper.createObjectNode();
-        root.put("taskNo", taskNo);
-        root.put("reviewedAt", LocalDateTime.now().toString());
-        root.set("content", finalContent);
-        return root;
+        return OcrReviewConverter.minioRef(this.bucket, objectKey);
     }
 
     private String stageOutputPrefix(String taskNo, int stageNo) {

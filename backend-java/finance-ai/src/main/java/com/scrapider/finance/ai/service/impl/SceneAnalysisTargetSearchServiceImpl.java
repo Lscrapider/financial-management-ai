@@ -1,11 +1,9 @@
 package com.scrapider.finance.ai.service.impl;
 
 import cn.hutool.core.util.StrUtil;
+import com.scrapider.finance.ai.converter.SceneAnalysisTargetConverter;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisTargetOptionVO;
 import com.scrapider.finance.ai.service.SceneAnalysisTargetSearchService;
-import com.scrapider.finance.domain.po.BondConfigPO;
-import com.scrapider.finance.domain.po.IndexConfigPO;
-import com.scrapider.finance.domain.po.StockConfigPO;
 import com.scrapider.finance.manage.BondConfigManage;
 import com.scrapider.finance.manage.IndexConfigManage;
 import com.scrapider.finance.manage.StockConfigManage;
@@ -39,46 +37,16 @@ public class SceneAnalysisTargetSearchServiceImpl implements SceneAnalysisTarget
         int limited = limit == null || limit <= 0 ? DEFAULT_LIMIT : Math.min(limit, MAX_LIMIT);
         return switch (normalizedTargetType) {
             case "STOCK" -> this.stockConfigManage.searchEnabledStocks(normalizedKeyword, limited).stream()
-                    .map(this::stockOption)
+                    .map(SceneAnalysisTargetConverter::stockOption)
                     .toList();
             case "INDEX" -> this.indexConfigManage.searchEnabledIndices(normalizedKeyword, limited).stream()
-                    .map(this::indexOption)
+                    .map(SceneAnalysisTargetConverter::indexOption)
                     .toList();
             case "CONVERTIBLE_BOND" -> this.bondConfigManage.searchEnabledBonds(normalizedKeyword, limited).stream()
-                    .map(this::bondOption)
+                    .map(SceneAnalysisTargetConverter::bondOption)
                     .toList();
             default -> throw new IllegalArgumentException("unsupported targetType: " + targetType);
         };
-    }
-
-    private SceneAnalysisTargetOptionVO stockOption(StockConfigPO po) {
-        return new SceneAnalysisTargetOptionVO(
-                "STOCK",
-                po.getStockCode(),
-                po.getStockName(),
-                po.getSecid(),
-                po.getMarketCode(),
-                po.getExchangeCode());
-    }
-
-    private SceneAnalysisTargetOptionVO indexOption(IndexConfigPO po) {
-        return new SceneAnalysisTargetOptionVO(
-                "INDEX",
-                po.getIndexCode(),
-                po.getIndexName(),
-                po.getSecid(),
-                po.getMarketCode(),
-                po.getExchangeCode());
-    }
-
-    private SceneAnalysisTargetOptionVO bondOption(BondConfigPO po) {
-        return new SceneAnalysisTargetOptionVO(
-                "CONVERTIBLE_BOND",
-                po.getBondCode(),
-                po.getBondName(),
-                po.getSecid(),
-                po.getMarketCode(),
-                po.getExchangeCode());
     }
 
     private String normalizeTargetType(String targetType) {

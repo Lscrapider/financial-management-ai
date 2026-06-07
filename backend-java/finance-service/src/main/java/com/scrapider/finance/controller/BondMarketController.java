@@ -65,7 +65,7 @@ public class BondMarketController {
             @RequestParam(required = false) Integer limit) {
         boolean synced = this.bondMarketSyncTask.syncKlinesForBond(
                 bondCode,
-                normalizePeriodType(periodType),
+                BondMarketController.normalizePeriodType(periodType),
                 limit);
         return ApiResponseVO.success(new MarketSyncStatusVO(synced, false));
     }

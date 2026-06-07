@@ -2,6 +2,7 @@ package com.scrapider.finance.ai.service.impl.scene;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.scrapider.finance.ai.converter.SceneTargetDataConverter;
 import com.scrapider.finance.ai.domain.dto.SceneAnalysisMessageDTO;
 import com.scrapider.finance.ai.domain.dto.SceneAnalysisTargetDTO;
 import com.scrapider.finance.ai.domain.param.SceneAnalysisSubmitParam;
@@ -58,17 +59,7 @@ public class IndexSceneTargetDataProvider extends AbstractSceneTargetDataProvide
                 param.targetName(),
                 quote == null ? null : quote.getIndexName(),
                 config == null ? null : config.getIndexName());
-        SceneAnalysisTargetDTO target = new SceneAnalysisTargetDTO(
-                "INDEX",
-                indexCode,
-                targetName,
-                this.firstNotBlank(quote == null ? null : quote.getSecid(), config == null ? null : config.getSecid()),
-                this.firstNotBlank(
-                        quote == null ? null : quote.getMarketCode(),
-                        config == null ? null : config.getMarketCode()),
-                this.firstNotBlank(
-                        quote == null ? null : quote.getExchangeCode(),
-                        config == null ? null : config.getExchangeCode()));
+        SceneAnalysisTargetDTO target = SceneTargetDataConverter.indexTarget(indexCode, targetName, quote, config);
         List<Map<String, Object>> dailyKlines = this.indexKlineManage
                 .listKlines(indexCode, null, KlinePeriodTypeEnum.DAILY, null, null, MARKET_KLINE_LIMIT)
                 .stream()

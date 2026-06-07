@@ -81,4 +81,4 @@ Controller -> Service -> Manage / API / Mapper -> Domain
 18. `Controller` 中不要编写局部 `@ExceptionHandler`。异常必须由模块级或全局 `@RestControllerAdvice` 统一处理，并且异常处理器必须使用日志打印异常对象，保留完整堆栈，避免吞掉真实报错原因。
 19. `Controller` 接收请求体必须使用 `domain/param` 包下的 Param 对象，不得使用 `Map`、`JsonNode` 等弱类型接收请求参数。
 20. 代码应保持简洁、干净、优雅。不要为了所谓的未来扩展性提前增加冗余判断、冗余抽象或多余设计。只有在存在重复逻辑、类似功能代码块，或单段逻辑过长影响可读性时，才允许抽离函数或类。禁止无意义的方法套方法。
-21. 对象拷贝、对象转 Map、Map 转对象时，优先使用项目已有依赖或框架提供的工具方法。若现有工具无法满足业务语义，需按业务场景创建明确的 Converter 转换类，并统一放在 converter 包下处理，避免在业务代码中散落手动转换逻辑。
+21. 对象拷贝、对象转 Map、Map 转对象时，优先使用项目已有依赖或框架提供的工具方法。若现有工具无法满足业务语义，需按业务场景创建明确的 Converter 转换类，并统一放在 converter 包下处理，一定不能在业务代码service或serviceImpl中散落手动转换逻辑。

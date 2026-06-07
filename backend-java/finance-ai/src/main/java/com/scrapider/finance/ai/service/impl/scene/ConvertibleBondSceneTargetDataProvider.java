@@ -2,6 +2,7 @@ package com.scrapider.finance.ai.service.impl.scene;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.scrapider.finance.ai.converter.SceneTargetDataConverter;
 import com.scrapider.finance.ai.domain.dto.SceneAnalysisMessageDTO;
 import com.scrapider.finance.ai.domain.dto.SceneAnalysisTargetDTO;
 import com.scrapider.finance.ai.domain.param.SceneAnalysisSubmitParam;
@@ -25,7 +26,6 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Component;
@@ -83,17 +83,7 @@ public class ConvertibleBondSceneTargetDataProvider extends AbstractSceneTargetD
                 param.targetName(),
                 quote == null ? null : quote.getBondName(),
                 config == null ? null : config.getBondName());
-        SceneAnalysisTargetDTO target = new SceneAnalysisTargetDTO(
-                "CONVERTIBLE_BOND",
-                bondCode,
-                targetName,
-                this.firstNotBlank(quote == null ? null : quote.getSecid(), config == null ? null : config.getSecid()),
-                this.firstNotBlank(
-                        quote == null ? null : quote.getMarketCode(),
-                        config == null ? null : config.getMarketCode()),
-                this.firstNotBlank(
-                        quote == null ? null : quote.getExchangeCode(),
-                        config == null ? null : config.getExchangeCode()));
+        SceneAnalysisTargetDTO target = SceneTargetDataConverter.bondTarget(bondCode, targetName, quote, config);
         List<Map<String, Object>> dailyKlines = this.queryBondKlines(
                 bondCode,
                 KlinePeriodTypeEnum.DAILY,
@@ -162,50 +152,21 @@ public class ConvertibleBondSceneTargetDataProvider extends AbstractSceneTargetD
         BigDecimal realtimePremiumRate = quote == null ? null : quote.getConversionPremiumRate();
         this.collectRealtimePremiumMissingInputs(missing, bondPrice, underlyingPrice, conversionPrice);
 
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("bondPrice", bondPrice);
-        data.put("turnoverRate", quote == null ? null : quote.getTurnoverRate());
-        data.put("bondRating", this.firstNotBlank(
-                basic == null ? null : basic.getRating(),
-                quote == null ? null : quote.getBondRating()));
-        data.put("premiumRate", realtimePremiumRate);
-        data.put("premiumRateSource", realtimePremiumRate == null ? null : "quote_snapshot_calculated");
-        data.put("dailyPremiumRate", latestValuation == null ? null : latestValuation.getPremiumRate());
-        data.put("premiumRateHistory", valuations.stream()
-                .map(ConvertibleBondDailyValuationPO::getPremiumRate)
-                .toList());
-        data.put("conversionValue", realtimeConversionValue);
-        data.put("conversionValueSource", realtimeConversionValue == null ? null : "quote_snapshot_calculated");
-        data.put("dailyConversionValue", latestValuation == null ? null : latestValuation.getConversionValue());
-        data.put("conversionValueHistory", valuations.stream()
-                .map(ConvertibleBondDailyValuationPO::getConversionValue)
-                .toList());
-        data.put("pureBondValue", latestValuation == null ? null : latestValuation.getPureBondValue());
-        data.put("ytm", this.firstNonNull(
-                latestValuation == null ? null : latestValuation.getYtm(),
-                this.estimatedYtm(data.get("bondPrice"), basic)));
-        data.put("remainingSize", this.firstNonNull(
-                basic == null ? null : basic.getRemainingSize(),
-                latestShare == null ? null : latestShare.getRemainingSize()));
-        data.put("maturityDays", this.maturityDays(basic));
-        data.put("redeemStatus", "DATA_INSUFFICIENT");
-        data.put("redeemTriggerProgress", null);
-        data.put("putbackStatus", "DATA_INSUFFICIENT");
-        data.put("underlyingStockCode", basic == null ? null : basic.getUnderlyingStockCode());
-        data.put("underlyingStockName", basic == null ? null : basic.getUnderlyingStockName());
-        data.put("conversionPrice", conversionPrice);
-        data.put("maturityDate", basic == null ? null : basic.getMaturityDate());
-        data.put("maturityCallPrice", basic == null ? null : basic.getMaturityCallPrice());
-        data.put("couponRate", basic == null ? null : basic.getCouponRate());
-        data.put("redeemClause", basic == null ? null : basic.getRedeemClause());
-        data.put("putbackClause", basic == null ? null : basic.getPutbackClause());
-        data.put("underlyingQuote", this.toMap(underlyingQuote));
-        data.put("underlyingDailyKlines", List.of());
-        data.put("underlyingPrice", underlyingPrice);
-        data.put("underlyingChangePct", underlyingQuote == null ? null : underlyingQuote.getChangePercent());
-        data.put("underlyingTrendScore", null);
-        data.put("stockBondLinkage", null);
-        return Map.of("convertibleBond", this.compactMap(data));
+        return SceneTargetDataConverter.convertibleBondAssetSpecificData(
+                this.objectMapper(),
+                quote,
+                basic,
+                latestValuation,
+                latestShare,
+                valuations,
+                underlyingQuote,
+                bondPrice,
+                conversionPrice,
+                underlyingPrice,
+                realtimeConversionValue,
+                realtimePremiumRate,
+                this.estimatedYtm(bondPrice, basic),
+                this.maturityDays(basic));
     }
 
     private StockQuoteSnapshotPO underlyingQuote(ConvertibleBondBasicPO basic) {
@@ -274,13 +235,4 @@ public class ConvertibleBondSceneTargetDataProvider extends AbstractSceneTargetD
         return BigDecimal.valueOf(value * 100.0D).setScale(4, RoundingMode.HALF_UP);
     }
 
-    @SafeVarargs
-    private final <T> T firstNonNull(T... values) {
-        for (T value : values) {
-            if (value != null) {
-                return value;
-            }
-        }
-        return null;
-    }
 }

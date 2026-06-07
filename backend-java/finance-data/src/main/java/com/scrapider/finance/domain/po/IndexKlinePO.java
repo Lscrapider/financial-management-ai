@@ -145,6 +145,36 @@ public class IndexKlinePO {
         return kline;
     }
 
+    public static IndexKlinePO aggregateFromDaily(
+            IndexConfigPO indexConfig,
+            List<IndexKlinePO> dailyKlines,
+            KlinePeriodTypeEnum periodType,
+            LocalDateTime syncedAt) {
+        if (dailyKlines == null || dailyKlines.isEmpty()) {
+            return null;
+        }
+        IndexKlinePO first = dailyKlines.get(0);
+        IndexKlinePO last = dailyKlines.get(dailyKlines.size() - 1);
+        IndexKlinePO repaired = new IndexKlinePO();
+        repaired.setIndexCode(indexConfig.getIndexCode());
+        repaired.setIndexName(indexConfig.getIndexName());
+        repaired.setSecid(indexConfig.getSecid());
+        repaired.setMarketCode(indexConfig.getMarketCode());
+        repaired.setExchangeCode(indexConfig.getExchangeCode());
+        repaired.setPeriodType(periodType.getCode());
+        repaired.setTradeDate(last.getTradeDate());
+        repaired.setOpenPrice(first.getOpenPrice());
+        repaired.setClosePrice(last.getClosePrice());
+        repaired.setHighPrice(maxHigh(dailyKlines));
+        repaired.setLowPrice(minLow(dailyKlines));
+        repaired.setVolume(sumLong(dailyKlines.stream().map(IndexKlinePO::getVolume).toList()));
+        repaired.setTurnoverAmount(sumDecimal(dailyKlines.stream().map(IndexKlinePO::getTurnoverAmount).toList()));
+        repaired.setTurnoverRate(sumDecimal(dailyKlines.stream().map(IndexKlinePO::getTurnoverRate).toList()));
+        repaired.setRawResponse("aggregated-from-daily");
+        repaired.setSyncedAt(syncedAt);
+        return repaired;
+    }
+
     private static List<IndexKlinePO> withMovingAverages(List<IndexKlinePO> klines) {
         if (klines.isEmpty()) {
             return klines;
@@ -173,6 +203,46 @@ public class IndexKlinePO {
             total = total.add(closePrice);
         }
         return total.divide(BigDecimal.valueOf(window), 4, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal maxHigh(List<IndexKlinePO> klines) {
+        return klines.stream()
+                .map(IndexKlinePO::getHighPrice)
+                .filter(Objects::nonNull)
+                .max(BigDecimal::compareTo)
+                .orElse(null);
+    }
+
+    private static BigDecimal minLow(List<IndexKlinePO> klines) {
+        return klines.stream()
+                .map(IndexKlinePO::getLowPrice)
+                .filter(Objects::nonNull)
+                .min(BigDecimal::compareTo)
+                .orElse(null);
+    }
+
+    private static Long sumLong(List<Long> values) {
+        long total = 0L;
+        boolean hasValue = false;
+        for (Long value : values) {
+            if (value != null) {
+                total += value;
+                hasValue = true;
+            }
+        }
+        return hasValue ? total : null;
+    }
+
+    private static BigDecimal sumDecimal(List<BigDecimal> values) {
+        BigDecimal total = BigDecimal.ZERO;
+        boolean hasValue = false;
+        for (BigDecimal value : values) {
+            if (value != null) {
+                total = total.add(value);
+                hasValue = true;
+            }
+        }
+        return hasValue ? total : null;
     }
 
     private static BigDecimal decimal(JsonNode line, int index) {

@@ -135,7 +135,7 @@ public class BondKlinePO {
 
         List<BondKlinePO> aggregated = new ArrayList<>();
         for (List<BondKlinePO> group : groups.values()) {
-            BondKlinePO row = aggregateOnePeriod(bond, group, periodType, syncedAt);
+            BondKlinePO row = aggregateOnePeriod(bond, group, periodType, syncedAt, "aggregated-from-tushare-cb-daily");
             if (row != null) {
                 aggregated.add(row);
             }
@@ -144,12 +144,21 @@ public class BondKlinePO {
         return aggregated;
     }
 
+    public static BondKlinePO aggregateFromDaily(
+            BondConfigPO bond,
+            List<BondKlinePO> dailyKlines,
+            KlinePeriodTypeEnum periodType,
+            LocalDateTime syncedAt) {
+        return aggregateOnePeriod(bond, dailyKlines, periodType, syncedAt, "aggregated-from-daily");
+    }
+
     private static BondKlinePO aggregateOnePeriod(
             BondConfigPO bond,
             List<BondKlinePO> group,
             KlinePeriodTypeEnum periodType,
-            LocalDateTime syncedAt) {
-        if (group.isEmpty()) {
+            LocalDateTime syncedAt,
+            String rawResponse) {
+        if (group == null || group.isEmpty()) {
             return null;
         }
         BondKlinePO first = group.get(0);
@@ -169,7 +178,7 @@ public class BondKlinePO {
         row.setVolume(sumLong(group.stream().map(BondKlinePO::getVolume).toList()));
         row.setTurnoverAmount(sumDecimal(group.stream().map(BondKlinePO::getTurnoverAmount).toList()));
         row.setTurnoverRate(sumDecimal(group.stream().map(BondKlinePO::getTurnoverRate).toList()));
-        row.setRawResponse("aggregated-from-tushare-cb-daily");
+        row.setRawResponse(rawResponse);
         row.setSyncedAt(syncedAt);
         return row;
     }

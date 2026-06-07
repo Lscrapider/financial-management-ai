@@ -2,6 +2,8 @@ package com.scrapider.finance.ai.service.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.scrapider.finance.ai.converter.AiTokenUsageConverter;
+import com.scrapider.finance.ai.domain.param.AiTokenUsageDeepSeekResponseParam;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageLogVO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageOverviewVO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageTrendVO;
@@ -24,7 +26,6 @@ public class AiTokenUsageServiceImpl implements AiTokenUsageService {
     private static final int MAX_OVERVIEW_DAYS = 365;
     private static final int DEFAULT_TREND_DAYS = 7;
     private static final int MAX_TREND_DAYS = 365;
-    private static final String DEEPSEEK_PROVIDER = "deepseek";
 
     private final AiTokenUsageLogManage aiTokenUsageLogManage;
     private final ObjectMapper objectMapper;
@@ -44,6 +45,14 @@ public class AiTokenUsageServiceImpl implements AiTokenUsageService {
     }
 
     @Override
+    public AiTokenUsageLogVO recordDeepSeekResponse(AiTokenUsageDeepSeekResponseParam param) {
+        if (param == null) {
+            throw new IllegalArgumentException("DeepSeek response usage must not be empty");
+        }
+        return this.recordDeepSeekResponse(param.toJsonNode(this.objectMapper));
+    }
+
+    @Override
     public void recordChatResponse(ChatResponse response) {
         if (response == null) {
             return;
@@ -53,7 +62,10 @@ public class AiTokenUsageServiceImpl implements AiTokenUsageService {
             return;
         }
         try {
-            this.aiTokenUsageLogManage.saveLog(this.toTokenUsageLog(response, usage));
+            this.aiTokenUsageLogManage.saveLog(AiTokenUsageConverter.fromChatResponse(
+                    response,
+                    usage,
+                    this.objectMapper));
         } catch (RuntimeException ex) {
             LOGGER.warn("Failed to record AI token usage", ex);
         }
@@ -78,39 +90,5 @@ public class AiTokenUsageServiceImpl implements AiTokenUsageService {
             return defaultValue;
         }
         return Math.min(value, maxValue);
-    }
-
-    private AiTokenUsageLogPO toTokenUsageLog(ChatResponse response, Usage usage) {
-        AiTokenUsageLogPO log = new AiTokenUsageLogPO();
-        log.setProvider(DEEPSEEK_PROVIDER);
-        log.setResponseId(response.getMetadata().getId());
-        log.setObjectType("chat.completion");
-        log.setModel(response.getMetadata().getModel());
-        log.setFinishReason(this.finishReason(response));
-        log.setPromptTokens(usage.getPromptTokens());
-        log.setCompletionTokens(usage.getCompletionTokens());
-        log.setTotalTokens(usage.getTotalTokens());
-        log.setCachedTokens(this.cachedTokens(usage));
-        log.setReasoningTokens(this.reasoningTokens(usage));
-        log.setRawResponse(this.objectMapper.valueToTree(response.getMetadata()).toString());
-        log.setOccurredAt(LocalDateTime.now());
-        return log;
-    }
-
-    private String finishReason(ChatResponse response) {
-        if (response.getResult() == null || response.getResult().getMetadata() == null) {
-            return null;
-        }
-        return response.getResult().getMetadata().getFinishReason();
-    }
-
-    private Integer cachedTokens(Usage usage) {
-        JsonNode node = this.objectMapper.valueToTree(usage.getNativeUsage());
-        return node.path("prompt_tokens_details").path("cached_tokens").asInt(0);
-    }
-
-    private Integer reasoningTokens(Usage usage) {
-        JsonNode node = this.objectMapper.valueToTree(usage.getNativeUsage());
-        return node.path("completion_tokens_details").path("reasoning_tokens").asInt(0);
     }
 }

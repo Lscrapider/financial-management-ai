@@ -1,8 +1,8 @@
 package com.scrapider.finance.service.impl;
 
 import cn.hutool.core.util.StrUtil;
+import com.scrapider.finance.converter.SystemConfigConverter;
 import com.scrapider.finance.domain.param.BondConfigAddParam;
-import com.scrapider.finance.domain.param.StockConfigAddParam;
 import com.scrapider.finance.domain.po.BondConfigPO;
 import com.scrapider.finance.domain.po.ConvertibleBondBasicPO;
 import com.scrapider.finance.domain.vo.BondConfigAddResultVO;
@@ -81,10 +81,7 @@ public class SystemConfigBondServiceImpl implements SystemConfigBondService {
         if (StrUtil.isBlank(stockCode) || StrUtil.isBlank(stockName)) {
             throw new IllegalArgumentException("可转债基础资料缺少正股代码或名称");
         }
-        StockConfigAddParam stockParam = new StockConfigAddParam();
-        stockParam.setStockCode(stockCode);
-        stockParam.setStockName(stockName);
-        return this.systemConfigStockService.addStock(stockParam);
+        return this.systemConfigStockService.addStock(SystemConfigConverter.toStockConfigAddParam(stockCode, stockName));
     }
 
     private BondConfigAddResultVO toResult(
@@ -93,21 +90,13 @@ public class SystemConfigBondServiceImpl implements SystemConfigBondService {
             StockConfigAddResultVO underlyingStock,
             boolean marketDataSynced,
             boolean convertibleDataSynced) {
-        BondConfigAddResultVO result = new BondConfigAddResultVO();
-        result.setBondCode(bond.getBondCode());
-        result.setBondName(bond.getBondName());
-        result.setSecid(bond.getSecid());
-        result.setMarketCode(bond.getMarketCode());
-        result.setExchangeCode(bond.getExchangeCode());
-        result.setUnderlyingStockCode(this.normalizeStockCode(basic.getUnderlyingStockCode()));
-        result.setUnderlyingStockName(basic.getUnderlyingStockName());
-        result.setBasicSynced(true);
-        result.setUnderlyingStockSynced(underlyingStock != null);
-        result.setMarketDataSynced(marketDataSynced);
-        result.setDailyValuationSynced(convertibleDataSynced);
-        result.setShareSynced(convertibleDataSynced);
-        result.setUnderlyingStock(underlyingStock);
-        return result;
+        return SystemConfigConverter.toBondConfigAddResult(
+                bond,
+                basic,
+                this.normalizeStockCode(basic.getUnderlyingStockCode()),
+                underlyingStock,
+                marketDataSynced,
+                convertibleDataSynced);
     }
 
     private String normalizeBondCode(BondConfigAddParam param) {
@@ -127,15 +116,11 @@ public class SystemConfigBondServiceImpl implements SystemConfigBondService {
     }
 
     private BondConfigPO buildBondConfig(String bondCode, String bondName) {
-        BondConfigPO bond = new BondConfigPO();
-        bond.setBondCode(bondCode);
-        bond.setBondName(bondName);
-        bond.setMarketCode("BOND");
-        bond.setExchangeCode(this.exchangeCodeOf(bondCode));
-        bond.setSecid(this.secidOf(bondCode));
-        bond.setEnabled(true);
-        bond.setRemark("系统配置页面新增可转债");
-        return bond;
+        return SystemConfigConverter.toBondConfig(
+                bondCode,
+                bondName,
+                this.exchangeCodeOf(bondCode),
+                this.secidOf(bondCode));
     }
 
     private String exchangeCodeOf(String bondCode) {

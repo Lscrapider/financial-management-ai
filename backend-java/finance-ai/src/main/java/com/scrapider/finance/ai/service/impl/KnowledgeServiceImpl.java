@@ -3,13 +3,12 @@ package com.scrapider.finance.ai.service.impl;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.scrapider.finance.ai.converter.KnowledgeConverter;
 import com.scrapider.finance.ai.domain.dto.KnowledgeReembedMessageDTO;
-import com.scrapider.finance.ai.domain.vo.CategoryTagDistribution;
 import com.scrapider.finance.ai.domain.vo.KnowledgeChunkPageVO;
 import com.scrapider.finance.ai.domain.vo.KnowledgeChunkVO;
 import com.scrapider.finance.ai.domain.vo.KnowledgeOverviewVO;
 import com.scrapider.finance.ai.domain.vo.KnowledgeStatsVO;
-import com.scrapider.finance.ai.domain.vo.TagCount;
 import com.scrapider.finance.ai.service.KnowledgeService;
 import com.scrapider.finance.ai.service.OcrTaskMessagePublisher;
 import com.scrapider.finance.domain.param.KnowledgeChunkUpdateParam;
@@ -17,12 +16,9 @@ import com.scrapider.finance.domain.po.KnowledgeVectorPO;
 import com.scrapider.finance.domain.po.OcrTaskPO;
 import com.scrapider.finance.manage.KnowledgeVectorManage;
 import com.scrapider.finance.manage.OcrTaskManage;
-import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -97,55 +93,15 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
     @Override
     public KnowledgeStatsVO stats() {
-        Map<String, Object> stats = this.knowledgeVectorManage.stats();
-        return new KnowledgeStatsVO(
-                ((Number) stats.get("taskCount")).longValue(),
-                ((Number) stats.get("chunkCount")).longValue(),
-                ((Number) stats.get("totalTextLength")).longValue(),
-                (OffsetDateTime) stats.get("latestCreatedAt"));
+        return KnowledgeConverter.stats(this.knowledgeVectorManage.stats());
     }
 
     @Override
     public KnowledgeOverviewVO overview() {
-        Map<String, Object> stats = this.knowledgeVectorManage.stats();
-        long taskCount = ((Number) stats.get("taskCount")).longValue();
-        long chunkCount = ((Number) stats.get("chunkCount")).longValue();
-        long totalTextLength = ((Number) stats.get("totalTextLength")).longValue();
-        OffsetDateTime latestCreatedAt = (OffsetDateTime) stats.get("latestCreatedAt");
-
-        List<Map<String, Object>> rawRows = this.knowledgeVectorManage.tagDistribution();
-
-        Map<String, Map<String, Long>> lookup = new LinkedHashMap<>();
-        for (var row : rawRows) {
-            String cat = (String) row.get("category");
-            String tag = (String) row.get("tag");
-            long cnt = ((Number) row.get("cnt")).longValue();
-            lookup.computeIfAbsent(cat, k -> new LinkedHashMap<>()).put(tag, cnt);
-        }
-
-        List<CategoryTagDistribution> distributions = new ArrayList<>();
-        for (var catEntry : VALID_TAGS.entrySet()) {
-            String categoryKey = catEntry.getKey();
-            Set<String> allTags = catEntry.getValue();
-            Map<String, Long> existing = lookup.getOrDefault(categoryKey, Map.of());
-            long categoryTotal = existing.values().stream().mapToLong(Long::longValue).sum();
-
-            List<TagCount> tagCounts = new ArrayList<>();
-            for (String tagKey : allTags) {
-                long count = existing.getOrDefault(tagKey, 0L);
-                double catPct = categoryTotal > 0
-                        ? Math.round(count * 10000.0 / categoryTotal) / 100.0
-                        : 0.0;
-                double totalPct = chunkCount > 0
-                        ? Math.round(count * 10000.0 / chunkCount) / 100.0
-                        : 0.0;
-                tagCounts.add(new TagCount(categoryKey, tagKey, count, catPct, totalPct));
-            }
-            distributions.add(new CategoryTagDistribution(categoryKey, tagCounts));
-        }
-
-        return new KnowledgeOverviewVO(
-                taskCount, chunkCount, totalTextLength, latestCreatedAt, distributions);
+        return KnowledgeConverter.overview(
+                this.knowledgeVectorManage.stats(),
+                this.knowledgeVectorManage.tagDistribution(),
+                VALID_TAGS);
     }
 
     @Override

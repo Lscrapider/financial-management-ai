@@ -16,12 +16,12 @@ public class LoginUser implements UserDetails {
     }
 
     public AppUserPO getUser() {
-        return user;
+        return this.user;
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        String roleCode = resolveRoleCode();
+        String roleCode = this.resolveRoleCode();
         if (roleCode == null || roleCode.isBlank()) {
             return List.of();
         }
@@ -29,28 +29,28 @@ public class LoginUser implements UserDetails {
     }
 
     public String getRoleCode() {
-        return resolveRoleCode();
+        return this.resolveRoleCode();
     }
 
     private String resolveRoleCode() {
-        if ("admin".equals(user.getUsername())) {
+        if ("admin".equals(this.user.getUsername())) {
             return "admin";
         }
-        return user.getRoleCode();
+        return this.user.getRoleCode();
     }
 
     @Override
     public String getPassword() {
-        return user.getPassword();
+        return this.user.getPassword();
     }
 
     @Override
     public String getUsername() {
-        return user.getUsername();
+        return this.user.getUsername();
     }
 
     @Override
     public boolean isEnabled() {
-        return Boolean.TRUE.equals(user.getEnabled());
+        return Boolean.TRUE.equals(this.user.getEnabled());
     }
 }

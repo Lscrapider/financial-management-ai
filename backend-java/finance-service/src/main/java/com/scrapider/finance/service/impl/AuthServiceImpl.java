@@ -1,6 +1,7 @@
 package com.scrapider.finance.service.impl;
 
 import cn.hutool.core.util.StrUtil;
+import com.scrapider.finance.converter.AuthConverter;
 import com.scrapider.finance.domain.constant.AuthConstant;
 import com.scrapider.finance.domain.param.ChangePasswordParam;
 import com.scrapider.finance.domain.param.LoginParam;
@@ -16,7 +17,6 @@ import com.scrapider.finance.security.LoginUser;
 import com.scrapider.finance.security.TokenStore;
 import com.scrapider.finance.service.AuthService;
 import io.jsonwebtoken.Claims;
-import java.util.List;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -54,7 +54,7 @@ public class AuthServiceImpl implements AuthService {
                 loginUser.getUser().getId(),
                 loginUser.getUsername(),
                 loginUser.getRoleCode());
-        return new LoginResultVO(token);
+        return AuthConverter.toLoginResult(token);
     }
 
     @Override
@@ -84,21 +84,7 @@ public class AuthServiceImpl implements AuthService {
         if (user == null) {
             throw new IllegalArgumentException("User not found.");
         }
-        String roleCode = loginUser.getRoleCode();
-        List<String> roles = StrUtil.isBlank(roleCode) ? List.of() : List.of(roleCode);
-        return new UserInfoVO(
-                String.valueOf(user.getId()),
-                user.getUsername(),
-                user.getRealName(),
-                user.getAvatar(),
-                roles,
-                user.getIntroduction(),
-                user.getHomePath(),
-                token,
-                user.getIntroduction(),
-                user.getEmail(),
-                user.getPhone(),
-                user.getEmailNotification());
+        return AuthConverter.toUserInfo(user, loginUser.getRoleCode(), token);
     }
 
     @Override

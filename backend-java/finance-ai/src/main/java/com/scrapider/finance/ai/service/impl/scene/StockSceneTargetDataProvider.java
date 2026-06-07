@@ -2,6 +2,8 @@ package com.scrapider.finance.ai.service.impl.scene;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.scrapider.finance.ai.converter.SceneTargetDataConverter;
+import com.scrapider.finance.ai.converter.StockSceneDataConverter;
 import com.scrapider.finance.ai.domain.dto.SceneAnalysisMessageDTO;
 import com.scrapider.finance.ai.domain.dto.SceneAnalysisTargetDTO;
 import com.scrapider.finance.ai.domain.dto.StockSceneDataDTO;
@@ -20,7 +22,6 @@ import com.scrapider.finance.manage.StockQuoteSnapshotManage;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Component;
@@ -82,17 +83,7 @@ public class StockSceneTargetDataProvider extends AbstractSceneTargetDataProvide
                 param.targetName(),
                 quote == null ? null : quote.getStockName(),
                 config == null ? null : config.getStockName());
-        SceneAnalysisTargetDTO target = new SceneAnalysisTargetDTO(
-                "STOCK",
-                stockCode,
-                targetName,
-                this.firstNotBlank(quote == null ? null : quote.getSecid(), config == null ? null : config.getSecid()),
-                this.firstNotBlank(
-                        quote == null ? null : quote.getMarketCode(),
-                        config == null ? null : config.getMarketCode()),
-                this.firstNotBlank(
-                        quote == null ? null : quote.getExchangeCode(),
-                        config == null ? null : config.getExchangeCode()));
+        SceneAnalysisTargetDTO target = SceneTargetDataConverter.stockTarget(stockCode, targetName, quote, config);
         StockSceneDataDTO sceneData = this.queryStockSceneData(config, missing);
         List<Map<String, Object>> intraday = this.queryStockIntraday(stockCode, missing);
         StockKlineLimits klineLimits = this.stockKlineLimits(param);
@@ -121,7 +112,7 @@ public class StockSceneTargetDataProvider extends AbstractSceneTargetDataProvide
                 param,
                 target,
                 this.toMap(quote),
-                this.stockValuationData(quote),
+                SceneTargetDataConverter.stockValuationData(quote),
                 this.toMap(sceneData.industryInfo()),
                 this.toMapList(sceneData.valuationHistory()),
                 this.toMapList(sceneData.financialIndicators()),
@@ -130,7 +121,7 @@ public class StockSceneTargetDataProvider extends AbstractSceneTargetDataProvide
                 weeklyKlines,
                 monthlyKlines,
                 intraday,
-                this.stockAssetSpecificData(sceneData),
+                SceneTargetDataConverter.stockAssetSpecificData(this.objectMapper(), sceneData),
                 missing);
     }
 
@@ -180,12 +171,7 @@ public class StockSceneTargetDataProvider extends AbstractSceneTargetDataProvide
         if (dailyKlines.isEmpty() || valuationHistory.isEmpty()) {
             return dailyKlines;
         }
-        Map<String, Long> freeSharesByDate = new LinkedHashMap<>();
-        valuationHistory.forEach(valuation -> {
-            if (valuation.getTradeDate() != null && valuation.getFreeSharesA() != null) {
-                freeSharesByDate.put(valuation.getTradeDate().toString(), valuation.getFreeSharesA());
-            }
-        });
+        Map<String, Long> freeSharesByDate = SceneTargetDataConverter.freeSharesByDate(valuationHistory);
         if (freeSharesByDate.isEmpty()) {
             return dailyKlines;
         }
@@ -211,14 +197,12 @@ public class StockSceneTargetDataProvider extends AbstractSceneTargetDataProvide
         BigDecimal turnoverRate = volume
                 .multiply(BigDecimal.valueOf(100))
                 .divide(BigDecimal.valueOf(freeShares), 6, RoundingMode.HALF_UP);
-        Map<String, Object> filled = new LinkedHashMap<>(row);
-        filled.put("turnoverRate", turnoverRate);
-        return filled;
+        return SceneTargetDataConverter.dailyKlineWithTurnoverRate(row, turnoverRate);
     }
 
     private StockSceneDataDTO queryStockSceneData(StockConfigPO config, List<String> missing) {
         if (config == null) {
-            return new StockSceneDataDTO(null, List.of(), List.of(), List.of());
+            return StockSceneDataConverter.empty();
         }
         StockSceneDataDTO sceneData = this.stockSceneDataEnsureService.ensureStockSceneData(config);
         if (sceneData.industryInfo() == null) {
@@ -234,32 +218,6 @@ public class StockSceneTargetDataProvider extends AbstractSceneTargetDataProvide
             missing.add("stock_dividend_history");
         }
         return sceneData;
-    }
-
-    private Map<String, Object> stockValuationData(StockQuoteSnapshotPO quote) {
-        if (quote == null) {
-            return Map.of();
-        }
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("peTtm", quote.getPeTtm());
-        data.put("peDynamic", quote.getPeDynamic());
-        data.put("peStatic", quote.getPeStatic());
-        data.put("pbRatio", quote.getPbRatio());
-        data.put("totalMarketValue", quote.getTotalMarketValue());
-        data.put("floatMarketValue", quote.getFloatMarketValue());
-        return this.compactMap(data);
-    }
-
-    private Map<String, Object> stockAssetSpecificData(StockSceneDataDTO sceneData) {
-        if (sceneData == null) {
-            return Map.of("stock", Map.of());
-        }
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("industryData", this.toMap(sceneData.industryInfo()));
-        data.put("valuationHistory", this.toMapList(sceneData.valuationHistory()));
-        data.put("financialIndicators", this.toMapList(sceneData.financialIndicators()));
-        data.put("dividendHistory", this.toMapList(sceneData.dividendHistory()));
-        return Map.of("stock", this.compactMap(data));
     }
 
     private record StockKlineLimits(int daily, int weekly, int monthly) {

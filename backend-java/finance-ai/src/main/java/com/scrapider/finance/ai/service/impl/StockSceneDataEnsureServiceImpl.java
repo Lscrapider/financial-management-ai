@@ -1,6 +1,7 @@
 package com.scrapider.finance.ai.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
+import com.scrapider.finance.ai.converter.StockSceneDataConverter;
 import com.scrapider.finance.ai.domain.dto.StockSceneDataDTO;
 import com.scrapider.finance.ai.service.StockFundamentalProvider;
 import com.scrapider.finance.ai.service.StockSceneDataEnsureService;
@@ -49,14 +50,14 @@ public class StockSceneDataEnsureServiceImpl implements StockSceneDataEnsureServ
     @Override
     public StockSceneDataDTO ensureStockSceneData(StockConfigPO stockConfig) {
         if (stockConfig == null) {
-            return new StockSceneDataDTO(null, List.of(), List.of(), List.of());
+            return StockSceneDataConverter.empty();
         }
         this.ensureIndustryInfoFresh(stockConfig);
         this.ensureValuationHistoryFresh(stockConfig);
         this.ensureIndustryInfoFromValuationHistory(stockConfig);
         this.ensureFinancialIndicatorsFresh(stockConfig);
         this.ensureDividendHistoryFresh(stockConfig);
-        return new StockSceneDataDTO(
+        return StockSceneDataConverter.toDTO(
                 this.stockIndustryInfoManage.getBySecid(stockConfig.getSecid()),
                 this.stockValuationHistoryManage.listByStockCode(stockConfig.getStockCode(), VALUATION_LIMIT),
                 this.stockFinancialIndicatorManage.listByStockCode(stockConfig.getStockCode(), FINANCIAL_LIMIT),

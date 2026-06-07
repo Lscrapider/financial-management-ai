@@ -3,6 +3,7 @@ package com.scrapider.finance.ai.service.impl;
 import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.scrapider.finance.ai.converter.SceneAnalysisTaskConverter;
 import com.scrapider.finance.ai.domain.dto.SceneAnalysisMessageDTO;
 import com.scrapider.finance.ai.domain.param.SceneAnalysisCallbackParam;
 import com.scrapider.finance.ai.domain.param.SceneAnalysisCurrentScenesPayloadParam;
@@ -13,7 +14,6 @@ import com.scrapider.finance.ai.service.SceneAnalysisMessagePublisher;
 import com.scrapider.finance.ai.service.SceneAnalysisTaskService;
 import com.scrapider.finance.ai.service.SceneReportPipelineService;
 import com.scrapider.finance.ai.service.SceneTargetDataProvider;
-import com.scrapider.finance.domain.enums.SceneAnalysisTaskStatusEnum;
 import com.scrapider.finance.domain.po.SceneAnalysisTaskPO;
 import com.scrapider.finance.manage.SceneAnalysisTaskManage;
 import java.lang.reflect.Method;
@@ -71,12 +71,7 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
             this.sceneAnalysisTaskManage.markFailed(taskNo, ex.getMessage());
             throw ex;
         }
-        return new SceneAnalysisSubmitVO(
-                taskNo,
-                message.target().type(),
-                message.target().code(),
-                message.config().profile(),
-                SceneAnalysisTaskStatusEnum.PROCESSING_CURRENT_SCENES.getCode());
+        return SceneAnalysisTaskConverter.submitted(taskNo, message);
     }
 
     @Override

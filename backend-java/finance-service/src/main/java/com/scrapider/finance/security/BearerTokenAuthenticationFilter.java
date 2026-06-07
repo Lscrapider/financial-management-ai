@@ -7,12 +7,15 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 public class BearerTokenAuthenticationFilter extends OncePerRequestFilter {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(BearerTokenAuthenticationFilter.class);
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtUtils jwtUtils;
@@ -31,9 +34,9 @@ public class BearerTokenAuthenticationFilter extends OncePerRequestFilter {
         String authorization = request.getHeader("Authorization");
         if (authorization != null && authorization.startsWith(BEARER_PREFIX)) {
             String token = authorization.substring(BEARER_PREFIX.length());
-            if (!tokenStore.isBlacklisted(token)) {
+            if (!this.tokenStore.isBlacklisted(token)) {
                 try {
-                    Claims claims = jwtUtils.parseToken(token);
+                    Claims claims = this.jwtUtils.parseToken(token);
                     Long userId = Long.valueOf(claims.getSubject());
                     String username = claims.get("username", String.class);
                     String role = claims.get("role", String.class);
@@ -47,8 +50,8 @@ public class BearerTokenAuthenticationFilter extends OncePerRequestFilter {
                     UsernamePasswordAuthenticationToken auth =
                             new UsernamePasswordAuthenticationToken(loginUser, null, loginUser.getAuthorities());
                     SecurityContextHolder.getContext().setAuthentication(auth);
-                } catch (Exception ignored) {
-                    // Token invalid or expired — leave SecurityContext empty
+                } catch (Exception ex) {
+                    LOGGER.debug("Invalid bearer token, leave SecurityContext empty.", ex);
                 }
             }
         }

@@ -2,6 +2,7 @@ package com.scrapider.finance.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
+import com.scrapider.finance.converter.WatchPoolConverter;
 import com.scrapider.finance.domain.enums.WatchTargetTypeEnum;
 import java.math.BigDecimal;
 import com.scrapider.finance.domain.param.WatchGroupItemSaveParam;
@@ -167,43 +168,24 @@ public class WatchPoolServiceImpl implements WatchPoolService {
 
     private List<WatchGroupVO> toGroupVOList(List<WatchGroupPO> groups) {
         List<Long> groupIds = groups.stream().map(WatchGroupPO::getId).toList();
-        Map<Long, List<WatchGroupItemPO>> itemMap = this.watchGroupItemManage.listByGroupIds(groupIds).stream()
-                .collect(Collectors.groupingBy(WatchGroupItemPO::getGroupId));
-        List<WatchGroupItemPO> allItems = itemMap.values().stream()
-                .flatMap(List::stream)
-                .toList();
-        Map<Long, WatchGroupItemVO> itemVOMap = this.toItemVOList(allItems).stream()
-                .collect(Collectors.toMap(item -> Long.valueOf(item.getId()), Function.identity()));
-        return groups.stream()
-                .map(group -> WatchGroupVO.fromPO(group, itemMap.getOrDefault(group.getId(), List.of()).stream()
-                        .map(item -> itemVOMap.get(item.getId()))
-                        .filter(Objects::nonNull)
-                        .toList()))
-                .toList();
+        List<WatchGroupItemPO> allItems = this.watchGroupItemManage.listByGroupIds(groupIds);
+        return WatchPoolConverter.toGroupVOList(
+                groups,
+                allItems,
+                this.stockQuoteMap(allItems),
+                this.indexQuoteMap(allItems),
+                this.bondQuoteMap(allItems));
     }
 
     private List<WatchGroupItemVO> toItemVOList(List<WatchGroupItemPO> items) {
         if (CollUtil.isEmpty(items)) {
             return List.of();
         }
-        Map<String, StockQuoteSnapshotPO> stockQuoteMap = this.stockQuoteMap(items);
-        Map<String, IndexQuoteSnapshotPO> indexQuoteMap = this.indexQuoteMap(items);
-        Map<String, BondQuoteSnapshotPO> bondQuoteMap = this.bondQuoteMap(items);
-        return items.stream()
-                .map(item -> {
-                    WatchGroupItemVO vo = WatchGroupItemVO.fromPO(item);
-                    if (WatchTargetTypeEnum.STOCK.name().equals(item.getTargetType())) {
-                        vo.fillStockQuote(stockQuoteMap.get(item.getTargetCode()));
-                    }
-                    if (WatchTargetTypeEnum.INDEX.name().equals(item.getTargetType())) {
-                        vo.fillIndexQuote(indexQuoteMap.get(item.getTargetCode()));
-                    }
-                    if (WatchTargetTypeEnum.BOND.name().equals(item.getTargetType())) {
-                        vo.fillBondQuote(bondQuoteMap.get(item.getTargetCode()));
-                    }
-                    return vo;
-                })
-                .toList();
+        return WatchPoolConverter.toItemVOList(
+                items,
+                this.stockQuoteMap(items),
+                this.indexQuoteMap(items),
+                this.bondQuoteMap(items));
     }
 
     private Map<String, StockQuoteSnapshotPO> stockQuoteMap(List<WatchGroupItemPO> items) {

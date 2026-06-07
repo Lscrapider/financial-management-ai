@@ -13,6 +13,7 @@
 - 提供 MyBatis-Plus Mapper 和 Manage 封装，供业务服务查询、保存和统计数据。
 - 提供 InfluxDB 配置与股票、指数、可转债分钟走势读写封装。
 - 提供股票/指数排序枚举和行情 JSON 解析工具。
+- 行情类 PO 负责第三方响应和中间行情数据到持久化对象的静态构造，例如 API 响应解析、Tushare 行转换和日 K 聚合为周/月 K。
 
 ## 目录结构
 
@@ -40,7 +41,7 @@ backend-java/finance-data/
 | `AppUserPO` | `app_user` | 系统用户、角色、默认首页和登录态用户信息来源。 |
 | `StockConfigPO` | `stock_config` | 启用的股票清单和腾讯行情 `secid` 配置。 |
 | `StockQuoteSnapshotPO` | `stock_quote_snapshot` | 股票最新行情快照。 |
-| `StockDailyKlinePO` | `stock_daily_kline` | 股票日 K 数据。 |
+| `StockKlinePO` | `stock_daily_kline` | 股票日 K 数据。 |
 | `StockIntradayTrendPO` | InfluxDB `stock_intraday / stock_minute` | 股票分钟级分时走势。 |
 | `IndexConfigPO` | `index_config` | 启用的指数清单和腾讯行情 `secid` 配置。 |
 | `IndexQuoteSnapshotPO` | `index_quote_snapshot` | 指数最新行情快照。 |
@@ -75,7 +76,7 @@ backend-java/finance-data/
 | `RegisterParam` | 注册 | `username`, `password`, `confirmPassword` |
 | `StockQuoteListParam` | 股票行情列表 | `marketCode`, `limit`, `sortField`, `sortOrder` |
 | `StockIntradayTrendParam` | 股票分时走势 | `stockCode` |
-| `StockDailyKlineParam` | 股票日 K | `stockCode`, `secid`, `startDate`, `endDate`, `limit` |
+| `StockKlineParam` | 股票日 K | `stockCode`, `secid`, `startDate`, `endDate`, `limit` |
 | `IndexQuoteListParam` | 指数行情列表 | `marketCode`, `limit`, `sortField`, `sortOrder` |
 | `IndexKlineParam` | 指数 K 线 | `indexCode`, `secid`, `startDate`, `endDate`, `limit` |
 | `BondQuoteListParam` | 可转债行情列表 | `limit`, `sortField`, `sortOrder` |
@@ -147,4 +148,10 @@ influxdb:
 
 ```bash
 mvn -pl backend-java/finance-data -am package
+```
+
+验证完整 Java 后端 Reactor 时，在 `backend-java` 目录执行：
+
+```bash
+mvn test
 ```

@@ -195,6 +195,38 @@ public class StockKlinePO {
         return value == null ? null : value.multiply(factor).setScale(4, RoundingMode.HALF_UP);
     }
 
+    public static StockKlinePO aggregateFromDaily(
+            StockConfigPO stockConfig,
+            List<StockKlinePO> dailyKlines,
+            KlinePeriodTypeEnum periodType,
+            KlineAdjustTypeEnum adjustType,
+            LocalDateTime syncedAt) {
+        if (dailyKlines == null || dailyKlines.isEmpty()) {
+            return null;
+        }
+        StockKlinePO first = dailyKlines.get(0);
+        StockKlinePO last = dailyKlines.get(dailyKlines.size() - 1);
+        StockKlinePO repaired = new StockKlinePO();
+        repaired.setStockCode(stockConfig.getStockCode());
+        repaired.setStockName(stockConfig.getStockName());
+        repaired.setSecid(stockConfig.getSecid());
+        repaired.setMarketCode(stockConfig.getMarketCode());
+        repaired.setExchangeCode(stockConfig.getExchangeCode());
+        repaired.setPeriodType(periodType.getCode());
+        repaired.setAdjustType(adjustType.getCode());
+        repaired.setTradeDate(last.getTradeDate());
+        repaired.setOpenPrice(first.getOpenPrice());
+        repaired.setClosePrice(last.getClosePrice());
+        repaired.setHighPrice(maxHigh(dailyKlines));
+        repaired.setLowPrice(minLow(dailyKlines));
+        repaired.setVolume(sumLong(dailyKlines.stream().map(StockKlinePO::getVolume).toList()));
+        repaired.setTurnoverAmount(sumDecimal(dailyKlines.stream().map(StockKlinePO::getTurnoverAmount).toList()));
+        repaired.setTurnoverRate(sumDecimal(dailyKlines.stream().map(StockKlinePO::getTurnoverRate).toList()));
+        repaired.setRawResponse("aggregated-from-daily");
+        repaired.setSyncedAt(syncedAt);
+        return repaired;
+    }
+
     private static List<StockKlinePO> withMovingAverages(List<StockKlinePO> klines) {
         if (klines.isEmpty()) {
             return klines;
@@ -223,6 +255,46 @@ public class StockKlinePO {
             total = total.add(closePrice);
         }
         return total.divide(BigDecimal.valueOf(window), 4, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal maxHigh(List<StockKlinePO> klines) {
+        return klines.stream()
+                .map(StockKlinePO::getHighPrice)
+                .filter(Objects::nonNull)
+                .max(BigDecimal::compareTo)
+                .orElse(null);
+    }
+
+    private static BigDecimal minLow(List<StockKlinePO> klines) {
+        return klines.stream()
+                .map(StockKlinePO::getLowPrice)
+                .filter(Objects::nonNull)
+                .min(BigDecimal::compareTo)
+                .orElse(null);
+    }
+
+    private static Long sumLong(List<Long> values) {
+        long total = 0L;
+        boolean hasValue = false;
+        for (Long value : values) {
+            if (value != null) {
+                total += value;
+                hasValue = true;
+            }
+        }
+        return hasValue ? total : null;
+    }
+
+    private static BigDecimal sumDecimal(List<BigDecimal> values) {
+        BigDecimal total = BigDecimal.ZERO;
+        boolean hasValue = false;
+        for (BigDecimal value : values) {
+            if (value != null) {
+                total = total.add(value);
+                hasValue = true;
+            }
+        }
+        return hasValue ? total : null;
     }
 
     private static String lineField(KlinePeriodTypeEnum periodType, KlineAdjustTypeEnum adjustType) {

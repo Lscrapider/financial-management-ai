@@ -3,6 +3,7 @@ package com.scrapider.finance.ai.service.impl;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.scrapider.finance.ai.converter.AiMarketDataConverter;
 import com.scrapider.finance.ai.domain.vo.AiDataRequestVO;
 import com.scrapider.finance.ai.domain.vo.AiDatabaseContextVO;
 import com.scrapider.finance.ai.domain.vo.AiQueryRewriteVO;
@@ -12,11 +13,8 @@ import com.scrapider.finance.domain.enums.IndexQuoteSortFieldEnum;
 import com.scrapider.finance.domain.enums.KlinePeriodTypeEnum;
 import com.scrapider.finance.domain.enums.SortOrderEnum;
 import com.scrapider.finance.domain.enums.StockQuoteSortFieldEnum;
-import com.scrapider.finance.domain.po.BondKlinePO;
 import com.scrapider.finance.domain.po.BondQuoteSnapshotPO;
-import com.scrapider.finance.domain.po.IndexKlinePO;
 import com.scrapider.finance.domain.po.IndexQuoteSnapshotPO;
-import com.scrapider.finance.domain.po.StockIntradayTrendPO;
 import com.scrapider.finance.domain.po.StockQuoteSnapshotPO;
 import com.scrapider.finance.manage.BondKlineManage;
 import com.scrapider.finance.manage.BondQuoteSnapshotManage;
@@ -24,7 +22,6 @@ import com.scrapider.finance.manage.IndexKlineManage;
 import com.scrapider.finance.manage.IndexQuoteSnapshotManage;
 import com.scrapider.finance.manage.StockIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
@@ -70,7 +67,7 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
                 .map(this::queryOne)
                 .filter(item -> !item.isEmpty())
                 .toList();
-        return new AiDatabaseContextVO(results);
+        return AiMarketDataConverter.databaseContext(results);
     }
 
     private Map<String, Object> queryOne(AiDataRequestVO request) {
@@ -100,7 +97,9 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
                 new LambdaQueryWrapper<StockQuoteSnapshotPO>()
                         .eq(StockQuoteSnapshotPO::getStockCode, request.targetCode())
                         .last("LIMIT 1"));
-        return this.result(request, quote == null ? List.of() : List.of(this.stockQuoteToMap(quote)));
+        return AiMarketDataConverter.result(
+                request,
+                quote == null ? List.of() : List.of(AiMarketDataConverter.stockQuoteToMap(quote)));
     }
 
     private Map<String, Object> queryStockQuoteList(AiDataRequestVO request) {
@@ -110,9 +109,9 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
                         StockQuoteSortFieldEnum.CHANGE_PERCENT,
                         SortOrderEnum.DESC)
                 .stream()
-                .map(this::stockQuoteToMap)
+                .map(AiMarketDataConverter::stockQuoteToMap)
                 .toList();
-        return this.result(request, rows);
+        return AiMarketDataConverter.result(request, rows);
     }
 
     private Map<String, Object> queryStockIntradayByCode(AiDataRequestVO request) {
@@ -124,9 +123,9 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
                 .listLatestTradingTrends(request.targetCode())
                 .stream()
                 .limit(this.normalizeIntradayLimit(request.limit()))
-                .map(this::stockIntradayToMap)
+                .map(AiMarketDataConverter::stockIntradayToMap)
                 .toList();
-        return this.result(request, rows);
+        return AiMarketDataConverter.result(request, rows);
     }
 
     private Map<String, Object> queryIndexQuoteByCode(AiDataRequestVO request) {
@@ -138,7 +137,9 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
                 new LambdaQueryWrapper<IndexQuoteSnapshotPO>()
                         .eq(IndexQuoteSnapshotPO::getIndexCode, request.targetCode())
                         .last("LIMIT 1"));
-        return this.result(request, quote == null ? List.of() : List.of(this.indexQuoteToMap(quote)));
+        return AiMarketDataConverter.result(
+                request,
+                quote == null ? List.of() : List.of(AiMarketDataConverter.indexQuoteToMap(quote)));
     }
 
     private Map<String, Object> queryIndexQuoteList(AiDataRequestVO request) {
@@ -148,9 +149,9 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
                         IndexQuoteSortFieldEnum.INDEX_CODE,
                         SortOrderEnum.ASC)
                 .stream()
-                .map(this::indexQuoteToMap)
+                .map(AiMarketDataConverter::indexQuoteToMap)
                 .toList();
-        return this.result(request, rows);
+        return AiMarketDataConverter.result(request, rows);
     }
 
     private Map<String, Object> queryIndexKlines(AiDataRequestVO request) {
@@ -166,9 +167,9 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
                         null,
                         this.normalizeLimit(request.limit()))
                 .stream()
-                .map(this::indexKlineToMap)
+                .map(AiMarketDataConverter::indexKlineToMap)
                 .toList();
-        return this.result(request, rows);
+        return AiMarketDataConverter.result(request, rows);
     }
 
     private Map<String, Object> queryBondQuoteByCode(AiDataRequestVO request) {
@@ -180,7 +181,9 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
                 new LambdaQueryWrapper<BondQuoteSnapshotPO>()
                         .eq(BondQuoteSnapshotPO::getBondCode, request.targetCode())
                         .last("LIMIT 1"));
-        return this.result(request, quote == null ? List.of() : List.of(this.bondQuoteToMap(quote)));
+        return AiMarketDataConverter.result(
+                request,
+                quote == null ? List.of() : List.of(AiMarketDataConverter.bondQuoteToMap(quote)));
     }
 
     private Map<String, Object> queryBondQuoteList(AiDataRequestVO request) {
@@ -190,9 +193,9 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
                         BondQuoteSortFieldEnum.CHANGE_PERCENT,
                         SortOrderEnum.DESC)
                 .stream()
-                .map(this::bondQuoteToMap)
+                .map(AiMarketDataConverter::bondQuoteToMap)
                 .toList();
-        return this.result(request, rows);
+        return AiMarketDataConverter.result(request, rows);
     }
 
     private Map<String, Object> queryBondKlines(AiDataRequestVO request) {
@@ -208,19 +211,9 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
                         null,
                         this.normalizeLimit(request.limit()))
                 .stream()
-                .map(this::bondKlineToMap)
+                .map(AiMarketDataConverter::bondKlineToMap)
                 .toList();
-        return this.result(request, rows);
-    }
-
-    private Map<String, Object> result(AiDataRequestVO request, List<Map<String, Object>> rows) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("queryType", request.queryType());
-        result.put("source", request.source());
-        result.put("targetCode", request.targetCode());
-        result.put("targetName", request.targetName());
-        result.put("rows", rows);
-        return result;
+        return AiMarketDataConverter.result(request, rows);
     }
 
     private AiDataRequestVO resolveStockRequest(AiDataRequestVO request) {
@@ -231,12 +224,7 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
         if (quote == null || StrUtil.isBlank(quote.getStockCode())) {
             return request;
         }
-        return new AiDataRequestVO(
-                request.source(),
-                request.queryType(),
-                quote.getStockCode(),
-                request.targetName(),
-                request.limit());
+        return AiMarketDataConverter.resolvedRequest(request, quote.getStockCode());
     }
 
     private StockQuoteSnapshotPO findStockQuoteByName(String stockName) {
@@ -261,12 +249,7 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
         if (quote == null || StrUtil.isBlank(quote.getIndexCode())) {
             return request;
         }
-        return new AiDataRequestVO(
-                request.source(),
-                request.queryType(),
-                quote.getIndexCode(),
-                request.targetName(),
-                request.limit());
+        return AiMarketDataConverter.resolvedRequest(request, quote.getIndexCode());
     }
 
     private IndexQuoteSnapshotPO findIndexQuoteByName(String indexName) {
@@ -291,12 +274,7 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
         if (quote == null || StrUtil.isBlank(quote.getBondCode())) {
             return request;
         }
-        return new AiDataRequestVO(
-                request.source(),
-                request.queryType(),
-                quote.getBondCode(),
-                request.targetName(),
-                request.limit());
+        return AiMarketDataConverter.resolvedRequest(request, quote.getBondCode());
     }
 
     private BondQuoteSnapshotPO findBondQuoteByName(String bondName) {
@@ -311,90 +289,6 @@ public class AiMarketDataQueryServiceImpl implements AiMarketDataQueryService {
                 new LambdaQueryWrapper<BondQuoteSnapshotPO>()
                         .like(BondQuoteSnapshotPO::getBondName, bondName)
                         .last("LIMIT 1"));
-    }
-
-    private Map<String, Object> stockQuoteToMap(StockQuoteSnapshotPO quote) {
-        Map<String, Object> row = new LinkedHashMap<>();
-        row.put("stockCode", quote.getStockCode());
-        row.put("stockName", quote.getStockName());
-        row.put("latestPrice", quote.getLatestPrice());
-        row.put("changePercent", quote.getChangePercent());
-        row.put("turnoverRate", quote.getTurnoverRate());
-        row.put("volume", quote.getVolume());
-        row.put("turnoverAmount", quote.getTurnoverAmount());
-        row.put("peTtm", quote.getPeTtm());
-        row.put("pbRatio", quote.getPbRatio());
-        row.put("syncedAt", quote.getSyncedAt());
-        return row;
-    }
-
-    private Map<String, Object> stockIntradayToMap(StockIntradayTrendPO trend) {
-        Map<String, Object> row = new LinkedHashMap<>();
-        row.put("stockCode", trend.getStockCode());
-        row.put("stockName", trend.getStockName());
-        row.put("trendTime", trend.getTrendTime());
-        row.put("closePrice", trend.getClosePrice());
-        row.put("averagePrice", trend.getAveragePrice());
-        row.put("volume", trend.getVolume());
-        row.put("turnoverAmount", trend.getTurnoverAmount());
-        row.put("previousClosePrice", trend.getPreviousClosePrice());
-        row.put("syncedAt", trend.getSyncedAt());
-        return row;
-    }
-
-    private Map<String, Object> indexQuoteToMap(IndexQuoteSnapshotPO quote) {
-        Map<String, Object> row = new LinkedHashMap<>();
-        row.put("indexCode", quote.getIndexCode());
-        row.put("indexName", quote.getIndexName());
-        row.put("latestPrice", quote.getLatestPrice());
-        row.put("changePercent", quote.getChangePercent());
-        row.put("volume", quote.getVolume());
-        row.put("turnoverAmount", quote.getTurnoverAmount());
-        row.put("syncedAt", quote.getSyncedAt());
-        return row;
-    }
-
-    private Map<String, Object> indexKlineToMap(IndexKlinePO kline) {
-        Map<String, Object> row = new LinkedHashMap<>();
-        row.put("indexCode", kline.getIndexCode());
-        row.put("indexName", kline.getIndexName());
-        row.put("tradeDate", kline.getTradeDate());
-        row.put("openPrice", kline.getOpenPrice());
-        row.put("closePrice", kline.getClosePrice());
-        row.put("highPrice", kline.getHighPrice());
-        row.put("lowPrice", kline.getLowPrice());
-        row.put("changePercent", kline.getChangePercent());
-        row.put("volume", kline.getVolume());
-        row.put("turnoverAmount", kline.getTurnoverAmount());
-        return row;
-    }
-
-    private Map<String, Object> bondQuoteToMap(BondQuoteSnapshotPO quote) {
-        Map<String, Object> row = new LinkedHashMap<>();
-        row.put("bondCode", quote.getBondCode());
-        row.put("bondName", quote.getBondName());
-        row.put("latestPrice", quote.getLatestPrice());
-        row.put("changePercent", quote.getChangePercent());
-        row.put("volume", quote.getVolume());
-        row.put("turnoverAmount", quote.getTurnoverAmount());
-        row.put("bondRating", quote.getBondRating());
-        row.put("syncedAt", quote.getSyncedAt());
-        return row;
-    }
-
-    private Map<String, Object> bondKlineToMap(BondKlinePO kline) {
-        Map<String, Object> row = new LinkedHashMap<>();
-        row.put("bondCode", kline.getBondCode());
-        row.put("bondName", kline.getBondName());
-        row.put("tradeDate", kline.getTradeDate());
-        row.put("openPrice", kline.getOpenPrice());
-        row.put("closePrice", kline.getClosePrice());
-        row.put("highPrice", kline.getHighPrice());
-        row.put("lowPrice", kline.getLowPrice());
-        row.put("changePercent", kline.getChangePercent());
-        row.put("volume", kline.getVolume());
-        row.put("turnoverAmount", kline.getTurnoverAmount());
-        return row;
     }
 
     private int normalizeLimit(Integer limit) {

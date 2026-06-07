@@ -29,14 +29,14 @@ public class JwtUtils {
                 .claim("username", username)
                 .claim("role", role)
                 .issuedAt(now)
-                .expiration(new Date(now.getTime() + accessTokenExpirationMs))
-                .signWith(key)
+                .expiration(new Date(now.getTime() + this.accessTokenExpirationMs))
+                .signWith(this.key)
                 .compact();
     }
 
     public Claims parseToken(String token) {
         return Jwts.parser()
-                .verifyWith(key)
+                .verifyWith(this.key)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
@@ -44,7 +44,7 @@ public class JwtUtils {
 
     public Claims parseTokenLenient(String token) {
         try {
-            return parseToken(token);
+            return this.parseToken(token);
         } catch (ExpiredJwtException e) {
             return e.getClaims();
         }

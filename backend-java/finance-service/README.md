@@ -28,6 +28,7 @@ backend-java/finance-service/
     │   ├── FinanceApplication.java            # Spring Boot 启动类
     │   ├── api/                               # 外部行情 API 调用
     │   ├── config/                            # 安全、RestTemplate、WebMvc、DeepSeek 请求配置
+    │   ├── converter/                         # 认证、行情查询、观察池、预警、系统配置等对象转换
     │   ├── controller/                        # Auth、行情、观察池、预警接口
     │   ├── interceptor/                       # 访问日志拦截器
     │   ├── security/                          # 登录用户、Bearer Token 过滤器、TokenStore、密码编码
@@ -37,6 +38,10 @@ backend-java/finance-service/
     └── resources/
         └── application.yml                    # 应用配置
 ```
+
+## 转换层约定
+
+`converter` 包负责本模块的对象拷贝、PO/DTO/VO 装配、对象转 Map、Map 转对象和业务字段收敛。行情查询结果的 PO 到 VO 转换由 `MarketQueryConverter` 统一处理，`service.impl` 只保留业务流程、校验、查询、同步和事务编排；新增手动转换逻辑时应放入 converter，避免在业务服务中分散维护。
 
 ## 接口分组
 
@@ -207,4 +212,10 @@ docker compose -f docker/docker-compose.yml up --build finance-service
 
 ```bash
 mvn -pl backend-java/finance-service -am package
+```
+
+验证完整 Java 后端 Reactor 时，也可以在 `backend-java` 目录执行：
+
+```bash
+mvn test
 ```

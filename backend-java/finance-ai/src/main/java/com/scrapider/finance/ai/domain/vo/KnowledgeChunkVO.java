@@ -1,6 +1,8 @@
 package com.scrapider.finance.ai.domain.vo;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scrapider.finance.domain.po.KnowledgeVectorPO;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -18,6 +20,10 @@ public record KnowledgeChunkVO(
         JsonNode metadata,
         OffsetDateTime createdAt) {
 
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final TypeReference<List<Integer>> INTEGER_LIST_TYPE = new TypeReference<>() {
+    };
+
     public static KnowledgeChunkVO fromPO(KnowledgeVectorPO po) {
         return fromPO(po, null);
     }
@@ -29,16 +35,8 @@ public record KnowledgeChunkVO(
         Double confidence = null;
         Integer version = null;
         if (meta != null) {
-            if (meta.has("pageNos") && meta.get("pageNos").isArray()) {
-                pageNos = List.copyOf(
-                        new com.fasterxml.jackson.databind.ObjectMapper()
-                                .convertValue(meta.get("pageNos"), List.class));
-            }
-            if (meta.has("paragraphNos") && meta.get("paragraphNos").isArray()) {
-                paragraphNos = List.copyOf(
-                        new com.fasterxml.jackson.databind.ObjectMapper()
-                                .convertValue(meta.get("paragraphNos"), List.class));
-            }
+            pageNos = readIntegerList(meta, "pageNos");
+            paragraphNos = readIntegerList(meta, "paragraphNos");
             if (meta.has("avgConfidence") && !meta.get("avgConfidence").isNull()) {
                 confidence = meta.get("avgConfidence").asDouble();
             }
@@ -58,5 +56,12 @@ public record KnowledgeChunkVO(
                 version,
                 meta,
                 po.getCreatedAt());
+    }
+
+    private static List<Integer> readIntegerList(JsonNode meta, String fieldName) {
+        if (!meta.has(fieldName) || !meta.get(fieldName).isArray()) {
+            return List.of();
+        }
+        return List.copyOf(OBJECT_MAPPER.convertValue(meta.get(fieldName), INTEGER_LIST_TYPE));
     }
 }

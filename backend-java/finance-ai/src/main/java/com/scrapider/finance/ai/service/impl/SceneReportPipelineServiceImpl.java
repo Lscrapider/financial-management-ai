@@ -2,6 +2,7 @@ package com.scrapider.finance.ai.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.scrapider.finance.ai.converter.SceneReportPipelineConverter;
 import com.scrapider.finance.ai.domain.dto.SceneChunkAllocationDTO;
 import com.scrapider.finance.ai.domain.dto.SceneKnowledgeChunkDTO;
 import com.scrapider.finance.ai.domain.dto.SceneKnowledgeRetrievalTaskDTO;
@@ -173,7 +174,7 @@ public class SceneReportPipelineServiceImpl implements SceneReportPipelineServic
                         .comparingInt(Candidate::chunkCount)
                         .reversed()
                         .thenComparing(Comparator.comparingDouble(Candidate::effectiveScore).reversed()))
-                .map(candidate -> new SceneChunkAllocationDTO(
+                .map(candidate -> SceneReportPipelineConverter.allocation(
                         candidate.scene(),
                         candidate.chunkCount(),
                         candidate.score(),
@@ -215,7 +216,7 @@ public class SceneReportPipelineServiceImpl implements SceneReportPipelineServic
                     SceneAnalysisSceneModuleParam module =
                             payload.currentScenes().module(allocation.scene());
                     Map<String, Double> currentTags = this.currentTags(module);
-                    return new SceneKnowledgeRetrievalTaskDTO(
+                    return SceneReportPipelineConverter.retrievalTask(
                             allocation.scene(),
                             allocation.chunkCount(),
                             currentTags,
@@ -250,7 +251,7 @@ public class SceneReportPipelineServiceImpl implements SceneReportPipelineServic
     private List<SceneKnowledgeRetrievalTaskDTO> retrievalTasks(
             List<SceneRetrievalEmbeddingParam> retrievalEmbeddings) {
         return retrievalEmbeddings.stream()
-                .map(item -> new SceneKnowledgeRetrievalTaskDTO(
+                .map(item -> SceneReportPipelineConverter.retrievalTask(
                         item.scene(),
                         item.chunkCount(),
                         this.safeTags(item.currentTags()),
@@ -269,7 +270,7 @@ public class SceneReportPipelineServiceImpl implements SceneReportPipelineServic
                         task -> task,
                         (left, right) -> left,
                         LinkedHashMap::new));
-        Map<String, List<SceneKnowledgeChunkDTO>> context = new LinkedHashMap<>();
+        Map<String, List<SceneKnowledgeChunkDTO>> context = SceneReportPipelineConverter.knowledgeContext();
         Set<Long> selectedChunkIds = new java.util.LinkedHashSet<>();
         for (SceneRetrievalEmbeddingParam task : retrievalEmbeddings) {
             Map<String, Double> currentTags = this.safeTags(task.currentTags());
@@ -311,7 +312,7 @@ public class SceneReportPipelineServiceImpl implements SceneReportPipelineServic
             selected.stream()
                     .map(SceneKnowledgeChunkDTO::chunkId)
                     .forEach(selectedChunkIds::add);
-            context.put(task.scene(), selected);
+            SceneReportPipelineConverter.putSceneChunks(context, task.scene(), selected);
         }
         return context;
     }
@@ -352,12 +353,9 @@ public class SceneReportPipelineServiceImpl implements SceneReportPipelineServic
                             + TAG_MATCH_SCORE_WEIGHT * tagMatchScore
                             + CROSS_SCENE_SCORE_WEIGHT * crossSceneScore;
                     return new RankedChunk(
-                            new SceneKnowledgeChunkDTO(
-                                    row.getId(),
-                                    row.getTaskNo(),
-                                    row.getChunkIndex(),
+                            SceneReportPipelineConverter.knowledgeChunk(
+                                    row,
                                     task.scene(),
-                                    row.getText(),
                                     matchedTags,
                                     this.roundScore(semanticScore),
                                     this.roundScore(tagMatchScore),

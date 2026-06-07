@@ -22,6 +22,15 @@ finance-service
 
 `finance-service` 的 `FinanceApplication` 会扫描 `com.scrapider.finance` 根包，因此 `finance-data` 和 `finance-ai` 中同根包下的 Bean 会随主应用一起装配。
 
+## 分层约定
+
+- `controller` 只处理 HTTP 入参、权限边界和响应包装。
+- `service` / `service.impl` 负责业务流程、校验、外部调用和事务编排。
+- `manage` / `mapper` 负责数据访问封装。
+- `converter` 负责对象拷贝、PO/DTO/VO 装配、对象转 Map、Map 转对象和业务语义明确的字段收敛。
+
+当现有框架工具无法表达业务语义时，应创建明确的 Converter 类并放入对应模块的 `converter` 包；不要在 `service` 或 `service.impl` 中散落手动转换逻辑。
+
 ## 技术栈
 
 - Java 17+
@@ -57,10 +66,17 @@ docker compose -f docker/docker-compose.yml up --build finance-service
 
 ## 构建
 
-构建整个 Java 后端聚合工程：
+构建整个 Java 后端聚合工程。推荐进入 `backend-java` 目录执行，这会编译 `finance-data`、`finance-ai` 和 `finance-service` 三个子模块：
 
 ```bash
-mvn -pl backend-java -am package
+cd backend-java
+mvn package
+```
+
+也可以在项目根目录直接指定主服务模块及其依赖：
+
+```bash
+mvn -pl backend-java/finance-service -am package
 ```
 
 构建单个模块及其依赖：

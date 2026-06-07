@@ -1,9 +1,8 @@
 package com.scrapider.finance.ai.service.impl;
 
+import com.scrapider.finance.ai.converter.AiConsoleMetricsConverter;
 import com.scrapider.finance.ai.domain.vo.AiConsoleOverviewVO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageOverviewVO;
-import com.scrapider.finance.ai.domain.vo.AppUserOverviewVO;
-import com.scrapider.finance.ai.domain.vo.AppVisitOverviewVO;
 import com.scrapider.finance.ai.domain.vo.AppVisitTrendVO;
 import com.scrapider.finance.ai.service.AiConsoleMetricsService;
 import com.scrapider.finance.ai.service.AiTokenUsageService;
@@ -39,9 +38,9 @@ public class AiConsoleMetricsServiceImpl implements AiConsoleMetricsService {
         int normalizedDays = this.normalize(days, DEFAULT_OVERVIEW_DAYS, MAX_OVERVIEW_DAYS);
         LocalDateTime startTime = LocalDateTime.now().minusDays(normalizedDays);
         AiTokenUsageOverviewVO tokenUsage = this.aiTokenUsageService.overview(normalizedDays);
-        return new AiConsoleOverviewVO(
-                new AppUserOverviewVO(this.appUserManage.countEnabledUsers()),
-                AppVisitOverviewVO.fromDTO(this.appVisitLogManage.summarySince(startTime)),
+        return AiConsoleMetricsConverter.overview(
+                this.appUserManage.countEnabledUsers(),
+                this.appVisitLogManage.summarySince(startTime),
                 tokenUsage);
     }
 

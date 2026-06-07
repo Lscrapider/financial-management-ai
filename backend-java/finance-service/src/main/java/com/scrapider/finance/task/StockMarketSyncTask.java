@@ -380,7 +380,12 @@ public class StockMarketSyncTask {
             if (CollUtil.isEmpty(dailyKlines)) {
                 return;
             }
-            StockKlinePO repaired = this.aggregateStockPeriodKline(stock, dailyKlines, periodType);
+            StockKlinePO repaired = StockKlinePO.aggregateFromDaily(
+                    stock,
+                    dailyKlines,
+                    periodType,
+                    DEFAULT_KLINE_ADJUST_TYPE,
+                    LocalDateTime.now(ZoneId.of(this.timezone)));
             this.fillStockDerivedFields(repaired, this.previousStockPeriodClose(stock, periodType, repaired.getTradeDate()));
             this.fillStockMovingAverages(repaired, periodType);
             this.stockKlineManage.saveKlines(List.of(repaired));
@@ -391,33 +396,6 @@ public class StockMarketSyncTask {
                     stock.getStockCode(),
                     ex);
         }
-    }
-
-    private StockKlinePO aggregateStockPeriodKline(
-            StockConfigPO stock,
-            List<StockKlinePO> dailyKlines,
-            KlinePeriodTypeEnum periodType) {
-        StockKlinePO first = dailyKlines.get(0);
-        StockKlinePO last = dailyKlines.get(dailyKlines.size() - 1);
-        StockKlinePO repaired = new StockKlinePO();
-        repaired.setStockCode(stock.getStockCode());
-        repaired.setStockName(stock.getStockName());
-        repaired.setSecid(stock.getSecid());
-        repaired.setMarketCode(stock.getMarketCode());
-        repaired.setExchangeCode(stock.getExchangeCode());
-        repaired.setPeriodType(periodType.getCode());
-        repaired.setAdjustType(DEFAULT_KLINE_ADJUST_TYPE.getCode());
-        repaired.setTradeDate(last.getTradeDate());
-        repaired.setOpenPrice(first.getOpenPrice());
-        repaired.setClosePrice(last.getClosePrice());
-        repaired.setHighPrice(maxStock(dailyKlines));
-        repaired.setLowPrice(minStock(dailyKlines));
-        repaired.setVolume(sumStockVolume(dailyKlines));
-        repaired.setTurnoverAmount(sumStockAmount(dailyKlines));
-        repaired.setTurnoverRate(sumStockTurnoverRate(dailyKlines));
-        repaired.setRawResponse("aggregated-from-daily");
-        repaired.setSyncedAt(LocalDateTime.now(ZoneId.of(this.timezone)));
-        return repaired;
     }
 
     private void fillStockDerivedFields(StockKlinePO kline, BigDecimal previousClose) {
@@ -481,54 +459,6 @@ public class StockMarketSyncTask {
             return today.withDayOfMonth(1);
         }
         return today;
-    }
-
-    private static BigDecimal maxStock(List<StockKlinePO> klines) {
-        return klines.stream()
-                .map(StockKlinePO::getHighPrice)
-                .filter(Objects::nonNull)
-                .max(BigDecimal::compareTo)
-                .orElse(null);
-    }
-
-    private static BigDecimal minStock(List<StockKlinePO> klines) {
-        return klines.stream()
-                .map(StockKlinePO::getLowPrice)
-                .filter(Objects::nonNull)
-                .min(BigDecimal::compareTo)
-                .orElse(null);
-    }
-
-    private static Long sumStockVolume(List<StockKlinePO> klines) {
-        long total = 0L;
-        boolean hasValue = false;
-        for (StockKlinePO kline : klines) {
-            if (kline.getVolume() != null) {
-                total += kline.getVolume();
-                hasValue = true;
-            }
-        }
-        return hasValue ? total : null;
-    }
-
-    private static BigDecimal sumStockAmount(List<StockKlinePO> klines) {
-        return sumStockDecimal(klines.stream().map(StockKlinePO::getTurnoverAmount).toList());
-    }
-
-    private static BigDecimal sumStockTurnoverRate(List<StockKlinePO> klines) {
-        return sumStockDecimal(klines.stream().map(StockKlinePO::getTurnoverRate).toList());
-    }
-
-    private static BigDecimal sumStockDecimal(List<BigDecimal> values) {
-        BigDecimal total = BigDecimal.ZERO;
-        boolean hasValue = false;
-        for (BigDecimal value : values) {
-            if (value != null) {
-                total = total.add(value);
-                hasValue = true;
-            }
-        }
-        return hasValue ? total : null;
     }
 
     private static BigDecimal meanStockClose(List<StockKlinePO> klines, int endIndex, int window) {

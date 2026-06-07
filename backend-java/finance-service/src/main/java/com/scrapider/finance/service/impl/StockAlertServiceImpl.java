@@ -2,6 +2,7 @@ package com.scrapider.finance.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
+import com.scrapider.finance.converter.StockAlertConverter;
 import com.scrapider.finance.domain.param.StockAlertConfigSaveParam;
 import com.scrapider.finance.domain.po.AppUserPO;
 import com.scrapider.finance.domain.po.BondConfigPO;
@@ -254,20 +255,7 @@ public class StockAlertServiceImpl implements StockAlertService {
         Map<String, StockQuoteSnapshotPO> stockQuoteMap = this.loadStockQuotes(configs);
         Map<String, IndexQuoteSnapshotPO> indexQuoteMap = this.loadIndexQuotes(configs);
         Map<String, BondQuoteSnapshotPO> bondQuoteMap = this.loadBondQuotes(configs);
-        return configs.stream()
-                .map(config -> {
-                    StockAlertConfigVO vo = StockAlertConfigVO.fromPO(config);
-                    QuoteSnapshot snapshot = this.getSnapshot(config, stockQuoteMap, indexQuoteMap, bondQuoteMap);
-                    if (snapshot != null) {
-                        vo.fillQuote(snapshot.latestPrice(), snapshot.changePercent(), snapshot.syncedAt());
-                    }
-                    AppUserPO user = userMap.get(config.getUserId());
-                    if (user != null) {
-                        vo.fillUser(user.getUsername(), user.getRealName(), user.getEmail(), user.getEmailNotification());
-                    }
-                    return vo;
-                })
-                .toList();
+        return StockAlertConverter.toVOList(configs, userMap, stockQuoteMap, indexQuoteMap, bondQuoteMap);
     }
 
     private Map<Long, AppUserPO> loadUsers(List<StockAlertConfigPO> configs) {

@@ -2,6 +2,7 @@ package com.scrapider.finance.service.impl;
 
 import cn.hutool.core.util.StrUtil;
 import com.scrapider.finance.api.StockMarketApi;
+import com.scrapider.finance.converter.SystemConfigConverter;
 import com.scrapider.finance.domain.dto.StockMarketDataDTO;
 import com.scrapider.finance.domain.param.StockConfigAddParam;
 import com.scrapider.finance.domain.po.StockConfigPO;
@@ -85,15 +86,12 @@ public class SystemConfigStockServiceImpl implements SystemConfigStockService {
     }
 
     private StockConfigPO buildStockConfig(String stockCode, String stockName) {
-        StockConfigPO stock = new StockConfigPO();
-        stock.setStockCode(stockCode);
-        stock.setStockName(stockName);
-        stock.setExchangeCode(this.exchangeCodeOf(stockCode));
-        stock.setMarketCode(this.marketCodeOf(stockCode));
-        stock.setSecid(this.secidOf(stockCode));
-        stock.setEnabled(true);
-        stock.setRemark("系统配置页面新增股票");
-        return stock;
+        return SystemConfigConverter.toStockConfig(
+                stockCode,
+                stockName,
+                this.exchangeCodeOf(stockCode),
+                this.marketCodeOf(stockCode),
+                this.secidOf(stockCode));
     }
 
     private String exchangeCodeOf(String stockCode) {

@@ -2,6 +2,7 @@ package com.scrapider.finance.ai.service.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.scrapider.finance.ai.converter.OcrFileConverter;
 import com.scrapider.finance.ai.domain.dto.StoredOcrFileDTO;
 import com.scrapider.finance.ai.service.OcrFileStorageService;
 import io.minio.BucketExistsArgs;
@@ -57,12 +58,7 @@ public class MinioOcrFileStorageServiceImpl implements OcrFileStorageService {
             throw new IllegalStateException("保存上传文件到对象存储失败", ex);
         }
 
-        return new StoredOcrFileDTO(
-                "minio",
-                this.bucket,
-                objectKey,
-                "minio://" + this.bucket + "/" + objectKey,
-                storedFilename);
+        return OcrFileConverter.storedFile(this.bucket, objectKey, storedFilename);
     }
 
     @Override

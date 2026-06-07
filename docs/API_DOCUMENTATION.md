@@ -746,7 +746,7 @@
 
 需要 Token。
 
-请求体：DeepSeek Chat Completions 原始响应 JSON，必须包含 `usage`。
+请求体：DeepSeek Chat Completions 原始响应 JSON，必须包含 `usage`。后端会读取 `id`、`object`、`model`、`created`、`choices` 和 `usage`，其他字段会作为原始响应字段保留入库。
 
 返回：`AiTokenUsageLogVO`
 

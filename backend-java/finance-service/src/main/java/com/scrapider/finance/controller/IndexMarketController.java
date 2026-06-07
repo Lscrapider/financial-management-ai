@@ -65,7 +65,7 @@ public class IndexMarketController {
             @RequestParam(required = false) Integer limit) {
         boolean synced = this.indexMarketSyncTask.syncKlinesForIndex(
                 indexCode,
-                normalizePeriodType(periodType),
+                IndexMarketController.normalizePeriodType(periodType),
                 limit);
         return ApiResponseVO.success(new MarketSyncStatusVO(synced, false));
     }

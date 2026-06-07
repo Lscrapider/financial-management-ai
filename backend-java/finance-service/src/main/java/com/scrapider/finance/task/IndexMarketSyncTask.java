@@ -349,7 +349,11 @@ public class IndexMarketSyncTask {
             if (CollUtil.isEmpty(dailyKlines)) {
                 return;
             }
-            IndexKlinePO repaired = this.aggregateIndexPeriodKline(index, dailyKlines, periodType);
+            IndexKlinePO repaired = IndexKlinePO.aggregateFromDaily(
+                    index,
+                    dailyKlines,
+                    periodType,
+                    LocalDateTime.now(ZoneId.of(this.timezone)));
             this.fillIndexDerivedFields(repaired, this.previousIndexPeriodClose(index, periodType, repaired.getTradeDate()));
             this.fillIndexMovingAverages(repaired, periodType);
             this.indexKlineManage.saveKlines(List.of(repaired));
@@ -360,32 +364,6 @@ public class IndexMarketSyncTask {
                     index.getIndexCode(),
                     ex);
         }
-    }
-
-    private IndexKlinePO aggregateIndexPeriodKline(
-            IndexConfigPO index,
-            List<IndexKlinePO> dailyKlines,
-            KlinePeriodTypeEnum periodType) {
-        IndexKlinePO first = dailyKlines.get(0);
-        IndexKlinePO last = dailyKlines.get(dailyKlines.size() - 1);
-        IndexKlinePO repaired = new IndexKlinePO();
-        repaired.setIndexCode(index.getIndexCode());
-        repaired.setIndexName(index.getIndexName());
-        repaired.setSecid(index.getSecid());
-        repaired.setMarketCode(index.getMarketCode());
-        repaired.setExchangeCode(index.getExchangeCode());
-        repaired.setPeriodType(periodType.getCode());
-        repaired.setTradeDate(last.getTradeDate());
-        repaired.setOpenPrice(first.getOpenPrice());
-        repaired.setClosePrice(last.getClosePrice());
-        repaired.setHighPrice(maxIndex(dailyKlines));
-        repaired.setLowPrice(minIndex(dailyKlines));
-        repaired.setVolume(sumIndexVolume(dailyKlines));
-        repaired.setTurnoverAmount(sumIndexAmount(dailyKlines));
-        repaired.setTurnoverRate(sumIndexTurnoverRate(dailyKlines));
-        repaired.setRawResponse("aggregated-from-daily");
-        repaired.setSyncedAt(LocalDateTime.now(ZoneId.of(this.timezone)));
-        return repaired;
     }
 
     private void fillIndexDerivedFields(IndexKlinePO kline, BigDecimal previousClose) {
@@ -447,54 +425,6 @@ public class IndexMarketSyncTask {
             return today.withDayOfMonth(1);
         }
         return today;
-    }
-
-    private static BigDecimal maxIndex(List<IndexKlinePO> klines) {
-        return klines.stream()
-                .map(IndexKlinePO::getHighPrice)
-                .filter(Objects::nonNull)
-                .max(BigDecimal::compareTo)
-                .orElse(null);
-    }
-
-    private static BigDecimal minIndex(List<IndexKlinePO> klines) {
-        return klines.stream()
-                .map(IndexKlinePO::getLowPrice)
-                .filter(Objects::nonNull)
-                .min(BigDecimal::compareTo)
-                .orElse(null);
-    }
-
-    private static Long sumIndexVolume(List<IndexKlinePO> klines) {
-        long total = 0L;
-        boolean hasValue = false;
-        for (IndexKlinePO kline : klines) {
-            if (kline.getVolume() != null) {
-                total += kline.getVolume();
-                hasValue = true;
-            }
-        }
-        return hasValue ? total : null;
-    }
-
-    private static BigDecimal sumIndexAmount(List<IndexKlinePO> klines) {
-        return sumIndexDecimal(klines.stream().map(IndexKlinePO::getTurnoverAmount).toList());
-    }
-
-    private static BigDecimal sumIndexTurnoverRate(List<IndexKlinePO> klines) {
-        return sumIndexDecimal(klines.stream().map(IndexKlinePO::getTurnoverRate).toList());
-    }
-
-    private static BigDecimal sumIndexDecimal(List<BigDecimal> values) {
-        BigDecimal total = BigDecimal.ZERO;
-        boolean hasValue = false;
-        for (BigDecimal value : values) {
-            if (value != null) {
-                total = total.add(value);
-                hasValue = true;
-            }
-        }
-        return hasValue ? total : null;
     }
 
     private static BigDecimal meanIndexClose(List<IndexKlinePO> klines, int endIndex, int window) {

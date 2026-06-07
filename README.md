@@ -37,6 +37,7 @@
 | 文档 | 说明 |
 | --- | --- |
 | [backend-java/README.md](./backend-java/README.md) | Java 后端聚合工程说明。 |
+| [backend-java/finance-data/README.md](./backend-java/finance-data/README.md) | Java 公共数据层模块说明，包括领域对象、Mapper、Manage、Param、VO 和 InfluxDB 配置。 |
 | [backend-java/finance-ai/README.md](./backend-java/finance-ai/README.md) | Java AI 能力模块说明，包括 AI Chat、OCR 上传、人工复核和知识库接口。 |
 | [backend-java/finance-service/README.md](./backend-java/finance-service/README.md) | Java 主服务说明。 |
 | [database/README.md](./database/README.md) | 数据库和迁移脚本说明。 |
