@@ -58,7 +58,7 @@ public final class SystemConfigConverter {
             String underlyingStockCode,
             StockConfigAddResultVO underlyingStock,
             boolean marketDataSynced,
-            boolean convertibleDataSynced) {
+            boolean dailyValuationSynced) {
         BondConfigAddResultVO result = new BondConfigAddResultVO();
         result.setBondCode(bond.getBondCode());
         result.setBondName(bond.getBondName());
@@ -70,8 +70,8 @@ public final class SystemConfigConverter {
         result.setBasicSynced(true);
         result.setUnderlyingStockSynced(underlyingStock != null);
         result.setMarketDataSynced(marketDataSynced);
-        result.setDailyValuationSynced(convertibleDataSynced);
-        result.setShareSynced(convertibleDataSynced);
+        result.setDailyValuationSynced(dailyValuationSynced);
+        result.setShareSynced(false);
         result.setUnderlyingStock(underlyingStock);
         return result;
     }

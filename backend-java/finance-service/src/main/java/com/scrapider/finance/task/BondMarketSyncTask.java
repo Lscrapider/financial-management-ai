@@ -20,7 +20,6 @@ import com.scrapider.finance.manage.BondKlineManage;
 import com.scrapider.finance.manage.BondQuoteSnapshotManage;
 import com.scrapider.finance.manage.ConvertibleBondBasicManage;
 import com.scrapider.finance.manage.ConvertibleBondDailyValuationManage;
-import com.scrapider.finance.manage.ConvertibleBondShareManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
 import com.scrapider.finance.service.ConvertibleBondDataProvider;
 import com.scrapider.finance.service.HistoricalKlineProvider;
@@ -70,7 +69,6 @@ public class BondMarketSyncTask {
     private final ObjectProvider<ConvertibleBondDataProvider> convertibleBondDataProvider;
     private final ConvertibleBondBasicManage convertibleBondBasicManage;
     private final ConvertibleBondDailyValuationManage convertibleBondDailyValuationManage;
-    private final ConvertibleBondShareManage convertibleBondShareManage;
     private final StockQuoteSnapshotManage stockQuoteSnapshotManage;
     private final MarketTradingCalendarService marketTradingCalendarService;
     private final AtomicBoolean syncing = new AtomicBoolean(false);
@@ -118,9 +116,6 @@ public class BondMarketSyncTask {
     @Value("${bond.sync.convertible-daily-limit:250}")
     private Integer convertibleDailyLimit;
 
-    @Value("${bond.sync.convertible-share-limit:250}")
-    private Integer convertibleShareLimit;
-
     public BondMarketSyncTask(
             StockMarketApi stockMarketApi,
             BondConfigManage bondConfigManage,
@@ -131,7 +126,6 @@ public class BondMarketSyncTask {
             ObjectProvider<ConvertibleBondDataProvider> convertibleBondDataProvider,
             ConvertibleBondBasicManage convertibleBondBasicManage,
             ConvertibleBondDailyValuationManage convertibleBondDailyValuationManage,
-            ConvertibleBondShareManage convertibleBondShareManage,
             StockQuoteSnapshotManage stockQuoteSnapshotManage,
             MarketTradingCalendarService marketTradingCalendarService) {
         this.stockMarketApi = stockMarketApi;
@@ -143,7 +137,6 @@ public class BondMarketSyncTask {
         this.convertibleBondDataProvider = convertibleBondDataProvider;
         this.convertibleBondBasicManage = convertibleBondBasicManage;
         this.convertibleBondDailyValuationManage = convertibleBondDailyValuationManage;
-        this.convertibleBondShareManage = convertibleBondShareManage;
         this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
         this.marketTradingCalendarService = marketTradingCalendarService;
     }
@@ -232,24 +225,19 @@ public class BondMarketSyncTask {
         }
     }
 
-    public boolean syncConvertibleDataForBond(String bondCode, boolean includeBasic) {
+    public boolean syncConvertibleDailyDataForBond(String bondCode) {
         BondConfigPO bond = this.bondConfigManage.getEnabledByBondCode(bondCode);
         ConvertibleBondDataProvider provider = this.convertibleBondDataProvider.getIfAvailable();
         if (!this.convertibleDataEnabled || bond == null || provider == null) {
-            log.warn("Cannot sync convertible bond data, bondCode: {}", bondCode);
+            log.warn("Cannot sync convertible bond daily data, bondCode: {}", bondCode);
             return false;
         }
         try {
-            if (includeBasic) {
-                this.convertibleBondBasicManage.saveBasic(provider.getBasic(bond));
-            }
             this.convertibleBondDailyValuationManage.saveValuations(
                     provider.getDailyValuations(bond, this.convertibleDailyLimit));
-            this.convertibleBondShareManage.saveShares(
-                    provider.getShareChanges(bond, this.convertibleShareLimit));
             return true;
         } catch (Exception ex) {
-            log.warn("Failed to sync convertible bond data for bond: {}", bondCode, ex);
+            log.warn("Failed to sync convertible bond daily data for bond: {}", bondCode, ex);
             return false;
         }
     }
@@ -335,7 +323,6 @@ public class BondMarketSyncTask {
                     this.monthlyKlineLimit));
         }
 //        this.repairLatestPeriodKlinesFromDaily(valid);
-        this.syncConvertibleBondData(valid);
     }
 
     private void fillRealtimeConversionMetrics(List<BondQuoteSnapshotPO> snapshots) {
@@ -434,25 +421,6 @@ public class BondMarketSyncTask {
             return trimmed.substring(2);
         }
         return trimmed;
-    }
-
-    private void syncConvertibleBondData(List<BondConfigPO> bonds) {
-        ConvertibleBondDataProvider provider = this.convertibleBondDataProvider.getIfAvailable();
-        if (!this.convertibleDataEnabled || provider == null || CollUtil.isEmpty(bonds)) {
-            return;
-        }
-        for (BondConfigPO bond : bonds) {
-            try {
-                this.convertibleBondBasicManage.saveBasic(provider.getBasic(bond));
-                this.convertibleBondDailyValuationManage.saveValuations(
-                        provider.getDailyValuations(bond, this.convertibleDailyLimit));
-                this.convertibleBondShareManage.saveShares(
-                        provider.getShareChanges(bond, this.convertibleShareLimit));
-                this.sleepForRateLimit();
-            } catch (Exception ex) {
-                log.warn("Failed to sync convertible bond data for bond: {}", bond.getBondCode(), ex);
-            }
-        }
     }
 
     private void doSyncTrendsForBond(BondConfigPO bond) {

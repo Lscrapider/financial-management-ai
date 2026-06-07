@@ -3,23 +3,20 @@ package com.scrapider.finance.ai.service.impl.scene;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scrapider.finance.ai.converter.SceneTargetDataConverter;
+import com.scrapider.finance.ai.domain.dto.ConvertibleBondSceneDataDTO;
 import com.scrapider.finance.ai.domain.dto.SceneAnalysisMessageDTO;
 import com.scrapider.finance.ai.domain.dto.SceneAnalysisTargetDTO;
 import com.scrapider.finance.ai.domain.param.SceneAnalysisSubmitParam;
+import com.scrapider.finance.ai.service.ConvertibleBondSceneDataEnsureService;
 import com.scrapider.finance.ai.service.SceneTargetDataProvider;
 import com.scrapider.finance.domain.enums.KlinePeriodTypeEnum;
 import com.scrapider.finance.domain.po.BondConfigPO;
 import com.scrapider.finance.domain.po.BondQuoteSnapshotPO;
 import com.scrapider.finance.domain.po.ConvertibleBondBasicPO;
-import com.scrapider.finance.domain.po.ConvertibleBondDailyValuationPO;
-import com.scrapider.finance.domain.po.ConvertibleBondSharePO;
 import com.scrapider.finance.domain.po.StockQuoteSnapshotPO;
 import com.scrapider.finance.manage.BondConfigManage;
 import com.scrapider.finance.manage.BondKlineManage;
 import com.scrapider.finance.manage.BondQuoteSnapshotManage;
-import com.scrapider.finance.manage.ConvertibleBondBasicManage;
-import com.scrapider.finance.manage.ConvertibleBondDailyValuationManage;
-import com.scrapider.finance.manage.ConvertibleBondShareManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -36,28 +33,22 @@ public class ConvertibleBondSceneTargetDataProvider extends AbstractSceneTargetD
     private final BondQuoteSnapshotManage bondQuoteSnapshotManage;
     private final BondConfigManage bondConfigManage;
     private final BondKlineManage bondKlineManage;
-    private final ConvertibleBondBasicManage convertibleBondBasicManage;
-    private final ConvertibleBondDailyValuationManage convertibleBondDailyValuationManage;
-    private final ConvertibleBondShareManage convertibleBondShareManage;
     private final StockQuoteSnapshotManage stockQuoteSnapshotManage;
+    private final ConvertibleBondSceneDataEnsureService convertibleBondSceneDataEnsureService;
 
     public ConvertibleBondSceneTargetDataProvider(
             ObjectMapper objectMapper,
             BondQuoteSnapshotManage bondQuoteSnapshotManage,
             BondConfigManage bondConfigManage,
             BondKlineManage bondKlineManage,
-            ConvertibleBondBasicManage convertibleBondBasicManage,
-            ConvertibleBondDailyValuationManage convertibleBondDailyValuationManage,
-            ConvertibleBondShareManage convertibleBondShareManage,
-            StockQuoteSnapshotManage stockQuoteSnapshotManage) {
+            StockQuoteSnapshotManage stockQuoteSnapshotManage,
+            ConvertibleBondSceneDataEnsureService convertibleBondSceneDataEnsureService) {
         super(objectMapper);
         this.bondQuoteSnapshotManage = bondQuoteSnapshotManage;
         this.bondConfigManage = bondConfigManage;
         this.bondKlineManage = bondKlineManage;
-        this.convertibleBondBasicManage = convertibleBondBasicManage;
-        this.convertibleBondDailyValuationManage = convertibleBondDailyValuationManage;
-        this.convertibleBondShareManage = convertibleBondShareManage;
         this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
+        this.convertibleBondSceneDataEnsureService = convertibleBondSceneDataEnsureService;
     }
 
     @Override
@@ -137,16 +128,16 @@ public class ConvertibleBondSceneTargetDataProvider extends AbstractSceneTargetD
             String bondCode,
             BondQuoteSnapshotPO quote,
             List<String> missing) {
-        ConvertibleBondBasicPO basic = this.convertibleBondBasicManage.latestByBondCode(bondCode);
-        ConvertibleBondDailyValuationPO latestValuation =
-                this.convertibleBondDailyValuationManage.latestByBondCode(bondCode);
-        ConvertibleBondSharePO latestShare = this.convertibleBondShareManage.latestByBondCode(bondCode);
-        List<ConvertibleBondDailyValuationPO> valuations =
-                this.convertibleBondDailyValuationManage.listByBondCode(bondCode, MARKET_KLINE_LIMIT);
-        StockQuoteSnapshotPO underlyingQuote = this.underlyingQuote(basic);
+        BondConfigPO config = this.bondConfigManage.getEnabledByBondCode(bondCode);
+        ConvertibleBondSceneDataDTO sceneData = this.convertibleBondSceneDataEnsureService.ensureBondSceneData(
+                config,
+                quote,
+                MARKET_KLINE_LIMIT,
+                MARKET_KLINE_LIMIT);
+        StockQuoteSnapshotPO underlyingQuote = this.underlyingQuote(sceneData.basic());
 
         BigDecimal bondPrice = quote == null ? null : quote.getLatestPrice();
-        BigDecimal conversionPrice = basic == null ? null : basic.getConversionPrice();
+        BigDecimal conversionPrice = sceneData.basic() == null ? null : sceneData.basic().getConversionPrice();
         BigDecimal underlyingPrice = underlyingQuote == null ? null : underlyingQuote.getLatestPrice();
         BigDecimal realtimeConversionValue = quote == null ? null : quote.getConversionValue();
         BigDecimal realtimePremiumRate = quote == null ? null : quote.getConversionPremiumRate();
@@ -155,18 +146,18 @@ public class ConvertibleBondSceneTargetDataProvider extends AbstractSceneTargetD
         return SceneTargetDataConverter.convertibleBondAssetSpecificData(
                 this.objectMapper(),
                 quote,
-                basic,
-                latestValuation,
-                latestShare,
-                valuations,
+                sceneData.basic(),
+                sceneData.latestValuation(),
+                sceneData.latestShare(),
+                sceneData.valuationHistory(),
                 underlyingQuote,
                 bondPrice,
                 conversionPrice,
                 underlyingPrice,
                 realtimeConversionValue,
                 realtimePremiumRate,
-                this.estimatedYtm(bondPrice, basic),
-                this.maturityDays(basic));
+                this.estimatedYtm(bondPrice, sceneData.basic()),
+                this.maturityDays(sceneData.basic()));
     }
 
     private StockQuoteSnapshotPO underlyingQuote(ConvertibleBondBasicPO basic) {

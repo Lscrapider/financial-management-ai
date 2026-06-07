@@ -1,6 +1,7 @@
 package com.scrapider.finance.service.impl;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.scrapider.finance.ai.service.ConvertibleBondSceneDataProvider;
 import com.scrapider.finance.ai.api.TushareApi;
 import com.scrapider.finance.domain.po.BondConfigPO;
 import com.scrapider.finance.domain.po.ConvertibleBondBasicPO;
@@ -14,7 +15,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @ConditionalOnProperty(name = "market.provider.convertible-bond", havingValue = "tushare")
-public class TushareConvertibleBondDataProvider implements ConvertibleBondDataProvider {
+public class TushareConvertibleBondDataProvider implements ConvertibleBondDataProvider, ConvertibleBondSceneDataProvider {
 
     private static final String CB_BASIC_FIELDS =
             "ts_code,bond_short_name,stk_code,stk_short_name,issue_size,remain_size,"

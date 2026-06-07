@@ -47,6 +47,7 @@ public class SceneReportPipelineServiceImpl implements SceneReportPipelineServic
     private static final double SEMANTIC_SCORE_WEIGHT = 0.45;
     private static final double TAG_MATCH_SCORE_WEIGHT = 0.45;
     private static final double CROSS_SCENE_SCORE_WEIGHT = 0.10;
+    private static final String NO_RETRIEVAL_SCENE_ERROR = "当前标的场景信号不足，未生成有效知识库召回任务";
     private static final Map<String, Map<String, Double>> REPORT_TYPE_WEIGHTS = Map.of(
             "quick_analysis", Map.of(
                     "price", 1.0,
@@ -96,6 +97,11 @@ public class SceneReportPipelineServiceImpl implements SceneReportPipelineServic
         // 6.3 按 scene 生成检索任务。
         List<SceneKnowledgeRetrievalTaskDTO> retrievalTasks =
                 this.buildRetrievalTasks(allocations, currentScenesPayload);
+        if (retrievalTasks.isEmpty()) {
+            this.sceneAnalysisTaskManage.markFailed(taskNo, NO_RETRIEVAL_SCENE_ERROR);
+            LOGGER.info("scene report retrieval skipped task_no={} reason={}", taskNo, NO_RETRIEVAL_SCENE_ERROR);
+            return;
+        }
         this.sceneAnalysisMessagePublisher.publishRetrievalEmbeddingMessage(
                 SceneRetrievalEmbeddingMessageDTO.create(taskNo, retrievalTasks));
         LOGGER.info(

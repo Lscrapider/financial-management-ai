@@ -50,8 +50,8 @@ public class SystemConfigBondServiceImpl implements SystemConfigBondService {
 
         StockConfigAddResultVO underlyingStock = this.syncUnderlyingStock(basic);
         boolean marketDataSynced = this.bondMarketSyncTask.syncMarketDataForBond(bondCode);
-        boolean convertibleDataSynced = this.bondMarketSyncTask.syncConvertibleDataForBond(bondCode, false);
-        return this.toResult(bond, basic, underlyingStock, marketDataSynced, convertibleDataSynced);
+        boolean dailyValuationSynced = this.bondMarketSyncTask.syncConvertibleDailyDataForBond(bondCode);
+        return this.toResult(bond, basic, underlyingStock, marketDataSynced, dailyValuationSynced);
     }
 
     private ConvertibleBondBasicPO fetchAndValidateBasic(
@@ -89,14 +89,14 @@ public class SystemConfigBondServiceImpl implements SystemConfigBondService {
             ConvertibleBondBasicPO basic,
             StockConfigAddResultVO underlyingStock,
             boolean marketDataSynced,
-            boolean convertibleDataSynced) {
+            boolean dailyValuationSynced) {
         return SystemConfigConverter.toBondConfigAddResult(
                 bond,
                 basic,
                 this.normalizeStockCode(basic.getUnderlyingStockCode()),
                 underlyingStock,
                 marketDataSynced,
-                convertibleDataSynced);
+                dailyValuationSynced);
     }
 
     private String normalizeBondCode(BondConfigAddParam param) {

@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.scrapider.finance.domain.po.ConvertibleBondDailyValuationPO;
 import com.scrapider.finance.mapper.ConvertibleBondDailyValuationMapper;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -37,6 +38,14 @@ public class ConvertibleBondDailyValuationManage
         }
         valuations.forEach(this::fillExistingId);
         this.saveOrUpdateBatch(valuations);
+    }
+
+    public boolean hasSyncedSince(LocalDateTime startAt) {
+        if (startAt == null) {
+            return false;
+        }
+        return this.count(new LambdaQueryWrapper<ConvertibleBondDailyValuationPO>()
+                .ge(ConvertibleBondDailyValuationPO::getSyncedAt, startAt)) > 0;
     }
 
     private void fillExistingId(ConvertibleBondDailyValuationPO valuation) {

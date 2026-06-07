@@ -622,7 +622,6 @@ function toNumber(value?: number | string | null) {
 
               <div class="report-footer">
                 <span>模型 {{ item.latestModel || '-' }}</span>
-                <span>任务 {{ item.latestTaskNo || '-' }}</span>
                 <span>{{ formatDateTime(item.latestGeneratedAt || item.latestCreatedAt) }}</span>
               </div>
             </button>

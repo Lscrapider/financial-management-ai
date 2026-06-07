@@ -22,6 +22,7 @@ import com.scrapider.finance.domain.po.StockQuoteSnapshotPO;
 import com.scrapider.finance.domain.po.StockValuationHistoryPO;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -211,13 +212,17 @@ public final class SceneTargetDataConverter {
         data.put("premiumRate", realtimePremiumRate);
         data.put("premiumRateSource", realtimePremiumRate == null ? null : "quote_snapshot_calculated");
         data.put("dailyPremiumRate", latestValuation == null ? null : latestValuation.getPremiumRate());
-        data.put("premiumRateHistory", valuations.stream()
+        List<ConvertibleBondDailyValuationPO> chronologicalValuations = valuations.stream()
+                .sorted(Comparator.comparing(ConvertibleBondDailyValuationPO::getTradeDate,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
+        data.put("premiumRateHistory", chronologicalValuations.stream()
                 .map(ConvertibleBondDailyValuationPO::getPremiumRate)
                 .toList());
         data.put("conversionValue", realtimeConversionValue);
         data.put("conversionValueSource", realtimeConversionValue == null ? null : "quote_snapshot_calculated");
         data.put("dailyConversionValue", latestValuation == null ? null : latestValuation.getConversionValue());
-        data.put("conversionValueHistory", valuations.stream()
+        data.put("conversionValueHistory", chronologicalValuations.stream()
                 .map(ConvertibleBondDailyValuationPO::getConversionValue)
                 .toList());
         data.put("pureBondValue", latestValuation == null ? null : latestValuation.getPureBondValue());
