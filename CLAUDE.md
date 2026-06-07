@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-编写代码前请先阅读 [AGENTS.md](AGENTS.md) 和 [docs/CODEX_GUIDELINES.md](docs/CODEX_GUIDELINES.md)，并遵循其中的要求。项目文档使用中文。非 trivial 实现任务请使用 `karpathy-guidelines` skill。
+编写代码前请先阅读 [AGENTS.md](AGENTS.md)，并遵循其中的要求。项目文档使用中文。非 trivial 实现任务请使用 `scrapier-guidelines` skill。
 
 ## 项目概览
 
@@ -99,7 +99,7 @@ docker compose -f docker/docker-compose.yml up --build finance-service  # 构建
 - `app/api/`：FastAPI 路由（内部接口）
 - `test/`：测试文件（直接 `python test/xxx_test.py` 运行）
 
-### Java 分层规范（CODEX_GUIDELINES.md 核心规则）
+### Java 分层规范
 
 调用链路：`Controller → Service → Manage / API / Mapper → Domain`
 

@@ -27,7 +27,6 @@
 | [docs/OCR_PIPELINE.md](./docs/OCR_PIPELINE.md) | OCR 全链路实现说明，包括 Java/Python 边界、RabbitMQ 队列、阶段消息、MinIO 产物、人工复核、chunk 打标、软删除和向量入库。 |
 | [docs/API_DOCUMENTATION.md](./docs/API_DOCUMENTATION.md) | 后端接口文档，记录主要 API 的请求方式、请求参数和响应结构。                                                |
 | [docs/COMPLETED_REQUIREMENTS.md](./docs/COMPLETED_REQUIREMENTS.md) | 已完成需求记录，用于追踪阶段性功能交付情况。                                                          |
-| [docs/CODEX_GUIDELINES.md](./docs/CODEX_GUIDELINES.md) | 写代码、改代码和审查代码时需要遵守的协作与代码规范。                                                      |
 | [docs/chunk入库打标签文档.md](./docs/chunk入库打标签文档.md) | Chunk 场景标签规则和 LLM 打标方案。                                                         |
 | [docs/标的标签计算规则.md](docs/标的标签计算规则.md) | 标的标签计算规则。                                                                       |
 | [docs/FUTURE_WORK.md](./docs/FUTURE_WORK.md) | 后续能力建设和需求。                                                                      |
@@ -118,7 +117,6 @@ financial-management-ai/
 │   ├── OCR_PIPELINE.md               # OCR 全链路说明
 │   ├── REPORT_PIPELINE.md            # AI 分析报告流程
 │   ├── API_DOCUMENTATION.md          # 接口文档
-│   ├── CODEX_GUIDELINES.md           # 代码规范
 │   ├── COMPLETED_REQUIREMENTS.md     # 已完成需求记录
 │   ├── chunk入库打标签文档.md         # 场景标签方案
 │   └── img/                          # 文档图片素材
