@@ -68,6 +68,7 @@ class TextCleaner:
 
     def _normalize_text(self, text: str) -> str:
         normalized = text.replace("\u3000", " ")
+        normalized = re.sub(r"[\r\n]+", "", normalized)
         normalized = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", normalized)
         normalized = re.sub(r"[ \t]+", " ", normalized)
         return normalized.strip()

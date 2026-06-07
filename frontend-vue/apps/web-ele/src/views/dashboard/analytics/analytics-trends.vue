@@ -26,21 +26,24 @@ function renderTokenTrendChart() {
   );
 
   renderEcharts({
-    color: ['#5ab1ef', '#019680'],
+    color: ['#5ab1ef', '#57d188'],
     grid: {
-      bottom: 12,
+      bottom: 8,
       containLabel: true,
-      left: '1.5%',
-      right: '1.5%',
-      top: 36,
+      left: 8,
+      right: 10,
+      top: 38,
     },
     legend: {
       data: ['输入 Token', '输出 Token'],
+      icon: 'roundRect',
       top: 0,
     },
     series: [
       {
-        areaStyle: {},
+        areaStyle: {
+          opacity: 0.12,
+        },
         data: promptTokens,
         name: '输入 Token',
         showSymbol: false,
@@ -48,7 +51,9 @@ function renderTokenTrendChart() {
         type: 'line',
       },
       {
-        areaStyle: {},
+        areaStyle: {
+          opacity: 0.12,
+        },
         data: completionTokens,
         name: '输出 Token',
         showSymbol: false,
@@ -59,10 +64,11 @@ function renderTokenTrendChart() {
     tooltip: {
       axisPointer: {
         lineStyle: {
-          color: '#019680',
+          color: '#57d188',
           width: 1,
         },
       },
+      valueFormatter: (value) => Number(value).toLocaleString(),
       trigger: 'axis',
     },
     xAxis: {
@@ -71,8 +77,12 @@ function renderTokenTrendChart() {
       },
       boundaryGap: false,
       data: labels,
+      axisLabel: {
+        color: '#94a3b8',
+      },
       splitLine: {
         lineStyle: {
+          color: 'rgba(148, 163, 184, 0.14)',
           type: 'solid',
           width: 1,
         },
@@ -82,17 +92,33 @@ function renderTokenTrendChart() {
     },
     yAxis: [
       {
+        axisLabel: {
+          color: '#94a3b8',
+          formatter: (value: number) => compactNumber(value),
+        },
         axisTick: {
           show: false,
         },
         splitArea: {
-          show: true,
+          show: false,
+        },
+        splitLine: {
+          lineStyle: {
+            color: 'rgba(148, 163, 184, 0.14)',
+          },
         },
         splitNumber: 4,
         type: 'value',
       },
     ],
   });
+}
+
+function compactNumber(value: number) {
+  if (value >= 10_000) {
+    return `${Math.round(value / 1000)}k`;
+  }
+  return `${value}`;
 }
 
 function formatDate(value: string) {

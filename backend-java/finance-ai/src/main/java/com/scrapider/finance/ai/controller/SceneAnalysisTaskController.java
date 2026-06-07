@@ -5,7 +5,6 @@ import com.scrapider.finance.ai.domain.param.SceneAnalysisSubmitParam;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisReportDetailVO;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisReportHistoryVO;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisReportTargetPageVO;
-import com.scrapider.finance.ai.domain.vo.SceneAnalysisReportTargetVO;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisReportVO;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisSubmitVO;
 import com.scrapider.finance.ai.service.SceneAnalysisReportGenerationService;

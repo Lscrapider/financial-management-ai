@@ -160,6 +160,14 @@ export function syncStockTrendData(stockCode: string) {
   );
 }
 
+export function syncStockDailyKlineData(stockCode: string) {
+  return requestClient.post<MarketSyncStatus>(
+    `/stocks/sync/daily-klines/${stockCode}`,
+    undefined,
+    { timeout: 60_000 },
+  );
+}
+
 export function addStockConfig(data: StockConfigAddParams) {
   return requestClient.post<StockConfigAddResult>('/system-config/stocks', data, {
     timeout: 60_000,

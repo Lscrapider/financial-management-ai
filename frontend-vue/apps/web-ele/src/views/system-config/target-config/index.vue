@@ -332,13 +332,13 @@ function labelOf(targetType: DeleteTargetType) {
 }
 
 .target-card {
-  background: #1f2937;
-  border-color: #374151;
+  background: var(--el-bg-color);
+  border-color: var(--el-border-color-light);
   border-radius: 8px;
 }
 
 .danger-card {
-  border-color: #7f1d1d;
+  border-color: var(--el-color-danger-light-5);
 }
 
 .reserved-card {
@@ -367,7 +367,7 @@ function labelOf(targetType: DeleteTargetType) {
 
 .target-form :deep(.el-form-item__label),
 .delete-form :deep(.el-form-item__label) {
-  color: #cbd5e1;
+  color: var(--el-text-color-regular);
 }
 
 .target-form-button {
@@ -376,7 +376,7 @@ function labelOf(targetType: DeleteTargetType) {
 }
 
 h2 {
-  color: #fff;
+  color: var(--el-text-color-primary);
   font-size: 16px;
   font-weight: 600;
   line-height: 24px;
@@ -384,7 +384,7 @@ h2 {
 }
 
 p {
-  color: #cbd5e1;
+  color: var(--el-text-color-regular);
   font-size: 13px;
   line-height: 20px;
   margin: 8px 0 0;

@@ -68,6 +68,10 @@ CREATE INDEX IF NOT EXISTS idx_stock_alert_config_enabled ON stock_alert_config 
 CREATE INDEX IF NOT EXISTS idx_watch_group_user_sort ON watch_group (user_id, sort_order, id);
 CREATE INDEX IF NOT EXISTS idx_watch_group_item_group_sort ON watch_group_item (group_id, target_type, sort_order, id);
 CREATE INDEX IF NOT EXISTS idx_watch_group_item_user ON watch_group_item (user_id, target_type, target_code);
+CREATE INDEX IF NOT EXISTS idx_market_sync_job_target_mode_started
+    ON market_sync_job (target_type, sync_mode, started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_market_sync_job_status_started
+    ON market_sync_job (status, started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_stock_industry_info_stock_code ON stock_industry_info (stock_code);
 CREATE INDEX IF NOT EXISTS idx_stock_valuation_history_stock_date ON stock_valuation_history (stock_code, trade_date DESC);
 CREATE INDEX IF NOT EXISTS idx_stock_valuation_history_board_date ON stock_valuation_history (board_name, trade_date DESC);

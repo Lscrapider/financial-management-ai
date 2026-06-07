@@ -12,6 +12,7 @@ import com.scrapider.finance.domain.po.BondIntradayTrendPO;
 import com.scrapider.finance.domain.po.BondKlinePO;
 import com.scrapider.finance.domain.po.BondQuoteSnapshotPO;
 import com.scrapider.finance.domain.po.ConvertibleBondBasicPO;
+import com.scrapider.finance.domain.po.MarketSyncJobPO;
 import com.scrapider.finance.domain.po.StockQuoteSnapshotPO;
 import com.scrapider.finance.domain.util.StockMarketJsonParser;
 import com.scrapider.finance.manage.BondConfigManage;
@@ -20,6 +21,7 @@ import com.scrapider.finance.manage.BondKlineManage;
 import com.scrapider.finance.manage.BondQuoteSnapshotManage;
 import com.scrapider.finance.manage.ConvertibleBondBasicManage;
 import com.scrapider.finance.manage.ConvertibleBondDailyValuationManage;
+import com.scrapider.finance.manage.MarketSyncJobManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
 import com.scrapider.finance.service.ConvertibleBondDataProvider;
 import com.scrapider.finance.service.HistoricalKlineProvider;
@@ -39,8 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.StreamSupport;
@@ -59,6 +60,7 @@ public class BondMarketSyncTask {
     private static final LocalTime MORNING_END = LocalTime.of(11, 30);
     private static final LocalTime AFTERNOON_START = LocalTime.of(13, 0);
     private static final LocalTime AFTERNOON_END = LocalTime.of(15, 0);
+    private static final String TARGET_TYPE = "bond";
 
     private final StockMarketApi stockMarketApi;
     private final BondConfigManage bondConfigManage;
@@ -71,8 +73,8 @@ public class BondMarketSyncTask {
     private final ConvertibleBondDailyValuationManage convertibleBondDailyValuationManage;
     private final StockQuoteSnapshotManage stockQuoteSnapshotManage;
     private final MarketTradingCalendarService marketTradingCalendarService;
+    private final MarketSyncJobManage marketSyncJobManage;
     private final AtomicBoolean syncing = new AtomicBoolean(false);
-    private final ExecutorService manualSyncExecutor = Executors.newSingleThreadExecutor();
 
     @Value("${bond.sync.enabled:false}")
     private boolean enabled;
@@ -127,7 +129,8 @@ public class BondMarketSyncTask {
             ConvertibleBondBasicManage convertibleBondBasicManage,
             ConvertibleBondDailyValuationManage convertibleBondDailyValuationManage,
             StockQuoteSnapshotManage stockQuoteSnapshotManage,
-            MarketTradingCalendarService marketTradingCalendarService) {
+            MarketTradingCalendarService marketTradingCalendarService,
+            MarketSyncJobManage marketSyncJobManage) {
         this.stockMarketApi = stockMarketApi;
         this.bondConfigManage = bondConfigManage;
         this.bondQuoteSnapshotManage = bondQuoteSnapshotManage;
@@ -139,6 +142,7 @@ public class BondMarketSyncTask {
         this.convertibleBondDailyValuationManage = convertibleBondDailyValuationManage;
         this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
         this.marketTradingCalendarService = marketTradingCalendarService;
+        this.marketSyncJobManage = marketSyncJobManage;
     }
 
     @Scheduled(
@@ -165,9 +169,11 @@ public class BondMarketSyncTask {
         if (!this.syncing.compareAndSet(false, true)) {
             return false;
         }
-        this.manualSyncExecutor.submit(() -> {
+        CompletableFuture.runAsync(() -> {
             try {
-                this.doSyncBondMarketData();
+                this.runSyncWithJob(MarketSyncJobPO.TRIGGER_MANUAL);
+            } catch (Exception ex) {
+                log.warn("Manual bond market sync failed.", ex);
             } finally {
                 this.syncing.set(false);
             }
@@ -248,9 +254,20 @@ public class BondMarketSyncTask {
             return;
         }
         try {
-            this.doSyncBondMarketData();
+            this.runSyncWithJob(MarketSyncJobPO.TRIGGER_SCHEDULED);
         } finally {
             this.syncing.set(false);
+        }
+    }
+
+    private void runSyncWithJob(String triggerType) {
+        MarketSyncJobPO job = this.marketSyncJobManage.startFullJob(TARGET_TYPE, triggerType);
+        try {
+            this.doSyncBondMarketData();
+            this.marketSyncJobManage.markSuccess(job.getId());
+        } catch (Exception ex) {
+            this.marketSyncJobManage.markFailed(job.getId(), ex.getMessage());
+            throw new IllegalStateException(ex);
         }
     }
 

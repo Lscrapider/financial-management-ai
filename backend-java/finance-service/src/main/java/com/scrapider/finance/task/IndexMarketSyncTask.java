@@ -11,11 +11,13 @@ import com.scrapider.finance.domain.po.IndexConfigPO;
 import com.scrapider.finance.domain.po.IndexIntradayTrendPO;
 import com.scrapider.finance.domain.po.IndexKlinePO;
 import com.scrapider.finance.domain.po.IndexQuoteSnapshotPO;
+import com.scrapider.finance.domain.po.MarketSyncJobPO;
 import com.scrapider.finance.domain.util.StockMarketJsonParser;
 import com.scrapider.finance.manage.IndexConfigManage;
 import com.scrapider.finance.manage.IndexIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.IndexKlineManage;
 import com.scrapider.finance.manage.IndexQuoteSnapshotManage;
+import com.scrapider.finance.manage.MarketSyncJobManage;
 import com.scrapider.finance.service.HistoricalKlineProvider;
 import com.scrapider.finance.service.MarketTradingCalendarService;
 import java.math.BigDecimal;
@@ -33,8 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.StreamSupport;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +52,7 @@ public class IndexMarketSyncTask {
     private static final LocalTime MORNING_END = LocalTime.of(11, 30);
     private static final LocalTime AFTERNOON_START = LocalTime.of(13, 0);
     private static final LocalTime AFTERNOON_END = LocalTime.of(15, 0);
+    private static final String TARGET_TYPE = "index";
 
     private final StockMarketApi stockMarketApi;
     private final IndexConfigManage indexConfigManage;
@@ -59,8 +61,8 @@ public class IndexMarketSyncTask {
     private final IndexIntradayTrendInfluxManage indexIntradayTrendInfluxManage;
     private final HistoricalKlineProvider historicalKlineProvider;
     private final MarketTradingCalendarService marketTradingCalendarService;
+    private final MarketSyncJobManage marketSyncJobManage;
     private final AtomicBoolean syncing = new AtomicBoolean(false);
-    private final ExecutorService manualSyncExecutor = Executors.newSingleThreadExecutor();
 
     @Value("${index.sync.enabled:false}")
     private boolean enabled;
@@ -105,7 +107,8 @@ public class IndexMarketSyncTask {
             IndexKlineManage indexKlineManage,
             IndexIntradayTrendInfluxManage indexIntradayTrendInfluxManage,
             HistoricalKlineProvider historicalKlineProvider,
-            MarketTradingCalendarService marketTradingCalendarService) {
+            MarketTradingCalendarService marketTradingCalendarService,
+            MarketSyncJobManage marketSyncJobManage) {
         this.stockMarketApi = stockMarketApi;
         this.indexConfigManage = indexConfigManage;
         this.indexQuoteSnapshotManage = indexQuoteSnapshotManage;
@@ -113,6 +116,7 @@ public class IndexMarketSyncTask {
         this.indexIntradayTrendInfluxManage = indexIntradayTrendInfluxManage;
         this.historicalKlineProvider = historicalKlineProvider;
         this.marketTradingCalendarService = marketTradingCalendarService;
+        this.marketSyncJobManage = marketSyncJobManage;
     }
 
     @Scheduled(
@@ -139,9 +143,11 @@ public class IndexMarketSyncTask {
         if (!this.syncing.compareAndSet(false, true)) {
             return false;
         }
-        this.manualSyncExecutor.submit(() -> {
+        CompletableFuture.runAsync(() -> {
             try {
-                this.doSyncIndexMarketData();
+                this.runSyncWithJob(MarketSyncJobPO.TRIGGER_MANUAL);
+            } catch (Exception ex) {
+                log.warn("Manual index market sync failed.", ex);
             } finally {
                 this.syncing.set(false);
             }
@@ -186,9 +192,20 @@ public class IndexMarketSyncTask {
             return;
         }
         try {
-            this.doSyncIndexMarketData();
+            this.runSyncWithJob(MarketSyncJobPO.TRIGGER_SCHEDULED);
         } finally {
             this.syncing.set(false);
+        }
+    }
+
+    private void runSyncWithJob(String triggerType) {
+        MarketSyncJobPO job = this.marketSyncJobManage.startFullJob(TARGET_TYPE, triggerType);
+        try {
+            this.doSyncIndexMarketData();
+            this.marketSyncJobManage.markSuccess(job.getId());
+        } catch (Exception ex) {
+            this.marketSyncJobManage.markFailed(job.getId(), ex.getMessage());
+            throw new IllegalStateException(ex);
         }
     }
 

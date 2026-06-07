@@ -82,7 +82,37 @@ COMMENT ON COLUMN watch_group_item.position IS '持仓数量（股/张/份）';
 COMMENT ON COLUMN watch_group_item.remark IS '用户备注';
 
 -- ================================================================================
--- 3. 股票行业/地域/概念信息
+-- 3. 行情同步任务记录
+-- ================================================================================
+CREATE TABLE IF NOT EXISTS market_sync_job (
+    id BIGSERIAL PRIMARY KEY,
+    job_no VARCHAR(64) NOT NULL,
+    target_type VARCHAR(32) NOT NULL,
+    sync_mode VARCHAR(32) NOT NULL,
+    data_scope VARCHAR(64) NOT NULL,
+    trigger_type VARCHAR(32) NOT NULL,
+    target_code VARCHAR(32),
+    status VARCHAR(32) NOT NULL,
+    started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    finished_at TIMESTAMP,
+    duration_ms BIGINT,
+    error_message TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_market_sync_job_no UNIQUE (job_no)
+);
+
+COMMENT ON TABLE market_sync_job IS '行情同步任务记录';
+COMMENT ON COLUMN market_sync_job.job_no IS '同步任务编号';
+COMMENT ON COLUMN market_sync_job.target_type IS '标的类型：stock/index/bond';
+COMMENT ON COLUMN market_sync_job.sync_mode IS '同步模式：full/single';
+COMMENT ON COLUMN market_sync_job.data_scope IS '数据范围：all/quote/trend/kline';
+COMMENT ON COLUMN market_sync_job.trigger_type IS '触发方式：manual/scheduled';
+COMMENT ON COLUMN market_sync_job.target_code IS '单标的同步代码，全量同步为空';
+COMMENT ON COLUMN market_sync_job.status IS '任务状态：running/success/failed';
+
+-- ================================================================================
+-- 4. 股票行业/地域/概念信息
 -- ================================================================================
 CREATE TABLE IF NOT EXISTS stock_industry_info (
     id BIGSERIAL PRIMARY KEY,
@@ -108,7 +138,7 @@ COMMENT ON COLUMN stock_industry_info.region_name IS '地域板块名称';
 COMMENT ON COLUMN stock_industry_info.concept_names IS '概念名称列表，逗号分隔';
 
 -- ================================================================================
--- 4. 股票每日估值历史
+-- 5. 股票每日估值历史
 -- ================================================================================
 CREATE TABLE IF NOT EXISTS stock_valuation_history (
     id BIGSERIAL PRIMARY KEY,
@@ -143,7 +173,7 @@ COMMENT ON COLUMN stock_valuation_history.pe_ttm IS '滚动市盈率';
 COMMENT ON COLUMN stock_valuation_history.pb_mrq IS '市净率';
 
 -- ================================================================================
--- 5. 股票财务主指标及银行专项指标
+-- 6. 股票财务主指标及银行专项指标
 -- ================================================================================
 CREATE TABLE IF NOT EXISTS stock_financial_indicator (
     id BIGSERIAL PRIMARY KEY,
@@ -185,7 +215,7 @@ CREATE TABLE IF NOT EXISTS stock_financial_indicator (
 COMMENT ON TABLE stock_financial_indicator IS '股票财务主指标及银行专项指标';
 
 -- ================================================================================
--- 6. 股票分红股息历史
+-- 7. 股票分红股息历史
 -- ================================================================================
 CREATE TABLE IF NOT EXISTS stock_dividend_history (
     id BIGSERIAL PRIMARY KEY,
@@ -214,7 +244,7 @@ CREATE TABLE IF NOT EXISTS stock_dividend_history (
 COMMENT ON TABLE stock_dividend_history IS '股票分红股息历史';
 
 -- ================================================================================
--- 7. 标的场景分析任务表
+-- 8. 标的场景分析任务表
 -- ================================================================================
 CREATE TABLE IF NOT EXISTS scene_analysis_task (
     id BIGSERIAL PRIMARY KEY,
@@ -252,7 +282,7 @@ COMMENT ON COLUMN scene_analysis_task.report_payload IS '结构化报告内容';
 COMMENT ON COLUMN scene_analysis_task.report_text IS '最终展示报告文本';
 
 -- ================================================================================
--- 8. 标的场景分析报告历史表
+-- 9. 标的场景分析报告历史表
 -- ================================================================================
 CREATE TABLE IF NOT EXISTS scene_analysis_report (
     id BIGSERIAL PRIMARY KEY,
