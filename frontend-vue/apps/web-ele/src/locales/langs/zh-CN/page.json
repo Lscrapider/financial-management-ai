@@ -9,7 +9,8 @@
   },
   "dashboard": {
     "title": "行情中心",
-    "analytics": "控制台",
+    "analytics": "系统监控",
+    "investmentWorkbench": "投资工作台",
     "workspace": "股票行情",
     "watchPool": "投资观察池",
     "indexMarket": "指数行情",

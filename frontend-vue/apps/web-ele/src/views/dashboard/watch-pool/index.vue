@@ -4,7 +4,8 @@ import type { IndexQuote } from '#/api/index-market';
 import type { StockQuote } from '#/api/stock';
 import type { WatchGroup, WatchItem, WatchTargetType } from '#/api/watch-pool';
 
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 
 import { Page } from '@vben/common-ui';
 
@@ -42,8 +43,11 @@ interface TargetOption {
   secid: string;
 }
 
+const route = useRoute();
+const router = useRouter();
 const groups = ref<WatchGroup[]>([]);
 const selectedGroupId = ref('');
+const highlightedItemId = ref('');
 const typeFilter = ref<WatchTargetType | 'ALL'>('ALL');
 const stockQuotes = ref<StockQuote[]>([]);
 const indexQuotes = ref<IndexQuote[]>([]);
@@ -175,19 +179,64 @@ onMounted(async () => {
   await Promise.all([loadGroups(), loadQuotes()]);
 });
 
+watch(
+  () => [route.query.groupId, route.query.itemId],
+  () => {
+    applyRouteSelection();
+  },
+);
+
 async function loadGroups() {
   loadingGroups.value = true;
   try {
     const currentGroupId = selectedGroupId.value;
     groups.value = await listWatchGroups();
-    selectedGroupId.value = groups.value.some(
-      (group) => group.id === currentGroupId,
-    )
-      ? currentGroupId
-      : (groups.value[0]?.id ?? '');
+    applyRouteSelection(currentGroupId);
   } finally {
     loadingGroups.value = false;
   }
+}
+
+function applyRouteSelection(fallbackGroupId = selectedGroupId.value) {
+  const queryGroupId = firstQueryValue(route.query.groupId);
+  const queryItemId = firstQueryValue(route.query.itemId);
+  const fallbackGroup = groups.value.find(
+    (group) => group.id === fallbackGroupId,
+  );
+  const routeGroup = groups.value.find((group) => group.id === queryGroupId);
+  const nextGroup = routeGroup ?? fallbackGroup ?? groups.value[0];
+
+  selectedGroupId.value = nextGroup?.id ?? '';
+  highlightedItemId.value =
+    nextGroup?.items.some((item) => item.id === queryItemId)
+      ? queryItemId
+      : '';
+}
+
+function selectGroup(groupId: string) {
+  selectedGroupId.value = groupId;
+  highlightedItemId.value = '';
+  if (route.query.groupId || route.query.itemId) {
+    void router.replace({
+      name: 'WatchPool',
+      query: {
+        ...route.query,
+        groupId,
+        itemId: undefined,
+      },
+    });
+  }
+}
+
+function firstQueryValue(value: unknown) {
+  if (Array.isArray(value)) {
+    return typeof value[0] === 'string' ? value[0] : '';
+  }
+  return typeof value === 'string' ? value : '';
+}
+
+function tableRowClassName({ row }: { row: WatchItem }) {
+  return row.id === highlightedItemId.value ? 'watch-row-highlight' : '';
 }
 
 async function loadQuotes() {
@@ -453,7 +502,7 @@ function positionPnL(
             :key="group.id"
             :class="['group-tab', { active: group.id === selectedGroupId }]"
             type="button"
-            @click="selectedGroupId = group.id"
+            @click="selectGroup(group.id)"
           >
             <span>{{ group.name }}</span>
             <small>{{ group.items.length }}</small>
@@ -497,8 +546,10 @@ function positionPnL(
         <ElTable
           v-if="filteredItems.length > 0"
           :data="filteredItems"
+          :row-class-name="tableRowClassName"
           border
           height="400"
+          row-key="id"
         >
           <ElTableColumn :width="widths['col-type']" min-width="70">
             <template #header>
@@ -1002,6 +1053,14 @@ function positionPnL(
 
 :deep(.el-table__header th) {
   overflow: visible;
+}
+
+:deep(.watch-row-highlight > td) {
+  background: var(--el-color-primary-light-9) !important;
+}
+
+:deep(.watch-row-highlight:hover > td) {
+  background: var(--el-color-primary-light-8) !important;
 }
 
 .edit-target-info {

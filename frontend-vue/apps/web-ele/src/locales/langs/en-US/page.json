@@ -9,7 +9,8 @@
   },
   "dashboard": {
     "title": "Market Center",
-    "analytics": "Console",
+    "analytics": "System Monitor",
+    "investmentWorkbench": "Investment Workbench",
     "workspace": "Market Overview",
     "watchPool": "Investment Watch Pool",
     "indexMarket": "Index Market",
