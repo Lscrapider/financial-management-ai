@@ -72,6 +72,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     meta: {
+      authority: ['admin'],
       icon: 'lucide:settings',
       order: 100,
       title: $t('page.systemConfig.title'),

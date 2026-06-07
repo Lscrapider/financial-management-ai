@@ -22,7 +22,7 @@ const defaultPreferences: Preferences = {
     enableCheckUpdates: true,
     enableCopyPreferences: true,
     enablePreferences: true,
-    enableRefreshToken: false,
+    enableRefreshToken: true,
     enableStickyPreferencesNavigationBar: true,
     isMobile: false,
     layout: 'sidebar-nav',

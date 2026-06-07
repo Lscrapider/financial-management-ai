@@ -9,6 +9,7 @@ import com.scrapider.finance.ai.converter.SceneAnalysisReportConverter;
 import com.scrapider.finance.ai.converter.SceneAnalysisReportPayloadConverter;
 import com.scrapider.finance.ai.converter.SceneAnalysisReportTextConverter;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisReportVO;
+import com.scrapider.finance.ai.security.CurrentUserContext;
 import com.scrapider.finance.ai.service.AiTokenUsageService;
 import com.scrapider.finance.ai.service.SceneAnalysisReportGenerationService;
 import com.scrapider.finance.domain.po.OcrTaskPO;
@@ -20,6 +21,7 @@ import com.scrapider.finance.manage.SceneAnalysisTaskManage;
 import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Executor;
 
@@ -88,12 +90,13 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
 
     @Override
     public void regenerateFromStoredContext(String taskNo) {
-        this.submitGeneration(taskNo, GENERATION_TYPE_REGENERATE);
+        this.submitGenerationForCurrentUser(taskNo, GENERATION_TYPE_REGENERATE);
     }
 
     @Override
     public SceneAnalysisReportVO getReport(String taskNo) {
         SceneAnalysisTaskPO task = this.loadTask(taskNo);
+        this.requireCurrentUserCanAccess(task);
         SceneAnalysisReportPO report = this.sceneAnalysisReportManage.latestByTaskNo(taskNo);
         if (report == null) {
             return SceneAnalysisReportConverter.notGenerated(task);
@@ -108,12 +111,29 @@ public class SceneAnalysisReportGenerationServiceImpl implements SceneAnalysisRe
                 () -> this.generateFromTaskSnapshotSafely(taskNo, report.getId(), generationType));
     }
 
+    private void submitGenerationForCurrentUser(String taskNo, String generationType) {
+        SceneAnalysisTaskPO task = this.reportReadyTask(taskNo);
+        this.requireCurrentUserCanAccess(task);
+        SceneAnalysisReportPO report = this.sceneAnalysisReportManage.createGeneratingReport(task, generationType);
+        this.sceneAnalysisReportExecutor.execute(
+                () -> this.generateFromTaskSnapshotSafely(taskNo, report.getId(), generationType));
+    }
+
     private SceneAnalysisTaskPO reportReadyTask(String taskNo) {
         SceneAnalysisTaskPO task = this.loadTask(taskNo);
         this.requiredObject(task.getCurrentScenesPayload(), "currentScenesPayload");
         ObjectNode reportPayload = this.mutableReportPayload(task.getReportPayload());
         this.requiredObject(reportPayload.path("knowledgeContext"), "knowledgeContext");
         return task;
+    }
+
+    private void requireCurrentUserCanAccess(SceneAnalysisTaskPO task) {
+        if (CurrentUserContext.isAdmin()) {
+            return;
+        }
+        if (!Objects.equals(task.getUserId(), CurrentUserContext.currentUserId())) {
+            throw new IllegalArgumentException("scene analysis task not found: " + task.getTaskNo());
+        }
     }
 
     private void generateFromTaskSnapshotSafely(String taskNo, Long reportId, String generationType) {

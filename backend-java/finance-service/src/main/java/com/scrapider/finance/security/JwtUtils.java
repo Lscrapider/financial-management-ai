@@ -12,6 +12,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class JwtUtils {
 
+    private static final String TOKEN_TYPE_CLAIM = "typ";
+    private static final String ACCESS_TOKEN_TYPE = "access";
+
     private final SecretKey key;
     private final long accessTokenExpirationMs;
 
@@ -22,10 +25,11 @@ public class JwtUtils {
         this.accessTokenExpirationMs = accessTokenExpirationMs;
     }
 
-    public String generateToken(Long userId, String username, String role) {
+    public String generateAccessToken(Long userId, String username, String role) {
         Date now = new Date();
         return Jwts.builder()
                 .subject(userId.toString())
+                .claim(TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE)
                 .claim("username", username)
                 .claim("role", role)
                 .issuedAt(now)
@@ -34,19 +38,15 @@ public class JwtUtils {
                 .compact();
     }
 
-    public Claims parseToken(String token) {
-        return Jwts.parser()
+    public Claims parseAccessToken(String token) {
+        Claims claims = Jwts.parser()
                 .verifyWith(this.key)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
-    }
-
-    public Claims parseTokenLenient(String token) {
-        try {
-            return this.parseToken(token);
-        } catch (ExpiredJwtException e) {
-            return e.getClaims();
+        if (!ACCESS_TOKEN_TYPE.equals(claims.get(TOKEN_TYPE_CLAIM, String.class))) {
+            throw new IllegalArgumentException("Invalid access token type.");
         }
+        return claims;
     }
 }

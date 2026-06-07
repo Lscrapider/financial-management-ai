@@ -36,7 +36,7 @@ public class BearerTokenAuthenticationFilter extends OncePerRequestFilter {
             String token = authorization.substring(BEARER_PREFIX.length());
             if (!this.tokenStore.isBlacklisted(token)) {
                 try {
-                    Claims claims = this.jwtUtils.parseToken(token);
+                    Claims claims = this.jwtUtils.parseAccessToken(token);
                     Long userId = Long.valueOf(claims.getSubject());
                     String username = claims.get("username", String.class);
                     String role = claims.get("role", String.class);

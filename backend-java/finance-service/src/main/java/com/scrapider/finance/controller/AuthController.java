@@ -1,7 +1,9 @@
 package com.scrapider.finance.controller;
 
 import cn.hutool.core.util.StrUtil;
+import com.scrapider.finance.converter.AuthConverter;
 import com.scrapider.finance.domain.constant.AuthConstant;
+import com.scrapider.finance.domain.dto.AuthSessionDTO;
 import com.scrapider.finance.domain.param.ChangePasswordParam;
 import com.scrapider.finance.domain.param.LoginParam;
 import com.scrapider.finance.domain.param.RegisterParam;
@@ -11,8 +13,10 @@ import com.scrapider.finance.domain.vo.ApiResponseVO;
 import com.scrapider.finance.domain.vo.LoginResultVO;
 import com.scrapider.finance.domain.vo.UserInfoVO;
 import com.scrapider.finance.security.LoginUser;
+import com.scrapider.finance.security.RefreshSessionCookieHandler;
 import com.scrapider.finance.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,14 +29,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final RefreshSessionCookieHandler refreshSessionCookieHandler;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, RefreshSessionCookieHandler refreshSessionCookieHandler) {
         this.authService = authService;
+        this.refreshSessionCookieHandler = refreshSessionCookieHandler;
     }
 
     @PostMapping("/api/auth/login")
-    public ApiResponseVO<LoginResultVO> login(@RequestBody LoginParam param) {
-        return ApiResponseVO.success(this.authService.login(param));
+    public ApiResponseVO<LoginResultVO> login(@RequestBody LoginParam param, HttpServletResponse response) {
+        AuthSessionDTO session = this.authService.login(param);
+        this.refreshSessionCookieHandler.addRefreshCookie(response, session.refreshSid());
+        return ApiResponseVO.success(AuthConverter.toLoginResult(session.accessToken()));
     }
 
     @PostMapping("/api/auth/register")
@@ -42,8 +50,11 @@ public class AuthController {
     }
 
     @PostMapping("/api/auth/logout")
-    public ApiResponseVO<Void> logout(HttpServletRequest request) {
-        this.authService.logout(this.resolveToken(request));
+    public ApiResponseVO<Void> logout(HttpServletRequest request, HttpServletResponse response) {
+        this.authService.logout(
+                this.resolveToken(request),
+                this.refreshSessionCookieHandler.resolveRefreshSid(request));
+        this.refreshSessionCookieHandler.clearRefreshCookie(response);
         return ApiResponseVO.success(null);
     }
 
@@ -83,8 +94,11 @@ public class AuthController {
     }
 
     @PostMapping("/api/auth/refresh")
-    public ApiResponseVO<String> refresh(HttpServletRequest request) {
-        return ApiResponseVO.success(this.authService.refresh(this.resolveToken(request)));
+    public ApiResponseVO<String> refresh(HttpServletRequest request, HttpServletResponse response) {
+        AuthSessionDTO session = this.authService.refresh(
+                this.refreshSessionCookieHandler.resolveRefreshSid(request));
+        this.refreshSessionCookieHandler.addRefreshCookie(response, session.refreshSid());
+        return ApiResponseVO.success(session.accessToken());
     }
 
     private String resolveToken(HttpServletRequest request) {

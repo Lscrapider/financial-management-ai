@@ -107,10 +107,10 @@ CREATE TABLE IF NOT EXISTS app_user (
                                         username VARCHAR(64) NOT NULL,
     password VARCHAR(255) NOT NULL,
     real_name VARCHAR(100) NOT NULL,
-    role_code VARCHAR(64) NOT NULL DEFAULT 'admin',
+    role_code VARCHAR(64) NOT NULL DEFAULT 'user',
     avatar VARCHAR(500) NOT NULL DEFAULT '',
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
-    home_path VARCHAR(200) NOT NULL DEFAULT '/analytics',
+    home_path VARCHAR(200) NOT NULL DEFAULT '/investment-workbench',
     introduction TEXT,
     email VARCHAR(128),
     phone VARCHAR(32),
@@ -120,11 +120,16 @@ CREATE TABLE IF NOT EXISTS app_user (
     CONSTRAINT uk_app_user_username UNIQUE (username)
     );
 
-ALTER TABLE app_user ADD COLUMN IF NOT EXISTS role_code VARCHAR(64) NOT NULL DEFAULT 'admin';
+ALTER TABLE app_user ADD COLUMN IF NOT EXISTS role_code VARCHAR(64) NOT NULL DEFAULT 'user';
+ALTER TABLE app_user ALTER COLUMN role_code SET DEFAULT 'user';
+ALTER TABLE app_user ALTER COLUMN home_path SET DEFAULT '/investment-workbench';
 ALTER TABLE app_user ADD COLUMN IF NOT EXISTS introduction TEXT;
 ALTER TABLE app_user ADD COLUMN IF NOT EXISTS email VARCHAR(128);
 ALTER TABLE app_user ADD COLUMN IF NOT EXISTS phone VARCHAR(32);
 ALTER TABLE app_user ADD COLUMN IF NOT EXISTS email_notification BOOLEAN NOT NULL DEFAULT TRUE;
+UPDATE app_user
+SET home_path = '/investment-workbench'
+WHERE role_code = 'user' AND home_path = '/analytics';
 
 COMMENT ON TABLE app_user IS '系统登录用户表';
 COMMENT ON COLUMN app_user.username IS '登录用户名';

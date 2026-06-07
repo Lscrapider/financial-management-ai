@@ -6,6 +6,7 @@ import com.scrapider.finance.ai.domain.vo.SceneAnalysisReportDetailVO;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisReportHistoryVO;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisReportTargetPageVO;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisReportTargetVO;
+import com.scrapider.finance.ai.security.CurrentUserContext;
 import com.scrapider.finance.ai.service.SceneAnalysisReportQueryService;
 import com.scrapider.finance.domain.po.SceneAnalysisReportPO;
 import com.scrapider.finance.manage.SceneAnalysisReportManage;
@@ -37,10 +38,17 @@ public class SceneAnalysisReportQueryServiceImpl implements SceneAnalysisReportQ
         String normalizedTargetName = this.normalizeText(targetName);
         String normalizedTargetCode = this.normalizeText(targetCode);
         String normalizedTargetType = this.normalizeText(targetType);
+        Long ownerUserId = CurrentUserContext.ownerUserIdForQuery();
         Long total = this.sceneAnalysisReportManage
-                .countTargets(normalizedTargetName, normalizedTargetCode, normalizedTargetType);
+                .countTargets(normalizedTargetName, normalizedTargetCode, normalizedTargetType, ownerUserId);
         List<SceneAnalysisReportTargetVO> records = this.sceneAnalysisReportManage
-                .listTargets(normalizedTargetName, normalizedTargetCode, normalizedTargetType, ps, (long) (pn - 1) * ps)
+                .listTargets(
+                        normalizedTargetName,
+                        normalizedTargetCode,
+                        normalizedTargetType,
+                        ownerUserId,
+                        ps,
+                        (long) (pn - 1) * ps)
                 .stream()
                 .map(SceneAnalysisReportConverter::target)
                 .toList();
@@ -55,7 +63,9 @@ public class SceneAnalysisReportQueryServiceImpl implements SceneAnalysisReportQ
         if (StrUtil.isBlank(targetCode)) {
             throw new IllegalArgumentException("targetCode is required");
         }
-        return this.sceneAnalysisReportManage.listHistory(targetType, targetCode).stream()
+        return this.sceneAnalysisReportManage
+                .listHistory(targetType, targetCode, CurrentUserContext.ownerUserIdForQuery())
+                .stream()
                 .map(SceneAnalysisReportConverter::history)
                 .toList();
     }
@@ -65,7 +75,8 @@ public class SceneAnalysisReportQueryServiceImpl implements SceneAnalysisReportQ
         if (reportId == null) {
             throw new IllegalArgumentException("reportId is required");
         }
-        SceneAnalysisReportPO report = this.sceneAnalysisReportManage.getById(reportId);
+        SceneAnalysisReportPO report = this.sceneAnalysisReportManage
+                .findByIdForOwner(reportId, CurrentUserContext.ownerUserIdForQuery());
         if (report == null) {
             throw new IllegalArgumentException("scene analysis report not found: " + reportId);
         }

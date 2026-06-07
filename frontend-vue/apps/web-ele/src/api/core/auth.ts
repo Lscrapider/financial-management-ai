@@ -4,6 +4,7 @@ export namespace AuthApi {
   /** 登录接口参数 */
   export interface LoginParams {
     password?: string;
+    roleCode?: string;
     username?: string;
   }
 
@@ -12,9 +13,10 @@ export namespace AuthApi {
     accessToken: string;
   }
 
-  export interface RefreshTokenResult {
+  export interface RefreshTokenResponse {
+    code: number;
     data: string;
-    status: number;
+    message: string;
   }
 
   /** 注册接口参数 */
@@ -29,7 +31,9 @@ export namespace AuthApi {
  * 登录
  */
 export async function loginApi(data: AuthApi.LoginParams) {
-  return requestClient.post<AuthApi.LoginResult>('/auth/login', data);
+  return requestClient.post<AuthApi.LoginResult>('/auth/login', data, {
+    withCredentials: true,
+  });
 }
 
 /**
@@ -43,9 +47,16 @@ export async function registerApi(data: AuthApi.RegisterParams) {
  * 刷新accessToken
  */
 export async function refreshTokenApi() {
-  return baseRequestClient.post<AuthApi.RefreshTokenResult>('/auth/refresh', {
-    withCredentials: true,
-  });
+  const response = await baseRequestClient.post<{
+    data: AuthApi.RefreshTokenResponse;
+  }>(
+    '/auth/refresh',
+    undefined,
+    {
+      withCredentials: true,
+    },
+  );
+  return response.data;
 }
 
 /**

@@ -67,6 +67,13 @@ export const useReportPollingStore = defineStore('report-polling', () => {
     delete tasks[taskNo];
   }
 
+  function $reset() {
+    for (const taskNo of Object.keys(tasks)) {
+      stop(taskNo);
+    }
+    routerRef = undefined;
+  }
+
   function schedule(taskNo: string) {
     const task = tasks[taskNo];
     if (!task) {
@@ -137,6 +144,7 @@ export const useReportPollingStore = defineStore('report-polling', () => {
   }
 
   return {
+    $reset,
     init,
     start,
     stop,

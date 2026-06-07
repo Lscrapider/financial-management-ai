@@ -34,21 +34,26 @@ public class SceneAnalysisReportManage extends ServiceImpl<SceneAnalysisReportMa
         return this.baseMapper.latestByTaskNo(taskNo);
     }
 
-    public Long countTargets(String targetName, String targetCode, String targetType) {
-        return this.baseMapper.countTargets(targetName, targetCode, targetType);
+    public Long countTargets(String targetName, String targetCode, String targetType, Long ownerUserId) {
+        return this.baseMapper.countTargets(targetName, targetCode, targetType, ownerUserId);
     }
 
     public List<SceneAnalysisReportTargetDTO> listTargets(
             String targetName,
             String targetCode,
             String targetType,
+            Long ownerUserId,
             int limit,
             long offset) {
-        return this.baseMapper.listTargets(targetName, targetCode, targetType, limit, offset);
+        return this.baseMapper.listTargets(targetName, targetCode, targetType, ownerUserId, limit, offset);
     }
 
-    public List<SceneAnalysisReportHistoryDTO> listHistory(String targetType, String targetCode) {
-        return this.baseMapper.listHistory(targetType, targetCode);
+    public List<SceneAnalysisReportHistoryDTO> listHistory(String targetType, String targetCode, Long ownerUserId) {
+        return this.baseMapper.listHistory(targetType, targetCode, ownerUserId);
+    }
+
+    public SceneAnalysisReportPO findByIdForOwner(Long reportId, Long ownerUserId) {
+        return this.baseMapper.findByIdForOwner(reportId, ownerUserId);
     }
 
     public void markSuccess(Long reportId, JsonNode reportContent, String reportText, String model) {

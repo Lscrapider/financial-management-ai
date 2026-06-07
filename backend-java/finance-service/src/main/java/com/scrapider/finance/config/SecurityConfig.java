@@ -35,9 +35,29 @@ public class SecurityConfig {
                                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED)))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
+                        .requestMatchers(
+                                "/api/auth/login",
+                                "/api/auth/register",
+                                "/api/auth/refresh",
+                                "/api/auth/logout")
+                        .permitAll()
                         .requestMatchers("/api/ai/ocr/reviews/*/pages/*/image").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/ai/scene-analysis/tasks/*/callback").permitAll()
+                        .requestMatchers(
+                                "/api/system-config/**",
+                                "/api/stocks/sync",
+                                "/api/stocks/sync/**",
+                                "/api/indices/sync",
+                                "/api/indices/sync/**",
+                                "/api/bonds/sync",
+                                "/api/bonds/sync/**",
+                                "/api/knowledge/**",
+                                "/api/ai/ocr/tasks/**",
+                                "/api/ai/ocr/reviews/**",
+                                "/api/ai/manual-knowledge/tasks/**",
+                                "/api/ai/console/**",
+                                "/api/ai/token-usage/**")
+                        .hasRole("admin")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll())
                 .addFilterBefore(

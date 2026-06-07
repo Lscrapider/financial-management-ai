@@ -10,18 +10,16 @@ import com.scrapider.finance.ai.domain.param.SceneAnalysisCurrentScenesPayloadPa
 import com.scrapider.finance.ai.domain.param.SceneAnalysisSubmitParam;
 import com.scrapider.finance.ai.domain.param.SceneRetrievalEmbeddingParam;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisSubmitVO;
+import com.scrapider.finance.ai.security.CurrentUserContext;
 import com.scrapider.finance.ai.service.SceneAnalysisMessagePublisher;
 import com.scrapider.finance.ai.service.SceneAnalysisTaskService;
 import com.scrapider.finance.ai.service.SceneReportPipelineService;
 import com.scrapider.finance.ai.service.SceneTargetDataProvider;
 import com.scrapider.finance.domain.po.SceneAnalysisTaskPO;
 import com.scrapider.finance.manage.SceneAnalysisTaskManage;
-import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -59,7 +57,7 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
         if (param.totalChunks() == null || param.totalChunks() <= 0) {
             throw new IllegalArgumentException("totalChunks is required and must be greater than 0");
         }
-        Long userId = this.currentUserId();
+        Long userId = CurrentUserContext.currentUserId();
         String taskNo = this.newTaskNo();
         SceneAnalysisMessageDTO message = this.targetDataProvider(targetType)
                 .buildMessage(taskNo, targetCode, param);
@@ -142,26 +140,4 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
         return this.objectMapper.valueToTree(value);
     }
 
-    private Long currentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || authentication.getPrincipal() == null) {
-            throw new IllegalArgumentException("login required");
-        }
-        Object principal = authentication.getPrincipal();
-        try {
-            Method getUser = principal.getClass().getMethod("getUser");
-            Object user = getUser.invoke(principal);
-            Method getId = user.getClass().getMethod("getId");
-            Object id = getId.invoke(user);
-            if (id instanceof Long userId) {
-                return userId;
-            }
-            if (id instanceof Number number) {
-                return number.longValue();
-            }
-        } catch (ReflectiveOperationException ex) {
-            throw new IllegalArgumentException("login user id is unavailable", ex);
-        }
-        throw new IllegalArgumentException("login user id is unavailable");
-    }
 }

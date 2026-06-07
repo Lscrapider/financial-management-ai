@@ -17,6 +17,7 @@ const routes: RouteRecordRaw[] = [
         path: '/ai-center/knowledge-processing',
         component: () => import('#/views/ai-center/index.vue'),
         meta: {
+          authority: ['admin'],
           icon: 'lucide:file-scan',
           title: $t('page.aiCenter.knowledgeProcessing'),
         },
@@ -27,6 +28,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('#/views/ai-center/ocr-review/index.vue'),
         meta: {
           activePath: '/ai-center/knowledge-processing',
+          authority: ['admin'],
           hideInMenu: true,
           icon: 'lucide:file-check-2',
           title: $t('page.aiCenter.ocrReview'),
@@ -37,6 +39,7 @@ const routes: RouteRecordRaw[] = [
         path: '/ai-center/manual-knowledge',
         component: () => import('#/views/ai-center/manual-knowledge/index.vue'),
         meta: {
+          authority: ['admin'],
           icon: 'lucide:file-plus-2',
           title: $t('page.aiCenter.manualKnowledge'),
         },

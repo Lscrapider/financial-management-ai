@@ -12,6 +12,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
@@ -80,6 +81,12 @@ public interface SceneAnalysisReportMapper extends BaseMapper<SceneAnalysisRepor
                         ORDER BY COALESCE(r.generated_at, r.created_at) DESC, r.id DESC
                     ) AS row_num
                 FROM scene_analysis_report r
+                JOIN scene_analysis_task t ON t.id = r.task_id
+                <where>
+                  <if test="ownerUserId != null">
+                    t.user_id = #{ownerUserId}
+                  </if>
+                </where>
             )
             SELECT COUNT(*)
             FROM ranked
@@ -98,7 +105,8 @@ public interface SceneAnalysisReportMapper extends BaseMapper<SceneAnalysisRepor
     Long countTargets(
             @Param("targetName") String targetName,
             @Param("targetCode") String targetCode,
-            @Param("targetType") String targetType);
+            @Param("targetType") String targetType,
+            @Param("ownerUserId") Long ownerUserId);
 
     @Select("""
             <script>
@@ -111,6 +119,12 @@ public interface SceneAnalysisReportMapper extends BaseMapper<SceneAnalysisRepor
                         ORDER BY COALESCE(r.generated_at, r.created_at) DESC, r.id DESC
                     ) AS row_num
                 FROM scene_analysis_report r
+                JOIN scene_analysis_task t ON t.id = r.task_id
+                <where>
+                  <if test="ownerUserId != null">
+                    t.user_id = #{ownerUserId}
+                  </if>
+                </where>
             )
             SELECT *
             FROM (
@@ -167,28 +181,35 @@ public interface SceneAnalysisReportMapper extends BaseMapper<SceneAnalysisRepor
             @Param("targetName") String targetName,
             @Param("targetCode") String targetCode,
             @Param("targetType") String targetType,
+            @Param("ownerUserId") Long ownerUserId,
             @Param("limit") int limit,
             @Param("offset") long offset);
 
     @Select("""
+            <script>
             SELECT
-                id AS report_id,
-                task_no,
-                target_type,
-                target_code,
-                target_name,
-                report_type,
-                generation_type,
-                version_no,
-                status,
-                model,
-                error_message,
-                generated_at,
-                created_at
-            FROM scene_analysis_report
-            WHERE target_type = #{targetType}
-              AND target_code = #{targetCode}
-            ORDER BY COALESCE(generated_at, created_at) DESC, id DESC
+                r.id AS report_id,
+                r.task_no,
+                r.target_type,
+                r.target_code,
+                r.target_name,
+                r.report_type,
+                r.generation_type,
+                r.version_no,
+                r.status,
+                r.model,
+                r.error_message,
+                r.generated_at,
+                r.created_at
+            FROM scene_analysis_report r
+            JOIN scene_analysis_task t ON t.id = r.task_id
+            WHERE r.target_type = #{targetType}
+              AND r.target_code = #{targetCode}
+            <if test="ownerUserId != null">
+              AND t.user_id = #{ownerUserId}
+            </if>
+            ORDER BY COALESCE(r.generated_at, r.created_at) DESC, r.id DESC
+            </script>
             """)
     @Results(id = "sceneAnalysisReportHistoryMap", value = {
             @Result(column = "report_id", property = "reportId"),
@@ -207,7 +228,24 @@ public interface SceneAnalysisReportMapper extends BaseMapper<SceneAnalysisRepor
     })
     List<SceneAnalysisReportHistoryDTO> listHistory(
             @Param("targetType") String targetType,
-            @Param("targetCode") String targetCode);
+            @Param("targetCode") String targetCode,
+            @Param("ownerUserId") Long ownerUserId);
+
+    @Select("""
+            <script>
+            SELECT r.*
+            FROM scene_analysis_report r
+            JOIN scene_analysis_task t ON t.id = r.task_id
+            WHERE r.id = #{reportId}
+            <if test="ownerUserId != null">
+              AND t.user_id = #{ownerUserId}
+            </if>
+            </script>
+            """)
+    @ResultMap("sceneAnalysisReportMap")
+    SceneAnalysisReportPO findByIdForOwner(
+            @Param("reportId") Long reportId,
+            @Param("ownerUserId") Long ownerUserId);
 
     @Update("""
             UPDATE scene_analysis_report

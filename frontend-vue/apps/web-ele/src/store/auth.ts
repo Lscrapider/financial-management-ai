@@ -84,14 +84,6 @@ export const useAuthStore = defineStore('auth', () => {
     const { remote = true } = options;
     const accessToken = accessStore.accessToken;
 
-    if (remote) {
-      try {
-        await logoutApi(accessToken);
-      } catch {
-        // 不做任何处理
-      }
-    }
-
     resetAllStores();
     accessStore.setLoginExpired(false);
 
@@ -104,6 +96,12 @@ export const useAuthStore = defineStore('auth', () => {
           }
         : {},
     });
+
+    if (remote) {
+      void logoutApi(accessToken).catch(() => {
+        // 不做任何处理
+      });
+    }
   }
 
   async function fetchUserInfo() {

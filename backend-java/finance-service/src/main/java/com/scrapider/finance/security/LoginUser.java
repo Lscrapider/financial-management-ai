@@ -1,5 +1,6 @@
 package com.scrapider.finance.security;
 
+import com.scrapider.finance.domain.constant.AuthConstant;
 import com.scrapider.finance.domain.po.AppUserPO;
 import java.util.Collection;
 import java.util.List;
@@ -33,10 +34,11 @@ public class LoginUser implements UserDetails {
     }
 
     private String resolveRoleCode() {
-        if ("admin".equals(this.user.getUsername())) {
-            return "admin";
+        String roleCode = AuthConstant.normalizeRoleCode(this.user.getRoleCode());
+        if (!AuthConstant.isSupportedRoleCode(roleCode)) {
+            throw new IllegalArgumentException("Unsupported roleCode: " + this.user.getRoleCode());
         }
-        return this.user.getRoleCode();
+        return roleCode;
     }
 
     @Override
