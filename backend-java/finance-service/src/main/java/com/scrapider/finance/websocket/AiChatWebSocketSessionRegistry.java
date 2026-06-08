@@ -49,6 +49,21 @@ public class AiChatWebSocketSessionRegistry {
         }
     }
 
+    public void sendToConversation(Long userId, String conversationId, String payload) throws IOException {
+        for (SessionInfo sessionInfo : this.sessions.values()) {
+            WebSocketSession session = sessionInfo.session();
+            String boundConversationId = (String) session.getAttributes()
+                    .get(AiChatWebSocketHandshakeInterceptor.CONVERSATION_ID_ATTRIBUTE);
+            if (sessionInfo.loginUser().getUser().getId().equals(userId)
+                    && conversationId.equals(boundConversationId)
+                    && session.isOpen()) {
+                synchronized (session) {
+                    session.sendMessage(new TextMessage(payload));
+                }
+            }
+        }
+    }
+
     private record SessionInfo(WebSocketSession session, LoginUser loginUser) {
     }
 }

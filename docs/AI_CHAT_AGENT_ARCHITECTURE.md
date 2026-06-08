@@ -113,6 +113,175 @@ KnowledgeSearchTool
 
 第一阶段先使用 LangChain Tool Calling Agent；如果后续需要复杂状态机、循环规划、人工确认或长耗时研究任务，再升级为 LangGraph。
 
+### Tool Calling 执行语义
+
+当前第一版 Agent Executor 是一次性 Tool Calling 流程，不是循环式多工具 Agent。
+
+```text
+1. Python 将当前问题、短期记忆和工具定义发送给 LLM
+2. LLM 只负责判断是否需要工具，并返回结构化 tool_calls
+3. Python 读取 tool_calls，由代码执行对应 LangChain Tool
+4. LangChain Tool 通过 Java 内部数据网关查询业务数据
+5. Python 将工具结果包装为 ToolMessage，再次发送给 LLM
+6. LLM 基于工具结果生成最终答案
+7. Python callback Java，Java 通过 WebSocket 推送前端
+```
+
+模型不会直接调用 Java 接口，也不会直接访问数据库。Tool Calling 的本质是：
+
+```text
+模型提出工具调用请求
+Python 执行工具
+Java 执行业务数据查询
+Python 把结果交回模型
+模型生成最终答案
+```
+
+这条链路可以理解为两层调用：
+
+```text
+第一层：LLM Tool Calling
+  - 由模型决定是否调用 market_quote、market_kline、knowledge_search 等工具
+  - 用自然语言上下文生成结构化工具参数
+
+第二层：Java Data Gateway Calling
+  - 由 Python Tool 使用 HMAC 签名调用 Java 内部数据网关
+  - Java 负责 scope、userId、limit、参数和权限校验
+  - Java 只暴露 action 白名单，不暴露 SQL，不允许 Python 直接查库
+```
+
+第一版对工具结果统一走二次模型生成答案，适合行情分析、买卖风险说明、对比解读等需要综合表达的场景。后续可以增加 `ToolResultPolicy`：
+
+```text
+direct_return:
+  天气、汇率、单字段状态、最新价格等简单查询，由代码格式化后直接返回。
+
+model_analyze:
+  行情分析、K 线、财务指标、知识库召回、投资风险说明等复杂结果，再交给模型生成答案。
+```
+
+无论采用哪种结果策略，Java 数据网关仍然是业务数据访问边界，Python 和 LLM 都不直接接触数据库。
+
+## 对话短期记忆与清理
+
+短期记忆以 `conversationId + userId` 为边界，不绑定 WebSocket Session，也不绑定 Agent Session。
+
+```text
+conversationId = 对话上下文身份
+userId = 对话归属和权限校验
+WebSocket Session = 当前传输连接
+Agent Session = Python 调 Java 内部接口的临时签名凭证
+```
+
+前端在建立 WebSocket 时通过 query 参数传入 `conversationId`：
+
+```text
+/ws/ai-chat?conversationId=conv-xxx&accessToken=...
+```
+
+Java 在 WebSocket 握手阶段完成：
+
+```text
+1. 从 accessToken 解析 userId
+2. 从 query 参数读取 conversationId
+3. 如果 conversation 不存在，创建并绑定当前 userId
+4. 如果 conversation 已存在，校验 conversation.userId == 当前 userId
+5. activeCount + 1
+6. cleanupVersion + 1
+7. 把 userId、conversationId 写入 WebSocketSession attributes
+```
+
+同一个 WebSocket 后续发送多条消息时不再重复增加 `activeCount`。Java 收到用户消息后：
+
+```text
+1. 校验消息体中的 conversationId 与握手绑定的 conversationId 一致
+2. 保存 user message 到 ai_chat_message
+3. 创建 Agent Session
+4. 发 RabbitMQ agent.run.start 给 Python
+```
+
+Python 每次 Agent Run 固定通过 Java 内部数据网关读取最近短期记忆：
+
+```text
+action = conversation.history
+params = {
+  "conversationId": "conv-xxx"
+}
+limit = 10
+```
+
+Java 使用 Agent Session 中的 `userId + conversationId` 查询 `ai_chat_message`，不允许 Python 自行指定任意用户。Python 将短期记忆、当前问题和工具结果交给 LLM 生成答案。
+
+Java 收到 Python `final_answer` callback 后：
+
+```text
+1. 验签
+2. 保存 assistant message 到 ai_chat_message
+3. 通过 WebSocket 推送给前端
+```
+
+WebSocket 关闭后不立即删除短期记忆。Java 使用 `activeCount + cleanupVersion` 防止误删：
+
+```text
+WS close:
+  activeCount - 1
+  if activeCount == 0:
+      发送 30 分钟延迟 conversation.cleanup 消息，携带当前 cleanupVersion
+
+用户重新连接:
+  activeCount + 1
+  cleanupVersion + 1
+
+cleanup 消费:
+  if message.cleanupVersion != conversation.cleanupVersion:
+      跳过
+  else:
+      根据 ai_chat_message 生成 conversation_summary 长期记忆
+      保存 ai_user_memory
+      删除 ai_chat_message 短期消息
+      conversation.status = cleaned
+```
+
+第一版 cleanup 摘要使用 Java 确定性文本压缩，保证清理链路不依赖 LLM 可用性。后续接入长期记忆增强时，可以把摘要生成替换为 Python `agent.memory.summarize`：Java cleanup 发布总结任务，Python 读取短期消息生成高质量摘要，Java 保存 `ai_user_memory` 后再删除短期消息。
+
+建议表：
+
+```text
+ai_chat_conversation
+- id
+- user_id
+- conversation_id
+- title
+- status
+- cleanup_version
+- created_at
+- updated_at
+- cleaned_at
+
+ai_chat_message
+- id
+- user_id
+- conversation_id
+- message_id
+- role
+- content
+- metadata_json
+- created_at
+
+ai_user_memory
+- id
+- user_id
+- memory_type
+- title
+- content
+- metadata_json
+- source_conversation_id
+- confidence
+- created_at
+- updated_at
+- deleted
+```
+
 ## Agent Session
 
 当前端 WebSocket 消息进入 Java 后，Java 创建一次 Agent Session。
@@ -132,7 +301,8 @@ KnowledgeSearchTool
     "market.intraday",
     "knowledge.search",
     "report.latest",
-    "watch_pool.context"
+    "watch_pool.context",
+    "conversation.history"
   ],
   "expiresAt": "2026-06-08T10:30:00+08:00"
 }
@@ -172,7 +342,8 @@ Java 发布 Agent 启动消息到 RabbitMQ。
     "market.quote",
     "market.kline",
     "knowledge.search",
-    "report.latest"
+    "report.latest",
+    "conversation.history"
   ],
   "expiresAt": "2026-06-08T10:30:00+08:00",
   "dataGatewayUrl": "http://finance-service:8081/internal/agent/data/query",
@@ -233,6 +404,7 @@ knowledge.search
 report.latest
 watch_pool.context
 scene_analysis.status
+conversation.history
 ```
 
 Java 数据网关负责：

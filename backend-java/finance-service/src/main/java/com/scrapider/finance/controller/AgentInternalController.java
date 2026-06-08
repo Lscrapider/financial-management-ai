@@ -7,7 +7,9 @@ import com.scrapider.finance.domain.param.AgentCallbackParam;
 import com.scrapider.finance.domain.param.AgentDataQueryParam;
 import com.scrapider.finance.domain.vo.AgentDataGatewayResponseVO;
 import com.scrapider.finance.domain.vo.AiChatWebSocketMessageVO;
+import com.scrapider.finance.service.AgentDataGatewayService;
 import com.scrapider.finance.service.AgentSignatureService;
+import com.scrapider.finance.service.AiChatConversationService;
 import com.scrapider.finance.websocket.AiChatWebSocketSessionRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.OffsetDateTime;
@@ -22,14 +24,20 @@ import org.springframework.web.bind.annotation.RestController;
 public class AgentInternalController {
 
     private final AgentSignatureService agentSignatureService;
+    private final AgentDataGatewayService agentDataGatewayService;
+    private final AiChatConversationService aiChatConversationService;
     private final AiChatWebSocketSessionRegistry sessionRegistry;
     private final ObjectMapper objectMapper;
 
     public AgentInternalController(
             AgentSignatureService agentSignatureService,
+            AgentDataGatewayService agentDataGatewayService,
+            AiChatConversationService aiChatConversationService,
             AiChatWebSocketSessionRegistry sessionRegistry,
             ObjectMapper objectMapper) {
         this.agentSignatureService = agentSignatureService;
+        this.agentDataGatewayService = agentDataGatewayService;
+        this.aiChatConversationService = aiChatConversationService;
         this.sessionRegistry = sessionRegistry;
         this.objectMapper = objectMapper;
     }
@@ -40,12 +48,21 @@ public class AgentInternalController {
         AgentCallbackParam param = this.objectMapper.readValue(rawBody, AgentCallbackParam.class);
         this.requireSameSession(session, param);
         if ("final_answer".equals(param.eventType())) {
+            String answerContent = this.answerContent(param.payload());
+            this.aiChatConversationService.saveAssistantMessage(
+                    session.userId(),
+                    session.conversationId(),
+                    session.messageId(),
+                    answerContent);
             AiChatWebSocketMessageVO message = AiChatWebSocketMessageVO.finalAnswer(
                     session.conversationId(),
                     session.messageId(),
-                    this.answerContent(param.payload()),
+                    answerContent,
                     OffsetDateTime.now().toString());
-            this.sessionRegistry.sendToUser(session.userId(), this.objectMapper.writeValueAsString(message));
+            this.sessionRegistry.sendToConversation(
+                    session.userId(),
+                    session.conversationId(),
+                    this.objectMapper.writeValueAsString(message));
         }
         return ResponseEntity.ok().build();
     }
@@ -56,18 +73,19 @@ public class AgentInternalController {
             @RequestBody String rawBody) throws Exception {
         AgentSessionDTO session = this.agentSignatureService.verify(request, rawBody);
         AgentDataQueryParam param = this.objectMapper.readValue(rawBody, AgentDataQueryParam.class);
-        if (param.action() == null || !session.scopes().contains(param.action())) {
+        String action = param == null ? null : param.action();
+        if (action == null || !session.scopes().contains(action)) {
             return ResponseEntity.status(403)
                     .body(new AgentDataGatewayResponseVO(
-                            param.action(),
+                            action,
                             false,
                             java.util.List.of(),
                             java.util.Map.of(),
                             new AgentDataGatewayResponseVO.Error(
                                     "ACTION_FORBIDDEN",
-                                    "当前 Agent Session 不允许调用 " + param.action())));
+                                    "当前 Agent Session 不允许调用 " + action)));
         }
-        return ResponseEntity.ok(AgentDataGatewayResponseVO.empty(param.action()));
+        return ResponseEntity.ok(this.agentDataGatewayService.query(session, param));
     }
 
     private void requireSameSession(AgentSessionDTO session, AgentCallbackParam param) {

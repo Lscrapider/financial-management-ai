@@ -86,7 +86,7 @@ function connectAiChatSocket() {
 
   connectingPromise = new Promise<WebSocket>((resolve, reject) => {
     let opened = false;
-    const ws = new WebSocket(buildAiChatSocketUrl(accessToken));
+    const ws = new WebSocket(buildAiChatSocketUrl(accessToken, conversationId));
     socket = ws;
 
     ws.addEventListener('open', () => {
@@ -141,11 +141,12 @@ function handleAiChatSocketMessage(data: unknown) {
   });
 }
 
-function buildAiChatSocketUrl(token: string) {
+function buildAiChatSocketUrl(token: string, currentConversationId: string) {
   const endpoint = joinUrl(apiURL, '/ws/ai-chat');
   const url = new URL(endpoint, window.location.origin);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
   url.searchParams.set('accessToken', token);
+  url.searchParams.set('conversationId', currentConversationId);
   return url.toString();
 }
 

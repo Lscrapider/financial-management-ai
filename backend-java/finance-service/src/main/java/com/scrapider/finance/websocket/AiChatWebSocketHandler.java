@@ -8,6 +8,7 @@ import com.scrapider.finance.domain.vo.AiChatWebSocketMessageVO;
 import com.scrapider.finance.security.LoginUser;
 import com.scrapider.finance.service.AgentMessagePublisher;
 import com.scrapider.finance.service.AgentSessionService;
+import com.scrapider.finance.service.AiChatConversationService;
 import cn.hutool.core.util.StrUtil;
 import java.io.IOException;
 import java.time.OffsetDateTime;
@@ -28,6 +29,7 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
     private final AiChatWebSocketSessionRegistry sessionRegistry;
     private final AgentSessionService agentSessionService;
     private final AgentMessagePublisher agentMessagePublisher;
+    private final AiChatConversationService aiChatConversationService;
     private final String dataGatewayUrl;
     private final String callbackUrl;
 
@@ -36,6 +38,7 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
             AiChatWebSocketSessionRegistry sessionRegistry,
             AgentSessionService agentSessionService,
             AgentMessagePublisher agentMessagePublisher,
+            AiChatConversationService aiChatConversationService,
             @Value("${finance.agent.data-gateway-url:http://localhost:8081/internal/agent/data/query}")
                     String dataGatewayUrl,
             @Value("${finance.agent.callback-url:http://localhost:8081/internal/agent/callback}")
@@ -44,6 +47,7 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
         this.sessionRegistry = sessionRegistry;
         this.agentSessionService = agentSessionService;
         this.agentMessagePublisher = agentMessagePublisher;
+        this.aiChatConversationService = aiChatConversationService;
         this.dataGatewayUrl = dataGatewayUrl;
         this.callbackUrl = callbackUrl;
     }
@@ -66,10 +70,21 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
             session.close(CloseStatus.BAD_DATA);
             return;
         }
+        String boundConversationId = (String) session.getAttributes()
+                .get(AiChatWebSocketHandshakeInterceptor.CONVERSATION_ID_ATTRIBUTE);
+        if (!param.conversationId().equals(boundConversationId)) {
+            session.close(CloseStatus.BAD_DATA);
+            return;
+        }
 
         LoginUser loginUser = this.sessionRegistry.loginUser(session.getId())
                 .orElseThrow(() -> new IllegalStateException("websocket login user is missing"));
         try {
+            this.aiChatConversationService.saveUserMessage(
+                    loginUser.getUser().getId(),
+                    param.conversationId(),
+                    param.messageId(),
+                    param.content());
             AgentSessionDTO agentSession = this.agentSessionService.create(
                     loginUser.getUser().getId(),
                     loginUser.getUsername(),
@@ -92,6 +107,10 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
+        Long userId = (Long) session.getAttributes().get(AiChatWebSocketHandshakeInterceptor.USER_ID_ATTRIBUTE);
+        String conversationId = (String) session.getAttributes()
+                .get(AiChatWebSocketHandshakeInterceptor.CONVERSATION_ID_ATTRIBUTE);
+        this.aiChatConversationService.release(userId, conversationId);
         this.sessionRegistry.unregister(session.getId());
     }
 

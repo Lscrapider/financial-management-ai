@@ -24,7 +24,8 @@ public class InMemoryAgentSessionServiceImpl implements AgentSessionService {
             "market.intraday",
             "knowledge.search",
             "report.latest",
-            "watch_pool.context");
+            "watch_pool.context",
+            "conversation.history");
 
     private final ConcurrentMap<String, AgentSessionDTO> sessions = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, Set<String>> usedNonces = new ConcurrentHashMap<>();

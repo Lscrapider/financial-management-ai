@@ -218,6 +218,8 @@ financial-management-ai/
 - Agent 的 LLM、Planner、Memory、Tool Calling 和 Answer 逻辑放在 Python 层执行。
 - Java 只负责用户鉴权、WebSocket 推送、RabbitMQ 启动消息、内部数据网关、callback 接收和 HMAC 签名校验。
 - Python Agent 查询业务数据时只调用 Java 暴露的受控数据网关，不直接访问数据库，不传 SQL。
+- AI Chat 对话以 `userId + conversationId` 作为短期记忆边界，Java 保存用户和助手消息，Python 每次 Agent Run 通过 `conversation.history` 固定召回最近上下文。
+- WebSocket 关闭后不立即清理短期消息；Java 在 activeCount 归零时发送 30 分钟延迟 cleanup，版本一致时先保存 `ai_user_memory` 对话摘要，再删除 `ai_chat_message`。
 
 ### 投资报告模块
 
@@ -289,24 +291,34 @@ Java 异步调用 DeepSeek 生成结构化报告
 AI Chat Agent 规划流程：
 
 ```text
-前端通过 WebSocket 发送用户问题
+前端首条消息时携带 conversationId 建立 WebSocket，并发送用户问题
   ↓
-Java 校验用户身份，创建 Agent Session 和临时 sessionSecret
+Java 校验用户身份，绑定 userId + conversationId，保存 user message
+  ↓
+Java 创建 Agent Session 和临时 sessionSecret
   ↓
 Java 通过 RabbitMQ 发布 agent.run.start 消息
   ↓
 Python Worker 消费消息，启动 LangChain Agent
   ↓
-Python LangChain 调用 LLM 执行 Planner / Memory / Tool Calling / Answer
+Python 先通过 conversation.history 召回短期记忆，再调用 LLM 判断是否需要 Tool Calling
+  ↓
+如果模型返回 tool_calls，Python 代码执行对应 Tool
   ↓
 Python Tool 通过 HMAC 签名调用 Java 内部数据网关查询业务数据
   ↓
 Java 校验签名、nonce、过期时间、scope 和用户数据边界后返回受控数据
   ↓
+Python 将工具结果回填给 LLM，由 LLM 生成最终答案
+  ↓
 Python 通过 callback 回传过程事件和最终答案
   ↓
-Java 通过 WebSocket 推送给前端
+Java 保存 assistant message，并通过 WebSocket 推送给前端
+  ↓
+WebSocket 关闭 30 分钟后，版本一致则摘要入 ai_user_memory 并删除短期消息
 ```
+
+AI Chat 当前是一次性 Tool Calling：模型只负责提出工具调用请求，Python 执行工具，Java 数据网关查询业务数据，工具结果再回填给模型生成最终答案。后续可以按工具结果类型扩展为两种策略：简单查询由代码直接格式化返回，复杂行情和知识库结果交给模型分析。
 
 知识库处理流程：
 
@@ -371,6 +383,7 @@ OCR 详细阶段、消息体、产物目录和人工复核规则见 [docs/OCR_PI
 - 项目文档、代码注释、提交说明优先使用中文。
 - Java 服务负责业务稳定性、数据一致性和系统对外接口。
 - Python 服务负责 AI 能力；AI Chat Agent 的 LLM、Planner、Memory、Tool Calling 和 Answer 放在 Python LangChain 层，业务数据访问仍通过 Java 受控数据网关完成。
+- AI Chat 记忆第一版由 Java 负责短期消息持久化和 cleanup 摘要入库；后续需要更高质量长期记忆时，再把摘要生成升级为 Python LangChain/LLM 任务。
 - 前后端接口返回结构保持清晰、可追踪、可扩展。
 - 所有模型输出都需要保留引用依据，避免只有结论没有来源。
 - 原始数据、扫描件、模型文件、日志文件不提交到 Git。
