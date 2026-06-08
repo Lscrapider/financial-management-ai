@@ -218,7 +218,7 @@ financial-management-ai/
 - Agent 的 LLM、Planner、Memory、Tool Calling 和 Answer 逻辑放在 Python 层执行。
 - Java 只负责用户鉴权、WebSocket 推送、RabbitMQ 启动消息、内部数据网关、callback 接收和 HMAC 签名校验。
 - Python Agent 查询业务数据时只调用 Java 暴露的受控数据网关，不直接访问数据库，不传 SQL。
-- AI Chat 对话以 `userId + conversationId` 作为短期记忆边界，Java 保存用户和助手消息，Python 每次 Agent Run 通过 `conversation.history` 固定召回最近上下文。
+- AI Chat 对话以 `userId + conversationId` 作为短期记忆边界，`conversationId` 由 Java 在 WebSocket 握手时生成或复用，Python 每次 Agent Run 通过 `conversation.history` 固定召回最近 20 条上下文。
 - WebSocket 关闭后不立即清理短期消息；Java 在 activeCount 归零时发送 30 分钟延迟 cleanup，版本一致时先保存 `ai_user_memory` 对话摘要，再删除 `ai_chat_message`。
 
 ### 投资报告模块
@@ -291,9 +291,9 @@ Java 异步调用 DeepSeek 生成结构化报告
 AI Chat Agent 规划流程：
 
 ```text
-前端首条消息时携带 conversationId 建立 WebSocket，并发送用户问题
+前端首条消息时建立 WebSocket，并发送用户问题
   ↓
-Java 校验用户身份，绑定 userId + conversationId，保存 user message
+Java 校验用户身份，自动生成或复用 userId 的 active conversation，保存 user message
   ↓
 Java 创建 Agent Session 和临时 sessionSecret
   ↓

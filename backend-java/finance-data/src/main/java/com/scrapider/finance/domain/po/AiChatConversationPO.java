@@ -2,6 +2,7 @@ package com.scrapider.finance.domain.po;
 
 import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.LocalDateTime;
+import java.util.UUID;
 import lombok.Data;
 
 @Data
@@ -20,6 +21,10 @@ public class AiChatConversationPO {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime cleanedAt;
+
+    public static AiChatConversationPO create(Long userId) {
+        return create(userId, "conv-" + UUID.randomUUID());
+    }
 
     public static AiChatConversationPO create(Long userId, String conversationId) {
         LocalDateTime now = LocalDateTime.now();

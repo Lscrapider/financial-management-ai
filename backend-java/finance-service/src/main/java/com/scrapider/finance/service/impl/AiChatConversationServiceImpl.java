@@ -53,13 +53,31 @@ public class AiChatConversationServiceImpl implements AiChatConversationService 
     }
 
     @Override
+    public AiChatConversationBindingDTO bind(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("conversation userId is required");
+        }
+        AiChatConversationPO conversation = this.conversationManage.findLatestActiveByUserId(userId);
+        if (conversation == null) {
+            conversation = AiChatConversationPO.create(userId);
+            this.conversationManage.save(conversation);
+        }
+        return this.bindActiveConversation(userId, conversation);
+    }
+
+    @Override
     public AiChatConversationBindingDTO bind(Long userId, String conversationId) {
         if (userId == null || StrUtil.isBlank(conversationId)) {
             throw new IllegalArgumentException("conversation userId and conversationId are required");
         }
         AiChatConversationPO conversation = this.ensureConversation(userId, conversationId);
+        return this.bindActiveConversation(userId, conversation);
+    }
+
+    private AiChatConversationBindingDTO bindActiveConversation(Long userId, AiChatConversationPO conversation) {
         long cleanupVersion = (conversation.getCleanupVersion() == null ? 0L : conversation.getCleanupVersion()) + 1;
         this.conversationManage.markActive(conversation.getId(), cleanupVersion);
+        String conversationId = conversation.getConversationId();
         this.activeCounts.computeIfAbsent(this.key(userId, conversationId), key -> new AtomicInteger())
                 .incrementAndGet();
         return new AiChatConversationBindingDTO(userId, conversationId, cleanupVersion);

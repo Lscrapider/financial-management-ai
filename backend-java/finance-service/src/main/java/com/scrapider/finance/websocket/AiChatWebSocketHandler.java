@@ -66,13 +66,13 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
             session.close(CloseStatus.BAD_DATA);
             return;
         }
-        if (StrUtil.hasBlank(param.conversationId(), param.messageId(), param.content())) {
+        if (StrUtil.hasBlank(param.messageId(), param.content())) {
             session.close(CloseStatus.BAD_DATA);
             return;
         }
         String boundConversationId = (String) session.getAttributes()
                 .get(AiChatWebSocketHandshakeInterceptor.CONVERSATION_ID_ATTRIBUTE);
-        if (!param.conversationId().equals(boundConversationId)) {
+        if (StrUtil.isBlank(boundConversationId)) {
             session.close(CloseStatus.BAD_DATA);
             return;
         }
@@ -82,13 +82,13 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
         try {
             this.aiChatConversationService.saveUserMessage(
                     loginUser.getUser().getId(),
-                    param.conversationId(),
+                    boundConversationId,
                     param.messageId(),
                     param.content());
             AgentSessionDTO agentSession = this.agentSessionService.create(
                     loginUser.getUser().getId(),
                     loginUser.getUsername(),
-                    param.conversationId(),
+                    boundConversationId,
                     param.messageId());
             this.agentMessagePublisher.publishRunStart(AgentRunStartMessageDTO.from(
                     agentSession,
@@ -97,7 +97,7 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
                     this.callbackUrl));
         } catch (Exception ex) {
             this.send(session, AiChatWebSocketMessageVO.finalAnswer(
-                    param.conversationId(),
+                    boundConversationId,
                     param.messageId(),
                     "Agent 启动失败，请稍后再试。",
                     OffsetDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)));

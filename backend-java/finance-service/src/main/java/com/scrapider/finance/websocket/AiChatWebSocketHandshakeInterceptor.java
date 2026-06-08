@@ -51,25 +51,15 @@ public class AiChatWebSocketHandshakeInterceptor implements HandshakeInterceptor
                 .build()
                 .getQueryParams()
                 .getFirst("accessToken");
-        String conversationId = UriComponentsBuilder.fromUri(request.getURI())
-                .build()
-                .getQueryParams()
-                .getFirst("conversationId");
         if (token == null || token.isBlank() || this.tokenStore.isBlacklisted(token)) {
             response.setStatusCode(HttpStatus.UNAUTHORIZED);
-            return false;
-        }
-        if (conversationId == null || conversationId.isBlank()) {
-            response.setStatusCode(HttpStatus.BAD_REQUEST);
             return false;
         }
 
         try {
             Claims claims = this.jwtUtils.parseAccessToken(token);
             LoginUser loginUser = this.loginUser(claims);
-            AiChatConversationBindingDTO binding = this.aiChatConversationService.bind(
-                    loginUser.getUser().getId(),
-                    conversationId);
+            AiChatConversationBindingDTO binding = this.aiChatConversationService.bind(loginUser.getUser().getId());
             attributes.put(LOGIN_USER_ATTRIBUTE, loginUser);
             attributes.put(USER_ID_ATTRIBUTE, binding.userId());
             attributes.put(CONVERSATION_ID_ATTRIBUTE, binding.conversationId());

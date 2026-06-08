@@ -22,6 +22,15 @@ public class AiChatConversationManage extends ServiceImpl<AiChatConversationMapp
                 .one();
     }
 
+    public AiChatConversationPO findLatestActiveByUserId(Long userId) {
+        return this.lambdaQuery()
+                .eq(AiChatConversationPO::getUserId, userId)
+                .eq(AiChatConversationPO::getStatus, AiChatConversationPO.STATUS_ACTIVE)
+                .orderByDesc(AiChatConversationPO::getUpdatedAt)
+                .last("LIMIT 1")
+                .one();
+    }
+
     public boolean markActive(Long id, Long cleanupVersion) {
         return this.lambdaUpdate()
                 .eq(AiChatConversationPO::getId, id)

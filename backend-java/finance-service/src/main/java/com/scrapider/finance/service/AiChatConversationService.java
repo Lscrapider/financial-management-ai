@@ -7,6 +7,8 @@ import java.util.Map;
 
 public interface AiChatConversationService {
 
+    AiChatConversationBindingDTO bind(Long userId);
+
     AiChatConversationBindingDTO bind(Long userId, String conversationId);
 
     void release(Long userId, String conversationId);

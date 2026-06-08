@@ -29,7 +29,6 @@ interface PendingMessage {
 
 const { apiURL } = useAppConfig(import.meta.env, import.meta.env.PROD);
 
-const conversationId = createId('conv');
 let messageSequence = 0;
 let socket: null | WebSocket = null;
 let connectingPromise: null | Promise<WebSocket> = null;
@@ -52,7 +51,6 @@ export async function sendAiChatMessage(data: AiChatRequest) {
     ws.send(
       JSON.stringify({
         content: data.message,
-        conversationId,
         messageId,
         type: 'user_message',
       }),
@@ -86,7 +84,7 @@ function connectAiChatSocket() {
 
   connectingPromise = new Promise<WebSocket>((resolve, reject) => {
     let opened = false;
-    const ws = new WebSocket(buildAiChatSocketUrl(accessToken, conversationId));
+    const ws = new WebSocket(buildAiChatSocketUrl(accessToken));
     socket = ws;
 
     ws.addEventListener('open', () => {
@@ -141,12 +139,11 @@ function handleAiChatSocketMessage(data: unknown) {
   });
 }
 
-function buildAiChatSocketUrl(token: string, currentConversationId: string) {
+function buildAiChatSocketUrl(token: string) {
   const endpoint = joinUrl(apiURL, '/ws/ai-chat');
   const url = new URL(endpoint, window.location.origin);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
   url.searchParams.set('accessToken', token);
-  url.searchParams.set('conversationId', currentConversationId);
   return url.toString();
 }
 
@@ -157,11 +154,4 @@ function joinUrl(baseUrl: string, path: string) {
 function createMessageId() {
   messageSequence += 1;
   return `msg-${Date.now()}-${messageSequence}`;
-}
-
-function createId(prefix: string) {
-  if (globalThis.crypto?.randomUUID) {
-    return `${prefix}-${globalThis.crypto.randomUUID()}`;
-  }
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
