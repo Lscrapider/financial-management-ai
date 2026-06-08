@@ -36,6 +36,11 @@ import { LayoutTabbar } from './tabbar';
 
 defineOptions({ name: 'BasicLayout' });
 
+const props = defineProps<{
+  navigationSidebarActive?: string;
+  navigationSidebarMenus?: MenuRecordRaw[];
+}>();
+
 const emit = defineEmits<{ clearPreferencesAndLogout: []; clickLogo: [] }>();
 
 const {
@@ -139,6 +144,14 @@ const {
   handleSideMouseLeave,
   sidebarExtraVisible,
 } = useExtraMenu(mixHeaderMenus);
+
+const displayedSidebarMenus = computed(
+  () => props.navigationSidebarMenus ?? sidebarMenus.value,
+);
+
+const displayedSidebarActive = computed(
+  () => props.navigationSidebarActive ?? sidebarActive.value,
+);
 
 /**
  * 包装菜单，翻译菜单名称
@@ -348,8 +361,8 @@ const headerSlots = computed(() => {
         :accordion="preferences.navigation.accordion"
         :collapse="preferences.sidebar.collapsed"
         :collapse-show-title="preferences.sidebar.collapsedShowTitle"
-        :default-active="sidebarActive"
-        :menus="wrapperMenus(sidebarMenus)"
+        :default-active="displayedSidebarActive"
+        :menus="wrapperMenus(displayedSidebarMenus)"
         :rounded="isMenuRounded"
         :theme="sidebarTheme"
         mode="vertical"
@@ -401,7 +414,12 @@ const headerSlots = computed(() => {
 
     <!-- 主体内容 -->
     <template #content>
-      <LayoutContent />
+      <div class="flex min-h-full flex-col">
+        <slot name="content-prefix"></slot>
+        <div class="min-h-0 flex-1">
+          <LayoutContent />
+        </div>
+      </div>
     </template>
 
     <template v-if="preferences.transition.loading" #content-overlay>

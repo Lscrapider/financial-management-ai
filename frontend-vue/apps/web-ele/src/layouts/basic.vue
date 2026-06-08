@@ -1,8 +1,9 @@
 <script lang="ts" setup>
 import type { NotificationItem } from '@vben/layouts';
+import type { MenuRecordRaw } from '@vben/types';
 
 import { computed, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 
 import { AuthenticationLoginExpiredModal } from '@vben/common-ui';
 import { useWatermark } from '@vben/hooks';
@@ -17,11 +18,20 @@ import { useAccessStore, useUserStore } from '@vben/stores';
 
 import { $t } from '#/locales';
 import { useAuthStore } from '#/store';
-import AiChatDrawer from '#/widgets/ai-chat/ai-chat-drawer.vue';
 import LoginForm from '#/views/_core/authentication/login.vue';
+import AiChatDrawer from '#/widgets/ai-chat/ai-chat-drawer.vue';
+
+import WorkspaceSecondaryNav from './components/workspace-secondary-nav.vue';
+import {
+  findNavigationWorkspace,
+  getNavigationPath,
+  getNavigationSidebarMenus,
+  NAVIGATION_WORKSPACES,
+} from './navigation-workspaces';
 
 const notifications = ref<NotificationItem[]>([]);
 
+const route = useRoute();
 const router = useRouter();
 const userStore = useUserStore();
 const authStore = useAuthStore();
@@ -30,6 +40,36 @@ const { destroyWatermark, updateWatermark } = useWatermark();
 const { isDark } = usePreferences();
 const showDot = computed(() =>
   notifications.value.some((item) => !item.isRead),
+);
+const navigationRoutePath = computed(
+  () => (route.meta.activePath as string | undefined) ?? route.path,
+);
+const navigationActivePath = computed(() =>
+  getNavigationPath(navigationRoutePath.value),
+);
+const accessibleMenuPaths = computed(() =>
+  collectMenuPaths(accessStore.accessMenus),
+);
+const visibleNavigationWorkspaces = computed(() =>
+  NAVIGATION_WORKSPACES.map((workspace) => ({
+    ...workspace,
+    children: workspace.children.filter((item) =>
+      accessibleMenuPaths.value.has(item.path),
+    ),
+  })).filter((workspace) => workspace.children.length > 0),
+);
+const currentNavigationWorkspace = computed(() =>
+  findNavigationWorkspace(
+    navigationRoutePath.value,
+    visibleNavigationWorkspaces.value,
+  ),
+);
+const navigationSidebarMenus = computed(() =>
+  getNavigationSidebarMenus(visibleNavigationWorkspaces.value),
+);
+const navigationSidebarActive = computed(
+  () =>
+    currentNavigationWorkspace.value?.defaultPath ?? navigationActivePath.value,
 );
 
 const menus = computed(() => [
@@ -96,6 +136,20 @@ function navigateTo(
   }
 }
 
+function collectMenuPaths(menus: MenuRecordRaw[]) {
+  const paths = new Set<string>();
+  const walk = (items: MenuRecordRaw[]) => {
+    for (const item of items) {
+      paths.add(item.path);
+      if (item.children?.length) {
+        walk(item.children);
+      }
+    }
+  };
+  walk(menus);
+  return paths;
+}
+
 watch(
   () => ({
     enable: preferences.app.watermark,
@@ -137,7 +191,20 @@ watch(
 </script>
 
 <template>
-  <BasicLayout @clear-preferences-and-logout="handleLogout">
+  <BasicLayout
+    :navigation-sidebar-active="navigationSidebarActive"
+    :navigation-sidebar-menus="navigationSidebarMenus"
+    @clear-preferences-and-logout="handleLogout"
+  >
+    <template #logo-text>
+      <span class="sr-only">{{ preferences.app.name }}</span>
+    </template>
+    <template #header-left-120>
+      <WorkspaceSecondaryNav
+        :active-path="navigationActivePath"
+        :workspace="currentNavigationWorkspace"
+      />
+    </template>
     <template #user-dropdown>
       <UserDropdown
         :avatar

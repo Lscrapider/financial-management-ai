@@ -10,7 +10,22 @@ export const overridesPreferences = defineOverridesPreferences({
   app: {
     name: import.meta.env.VITE_APP_TITLE,
   },
+  breadcrumb: {
+    enable: false,
+  },
+  logo: {
+    fit: 'contain',
+    source: '/astraquant-ai-logo-mark.svg',
+    sourceDark: '/astraquant-ai-logo-mark.svg',
+  },
   navigation: {
     accordion: false,
+  },
+  sidebar: {
+    collapsed: true,
+    width: 136,
+  },
+  tabbar: {
+    enable: false,
   },
 });

@@ -111,6 +111,14 @@ const rightSlots = computed(() => {
   return list.toSorted((a, b) => a.index - b.index);
 });
 
+const utilitySlots = computed(() =>
+  rightSlots.value.filter((item) => item.name !== 'user-dropdown'),
+);
+
+const userDropdownSlot = computed(() =>
+  rightSlots.value.find((item) => item.name === 'user-dropdown'),
+);
+
 const leftSlots = computed(() => {
   const list: Array<SlotItem> = [];
   // 刷新
@@ -178,36 +186,46 @@ function clearPreferencesAndLogout() {
     <slot name="menu"></slot>
   </div>
   <div class="flex h-full min-w-0 shrink-0 items-center">
-    <template v-for="slot in rightSlots" :key="slot.name">
-      <slot :name="slot.name">
-        <template v-if="slot.name === 'global-search'">
-          <GlobalSearch
-            :enable-shortcut-key="globalSearchShortcutKey"
-            :menus="accessStore.accessMenus"
-            class="mr-1 sm:mr-4"
-          />
-        </template>
+    <div class="header-actions-tray">
+      <div
+        v-if="utilitySlots.length > 0"
+        aria-label="顶部快捷工具"
+        class="header-actions-popover"
+        role="group"
+      >
+        <template v-for="slot in utilitySlots" :key="slot.name">
+          <slot :name="slot.name">
+            <template v-if="slot.name === 'global-search'">
+              <GlobalSearch
+                :enable-shortcut-key="globalSearchShortcutKey"
+                :menus="accessStore.accessMenus"
+                class="header-tray-search"
+              />
+            </template>
 
-        <template v-else-if="slot.name === 'preferences'">
-          <PreferencesButton
-            class="mr-1"
-            @clear-preferences-and-logout="clearPreferencesAndLogout"
-          />
+            <template v-else-if="slot.name === 'preferences'">
+              <PreferencesButton
+                class="header-tray-action"
+                @clear-preferences-and-logout="clearPreferencesAndLogout"
+              />
+            </template>
+            <template v-else-if="slot.name === 'theme-toggle'">
+              <ThemeToggle class="header-tray-action" />
+            </template>
+            <template v-else-if="slot.name === 'language-toggle'">
+              <LanguageToggle class="header-tray-action" />
+            </template>
+            <template v-else-if="slot.name === 'fullscreen'">
+              <VbenFullScreen class="header-tray-action" />
+            </template>
+            <template v-else-if="slot.name === 'timezone'">
+              <TimezoneButton class="header-tray-action" />
+            </template>
+          </slot>
         </template>
-        <template v-else-if="slot.name === 'theme-toggle'">
-          <ThemeToggle class="mt-0.5 mr-1" />
-        </template>
-        <template v-else-if="slot.name === 'language-toggle'">
-          <LanguageToggle class="mr-1" />
-        </template>
-        <template v-else-if="slot.name === 'fullscreen'">
-          <VbenFullScreen class="mr-1" />
-        </template>
-        <template v-else-if="slot.name === 'timezone'">
-          <TimezoneButton class="mt-0.5 mr-1" />
-        </template>
-      </slot>
-    </template>
+      </div>
+      <slot v-if="userDropdownSlot" :name="userDropdownSlot.name"></slot>
+    </div>
   </div>
 </template>
 <style lang="scss" scoped>
@@ -221,5 +239,64 @@ function clearPreferencesAndLogout() {
 
 .menu-align-end {
   --menu-align: end;
+}
+
+.header-actions-tray {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.header-actions-popover {
+  position: absolute;
+  top: 50%;
+  right: calc(100% + 6px);
+  display: flex;
+  visibility: hidden;
+  align-items: center;
+  max-width: calc(100vw - 260px);
+  height: 38px;
+  padding: 4px 6px;
+  color: hsl(var(--popover-foreground));
+  pointer-events: none;
+  background: hsl(var(--popover) / 96%);
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  box-shadow:
+    0 10px 28px hsl(var(--background) / 45%),
+    inset 0 1px 0 hsl(var(--foreground) / 6%);
+  opacity: 0;
+  transform: translateY(-50%) translateX(8px) scale(0.98);
+  transform-origin: right center;
+  transition:
+    opacity 140ms ease,
+    visibility 140ms ease,
+    transform 140ms ease;
+}
+
+.header-actions-tray:hover .header-actions-popover,
+.header-actions-tray:focus-within .header-actions-popover {
+  visibility: visible;
+  pointer-events: auto;
+  opacity: 1;
+  transform: translateY(-50%) translateX(0) scale(1);
+}
+
+.header-actions-popover::after {
+  position: absolute;
+  top: 0;
+  right: -8px;
+  width: 8px;
+  height: 100%;
+  content: '';
+}
+
+.header-actions-popover :deep(.header-tray-action) {
+  margin: 0 2px;
+}
+
+.header-actions-popover :deep(.header-tray-search) {
+  margin: 0 6px 0 0;
 }
 </style>
