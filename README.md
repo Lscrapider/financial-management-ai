@@ -21,13 +21,8 @@
 | 文档 | 说明                                                                              |
 | --- |---------------------------------------------------------------------------------|
 | [docs/REPORT_PIPELINE.md](./docs/REPORT_PIPELINE.md) | AI 分析报告全链路实现说明。                                                                 |
-| [docs/img/架构图.png](./docs/img/架构图.png) | 系统架构图。                                                                          |
-| [docs/img/report流程图.png](./docs/img/report流程图.png) | 分析报告流程图。                                                                        |
-| [docs/img/报告示例图.jpg](./docs/img/报告示例图.jpg) | 报告页面效果示例图。                                                                      |
-| [docs/img/投资工作台.jpg](./docs/img/投资工作台.jpg) | 投资工作台演示图。                                                                       |
-| [docs/img/股票行情.jpg](./docs/img/股票行情.jpg) | 股票行情演示图。                                                                        |
-| [docs/img/报告工作台.png](./docs/img/报告工作台.png) | 报告工作台演示图。                                                                       |
 | [docs/OCR_PIPELINE.md](./docs/OCR_PIPELINE.md) | OCR 全链路实现说明，包括 Java/Python 边界、RabbitMQ 队列、阶段消息、MinIO 产物、人工复核、chunk 打标、软删除和向量入库。 |
+| [docs/AI_CHAT_AGENT_ARCHITECTURE.md](./docs/AI_CHAT_AGENT_ARCHITECTURE.md) | AI Chat Agent 化架构方案，说明 WebSocket、RabbitMQ、Python LangChain、Java 数据网关和 HMAC 内部签名逻辑。 |
 | [docs/API_DOCUMENTATION.md](./docs/API_DOCUMENTATION.md) | 后端接口文档，记录主要 API 的请求方式、请求参数和响应结构。                                                |
 | [docs/COMPLETED_REQUIREMENTS.md](./docs/COMPLETED_REQUIREMENTS.md) | 已完成需求记录，用于追踪阶段性功能交付情况。                                                          |
 | [docs/chunk入库打标签文档.md](./docs/chunk入库打标签文档.md) | Chunk 场景标签规则和 LLM 打标方案。                                                         |
@@ -71,6 +66,7 @@
 
 - Python 3.11+
 - RabbitMQ worker（消息队列消费者，全异步处理）
+- LangChain（AI Chat Agent Runtime、Tool Calling、Memory、Answer）
 - Sentence Transformers / Embedding 模型
 - OCR 大模型接口（阿里云 DashScope `qwen-vl-ocr-latest`）
 - LLM 接口（DeepSeek V4 Pro，场景标签生成）
@@ -218,6 +214,10 @@ financial-management-ai/
 - 查询行情上下文（股票/指数行情、分时、日K）。
 - 向量检索召回相关知识库片段。
 - 通过 DeepSeek ChatClient 输出结构化回答。
+- 规划 AI Chat Agent 化：前端通过 WebSocket 连接 Java，Java 创建 Agent Session 并通过 RabbitMQ 触发 Python LangChain Agent。
+- Agent 的 LLM、Planner、Memory、Tool Calling 和 Answer 逻辑放在 Python 层执行。
+- Java 只负责用户鉴权、WebSocket 推送、RabbitMQ 启动消息、内部数据网关、callback 接收和 HMAC 签名校验。
+- Python Agent 查询业务数据时只调用 Java 暴露的受控数据网关，不直接访问数据库，不传 SQL。
 
 ### 投资报告模块
 
@@ -286,6 +286,28 @@ Java 异步调用 DeepSeek 生成结构化报告
 保存 scene_analysis_report，前端轮询展示报告和历史版本
 ```
 
+AI Chat Agent 规划流程：
+
+```text
+前端通过 WebSocket 发送用户问题
+  ↓
+Java 校验用户身份，创建 Agent Session 和临时 sessionSecret
+  ↓
+Java 通过 RabbitMQ 发布 agent.run.start 消息
+  ↓
+Python Worker 消费消息，启动 LangChain Agent
+  ↓
+Python LangChain 调用 LLM 执行 Planner / Memory / Tool Calling / Answer
+  ↓
+Python Tool 通过 HMAC 签名调用 Java 内部数据网关查询业务数据
+  ↓
+Java 校验签名、nonce、过期时间、scope 和用户数据边界后返回受控数据
+  ↓
+Python 通过 callback 回传过程事件和最终答案
+  ↓
+Java 通过 WebSocket 推送给前端
+```
+
 知识库处理流程：
 
 ```text
@@ -348,7 +370,7 @@ OCR 详细阶段、消息体、产物目录和人工复核规则见 [docs/OCR_PI
 
 - 项目文档、代码注释、提交说明优先使用中文。
 - Java 服务负责业务稳定性、数据一致性和系统对外接口。
-- Python 服务负责 AI 能力，不直接承担复杂业务编排。
+- Python 服务负责 AI 能力；AI Chat Agent 的 LLM、Planner、Memory、Tool Calling 和 Answer 放在 Python LangChain 层，业务数据访问仍通过 Java 受控数据网关完成。
 - 前后端接口返回结构保持清晰、可追踪、可扩展。
 - 所有模型输出都需要保留引用依据，避免只有结论没有来源。
 - 原始数据、扫描件、模型文件、日志文件不提交到 Git。
