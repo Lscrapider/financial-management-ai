@@ -1,5 +1,6 @@
 from app.core.config import settings
 from app.core.logging import configure_logging
+from app.agent.bootstrap import register_agent_handlers
 from app.messaging.rabbit_worker import RabbitMqWorker
 from app.messaging.registry import HandlerRegistry
 from app.ocr.bootstrap import register_ocr_handlers
@@ -16,7 +17,8 @@ def build_worker() -> RabbitMqWorker:
     )
     ocr_routes, _ocr_repository = register_ocr_handlers(settings, registry, embedding_engine)
     scene_analysis_routes = register_scene_analysis_handlers(settings, registry, embedding_engine)
-    routes = [*ocr_routes, *scene_analysis_routes]
+    agent_routes = register_agent_handlers(registry)
+    routes = [*ocr_routes, *scene_analysis_routes, *agent_routes]
     return RabbitMqWorker(settings.rabbitmq, routes, registry)
 
 

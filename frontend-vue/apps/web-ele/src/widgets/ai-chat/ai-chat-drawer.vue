@@ -14,7 +14,7 @@ import {
 
 import { ElButton, ElEmpty, ElInput, ElScrollbar, ElTag } from 'element-plus';
 
-import { sendAiChatMessage } from '#/api/ai-chat';
+import { closeAiChatConnection, sendAiChatMessage } from '#/api/ai-chat';
 
 interface ChatMessage {
   content: string;
@@ -82,10 +82,18 @@ const panelStyle = computed(() => {
 let messageId = 0;
 
 function toggleChat() {
-  open.value = !open.value;
   if (open.value) {
-    scrollToBottom();
+    closeChat();
+    return;
   }
+
+  open.value = true;
+  scrollToBottom();
+}
+
+function closeChat() {
+  open.value = false;
+  closeAiChatConnection();
 }
 
 function clearMessages() {
@@ -283,6 +291,7 @@ function clamp(value: number, min: number, max: number) {
 }
 
 onBeforeUnmount(() => {
+  closeAiChatConnection();
   window.removeEventListener('pointermove', moveTrigger);
   window.removeEventListener('pointerup', stopDrag);
 });
@@ -321,7 +330,7 @@ onBeforeUnmount(() => {
             size="small"
             @click="toggleFullscreen"
           />
-          <ElButton circle plain size="small" @click="open = false">
+          <ElButton circle plain size="small" @click="closeChat">
             ×
           </ElButton>
         </div>

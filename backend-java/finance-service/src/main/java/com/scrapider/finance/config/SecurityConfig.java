@@ -41,6 +41,7 @@ public class SecurityConfig {
                                 "/api/auth/refresh",
                                 "/api/auth/logout")
                         .permitAll()
+                        .requestMatchers("/api/ws/**").permitAll()
                         .requestMatchers("/api/ai/ocr/reviews/*/pages/*/image").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/ai/scene-analysis/tasks/*/callback").permitAll()
                         .requestMatchers(
