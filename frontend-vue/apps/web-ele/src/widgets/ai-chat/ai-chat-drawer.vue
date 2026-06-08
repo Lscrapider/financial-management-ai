@@ -4,13 +4,6 @@ import type { AiChatResponse } from '#/api/ai-chat';
 import { computed, nextTick, onBeforeUnmount, reactive, ref } from 'vue';
 
 import {
-  ElButton,
-  ElEmpty,
-  ElInput,
-  ElScrollbar,
-  ElTag,
-} from 'element-plus';
-import {
   CornerDownLeft,
   Eraser,
   Expand,
@@ -18,6 +11,8 @@ import {
   Shrink,
   UserRoundPen,
 } from '@vben/icons';
+
+import { ElButton, ElEmpty, ElInput, ElScrollbar, ElTag } from 'element-plus';
 
 import { sendAiChatMessage } from '#/api/ai-chat';
 
@@ -65,7 +60,9 @@ const panelStyle = computed(() => {
 
   const panelWidth = Math.min(420, window.innerWidth - 32);
   const panelHeight = Math.min(560, window.innerHeight - 32);
-  const preferRight = triggerPosition.left + triggerSize + 16 + panelWidth <= window.innerWidth - 16;
+  const preferRight =
+    triggerPosition.left + triggerSize + 16 + panelWidth <=
+    window.innerWidth - 16;
   const left = preferRight
     ? triggerPosition.left + triggerSize + 16
     : Math.max(16, triggerPosition.left - panelWidth - 16);
@@ -115,7 +112,9 @@ async function submitMessage() {
     const response = await sendAiChatMessage({ message: content });
     messages.value.push(createAssistantMessage(response));
   } catch {
-    messages.value.push(createMessage('assistant', 'AI 服务暂时不可用，请稍后再试。'));
+    messages.value.push(
+      createMessage('assistant', 'AI 服务暂时不可用，请稍后再试。'),
+    );
   } finally {
     loading.value = false;
     scrollToBottom();
@@ -133,7 +132,10 @@ function handleInputKeydown(event: Event | KeyboardEvent) {
   submitMessage();
 }
 
-function createMessage(role: ChatMessage['role'], content: string): ChatMessage {
+function createMessage(
+  role: ChatMessage['role'],
+  content: string,
+): ChatMessage {
   messageId += 1;
   return {
     content,
@@ -147,7 +149,9 @@ function createAssistantMessage(response: AiChatResponse): ChatMessage {
   messageId += 1;
   return {
     content: response.answer || '没有返回内容。',
-    createdAt: formatTime(response.answeredAt ? new Date(response.answeredAt) : new Date()),
+    createdAt: formatTime(
+      response.answeredAt ? new Date(response.answeredAt) : new Date(),
+    ),
     id: messageId,
     model: response.model,
     role: 'assistant',
@@ -187,8 +191,16 @@ function moveTrigger(event: PointerEvent) {
   const deltaY = Math.abs(event.clientY - dragState.startY);
   dragState.moved = dragState.moved || deltaX > 4 || deltaY > 4;
 
-  triggerPosition.left = clamp(event.clientX - dragState.offsetX, 12, window.innerWidth - triggerSize - 12);
-  triggerPosition.top = clamp(event.clientY - dragState.offsetY, 12, window.innerHeight - triggerSize - 12);
+  triggerPosition.left = clamp(
+    event.clientX - dragState.offsetX,
+    12,
+    window.innerWidth - triggerSize - 12,
+  );
+  triggerPosition.top = clamp(
+    event.clientY - dragState.offsetY,
+    12,
+    window.innerHeight - triggerSize - 12,
+  );
 }
 
 function stopDrag() {
@@ -221,7 +233,9 @@ function renderMessage(content: string) {
         html.push('<ul>');
         listOpen = true;
       }
-      html.push(`<li>${formatInline((bullet?.[1] ?? ordered?.[1]) || '')}</li>`);
+      html.push(
+        `<li>${formatInline((bullet?.[1] ?? ordered?.[1]) || '')}</li>`,
+      );
       return;
     }
 
@@ -318,7 +332,8 @@ onBeforeUnmount(() => {
           <div
             v-for="message in messages"
             :key="message.id"
-            :class="['message-row', message.role]"
+            class="message-row"
+            :class="[message.role]"
           >
             <div class="message-avatar">
               <UserRoundPen v-if="message.role === 'user'" :size="16" />
@@ -390,20 +405,20 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .ai-chat-trigger {
+  position: fixed;
+  z-index: 3000;
+  display: flex;
   align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  color: #fff;
+  touch-action: none;
+  cursor: pointer;
   background: var(--el-color-primary);
   border: 0;
   border-radius: 50%;
   box-shadow: 0 10px 24px rgb(0 0 0 / 18%);
-  color: #fff;
-  cursor: pointer;
-  display: flex;
-  justify-content: center;
-  position: fixed;
-  touch-action: none;
-  height: 60px;
-  width: 60px;
-  z-index: 3000;
 }
 
 .ai-chat-trigger:hover {
@@ -411,24 +426,24 @@ onBeforeUnmount(() => {
 }
 
 .ai-chat-window {
+  position: fixed;
+  z-index: 2999;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
   box-shadow: 0 18px 48px rgb(0 0 0 / 24%);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  position: fixed;
-  z-index: 2999;
 }
 
 .window-header {
-  align-items: center;
-  border-bottom: 1px solid var(--el-border-color-lighter);
   display: flex;
   flex: 0 0 auto;
+  align-items: center;
   justify-content: space-between;
   padding: 14px 16px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
 .window-title-group {
@@ -436,22 +451,22 @@ onBeforeUnmount(() => {
 }
 
 .window-title {
-  color: var(--el-text-color-primary);
   font-size: 18px;
   font-weight: 700;
   line-height: 1.25;
+  color: var(--el-text-color-primary);
 }
 
 .window-subtitle {
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
   margin-top: 4px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .window-actions {
-  align-items: center;
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
 .message-scrollbar {
@@ -480,22 +495,22 @@ onBeforeUnmount(() => {
 }
 
 .message-avatar {
+  display: flex;
+  flex: 0 0 30px;
   align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-top: 22px;
+  color: var(--el-text-color-secondary);
   background: var(--el-fill-color-light);
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 50%;
-  color: var(--el-text-color-secondary);
-  display: flex;
-  flex: 0 0 30px;
-  height: 30px;
-  justify-content: center;
-  margin-top: 22px;
-  width: 30px;
 }
 
 .message-row.user .message-avatar {
-  background: var(--el-color-primary-light-9);
   color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
 }
 
 .message-main {
@@ -503,30 +518,30 @@ onBeforeUnmount(() => {
 }
 
 .message-row.user .message-main {
-  align-items: flex-end;
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
 }
 
 .message-meta {
-  align-items: center;
-  color: var(--el-text-color-secondary);
   display: flex;
-  font-size: 12px;
   gap: 8px;
+  align-items: center;
   margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .message-bubble {
+  max-width: 100%;
+  padding: 10px 12px;
+  line-height: 1.65;
+  color: var(--el-text-color-primary);
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
   background: var(--el-fill-color-lighter);
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 8px;
-  color: var(--el-text-color-primary);
-  line-height: 1.65;
-  max-width: 100%;
-  padding: 10px 12px;
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 
 .message-bubble.rendered {
@@ -536,9 +551,9 @@ onBeforeUnmount(() => {
 .rendered-content :deep(h2),
 .rendered-content :deep(h3),
 .rendered-content :deep(h4) {
+  margin: 12px 0 8px;
   font-weight: 700;
   line-height: 1.35;
-  margin: 12px 0 8px;
 }
 
 .rendered-content :deep(h2:first-child),
@@ -554,8 +569,8 @@ onBeforeUnmount(() => {
 }
 
 .rendered-content :deep(ul) {
-  margin: 8px 0;
   padding-left: 20px;
+  margin: 8px 0;
 }
 
 .rendered-content :deep(li) {
@@ -581,20 +596,20 @@ onBeforeUnmount(() => {
 }
 
 .input-area {
-  border-top: 1px solid var(--el-border-color-lighter);
   display: flex;
-  flex-direction: column;
   flex: 0 0 auto;
+  flex-direction: column;
   gap: 10px;
   padding: 14px;
+  border-top: 1px solid var(--el-border-color-lighter);
 }
 
 .input-actions {
-  align-items: center;
-  color: var(--el-text-color-secondary);
   display: flex;
-  font-size: 12px;
+  align-items: center;
   justify-content: space-between;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 @media (max-width: 640px) {

@@ -39,6 +39,20 @@ const menus = computed((): VbenDropdownMenuItem[] => [
 
 const { authPanelCenter, authPanelLeft, authPanelRight } = usePreferences();
 
+const currentLayoutLabel = computed(() => {
+  if (authPanelRight.value) {
+    return $t('authentication.layout.alignRight');
+  }
+  if (authPanelLeft.value) {
+    return $t('authentication.layout.alignLeft');
+  }
+  return $t('authentication.layout.center');
+});
+
+const layoutToggleLabel = computed(() => {
+  return `切换登录页布局，当前为${currentLayoutLabel.value}`;
+});
+
 function handleUpdate(value: string | undefined) {
   if (!value) return;
   updatePreferences({
@@ -55,7 +69,8 @@ function handleUpdate(value: string | undefined) {
     :model-value="preferences.app.authPageLayout"
     @update:model-value="handleUpdate"
   >
-    <VbenIconButton>
+    <VbenIconButton :tooltip="layoutToggleLabel">
+      <span class="sr-only">{{ layoutToggleLabel }}</span>
       <PanelRight v-if="authPanelRight" class="size-4" />
       <PanelLeft v-if="authPanelLeft" class="size-4" />
       <InspectionPanel v-if="authPanelCenter" class="size-4" />

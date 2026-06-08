@@ -118,9 +118,9 @@ function toNullableNumber(value?: number | string) {
 }
 
 .widget-summary {
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  margin-bottom: 12px;
   padding-bottom: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
 .widget-summary div {
@@ -130,29 +130,29 @@ function toNullableNumber(value?: number | string) {
 }
 
 .widget-summary span {
-  color: var(--el-text-color-secondary);
   font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .metric-grid {
   display: grid;
-  gap: 10px;
   grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
+  gap: 10px;
 }
 
 .metric-item {
-  background: var(--el-fill-color-lighter);
-  border-radius: 6px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   min-height: 68px;
   padding: 10px;
+  background: var(--el-fill-color-lighter);
+  border-radius: 6px;
 }
 
 .metric-item span {
-  color: var(--el-text-color-secondary);
   font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .metric-item strong {

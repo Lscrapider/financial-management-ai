@@ -2,6 +2,7 @@
 import type { BuiltinThemeType } from '@vben/types';
 
 import { Palette } from '@vben/icons';
+import { $t } from '@vben/locales';
 import {
   COLOR_PRESETS,
   preferences,
@@ -22,6 +23,39 @@ function handleUpdate(colorPrimary: string, type: BuiltinThemeType) {
     },
   });
 }
+
+function themeTypeLabel(type: BuiltinThemeType) {
+  switch (type) {
+    case 'default': {
+      return $t('preferences.theme.builtin.default');
+    }
+    case 'green': {
+      return $t('preferences.theme.builtin.green');
+    }
+    case 'pink': {
+      return $t('preferences.theme.builtin.pink');
+    }
+    case 'sky-blue': {
+      return $t('preferences.theme.builtin.skyBlue');
+    }
+    case 'violet': {
+      return $t('preferences.theme.builtin.violet');
+    }
+    case 'yellow': {
+      return $t('preferences.theme.builtin.yellow');
+    }
+    case 'zinc': {
+      return $t('preferences.theme.builtin.zinc');
+    }
+    default: {
+      return $t('preferences.theme.builtin.custom');
+    }
+  }
+}
+
+function colorToggleLabel(type: BuiltinThemeType) {
+  return `切换为${themeTypeLabel(type)}主题色`;
+}
 </script>
 
 <template>
@@ -31,9 +65,11 @@ function handleUpdate(colorPrimary: string, type: BuiltinThemeType) {
     >
       <template v-for="preset in COLOR_PRESETS" :key="preset.color">
         <VbenIconButton
+          :tooltip="colorToggleLabel(preset.type)"
           class="flex-center shrink-0"
           @click="handleUpdate(preset.color, preset.type)"
         >
+          <span class="sr-only">{{ colorToggleLabel(preset.type) }}</span>
           <div
             :style="{ backgroundColor: preset.color }"
             class="relative flex-center size-5 rounded-full hover:scale-110"
@@ -57,7 +93,8 @@ function handleUpdate(colorPrimary: string, type: BuiltinThemeType) {
       </template>
     </div>
 
-    <VbenIconButton>
+    <VbenIconButton :tooltip="$t('preferences.theme.builtin.title')">
+      <span class="sr-only">{{ $t('preferences.theme.builtin.title') }}</span>
       <Palette class="size-4 text-primary" />
     </VbenIconButton>
   </div>

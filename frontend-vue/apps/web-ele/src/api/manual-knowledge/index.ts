@@ -1,10 +1,7 @@
-import { requestClient } from '#/api/request';
 import type { OcrReviewDetail } from '#/api/ocr-review';
-import type {
-  OcrTask,
-  OcrTaskPage,
-  OcrTaskPageParams,
-} from '#/api/ocr-task';
+import type { OcrTask, OcrTaskPage, OcrTaskPageParams } from '#/api/ocr-task';
+
+import { requestClient } from '#/api/request';
 
 export interface ManualKnowledgeDraft {
   chunks: string[];
@@ -51,7 +48,7 @@ export function saveManualKnowledgeDraft(
   taskNo: string,
   draft: ManualKnowledgeDraft,
 ) {
-  return requestClient.put<void>(
+  return requestClient.put<unknown>(
     `/ai/manual-knowledge/tasks/${taskNo}/draft`,
     draft,
     {
@@ -64,7 +61,7 @@ export function submitManualKnowledgeTask(
   taskNo: string,
   draft: ManualKnowledgeDraft,
 ) {
-  return requestClient.post<void>(
+  return requestClient.post<unknown>(
     `/ai/manual-knowledge/tasks/${taskNo}/submit`,
     draft,
     {
@@ -74,7 +71,7 @@ export function submitManualKnowledgeTask(
 }
 
 export function deleteManualKnowledgeTask(taskNo: string) {
-  return requestClient.post<void>(
+  return requestClient.post<unknown>(
     '/ai/manual-knowledge/tasks/delete',
     { taskNo },
     {

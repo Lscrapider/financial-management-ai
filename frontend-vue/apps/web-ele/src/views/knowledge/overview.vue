@@ -1,18 +1,17 @@
 <script lang="ts" setup>
+import type {
+  CategoryTagDistribution,
+  KnowledgeOverview,
+} from '#/api/knowledge';
+
 import { computed, onMounted, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
 
-import {
-  ElCard,
-  ElCol,
-  ElRow,
-  ElTable,
-  ElTableColumn,
-} from 'element-plus';
+import { ElCard, ElCol, ElRow, ElTable, ElTableColumn } from 'element-plus';
 
 import { getKnowledgeOverview } from '#/api/knowledge';
-import type { CategoryTagDistribution, KnowledgeOverview } from '#/api/knowledge';
+
 import {
   CATEGORY_TAG_TYPES,
   SCENE_CATEGORY_LABELS,
@@ -30,7 +29,7 @@ const loading = ref(false);
 
 const formatNumber = (n: number) => n.toLocaleString();
 
-const formatDate = (d: string | null) => {
+const formatDate = (d: null | string) => {
   if (!d) return '-';
   return new Date(d).toLocaleString('zh-CN');
 };
@@ -50,16 +49,16 @@ function tagLabel(key: string) {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  primary: '#409eff',
-  success: '#67c23a',
-  warning: '#e6a23c',
-  danger: '#f56c6c',
-  info: '#909399',
+  danger: '#dc4446',
+  info: '#8a929f',
+  primary: '#006be6',
+  success: '#57d188',
+  warning: '#efbd48',
 };
 
 function categoryColor(key: string) {
   const type = CATEGORY_TAG_TYPES[key];
-  return CATEGORY_COLORS[type ?? ''] ?? '#c0c4cc';
+  return CATEGORY_COLORS[type ?? ''] ?? CATEGORY_COLORS.info;
 }
 
 interface FlatRow {
@@ -77,9 +76,9 @@ const rawDistributions = ref<CategoryTagDistribution[]>([]);
 const sortField = ref<string>('totalPercentage');
 const sortDir = ref<'asc' | 'desc'>('desc');
 
-type SortKey = 'count' | 'categoryPercentage' | 'totalPercentage';
+type SortKey = 'categoryPercentage' | 'count' | 'totalPercentage';
 
-function handleSort(field: string) {
+function handleSort(field: SortKey) {
   if (sortField.value === field) {
     sortDir.value = sortDir.value === 'desc' ? 'asc' : 'desc';
   } else {
@@ -89,7 +88,7 @@ function handleSort(field: string) {
 }
 
 const flatRows = computed<FlatRow[]>(() => {
-  const key = sortField.value as SortKey | '';
+  const key = sortField.value as '' | SortKey;
   const dir = sortDir.value;
 
   return rawDistributions.value.flatMap((dist) => {
@@ -131,9 +130,13 @@ async function fetchOverview() {
   }
 }
 
-function categorySpanMethod({ row, column, rowIndex }: {
-  row: FlatRow;
+function categorySpanMethod({
+  row,
+  column,
+  rowIndex,
+}: {
   column: { property: string };
+  row: FlatRow;
   rowIndex: number;
 }) {
   if (column.property !== 'categoryLabel') {
@@ -141,10 +144,10 @@ function categorySpanMethod({ row, column, rowIndex }: {
   }
   const data = flatRows.value;
   const cur = row.categoryKey;
-  if (rowIndex === 0 || data[rowIndex - 1]!.categoryKey !== cur) {
+  if (rowIndex === 0 || data[rowIndex - 1]?.categoryKey !== cur) {
     let span = 0;
     for (let i = rowIndex; i < data.length; i++) {
-      if (data[i]!.categoryKey === cur) span++;
+      if (data[i]?.categoryKey === cur) span++;
       else break;
     }
     return { rowspan: span, colspan: 1 };
@@ -155,6 +158,15 @@ function categorySpanMethod({ row, column, rowIndex }: {
 function sortIndicator(field: string): string {
   if (sortField.value !== field) return '';
   return sortDir.value === 'desc' ? ' ▼' : ' ▲';
+}
+
+function sortAriaLabel(field: SortKey, label: string): string {
+  if (sortField.value !== field) {
+    return `按${label}排序，点击后按降序排列`;
+  }
+  const currentDir = sortDir.value === 'desc' ? '降序' : '升序';
+  const nextDir = sortDir.value === 'desc' ? '升序' : '降序';
+  return `当前按${label}${currentDir}排列，点击切换为${nextDir}`;
 }
 
 onMounted(() => {
@@ -210,17 +222,18 @@ onMounted(() => {
           stripe
           :span-method="categorySpanMethod"
         >
-          <ElTableColumn
-            prop="categoryLabel"
-            label="场景类别"
-            width="140"
-          />
+          <ElTableColumn prop="categoryLabel" label="场景类别" width="140" />
           <ElTableColumn prop="tagLabel" label="标签" width="140" />
           <ElTableColumn prop="count" width="110">
             <template #header>
-              <span class="sort-header" @click="handleSort('count')">
-                条数{{ sortIndicator('count') }}
-              </span>
+              <button
+                :aria-label="sortAriaLabel('count', '条数')"
+                class="sort-header"
+                type="button"
+                @click="handleSort('count')"
+              >
+                条数<span aria-hidden="true">{{ sortIndicator('count') }}</span>
+              </button>
             </template>
             <template #default="{ row }">
               {{ formatNumber(row.count) }}
@@ -228,9 +241,16 @@ onMounted(() => {
           </ElTableColumn>
           <ElTableColumn prop="categoryPercentage" width="110">
             <template #header>
-              <span class="sort-header" @click="handleSort('categoryPercentage')">
-                同类占比{{ sortIndicator('categoryPercentage') }}
-              </span>
+              <button
+                :aria-label="sortAriaLabel('categoryPercentage', '同类占比')"
+                class="sort-header"
+                type="button"
+                @click="handleSort('categoryPercentage')"
+              >
+                同类占比<span aria-hidden="true">{{
+                  sortIndicator('categoryPercentage')
+                }}</span>
+              </button>
             </template>
             <template #default="{ row }">
               {{ row.categoryPercentage }}%
@@ -238,13 +258,18 @@ onMounted(() => {
           </ElTableColumn>
           <ElTableColumn prop="totalPercentage" width="110">
             <template #header>
-              <span class="sort-header" @click="handleSort('totalPercentage')">
-                全局占比{{ sortIndicator('totalPercentage') }}
-              </span>
+              <button
+                :aria-label="sortAriaLabel('totalPercentage', '全局占比')"
+                class="sort-header"
+                type="button"
+                @click="handleSort('totalPercentage')"
+              >
+                全局占比<span aria-hidden="true">{{
+                  sortIndicator('totalPercentage')
+                }}</span>
+              </button>
             </template>
-            <template #default="{ row }">
-              {{ row.totalPercentage }}%
-            </template>
+            <template #default="{ row }"> {{ row.totalPercentage }}% </template>
           </ElTableColumn>
           <ElTableColumn label="分布" min-width="200">
             <template #default="{ row }">
@@ -253,10 +278,10 @@ onMounted(() => {
                   <div
                     class="bar-fill"
                     :style="{
-                      width: `${Math.max(row.totalPercentage, 0.5)}%`,
                       backgroundColor: categoryColor(row.categoryKey),
+                      transform: `scaleX(${Math.max(row.totalPercentage, 0.5) / 100})`,
                     }"
-                  />
+                  ></div>
                 </div>
                 <span class="bar-label">{{ row.totalPercentage }}%</span>
               </div>
@@ -280,19 +305,19 @@ onMounted(() => {
 }
 
 .stat-card {
-  text-align: center;
   padding: 8px 0;
+  text-align: center;
 }
 
 .stat-value {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--el-color-primary);
-  line-height: 1.3;
-  min-height: 42px;
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 42px;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--el-color-primary);
 }
 
 .stat-value--small {
@@ -312,37 +337,58 @@ onMounted(() => {
 
 .bar-wrapper {
   display: flex;
-  align-items: center;
   gap: 8px;
+  align-items: center;
 }
 
 .bar-track {
   flex: 1;
   height: 8px;
+  overflow: hidden;
   background: var(--el-fill-color-light);
   border-radius: 4px;
-  overflow: hidden;
 }
 
 .bar-fill {
+  width: 100%;
   height: 100%;
   border-radius: 4px;
-  transition: width 0.3s ease;
+  transform-origin: left center;
+  transition: transform 0.3s ease;
 }
 
 .bar-label {
+  min-width: 48px;
   font-size: 12px;
   color: var(--el-text-color-secondary);
-  min-width: 48px;
   text-align: right;
 }
 
 .sort-header {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0;
+  font: inherit;
+  color: inherit;
   cursor: pointer;
   user-select: none;
+  background: transparent;
+  border: 0;
 }
 
 .sort-header:hover {
   color: var(--el-color-primary);
+}
+
+.sort-header:focus-visible {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar-fill {
+    transition: none;
+  }
 }
 </style>

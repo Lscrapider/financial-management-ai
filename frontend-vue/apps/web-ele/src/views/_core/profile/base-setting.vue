@@ -39,7 +39,10 @@ onMounted(async () => {
   profileBaseSettingRef.value.getFormApi().setValues(data);
 });
 
-async function handleSubmit(values: { realName?: string; introduction?: string }) {
+async function handleSubmit(values: {
+  introduction?: string;
+  realName?: string;
+}) {
   await updateProfileApi(values);
   ElMessage.success('更新成功');
 }

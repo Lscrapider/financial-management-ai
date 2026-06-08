@@ -1,4 +1,11 @@
 <script lang="ts" setup>
+import type {
+  KnowledgeChunk,
+  KnowledgeChunkUpdateParam,
+  KnowledgeStats,
+  ScenesData,
+} from '#/api/knowledge';
+
 import { onMounted, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
@@ -25,12 +32,7 @@ import {
   getKnowledgeStats,
   updateKnowledgeChunk,
 } from '#/api/knowledge';
-import type {
-  KnowledgeChunk,
-  KnowledgeChunkUpdateParam,
-  KnowledgeStats,
-  ScenesData,
-} from '#/api/knowledge';
+
 import {
   CATEGORY_TAG_TYPES,
   SCENE_CATEGORY_LABELS,
@@ -58,7 +60,7 @@ const searchTag = ref<string[]>([]);
 
 const formatNumber = (n: number) => n.toLocaleString();
 
-const formatDate = (d: string | null) => {
+const formatDate = (d: null | string) => {
   if (!d) return '-';
   return new Date(d).toLocaleString('zh-CN');
 };
@@ -137,7 +139,7 @@ async function onPageSizeChange(ps: number) {
 
 function textPreview(text: string, maxLen = 60) {
   if (!text) return '';
-  const cleaned = text.replace(/\s+/g, ' ');
+  const cleaned = text.replaceAll(/\s+/g, ' ');
   return cleaned.length > maxLen ? `${cleaned.slice(0, maxLen)}...` : cleaned;
 }
 
@@ -155,15 +157,19 @@ function sourcePageLabel(chunk: KnowledgeChunk) {
     : '来源页 -';
 }
 
-
 function emptyScenes(): ScenesData {
   return {
-    asset: [], price: [], volume: [], trend: [],
-    valuation: [], sentiment: [], risk_strategy: [],
+    asset: [],
+    price: [],
+    volume: [],
+    trend: [],
+    valuation: [],
+    sentiment: [],
+    risk_strategy: [],
   };
 }
 
-function currentScenes(chunk: KnowledgeChunk): ScenesData | null {
+function currentScenes(chunk: KnowledgeChunk): null | ScenesData {
   const scenes = chunk.metadata?.scenes;
   if (!scenes || typeof scenes !== 'object') return null;
   const hasAny = Object.values(scenes).some(
@@ -180,7 +186,9 @@ function tagLabel(tag: string) {
   return TAG_LABELS[tag] ?? tag;
 }
 
-function categoryTagType(category: string): 'danger' | 'info' | 'primary' | 'success' | 'warning' | undefined {
+function categoryTagType(
+  category: string,
+): 'danger' | 'info' | 'primary' | 'success' | 'warning' | undefined {
   const t = CATEGORY_TAG_TYPES[category];
   if (t === '' || t === undefined) return undefined;
   return t as 'danger' | 'info' | 'primary' | 'success' | 'warning';
@@ -210,10 +218,7 @@ async function saveEdit() {
       text: editText.value,
       reembed,
     };
-    const updated = await updateKnowledgeChunk(
-      selectedChunk.value.id,
-      param,
-    );
+    const updated = await updateKnowledgeChunk(selectedChunk.value.id, param);
     if (updated) {
       selectedChunk.value = updated;
       const idx = chunks.value.findIndex((c) => c.id === updated.id);
@@ -228,15 +233,13 @@ async function saveEdit() {
 
 // ---- 标签编辑 ----
 const editingTags = ref(false);
-const draftScenes = ref<ScenesData | null>(null);
+const draftScenes = ref<null | ScenesData>(null);
 const savingTags = ref(false);
 
 function startEditTags() {
   if (!selectedChunk.value) return;
   const scenes = currentScenes(selectedChunk.value);
-  draftScenes.value = scenes
-    ? JSON.parse(JSON.stringify(scenes))
-    : emptyScenes();
+  draftScenes.value = scenes ? structuredClone(scenes) : emptyScenes();
   editingTags.value = true;
 }
 
@@ -277,10 +280,7 @@ async function saveEditTags() {
       scenes: draftScenes.value,
       reembed: false,
     };
-    const updated = await updateKnowledgeChunk(
-      selectedChunk.value.id,
-      param,
-    );
+    const updated = await updateKnowledgeChunk(selectedChunk.value.id, param);
     if (updated) {
       selectedChunk.value = updated;
       const idx = chunks.value.findIndex((c) => c.id === updated.id);
@@ -496,11 +496,19 @@ onMounted(async () => {
             />
             <div v-else class="chunk-text">{{ selectedChunk.text }}</div>
 
-            <div v-if="currentScenes(selectedChunk) || editingTags" class="scenes-section">
+            <div
+              v-if="currentScenes(selectedChunk) || editingTags"
+              class="scenes-section"
+            >
               <div class="scenes-header">
                 <span class="scenes-title">场景标签</span>
                 <template v-if="!editingTags">
-                  <ElButton size="small" type="primary" plain @click="startEditTags">
+                  <ElButton
+                    size="small"
+                    type="primary"
+                    plain
+                    @click="startEditTags"
+                  >
                     编辑标签
                   </ElButton>
                 </template>
@@ -514,7 +522,9 @@ onMounted(async () => {
                     >
                       保存
                     </ElButton>
-                    <ElButton size="small" @click="cancelEditTags"> 取消 </ElButton>
+                    <ElButton size="small" @click="cancelEditTags">
+                      取消
+                    </ElButton>
                   </div>
                 </template>
               </div>
@@ -526,7 +536,9 @@ onMounted(async () => {
                   :key="category"
                   class="scene-category"
                 >
-                  <template v-if="currentScenes(selectedChunk)?.[category]?.length">
+                  <template
+                    v-if="currentScenes(selectedChunk)?.[category]?.length"
+                  >
                     <span class="scene-category-label">
                       {{ categoryLabel(category) }}
                     </span>
@@ -569,7 +581,7 @@ onMounted(async () => {
                     </ElTag>
                     <ElSelect
                       v-if="availableTags(category).length > 0"
-                      :model-value="''"
+                      model-value=""
                       size="small"
                       placeholder="添加标签"
                       class="scene-tag-select"
@@ -614,7 +626,7 @@ onMounted(async () => {
               <ElDescriptionsItem label="置信度">
                 {{
                   selectedChunk.avgConfidence != null
-                    ? (selectedChunk.avgConfidence * 100).toFixed(1) + '%'
+                    ? `${(selectedChunk.avgConfidence * 100).toFixed(1)}%`
                     : '-'
                 }}
               </ElDescriptionsItem>
@@ -648,19 +660,19 @@ onMounted(async () => {
 }
 
 .stat-card {
-  text-align: center;
   padding: 8px 0;
+  text-align: center;
 }
 
 .stat-value {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--el-color-primary);
-  line-height: 1.3;
-  min-height: 42px;
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 42px;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--el-color-primary);
 }
 
 .stat-value--small {
@@ -676,8 +688,8 @@ onMounted(async () => {
 
 .content-row {
   flex: 1;
-  min-height: 0;
   row-gap: 16px;
+  min-height: 0;
 }
 
 .chunk-list-header {
@@ -688,8 +700,8 @@ onMounted(async () => {
 
 .chunk-list-filters {
   display: flex;
-  align-items: center;
   gap: 8px;
+  align-items: center;
 }
 
 .chunk-list-card {
@@ -717,8 +729,8 @@ onMounted(async () => {
 
 .chunk-title-line {
   display: flex;
-  align-items: center;
   gap: 8px;
+  align-items: center;
   min-width: 0;
 }
 
@@ -726,9 +738,9 @@ onMounted(async () => {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  color: var(--el-text-color-primary);
-  font-weight: 600;
   text-overflow: ellipsis;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
   white-space: nowrap;
 }
 
@@ -741,8 +753,8 @@ onMounted(async () => {
   gap: 10px;
   margin-top: 4px;
   overflow: hidden;
-  color: var(--el-text-color-secondary);
   font-size: 12px;
+  color: var(--el-text-color-secondary);
   white-space: nowrap;
 }
 
@@ -753,9 +765,9 @@ onMounted(async () => {
 }
 
 .chunk-preview {
-  color: var(--el-text-color-regular);
   line-height: 1.5;
-  word-break: break-word;
+  color: var(--el-text-color-regular);
+  overflow-wrap: break-word;
 }
 
 .detail-card {
@@ -764,17 +776,17 @@ onMounted(async () => {
 
 .detail-card :deep(.el-card__body) {
   display: flex;
-  flex-direction: column;
   flex: 1;
+  flex-direction: column;
   overflow: hidden;
 }
 
 .detail-header {
   display: flex;
-  align-items: center;
   gap: 6px;
-  font-weight: 600;
+  align-items: center;
   min-width: 0;
+  font-weight: 600;
 }
 
 .detail-title {
@@ -792,14 +804,14 @@ onMounted(async () => {
 }
 
 .header-actions {
-  margin-left: auto;
   display: flex;
   gap: 6px;
+  margin-left: auto;
 }
 
 .chunk-editor {
-  margin-bottom: 16px;
   flex: 1;
+  margin-bottom: 16px;
 }
 
 .chunk-editor :deep(.el-textarea__inner) {
@@ -807,17 +819,17 @@ onMounted(async () => {
 }
 
 .chunk-text {
+  flex: 1;
+  min-height: 300px;
   padding: 16px;
   margin-bottom: 16px;
-  background: var(--el-fill-color-light);
-  border-radius: 6px;
+  overflow-y: auto;
   font-size: 15px;
   line-height: 1.8;
+  overflow-wrap: break-word;
   white-space: pre-wrap;
-  word-break: break-word;
-  flex: 1;
-  overflow-y: auto;
-  min-height: 300px;
+  background: var(--el-fill-color-light);
+  border-radius: 6px;
 }
 
 .scenes-section {
@@ -848,9 +860,9 @@ onMounted(async () => {
 
 .scene-category {
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
   gap: 6px;
+  align-items: center;
   margin-bottom: 8px;
 }
 
@@ -863,19 +875,19 @@ onMounted(async () => {
 }
 
 .scene-category-label {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  min-width: 80px;
   flex: none;
+  min-width: 80px;
+  font-size: 12px;
   line-height: 24px;
+  color: var(--el-text-color-secondary);
 }
 
 .scene-tags-row {
   display: flex;
-  align-items: center;
+  flex: 1;
   flex-wrap: wrap;
   gap: 6px;
-  flex: 1;
+  align-items: center;
 }
 
 .scene-tag {

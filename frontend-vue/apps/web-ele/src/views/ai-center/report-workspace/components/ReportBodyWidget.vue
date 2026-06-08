@@ -23,7 +23,9 @@ const reportTitle = computed(() => {
     : report.value.targetCode;
 });
 
-const renderedReportHtml = computed(() => renderMarkdown(report.value?.reportText));
+const renderedReportHtml = computed(() =>
+  renderMarkdown(report.value?.reportText),
+);
 
 onMounted(loadReport);
 
@@ -144,13 +146,13 @@ function escapeHtml(value: string) {
 }
 
 .widget-summary {
-  align-items: flex-start;
-  border-bottom: 1px solid var(--el-border-color-lighter);
   display: flex;
   gap: 12px;
+  align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 12px;
   padding-bottom: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
 .widget-summary div {
@@ -160,21 +162,21 @@ function escapeHtml(value: string) {
 }
 
 .widget-summary span {
-  color: var(--el-text-color-secondary);
   font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .markdown-report {
-  color: var(--el-text-color-primary);
   font-size: 14px;
   line-height: 1.75;
+  color: var(--el-text-color-primary);
 }
 
 .markdown-report :deep(h1),
 .markdown-report :deep(h2),
 .markdown-report :deep(h3) {
-  font-weight: 700;
   margin: 14px 0 8px;
+  font-weight: 700;
 }
 
 .markdown-report :deep(p),
@@ -183,7 +185,7 @@ function escapeHtml(value: string) {
 }
 
 .markdown-report :deep(.report-reference) {
-  color: var(--el-color-primary);
   font-weight: 600;
+  color: var(--el-color-primary);
 }
 </style>

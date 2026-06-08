@@ -103,7 +103,7 @@ defineExpose({
         'cursor-wait': loading,
       }"
       :loading="loading"
-      aria-label="register"
+      :aria-label="submitButtonText || $t('authentication.signUp')"
       class="mt-2 w-full"
       @click="handleSubmit"
     >
@@ -113,9 +113,13 @@ defineExpose({
     </VbenButton>
     <div class="mt-4 text-center text-sm">
       {{ $t('authentication.alreadyHaveAccount') }}
-      <span class="vben-link text-sm font-normal" @click="goToLogin()">
+      <button
+        class="vben-link inline-flex min-h-8 items-center border-none bg-transparent p-0 text-sm font-normal"
+        type="button"
+        @click="goToLogin()"
+      >
         {{ $t('authentication.goToLogin') }}
-      </span>
+      </button>
     </div>
   </div>
 </template>

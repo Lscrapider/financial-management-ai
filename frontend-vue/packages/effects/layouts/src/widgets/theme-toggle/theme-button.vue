@@ -1,6 +1,8 @@
 <script lang="ts" setup>
 import { computed, nextTick } from 'vue';
 
+import { $t } from '@vben/locales';
+
 import { VbenButton } from '@vben-core/shadcn-ui';
 
 interface Props {
@@ -22,6 +24,13 @@ const isDark = defineModel<boolean>();
 
 const theme = computed(() => {
   return isDark.value ? 'light' : 'dark';
+});
+
+const themeToggleLabel = computed(() => {
+  const nextTheme = isDark.value
+    ? $t('preferences.theme.light')
+    : $t('preferences.theme.dark');
+  return `切换为${nextTheme}主题`;
 });
 
 const bindProps = computed(() => {
@@ -84,13 +93,15 @@ function toggleTheme(event: MouseEvent) {
 
 <template>
   <VbenButton
-    :aria-label="theme"
+    :aria-label="themeToggleLabel"
     :class="[`is-${theme}`]"
+    :title="themeToggleLabel"
     aria-live="polite"
     class="theme-toggle cursor-pointer border-none bg-none hover:animate-[shrink_0.3s_ease-in-out]"
     v-bind="bindProps"
     @click.stop="toggleTheme"
   >
+    <span class="sr-only">{{ themeToggleLabel }}</span>
     <svg aria-hidden="true" height="24" viewBox="0 0 24 24" width="24">
       <mask id="theme-toggle-moon" class="theme-toggle__moon">
         <rect fill="white" height="100%" width="100%" x="0" y="0" />

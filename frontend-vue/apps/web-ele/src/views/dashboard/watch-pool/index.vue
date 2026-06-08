@@ -35,6 +35,7 @@ import {
   saveWatchGroup,
   saveWatchItem,
 } from '#/api/watch-pool';
+
 import { useColumnResize } from './useColumnResize';
 
 interface TargetOption {
@@ -48,7 +49,7 @@ const router = useRouter();
 const groups = ref<WatchGroup[]>([]);
 const selectedGroupId = ref('');
 const highlightedItemId = ref('');
-const typeFilter = ref<WatchTargetType | 'ALL'>('ALL');
+const typeFilter = ref<'ALL' | WatchTargetType>('ALL');
 const stockQuotes = ref<StockQuote[]>([]);
 const indexQuotes = ref<IndexQuote[]>([]);
 const bondQuotes = ref<BondQuote[]>([]);
@@ -69,7 +70,7 @@ const targetPosition = ref('');
 const { onMouseDown, widths } = useColumnResize();
 
 const editDialogVisible = ref(false);
-const editingItem = ref<WatchItem | null>(null);
+const editingItem = ref<null | WatchItem>(null);
 const editBuyPrice = ref('');
 const editPosition = ref('');
 const editRemark = ref('');
@@ -207,10 +208,11 @@ function applyRouteSelection(fallbackGroupId = selectedGroupId.value) {
   const nextGroup = routeGroup ?? fallbackGroup ?? groups.value[0];
 
   selectedGroupId.value = nextGroup?.id ?? '';
-  highlightedItemId.value =
-    nextGroup?.items.some((item) => item.id === queryItemId)
-      ? queryItemId
-      : '';
+  highlightedItemId.value = nextGroup?.items.some(
+    (item) => item.id === queryItemId,
+  )
+    ? queryItemId
+    : '';
 }
 
 function selectGroup(groupId: string) {
@@ -449,13 +451,13 @@ function formatPrice(value?: null | number | string) {
   return numberValue === null ? '-' : numberValue.toFixed(3);
 }
 
-function toNullableNumber(value?: number | string | null) {
+function toNullableNumber(value?: null | number | string) {
   if (value === null || value === undefined || value === '') return null;
   const numberValue = Number(value);
   return Number.isFinite(numberValue) ? numberValue : null;
 }
 
-function toNumber(value?: number | string | null) {
+function toNumber(value?: null | number | string) {
   return toNullableNumber(value) ?? 0;
 }
 
@@ -500,7 +502,8 @@ function positionPnL(
           <button
             v-for="group in groups"
             :key="group.id"
-            :class="['group-tab', { active: group.id === selectedGroupId }]"
+            class="group-tab"
+            :class="[{ active: group.id === selectedGroupId }]"
             type="button"
             @click="selectGroup(group.id)"
           >
@@ -558,7 +561,7 @@ function positionPnL(
                 <span
                   class="resize-handle"
                   @mousedown="onMouseDown('col-type', $event)"
-                />
+                ></span>
               </div>
             </template>
             <template #default="{ row }">
@@ -574,7 +577,7 @@ function positionPnL(
                 <span
                   class="resize-handle"
                   @mousedown="onMouseDown('col-name', $event)"
-                />
+                ></span>
               </div>
             </template>
             <template #default="{ row }">
@@ -595,7 +598,7 @@ function positionPnL(
                 <span
                   class="resize-handle"
                   @mousedown="onMouseDown('col-latest', $event)"
-                />
+                ></span>
               </div>
             </template>
             <template #default="{ row }">
@@ -613,7 +616,7 @@ function positionPnL(
                 <span
                   class="resize-handle"
                   @mousedown="onMouseDown('col-change', $event)"
-                />
+                ></span>
               </div>
             </template>
             <template #default="{ row }">
@@ -633,7 +636,7 @@ function positionPnL(
                 <span
                   class="resize-handle"
                   @mousedown="onMouseDown('col-turnover', $event)"
-                />
+                ></span>
               </div>
             </template>
             <template #default="{ row }">
@@ -648,7 +651,9 @@ function positionPnL(
             </template>
             <template #default="{ row }">
               {{
-                supportsDetailQuote(row.targetType) ? formatPrice(row.averagePrice) : '-'
+                supportsDetailQuote(row.targetType)
+                  ? formatPrice(row.averagePrice)
+                  : '-'
               }}
             </template>
           </ElTableColumn>
@@ -660,7 +665,9 @@ function positionPnL(
             </template>
             <template #default="{ row }">
               {{
-                supportsDetailQuote(row.targetType) ? (row.currentVolume ?? '-') : '-'
+                supportsDetailQuote(row.targetType)
+                  ? (row.currentVolume ?? '-')
+                  : '-'
               }}
             </template>
           </ElTableColumn>
@@ -675,7 +682,7 @@ function positionPnL(
                 <span
                   class="resize-handle"
                   @mousedown="onMouseDown('col-buy', $event)"
-                />
+                ></span>
               </div>
             </template>
             <template #default="{ row }">
@@ -693,7 +700,7 @@ function positionPnL(
                 <span
                   class="resize-handle"
                   @mousedown="onMouseDown('col-pos', $event)"
-                />
+                ></span>
               </div>
             </template>
             <template #default="{ row }">
@@ -711,7 +718,7 @@ function positionPnL(
                 <span
                   class="resize-handle"
                   @mousedown="onMouseDown('col-mv', $event)"
-                />
+                ></span>
               </div>
             </template>
             <template #default="{ row }">
@@ -731,7 +738,7 @@ function positionPnL(
                 <span
                   class="resize-handle"
                   @mousedown="onMouseDown('col-pnl', $event)"
-                />
+                ></span>
               </div>
             </template>
             <template #default="{ row }">
@@ -761,7 +768,7 @@ function positionPnL(
                 <span
                   class="resize-handle"
                   @mousedown="onMouseDown('col-rate', $event)"
-                />
+                ></span>
               </div>
             </template>
             <template #default="{ row }">
@@ -785,7 +792,7 @@ function positionPnL(
                 <span
                   class="resize-handle"
                   @mousedown="onMouseDown('col-remark', $event)"
-                />
+                ></span>
               </div>
             </template>
             <template #default="{ row }">
@@ -959,41 +966,41 @@ function positionPnL(
 
 .group-toolbar,
 .group-summary {
+  display: flex;
+  gap: 16px;
   align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
-  display: flex;
-  gap: 16px;
-  justify-content: space-between;
-  padding: 16px 18px;
 }
 
 .group-tabs,
 .toolbar-actions {
-  align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  align-items: center;
 }
 
 .group-tab {
+  display: inline-flex;
+  gap: 8px;
   align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  color: var(--el-text-color-regular);
+  cursor: pointer;
   background: var(--el-fill-color-lighter);
   border: 1px solid transparent;
   border-radius: 6px;
-  color: var(--el-text-color-regular);
-  cursor: pointer;
-  display: inline-flex;
-  gap: 8px;
-  min-height: 32px;
-  padding: 0 12px;
 }
 
 .group-tab.active {
+  color: var(--el-color-primary);
   background: var(--el-color-primary-light-9);
   border-color: var(--el-color-primary-light-5);
-  color: var(--el-color-primary);
 }
 
 .group-tab small {
@@ -1001,14 +1008,14 @@ function positionPnL(
 }
 
 .group-summary h2 {
+  margin: 0 0 6px;
   font-size: 20px;
   line-height: 1.2;
-  margin: 0 0 6px;
 }
 
 .group-summary span {
-  color: var(--el-text-color-secondary);
   font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 
 .filter-bar {
@@ -1032,8 +1039,8 @@ function positionPnL(
 }
 
 .dialog-form > span {
-  color: var(--el-text-color-secondary);
   font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 
 .resize-header {
@@ -1042,13 +1049,13 @@ function positionPnL(
 }
 
 .resize-handle {
-  bottom: -4px;
-  cursor: col-resize;
   position: absolute;
-  right: -6px;
   top: -4px;
-  width: 14px;
+  right: -6px;
+  bottom: -4px;
   z-index: 1;
+  width: 14px;
+  cursor: col-resize;
 }
 
 :deep(.el-table__header th) {
@@ -1064,55 +1071,55 @@ function positionPnL(
 }
 
 .edit-target-info {
-  align-items: baseline;
-  background: var(--el-fill-color-lighter);
-  border-radius: 4px;
   display: flex;
   gap: 8px;
+  align-items: baseline;
   padding: 8px 12px;
+  background: var(--el-fill-color-lighter);
+  border-radius: 4px;
 }
 
 .edit-target-info small {
-  color: var(--el-text-color-secondary);
   font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .quote-detail-grid {
   display: grid;
-  gap: 0 32px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 32px;
   max-height: 520px;
   overflow: auto;
 }
 
 .quote-detail-cell {
-  align-items: baseline;
-  border-bottom: 1px dashed var(--el-border-color-lighter);
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
   padding: 9px 0;
+  border-bottom: 1px dashed var(--el-border-color-lighter);
 }
 
 .quote-detail-cell .detail-label {
-  color: var(--el-text-color-secondary);
   flex-shrink: 0;
-  font-size: 13px;
   margin-right: 8px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 
 .quote-detail-cell .detail-value {
   font-size: 13px;
-  font-variant-numeric: tabular-nums;
   font-weight: 600;
-  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
   text-align: right;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 768px) {
   .group-toolbar,
   .group-summary {
-    align-items: stretch;
     flex-direction: column;
+    align-items: stretch;
   }
 
   .toolbar-actions {

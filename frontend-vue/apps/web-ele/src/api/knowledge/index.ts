@@ -12,20 +12,20 @@ export interface ScenesData {
 }
 
 export interface KnowledgeChunk {
-  avgConfidence: number | null;
+  avgConfidence: null | number;
   chunkIndex: number;
   createdAt: string;
   id: number;
   metadata: {
-    scenes?: ScenesData;
     [key: string]: unknown;
+    scenes?: ScenesData;
   };
   originalFilename: null | string;
   pageNos: number[];
   paragraphNos: number[];
   taskNo: string;
   text: string;
-  version: number | null;
+  version: null | number;
 }
 
 export interface KnowledgeChunkPage {
@@ -38,7 +38,7 @@ export interface KnowledgeChunkPage {
 
 export interface KnowledgeStats {
   chunkCount: number;
-  latestCreatedAt: string | null;
+  latestCreatedAt: null | string;
   taskCount: number;
   totalTextLength: number;
 }
@@ -49,7 +49,14 @@ export function getKnowledgeStats() {
   });
 }
 
-export function getKnowledgeChunks(pageNum = 1, pageSize = 20, filename?: string, sourceType?: string, category?: string, tag?: string) {
+export function getKnowledgeChunks(
+  pageNum = 1,
+  pageSize = 20,
+  filename?: string,
+  sourceType?: string,
+  category?: string,
+  tag?: string,
+) {
   return requestClient.get<KnowledgeChunkPage>('/knowledge/chunks', {
     params: { pageNum, pageSize, filename, sourceType, category, tag },
     responseReturn: 'body',
@@ -72,13 +79,9 @@ export function updateKnowledgeChunk(
   id: number,
   param: KnowledgeChunkUpdateParam,
 ) {
-  return requestClient.put<KnowledgeChunk>(
-    `/knowledge/chunks/${id}`,
-    param,
-    {
-      responseReturn: 'body',
-    },
-  );
+  return requestClient.put<KnowledgeChunk>(`/knowledge/chunks/${id}`, param, {
+    responseReturn: 'body',
+  });
 }
 
 export interface TagCount {
@@ -98,7 +101,7 @@ export interface KnowledgeOverview {
   taskCount: number;
   chunkCount: number;
   totalTextLength: number;
-  latestCreatedAt: string | null;
+  latestCreatedAt: null | string;
   tagDistributions: CategoryTagDistribution[];
 }
 

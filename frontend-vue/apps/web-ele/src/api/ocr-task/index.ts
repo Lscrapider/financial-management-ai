@@ -100,12 +100,9 @@ export function pageOcrTasks(params: OcrTaskPageParams = {}) {
 }
 
 export function getOcrStageDetail(taskNo: string) {
-  return requestClient.get<OcrStageDetail>(
-    `/ai/ocr/tasks/${taskNo}/stages`,
-    {
-      responseReturn: 'body',
-    },
-  );
+  return requestClient.get<OcrStageDetail>(`/ai/ocr/tasks/${taskNo}/stages`, {
+    responseReturn: 'body',
+  });
 }
 
 export function getOcrChunkTagDetail(taskNo: string) {
@@ -118,7 +115,7 @@ export function getOcrChunkTagDetail(taskNo: string) {
 }
 
 export function deleteOcrTask(taskNo: string) {
-  return requestClient.post<void>(
+  return requestClient.post<unknown>(
     '/ai/ocr/tasks/delete',
     { taskNo },
     {
@@ -133,14 +130,10 @@ export function submitOcrTask(files: File[]) {
     formData.append('file', file);
   });
 
-  return requestClient.post<OcrTask[]>(
-    '/ai/ocr/tasks',
-    formData,
-    {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      responseReturn: 'body',
+  return requestClient.post<OcrTask[]>('/ai/ocr/tasks', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
     },
-  );
+    responseReturn: 'body',
+  });
 }

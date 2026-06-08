@@ -78,11 +78,11 @@ const isAdmin = computed(() => userStore.userInfo?.roles?.includes('admin'));
 
 const notificationTip = computed(() => {
   const userInfo = userStore.userInfo as
+    | null
     | (typeof userStore.userInfo & {
         email?: string;
         emailNotification?: boolean;
-      })
-    | null;
+      });
   if (isAdmin.value) {
     return '';
   }
@@ -238,14 +238,18 @@ function typeLabel(targetType?: string) {
 
 function typeTagType(targetType?: string) {
   switch (targetType) {
-    case 'STOCK':
-      return 'primary';
-    case 'INDEX':
-      return 'warning';
-    case 'BOND':
+    case 'BOND': {
       return 'success';
-    default:
+    }
+    case 'INDEX': {
+      return 'warning';
+    }
+    case 'STOCK': {
+      return 'primary';
+    }
+    default: {
       return 'info';
+    }
   }
 }
 
@@ -274,7 +278,7 @@ function formatDateTime(value?: string) {
   return value.replace('T', ' ').slice(0, 19);
 }
 
-function toNullableNumber(value?: number | string | null) {
+function toNullableNumber(value?: null | number | string) {
   if (value === null || value === undefined || value === '') {
     return null;
   }
@@ -282,7 +286,7 @@ function toNullableNumber(value?: number | string | null) {
   return Number.isFinite(numberValue) ? numberValue : null;
 }
 
-function toNumber(value?: number | string | null) {
+function toNumber(value?: null | number | string) {
   return toNullableNumber(value) ?? 0;
 }
 </script>
@@ -352,7 +356,11 @@ function toNumber(value?: number | string | null) {
                 <IconifyIcon icon="lucide:refresh-cw" />
                 刷新
               </ElButton>
-              <ElButton v-if="isAdmin" :loading="checking" @click="triggerCheck">
+              <ElButton
+                v-if="isAdmin"
+                :loading="checking"
+                @click="triggerCheck"
+              >
                 <IconifyIcon icon="lucide:send" />
                 触发检查
               </ElButton>
@@ -563,13 +571,13 @@ function toNumber(value?: number | string | null) {
 }
 
 .overview-band {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
-  display: flex;
-  justify-content: space-between;
-  padding: 20px 24px;
 }
 
 .page-title {
@@ -579,15 +587,15 @@ function toNumber(value?: number | string | null) {
 }
 
 .page-meta {
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
   margin-top: 8px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 
 .overview-stats {
   display: grid;
-  gap: 24px;
   grid-template-columns: repeat(3, minmax(84px, 1fr));
+  gap: 24px;
   min-width: 360px;
 }
 
@@ -599,8 +607,8 @@ function toNumber(value?: number | string | null) {
 
 .overview-stat span,
 .stack-cell small {
-  color: var(--el-text-color-secondary);
   font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 
 .overview-stat strong {
@@ -609,17 +617,17 @@ function toNumber(value?: number | string | null) {
 }
 
 .panel-header {
-  align-items: center;
   display: flex;
-  font-weight: 600;
   gap: 12px;
+  align-items: center;
   justify-content: space-between;
+  font-weight: 600;
 }
 
 .header-left {
-  align-items: center;
   display: flex;
   gap: 12px;
+  align-items: center;
 }
 
 .type-filter {
@@ -634,15 +642,23 @@ function toNumber(value?: number | string | null) {
 }
 
 .stock-alert-page :deep(.stock-alert-row-up) {
-  --el-table-tr-bg-color: #7f1d1d;
-  color: #fff7ed;
-  box-shadow: inset 3px 0 0 #f97316;
+  --el-table-row-hover-bg-color: rgb(220 68 70 / 28%);
+  --el-table-tr-bg-color: rgb(220 68 70 / 18%);
+  --stock-alert-row-border: rgb(220 68 70 / 55%);
+
+  color: var(--el-text-color-primary);
+  outline: 1px solid var(--stock-alert-row-border);
+  outline-offset: -1px;
 }
 
 .stock-alert-page :deep(.stock-alert-row-down) {
-  --el-table-tr-bg-color: #14532d;
-  color: #f0fdf4;
-  box-shadow: inset 3px 0 0 #22c55e;
+  --el-table-row-hover-bg-color: rgb(87 209 136 / 24%);
+  --el-table-tr-bg-color: rgb(87 209 136 / 16%);
+  --stock-alert-row-border: rgb(87 209 136 / 48%);
+
+  color: var(--el-text-color-primary);
+  outline: 1px solid var(--stock-alert-row-border);
+  outline-offset: -1px;
 }
 
 .stock-alert-page :deep(.stock-alert-row-up .el-table__cell),
@@ -652,14 +668,21 @@ function toNumber(value?: number | string | null) {
 
 .stock-alert-page :deep(.stock-alert-row-up small),
 .stock-alert-page :deep(.stock-alert-row-down small) {
-  color: rgb(255 255 255 / 70%);
+  color: var(--el-text-color-secondary);
+}
+
+.stock-alert-page :deep(.stock-alert-row-up .el-tag--warning),
+.stock-alert-page :deep(.stock-alert-row-down .el-tag--warning) {
+  color: var(--el-text-color-primary);
+  background-color: rgb(239 189 72 / 16%);
+  border-color: rgb(239 189 72 / 58%);
 }
 
 @media (max-width: 768px) {
   .overview-band,
   .panel-header {
-    align-items: stretch;
     flex-direction: column;
+    align-items: stretch;
   }
 
   .overview-stats {

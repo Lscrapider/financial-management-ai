@@ -1,29 +1,24 @@
 <script lang="ts" setup>
+import type {
+  AiConsoleOverview,
+  AiTokenUsageTrend,
+  AppVisitTrend,
+} from '#/api/console';
+import type { MarketSyncJob } from '#/api/market-sync';
+
 import { computed, onMounted, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
 import { IconifyIcon } from '@vben/icons';
 
-import {
-  ElButton,
-  ElCard,
-  ElMessage,
-  ElSkeleton,
-  ElTag,
-} from 'element-plus';
+import { ElButton, ElCard, ElMessage, ElSkeleton, ElTag } from 'element-plus';
 
 import {
   getAiConsoleOverview,
   listAiTokenUsageTrends,
   listAppVisitTrends,
-  type AiConsoleOverview,
-  type AiTokenUsageTrend,
-  type AppVisitTrend,
 } from '#/api/console';
-import {
-  listLatestFullMarketSyncJobs,
-  type MarketSyncJob,
-} from '#/api/market-sync';
+import { listLatestFullMarketSyncJobs } from '#/api/market-sync';
 
 import AnalyticsTrends from './analytics-trends.vue';
 import AnalyticsVisitTrends from './analytics-visit-trends.vue';
@@ -61,15 +56,13 @@ const tokenTrends = ref<AiTokenUsageTrend[]>([]);
 const visitTrends = ref<AppVisitTrend[]>([]);
 const marketSyncJobs = ref<MarketSyncJob[]>([]);
 
-const latestJobMap = computed(() =>
-  marketSyncJobs.value.reduce<Partial<Record<MarketKind, MarketSyncJob>>>(
-    (result, job) => {
-      result[job.targetType] = job;
-      return result;
-    },
-    {},
-  ),
-);
+const latestJobMap = computed(() => {
+  const result: Partial<Record<MarketKind, MarketSyncJob>> = {};
+  for (const job of marketSyncJobs.value) {
+    result[job.targetType] = job;
+  }
+  return result;
+});
 
 const hasRuntimeData = computed(
   () =>
@@ -118,12 +111,22 @@ const metricCards = computed<MetricCard[]>(() => {
     {
       detail: `成功 ${successCount}，失败 ${failedCount}`,
       label: '全量同步',
-      status: runningCount > 0 ? 'running' : failedCount > 0 ? 'failed' : 'success',
+      status: marketSyncStatus(runningCount, failedCount),
       trend: runningCount > 0 ? `${runningCount} 项运行中` : latestSyncText(),
       value: `${marketSyncJobs.value.length}/3`,
     },
   ];
 });
+
+function marketSyncStatus(runningCount: number, failedCount: number) {
+  if (runningCount > 0) {
+    return 'running';
+  }
+  if (failedCount > 0) {
+    return 'failed';
+  }
+  return 'success';
+}
 
 const monitorSignals = computed<MonitorSignal[]>(() => {
   const tokenUsage = overview.value?.tokenUsage;
@@ -213,7 +216,7 @@ function statusTagType(status: SignalStatus) {
 function latestSyncText() {
   const finishedJobs = marketSyncJobs.value
     .filter((item) => item.finishedAt)
-    .sort(
+    .toSorted(
       (left, right) =>
         new Date(right.finishedAt ?? '').getTime() -
         new Date(left.finishedAt ?? '').getTime(),
@@ -238,7 +241,7 @@ function syncJobDetail(job: MarketSyncJob) {
 }
 
 function formatDuration(durationMs?: number) {
-  if (durationMs == null) return '-';
+  if (durationMs === null || durationMs === undefined) return '-';
   if (durationMs < 1000) return `${durationMs}ms`;
   const seconds = Math.round(durationMs / 1000);
   if (seconds < 60) return `${seconds}s`;
@@ -269,7 +272,9 @@ function formatTime(value?: string) {
       <section class="monitor-toolbar">
         <div>
           <h2>运行扫描</h2>
-          <p>聚合访问日志、AI Token 和行情同步任务，快速确认系统是否正常写入。</p>
+          <p>
+            聚合访问日志、AI Token 和行情同步任务，快速确认系统是否正常写入。
+          </p>
         </div>
         <ElButton :loading="loading" type="primary" @click="loadMonitorData()">
           <IconifyIcon icon="lucide:refresh-cw" />
@@ -289,7 +294,11 @@ function formatTime(value?: string) {
           >
             <div class="metric-card-head">
               <span>{{ item.label }}</span>
-              <ElTag :type="statusTagType(item.status)" effect="plain" size="small">
+              <ElTag
+                :type="statusTagType(item.status)"
+                effect="plain"
+                size="small"
+              >
                 {{ statusLabel(item.status) }}
               </ElTag>
             </div>
@@ -342,18 +351,20 @@ function formatTime(value?: string) {
             >
               <div class="signal-main">
                 <span
-                  :class="[
-                    'status-dot',
-                    `is-${signal.status}`,
-                  ]"
-                />
+                  class="status-dot"
+                  :class="[`is-${signal.status}`]"
+                ></span>
                 <div>
                   <h4>{{ signal.title }}</h4>
                   <p>{{ signal.detail }}</p>
                 </div>
               </div>
               <div class="signal-meta">
-                <ElTag :type="statusTagType(signal.status)" effect="plain" size="small">
+                <ElTag
+                  :type="statusTagType(signal.status)"
+                  effect="plain"
+                  size="small"
+                >
                   {{ statusLabel(signal.status) }}
                 </ElTag>
                 <span>{{ signal.meta }}</span>
@@ -374,20 +385,20 @@ function formatTime(value?: string) {
 }
 
 .monitor-toolbar {
+  display: flex;
+  gap: 16px;
   align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
-  display: flex;
-  gap: 16px;
-  justify-content: space-between;
-  padding: 16px 18px;
 }
 
 .monitor-toolbar :deep(.el-button span) {
-  align-items: center;
   display: inline-flex;
   gap: 6px;
+  align-items: center;
 }
 
 .metric-grid,
@@ -416,8 +427,8 @@ function formatTime(value?: string) {
 .signal-row,
 .signal-main,
 .signal-meta {
-  align-items: center;
   display: flex;
+  align-items: center;
 }
 
 .metric-card-head,
@@ -432,18 +443,18 @@ function formatTime(value?: string) {
 
 .metric-card-head span,
 .signal-meta span {
-  color: var(--el-text-color-secondary);
   font-size: 12px;
   line-height: 18px;
+  color: var(--el-text-color-secondary);
 }
 
 .metric-card strong {
-  color: var(--el-text-color-primary);
   display: block;
+  margin-top: 14px;
   font-size: 28px;
   font-weight: 700;
   line-height: 34px;
-  margin-top: 14px;
+  color: var(--el-text-color-primary);
 }
 
 .metric-card p,
@@ -451,10 +462,10 @@ function formatTime(value?: string) {
 .panel-header p,
 .signal-main p,
 .monitor-toolbar p {
-  color: var(--el-text-color-regular);
+  margin: 0;
   font-size: 13px;
   line-height: 20px;
-  margin: 0;
+  color: var(--el-text-color-regular);
 }
 
 .metric-card p {
@@ -462,9 +473,9 @@ function formatTime(value?: string) {
 }
 
 .metric-card small {
-  color: var(--el-text-color-secondary);
   display: block;
   margin-top: 10px;
+  color: var(--el-text-color-secondary);
 }
 
 .panel-header {
@@ -475,9 +486,9 @@ function formatTime(value?: string) {
 h2,
 h3,
 h4 {
-  color: var(--el-text-color-primary);
-  font-weight: 600;
   margin: 0;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
 }
 
 h2 {
@@ -496,14 +507,14 @@ h4 {
 }
 
 .chart-box {
-  height: 320px;
   min-width: 0;
+  height: 320px;
 }
 
 .signal-list {
+  overflow: hidden;
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
-  overflow: hidden;
 }
 
 .signal-row {
@@ -522,7 +533,7 @@ h4 {
 
 .signal-main p {
   margin-top: 2px;
-  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .signal-meta {
@@ -533,11 +544,11 @@ h4 {
 }
 
 .status-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
   background: #94a3b8;
   border-radius: 999px;
-  flex: 0 0 auto;
-  height: 8px;
-  width: 8px;
 }
 
 .status-dot.is-success {
@@ -559,8 +570,8 @@ h4 {
   }
 
   .signal-row {
-    align-items: stretch;
     flex-direction: column;
+    align-items: stretch;
   }
 
   .signal-meta {
@@ -573,8 +584,8 @@ h4 {
 @media (max-width: 640px) {
   .monitor-toolbar,
   .panel-header {
-    align-items: stretch;
     flex-direction: column;
+    align-items: stretch;
   }
 
   .monitor-toolbar :deep(.el-button) {

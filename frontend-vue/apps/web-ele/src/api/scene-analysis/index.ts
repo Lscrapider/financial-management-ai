@@ -152,7 +152,9 @@ export interface SceneAnalysisTargetOption {
   targetType: string;
 }
 
-export function listSceneReportTargets(params: SceneAnalysisReportTargetPageParams = {}) {
+export function listSceneReportTargets(
+  params: SceneAnalysisReportTargetPageParams = {},
+) {
   return requestClient.get<SceneAnalysisReportTargetPage>(
     '/ai/scene-analysis/tasks/reports/targets',
     {
@@ -168,7 +170,9 @@ export function listSceneReportTargets(params: SceneAnalysisReportTargetPagePara
   );
 }
 
-export function submitSceneAnalysisTask(payload: SceneAnalysisTaskSubmitPayload) {
+export function submitSceneAnalysisTask(
+  payload: SceneAnalysisTaskSubmitPayload,
+) {
   return requestClient.post<SceneAnalysisSubmitResult>(
     '/ai/scene-analysis/tasks',
     payload,
@@ -197,7 +201,9 @@ export function getSceneAnalysisReportTypes() {
   );
 }
 
-export function createSceneAnalysisConfigProfile(payload: SceneAnalysisConfigProfilePayload) {
+export function createSceneAnalysisConfigProfile(
+  payload: SceneAnalysisConfigProfilePayload,
+) {
   return requestClient.post<SceneAnalysisConfigProfile>(
     '/ai/scene-analysis/config-profiles',
     payload,
@@ -217,7 +223,9 @@ export function updateSceneAnalysisConfigProfile(
 }
 
 export function deleteSceneAnalysisConfigProfile(id: number) {
-  return requestClient.delete<void>(`/ai/scene-analysis/config-profiles/${id}`);
+  return requestClient.delete<unknown>(
+    `/ai/scene-analysis/config-profiles/${id}`,
+  );
 }
 
 export function searchSceneAnalysisTargets(params: {
@@ -252,7 +260,7 @@ export function getSceneReportDetail(reportId: number) {
 }
 
 export function regenerateSceneReport(taskNo: string) {
-  return requestClient.post<void>(
+  return requestClient.post<unknown>(
     `/ai/scene-analysis/tasks/${taskNo}/report/regenerate`,
     undefined,
     { responseReturn: 'body' },

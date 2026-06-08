@@ -72,9 +72,9 @@ async function loadQuote() {
 }
 
 .widget-summary {
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  margin-bottom: 12px;
   padding-bottom: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
 .widget-summary div {
@@ -84,35 +84,35 @@ async function loadQuote() {
 }
 
 .widget-summary span {
-  color: var(--el-text-color-secondary);
   font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .detail-grid {
   display: grid;
-  gap: 0 18px;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0 18px;
 }
 
 .detail-cell {
-  align-items: baseline;
-  border-bottom: 1px dashed var(--el-border-color-lighter);
   display: flex;
   gap: 10px;
+  align-items: baseline;
   justify-content: space-between;
   min-height: 40px;
   padding: 9px 0;
+  border-bottom: 1px dashed var(--el-border-color-lighter);
 }
 
 .detail-cell span {
-  color: var(--el-text-color-secondary);
   flex-shrink: 0;
   font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 
 .detail-cell strong {
   font-size: 13px;
-  overflow-wrap: anywhere;
   text-align: right;
+  overflow-wrap: anywhere;
 }
 </style>

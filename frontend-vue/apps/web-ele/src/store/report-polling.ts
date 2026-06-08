@@ -27,7 +27,7 @@ interface StartPollingOptions {
 
 const FIRST_WINDOW_MS = 20_000;
 const FIRST_WINDOW_INTERVAL_MS = 10_000;
-const NORMAL_INTERVAL_MS = 5_000;
+const NORMAL_INTERVAL_MS = 5000;
 
 export const useReportPollingStore = defineStore('report-polling', () => {
   const tasks = reactive<Record<string, PollingTask>>({});
@@ -64,7 +64,7 @@ export const useReportPollingStore = defineStore('report-polling', () => {
     if (task.timerId) {
       clearTimeout(task.timerId);
     }
-    delete tasks[taskNo];
+    Reflect.deleteProperty(tasks, taskNo);
   }
 
   function $reset() {
@@ -81,9 +81,7 @@ export const useReportPollingStore = defineStore('report-polling', () => {
     }
     const elapsed = Date.now() - task.startedAt;
     const delay =
-      elapsed < FIRST_WINDOW_MS
-        ? FIRST_WINDOW_INTERVAL_MS
-        : NORMAL_INTERVAL_MS;
+      elapsed < FIRST_WINDOW_MS ? FIRST_WINDOW_INTERVAL_MS : NORMAL_INTERVAL_MS;
     task.timerId = setTimeout(() => {
       void poll(taskNo);
     }, delay);
@@ -108,7 +106,6 @@ export const useReportPollingStore = defineStore('report-polling', () => {
       if (report.status === 'failed') {
         notifyFailed(task, report.errorMessage);
         stop(taskNo);
-        return;
       }
     } finally {
       const latest = tasks[taskNo];

@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import type { OcrTask, OcrTaskStatus } from '#/api/ocr-task';
+
 import { computed, onMounted, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
@@ -27,7 +29,6 @@ import {
   saveManualKnowledgeDraft,
   submitManualKnowledgeTask,
 } from '#/api/manual-knowledge';
-import type { OcrTask, OcrTaskStatus } from '#/api/ocr-task';
 
 type ManualTask = {
   chunks: number;
@@ -39,6 +40,9 @@ type ManualTask = {
   updatedAt: string;
 };
 
+const MANUAL_INTRO_TEXT =
+  '按 chunk 手动录入文本，提交后复用现有场景打标和向量入库流程';
+
 const loadingTasks = ref(false);
 const saving = ref(false);
 const submitting = ref(false);
@@ -49,14 +53,14 @@ const editingTaskNo = ref('');
 const title = ref('');
 const chunks = ref<string[]>(['']);
 const tasks = ref<ManualTask[]>([]);
-const statusFilter = ref<OcrTaskStatus | 'all'>('all');
+const statusFilter = ref<'all' | OcrTaskStatus>('all');
 const pageNum = ref(1);
 const pageSize = ref(20);
 const totalTasks = ref(0);
 
 const statusFilterOptions: Array<{
   label: string;
-  value: OcrTaskStatus | 'all';
+  value: 'all' | OcrTaskStatus;
 }> = [
   { label: '全部状态', value: 'all' },
   { label: '草稿待提交', value: 'manual_review_required' },
@@ -99,7 +103,7 @@ async function loadTasks() {
       pageSize: pageSize.value,
       status: statusFilter.value === 'all' ? undefined : statusFilter.value,
     });
-    tasks.value = page.records.map(toManualTask);
+    tasks.value = page.records.map((item) => toManualTask(item));
     totalTasks.value = page.total;
   } finally {
     loadingTasks.value = false;
@@ -183,7 +187,9 @@ async function removeTask(row: ManualTask) {
 }
 
 function currentDraft() {
-  const normalizedChunks = chunks.value.map((item) => item.trim()).filter(Boolean);
+  const normalizedChunks = chunks.value
+    .map((item) => item.trim())
+    .filter(Boolean);
   if (normalizedChunks.length === 0) {
     ElMessage.warning('至少需要一个非空文本分段');
     return undefined;
@@ -284,7 +290,7 @@ function formatDateTime(value?: string) {
       <section class="toolbar-band">
         <div>
           <h2>手动文本入库</h2>
-          <span>按 chunk 手动录入文本，提交后复用现有场景打标和向量入库流程</span>
+          <span>{{ MANUAL_INTRO_TEXT }}</span>
         </div>
         <div class="toolbar-actions">
           <ElSelect
@@ -357,7 +363,10 @@ function formatDateTime(value?: string) {
               <ElButton link type="primary" @click="openEditor(row)">
                 {{ row.status === 'manual_review_required' ? '编辑' : '查看' }}
               </ElButton>
-              <ElPopconfirm title="确认删除该手动任务？" @confirm="removeTask(row)">
+              <ElPopconfirm
+                title="确认删除该手动任务？"
+                @confirm="removeTask(row)"
+              >
                 <template #reference>
                   <ElButton
                     :loading="deletingTaskNo === row.id"
@@ -371,7 +380,10 @@ function formatDateTime(value?: string) {
             </template>
           </ElTableColumn>
         </ElTable>
-        <ElEmpty v-if="!loadingTasks && tasks.length === 0" description="暂无手动任务" />
+        <ElEmpty
+          v-if="!loadingTasks && tasks.length === 0"
+          description="暂无手动任务"
+        />
         <div class="pagination-row">
           <ElPagination
             v-model:current-page="pageNum"
@@ -429,7 +441,12 @@ function formatDateTime(value?: string) {
               />
             </div>
           </div>
-          <ElButton v-if="!dialogReadonly" plain type="primary" @click="addChunk">
+          <ElButton
+            v-if="!dialogReadonly"
+            plain
+            type="primary"
+            @click="addChunk"
+          >
             添加 Chunk
           </ElButton>
         </div>
@@ -467,16 +484,16 @@ function formatDateTime(value?: string) {
 .toolbar-band,
 .summary-band,
 .table-band {
+  background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
-  background: var(--el-bg-color);
 }
 
 .toolbar-band {
   display: flex;
+  gap: 16px;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
   padding: 18px 20px;
 }
 
@@ -487,14 +504,14 @@ function formatDateTime(value?: string) {
 }
 
 .toolbar-band span {
-  color: var(--el-text-color-secondary);
   font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 
 .toolbar-actions {
   display: flex;
-  align-items: center;
   gap: 10px;
+  align-items: center;
 }
 
 .status-filter {
@@ -514,8 +531,8 @@ function formatDateTime(value?: string) {
 }
 
 .metric-item span {
-  color: var(--el-text-color-secondary);
   font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 
 .metric-item strong {
@@ -547,9 +564,9 @@ function formatDateTime(value?: string) {
 
 .editor-form label span,
 .editor-header {
-  color: var(--el-text-color-regular);
   font-size: 13px;
   font-weight: 600;
+  color: var(--el-text-color-regular);
 }
 
 .editor-header {
@@ -562,14 +579,14 @@ function formatDateTime(value?: string) {
   flex-direction: column;
   gap: 12px;
   max-height: 560px;
-  overflow: auto;
   padding-right: 4px;
+  overflow: auto;
 }
 
 .chunk-item {
+  padding: 12px;
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
-  padding: 12px;
 }
 
 .chunk-title {
@@ -581,8 +598,8 @@ function formatDateTime(value?: string) {
 
 @media (max-width: 900px) {
   .toolbar-band {
-    align-items: stretch;
     flex-direction: column;
+    align-items: stretch;
   }
 
   .toolbar-actions {

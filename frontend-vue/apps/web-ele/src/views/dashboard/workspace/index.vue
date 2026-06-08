@@ -59,6 +59,14 @@ const adjustTypeOptions: Array<{ label: string; value: KlineAdjustType }> = [
   { label: '不复权', value: 'none' },
 ];
 
+const MARKET_CHART_COLORS = {
+  compare: '#8a929f',
+  fall: '#57d188',
+  price: '#006be6',
+  reference: '#efbd48',
+  rise: '#dc4446',
+} as const;
+
 const chartRef = ref<EchartsUIType>();
 const { renderEcharts } = useEcharts(chartRef);
 const router = useRouter();
@@ -297,7 +305,8 @@ async function refreshKlines() {
     klines.value = await listStockKlines({
       adjustType: adjustType.value,
       limit: klineLimit.value,
-      periodType: trendPeriod.value === 'intraday' ? 'daily' : trendPeriod.value,
+      periodType:
+        trendPeriod.value === 'intraday' ? 'daily' : trendPeriod.value,
       stockCode: selectedStockCode.value,
     });
     trends.value = [];
@@ -388,7 +397,11 @@ function renderIntradayChart() {
   ];
 
   renderEcharts({
-    color: ['#089981', '#f59e0b', '#ef4444'],
+    color: [
+      MARKET_CHART_COLORS.price,
+      MARKET_CHART_COLORS.reference,
+      MARKET_CHART_COLORS.compare,
+    ],
     grid: {
       bottom: 36,
       left: 48,
@@ -431,14 +444,22 @@ function renderKlineChart() {
     const closePrice = toNumber(item.closePrice);
     return {
       itemStyle: {
-        color: closePrice >= openPrice ? '#ef4444' : '#089981',
+        color:
+          closePrice >= openPrice
+            ? MARKET_CHART_COLORS.rise
+            : MARKET_CHART_COLORS.fall,
       },
       value: toNumber(item.volume),
     };
   });
 
   renderEcharts({
-    color: ['#ef4444', '#f59e0b', '#3b82f6', '#8b5cf6'],
+    color: [
+      MARKET_CHART_COLORS.rise,
+      MARKET_CHART_COLORS.reference,
+      MARKET_CHART_COLORS.price,
+      MARKET_CHART_COLORS.compare,
+    ],
     axisPointer: {
       link: [
         {
@@ -480,10 +501,10 @@ function renderKlineChart() {
       {
         data: candleData,
         itemStyle: {
-          borderColor: '#ef4444',
-          borderColor0: '#089981',
-          color: '#ef4444',
-          color0: '#089981',
+          borderColor: MARKET_CHART_COLORS.rise,
+          borderColor0: MARKET_CHART_COLORS.fall,
+          color: MARKET_CHART_COLORS.rise,
+          color0: MARKET_CHART_COLORS.fall,
         },
         name: selectedTrendPeriodLabel.value,
         type: 'candlestick',
@@ -1035,22 +1056,22 @@ function toNumber(value?: null | number | string) {
 }
 
 .overview-band {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
-  display: flex;
-  justify-content: space-between;
-  padding: 20px 24px;
 }
 
 .stock-title {
-  align-items: baseline;
   display: flex;
   flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
   font-size: 28px;
   font-weight: 700;
-  gap: 10px;
   line-height: 1.2;
 }
 
@@ -1066,58 +1087,58 @@ function toNumber(value?: null | number | string) {
 }
 
 .stock-meta {
-  font-size: 13px;
   margin-top: 8px;
+  font-size: 13px;
 }
 
 .market-index-section {
+  padding: 16px 18px;
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
-  padding: 16px 18px;
 }
 
 .section-header {
-  align-items: center;
   display: flex;
+  align-items: center;
   justify-content: space-between;
   margin-bottom: 14px;
 }
 
 .section-header h2 {
+  margin: 0;
   font-size: 16px;
   font-weight: 700;
   line-height: 1.2;
-  margin: 0;
 }
 
 .section-header span {
-  color: var(--el-text-color-secondary);
   display: block;
-  font-size: 12px;
   margin-top: 4px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .index-card-grid {
   display: flex;
   gap: 12px;
-  overflow-x: auto;
   padding-bottom: 4px;
+  overflow-x: auto;
   scrollbar-width: thin;
 }
 
 .index-card {
-  background: var(--el-fill-color-lighter);
-  border: 1px solid transparent;
-  border-radius: 6px;
-  color: inherit;
-  cursor: pointer;
   display: grid;
   flex: 0 0 240px;
   gap: 6px;
   min-height: 116px;
   padding: 14px;
+  color: inherit;
   text-align: left;
+  cursor: pointer;
+  background: var(--el-fill-color-lighter);
+  border: 1px solid transparent;
+  border-radius: 6px;
   transition:
     border-color 0.2s ease,
     background-color 0.2s ease;
@@ -1129,9 +1150,9 @@ function toNumber(value?: null | number | string) {
 }
 
 .index-card-name {
-  color: var(--el-text-color-regular);
   font-size: 14px;
   font-weight: 600;
+  color: var(--el-text-color-regular);
 }
 
 .index-card strong {
@@ -1145,14 +1166,14 @@ function toNumber(value?: null | number | string) {
 }
 
 .index-card small {
-  color: var(--el-text-color-secondary);
   font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .overview-stats {
   display: grid;
-  gap: 24px;
   grid-template-columns: repeat(3, minmax(84px, 1fr));
+  gap: 24px;
   min-width: 360px;
 }
 
@@ -1163,8 +1184,8 @@ function toNumber(value?: null | number | string) {
 }
 
 .overview-stat span {
-  color: var(--el-text-color-secondary);
   font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 
 .overview-stat strong {
@@ -1173,10 +1194,10 @@ function toNumber(value?: null | number | string) {
 }
 
 .content-grid {
-  align-items: start;
   display: grid;
-  gap: 16px;
   grid-template-columns: minmax(470px, 0.92fr) minmax(500px, 1.08fr);
+  gap: 16px;
+  align-items: start;
 }
 
 .quote-panel {
@@ -1196,9 +1217,9 @@ function toNumber(value?: null | number | string) {
 
 .quote-table {
   flex: 1;
+  width: 100%;
   height: 100%;
   min-height: 0;
-  width: 100%;
 }
 
 .quote-table :deep(.el-table__inner-wrapper) {
@@ -1227,29 +1248,29 @@ function toNumber(value?: null | number | string) {
 }
 
 .panel-header {
-  align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  font-weight: 600;
+  align-items: center;
   justify-content: space-between;
   min-width: 0;
+  font-weight: 600;
 }
 
 .trend-status {
   flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 12px;
   font-weight: 400;
-  overflow: hidden;
   text-align: right;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .header-actions {
-  align-items: center;
   display: flex;
   gap: 10px;
+  align-items: center;
 }
 
 .market-select {
@@ -1275,54 +1296,54 @@ function toNumber(value?: null | number | string) {
 
 .quote-detail-grid {
   display: grid;
-  gap: 0 32px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 32px;
   max-height: 520px;
   overflow: auto;
 }
 
 .quote-detail-cell {
-  align-items: baseline;
-  border-bottom: 1px dashed var(--el-border-color-lighter);
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
   padding: 9px 0;
+  border-bottom: 1px dashed var(--el-border-color-lighter);
 }
 
 .quote-detail-cell .detail-label {
-  color: var(--el-text-color-secondary);
   flex-shrink: 0;
-  font-size: 13px;
   margin-right: 8px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 
 .quote-detail-cell .detail-value {
   font-size: 13px;
-  font-variant-numeric: tabular-nums;
   font-weight: 600;
-  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
   text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .metric-grid {
   display: grid;
-  gap: 14px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .metric-item {
-  background: var(--el-fill-color-lighter);
-  border-radius: 6px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   min-height: 72px;
   padding: 12px;
+  background: var(--el-fill-color-lighter);
+  border-radius: 6px;
 }
 
 .metric-item span {
-  color: var(--el-text-color-secondary);
   font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 
 .metric-item strong {
@@ -1331,8 +1352,8 @@ function toNumber(value?: null | number | string) {
 }
 
 .chart-wrap {
-  height: 460px;
   min-width: 0;
+  height: 460px;
 }
 
 @media (max-width: 1200px) {
@@ -1343,9 +1364,9 @@ function toNumber(value?: null | number | string) {
 
 @media (max-width: 768px) {
   .overview-band {
-    align-items: stretch;
     flex-direction: column;
     gap: 16px;
+    align-items: stretch;
   }
 
   .overview-stats {

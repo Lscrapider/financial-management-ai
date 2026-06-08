@@ -124,20 +124,22 @@ defineExpose({
         </VbenCheckbox>
       </div>
 
-      <span
+      <button
         v-if="showForgetPassword"
-        class="vben-link text-sm font-normal"
+        class="vben-link inline-flex min-h-8 items-center border-none bg-transparent p-0 text-sm font-normal"
+        type="button"
         @click="handleGo(forgetPasswordPath)"
+        @keydown.enter.stop
       >
         {{ $t('authentication.forgetPassword') }}
-      </span>
+      </button>
     </div>
     <VbenButton
       :class="{
         'cursor-wait': loading,
       }"
       :loading="loading"
-      aria-label="login"
+      :aria-label="submitButtonText || $t('common.login')"
       class="w-full"
       @click="handleSubmit"
     >
@@ -174,12 +176,14 @@ defineExpose({
     <slot name="to-register">
       <div v-if="showRegister" class="mt-3 text-center text-sm">
         {{ $t('authentication.accountTip') }}
-        <span
-          class="vben-link text-sm font-normal"
+        <button
+          class="vben-link inline-flex min-h-8 items-center border-none bg-transparent p-0 text-sm font-normal"
+          type="button"
           @click="handleGo(registerPath)"
+          @keydown.enter.stop
         >
           {{ $t('authentication.createAccount') }}
-        </span>
+        </button>
       </div>
     </slot>
   </div>

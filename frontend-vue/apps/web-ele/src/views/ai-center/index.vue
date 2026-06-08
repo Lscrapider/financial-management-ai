@@ -1,4 +1,14 @@
 <script lang="ts" setup>
+import type { UploadFile, UploadInstance, UploadRawFile } from 'element-plus';
+
+import type { OcrReviewDetail, OcrReviewDraftContent } from '#/api/ocr-review';
+import type {
+  OcrChunkTagChunk,
+  OcrChunkTagDetail,
+  OcrStageDetail,
+  OcrTask,
+} from '#/api/ocr-task';
+
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -23,25 +33,14 @@ import {
   ElTimelineItem,
   ElUpload,
 } from 'element-plus';
-import type { UploadFile, UploadRawFile } from 'element-plus';
-import type { UploadInstance } from 'element-plus';
 
-import {
-  getOcrReview,
-  submitOcrReview,
-  type OcrReviewDetail,
-  type OcrReviewDraftContent,
-} from '#/api/ocr-review';
+import { getOcrReview, submitOcrReview } from '#/api/ocr-review';
 import {
   deleteOcrTask,
   getOcrChunkTagDetail,
   getOcrStageDetail,
   pageOcrTasks,
   submitOcrTask,
-  type OcrChunkTagDetail,
-  type OcrChunkTagChunk,
-  type OcrStageDetail,
-  type OcrTask,
 } from '#/api/ocr-task';
 
 type ProcessingStatus = OcrTask['status'];
@@ -65,7 +64,7 @@ const uploadRef = ref<UploadInstance>();
 const submitting = ref(false);
 const loadingTasks = ref(false);
 const deletingTaskNo = ref('');
-const statusFilter = ref<ProcessingStatus | 'all'>('all');
+const statusFilter = ref<'all' | ProcessingStatus>('all');
 const pageNum = ref(1);
 const pageSize = ref(20);
 const totalTasks = ref(0);
@@ -95,7 +94,7 @@ const reviewDetail = ref<OcrReviewDetail>();
 
 const statusFilterOptions: Array<{
   label: string;
-  value: ProcessingStatus | 'all';
+  value: 'all' | ProcessingStatus;
 }> = [
   { label: '全部状态', value: 'all' },
   { label: '处理中', value: 'running' },
@@ -136,7 +135,9 @@ const reviewingCount = computed(() => {
   ).length;
 });
 
-const canSubmit = computed(() => selectedFiles.value.length > 0 && !submitting.value);
+const canSubmit = computed(
+  () => selectedFiles.value.length > 0 && !submitting.value,
+);
 
 onMounted(() => {
   void loadTasks();
@@ -150,7 +151,7 @@ async function loadTasks() {
       pageSize: pageSize.value,
       status: statusFilter.value === 'all' ? undefined : statusFilter.value,
     });
-    processingTasks.value = page.records.map(toProcessingTask);
+    processingTasks.value = page.records.map((item) => toProcessingTask(item));
     totalTasks.value = page.total;
     selectedTaskId.value = processingTasks.value[0]?.id ?? '';
   } finally {
@@ -166,7 +167,7 @@ async function submitTask() {
   submitting.value = true;
   try {
     const tasks = await submitOcrTask(selectedFiles.value);
-    const newProcessingTasks = tasks.map(toProcessingTask);
+    const newProcessingTasks = tasks.map((item) => toProcessingTask(item));
     pageNum.value = 1;
     selectedTaskId.value = newProcessingTasks[0]?.id ?? selectedTaskId.value;
     selectedFiles.value = [];
@@ -283,14 +284,16 @@ function statusLabel(status: ProcessingStatus) {
 }
 
 function statusType(status: ProcessingStatus) {
-  const types: Record<ProcessingStatus, 'danger' | 'info' | 'success' | 'warning'> =
-    {
-      failed: 'danger',
-      finished: 'success',
-      manual_review_required: 'warning',
-      ready: 'info',
-      running: 'warning',
-    };
+  const types: Record<
+    ProcessingStatus,
+    'danger' | 'info' | 'success' | 'warning'
+  > = {
+    failed: 'danger',
+    finished: 'success',
+    manual_review_required: 'warning',
+    ready: 'info',
+    running: 'warning',
+  };
   return types[status];
 }
 
@@ -309,7 +312,7 @@ function stageClass(index: number) {
   const currentIndex = pipelineStages.findIndex(
     (item) => item.key === normalizeStage(task.currentStage),
   );
-  if (currentIndex < 0) {
+  if (currentIndex === -1) {
     return '';
   }
   if (task.status === 'finished' || index < currentIndex) {
@@ -326,11 +329,9 @@ function normalizeStage(stage: ProcessingStage) {
 }
 
 function isChunkTagStage(stage: string) {
-  return [
-    'chunk.tag.rule',
-    'chunk.tag.llm',
-    'chunk.tag.correct',
-  ].includes(stage);
+  return ['chunk.tag.correct', 'chunk.tag.llm', 'chunk.tag.rule'].includes(
+    stage,
+  );
 }
 
 function canOpenStage(stageKey: string) {
@@ -338,10 +339,11 @@ function canOpenStage(stageKey: string) {
     return false;
   }
   const stageIndex = pipelineStages.findIndex((item) => item.key === stageKey);
+  const currentStage = selectedTask.value.currentStage;
   const currentIndex = pipelineStages.findIndex(
-    (item) => item.key === normalizeStage(selectedTask.value!.currentStage),
+    (item) => item.key === normalizeStage(currentStage),
   );
-  return stageIndex >= 0 && currentIndex >= stageIndex;
+  return stageIndex !== -1 && currentIndex >= stageIndex;
 }
 
 async function openStage(stageKey: string) {
@@ -465,6 +467,10 @@ function formatNumberList(values: number[]) {
   return values.length > 0 ? values.join(', ') : '-';
 }
 
+function sourcePagesText(values: number[]) {
+  return `第 ${formatNumberList(values)} 页`;
+}
+
 function formatScenes(chunk: OcrChunkTagChunk) {
   if (!chunk.scenes) {
     return '-';
@@ -565,8 +571,8 @@ function formatDateTime(value?: string) {
         <div
           v-for="(stage, index) in pipelineStages"
           :key="stage.key"
+          class="pipeline-step"
           :class="[
-            'pipeline-step',
             stageClass(index),
             { 'is-clickable': canOpenStage(stage.key) },
           ]"
@@ -792,11 +798,15 @@ function formatDateTime(value?: string) {
           </div>
           <div class="stage-detail-row">
             <span>开始</span>
-            <strong>{{ formatDateTime(selectedStageRecord?.startedAt ?? '') }}</strong>
+            <strong>{{
+              formatDateTime(selectedStageRecord?.startedAt ?? '')
+            }}</strong>
           </div>
           <div class="stage-detail-row">
             <span>结束</span>
-            <strong>{{ formatDateTime(selectedStageRecord?.finishedAt ?? '') }}</strong>
+            <strong>{{
+              formatDateTime(selectedStageRecord?.finishedAt ?? '')
+            }}</strong>
           </div>
           <div class="stage-detail-block">
             <span>指标</span>
@@ -868,12 +878,7 @@ function formatDateTime(value?: string) {
           height="620"
           row-key="chunkId"
         >
-          <ElTableColumn
-            align="right"
-            label="#"
-            prop="chunkIndex"
-            width="72"
-          />
+          <ElTableColumn align="right" label="#" prop="chunkIndex" width="72" />
           <ElTableColumn label="页码" width="100">
             <template #default="{ row }">
               {{ formatNumberList(row.pageNos) }}
@@ -956,7 +961,9 @@ function formatDateTime(value?: string) {
             <div class="review-summary">
               <div>
                 <span>任务</span>
-                <strong>{{ reviewTask?.fileName ?? reviewTask?.id ?? '-' }}</strong>
+                <strong>{{
+                  reviewTask?.fileName ?? reviewTask?.id ?? '-'
+                }}</strong>
               </div>
               <div>
                 <span>段落</span>
@@ -980,7 +987,7 @@ function formatDateTime(value?: string) {
               >
                 <div class="paragraph-meta">
                   <strong>#{{ paragraph.paragraphNo }}</strong>
-                  <span>第 {{ formatNumberList(paragraph.sourcePages) }} 页</span>
+                  <span>{{ sourcePagesText(paragraph.sourcePages) }}</span>
                   <span>{{ paragraph.text.length }} 字</span>
                   <ElTag
                     v-if="paragraph.warnings.length > 0"
@@ -1023,9 +1030,9 @@ function formatDateTime(value?: string) {
 .detail-panel,
 .submit-panel,
 .pipeline-band {
+  background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
   border-radius: 8px;
-  background: hsl(var(--card));
 }
 
 .submit-panel {
@@ -1044,8 +1051,8 @@ function formatDateTime(value?: string) {
 }
 
 .upload-content span {
-  color: hsl(var(--muted-foreground));
   font-size: 13px;
+  color: hsl(var(--muted-foreground));
 }
 
 .metric-item {
@@ -1054,8 +1061,8 @@ function formatDateTime(value?: string) {
 
 .metric-item span,
 .panel-header span {
-  color: hsl(var(--muted-foreground));
   font-size: 13px;
+  color: hsl(var(--muted-foreground));
 }
 
 .metric-item strong {
@@ -1075,23 +1082,23 @@ function formatDateTime(value?: string) {
 
 .pipeline-step {
   display: flex;
+  gap: 10px;
   align-items: center;
   min-height: 54px;
-  gap: 10px;
   padding: 10px;
-  border-radius: 6px;
-  background: hsl(var(--muted) / 35%);
   color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted) / 35%);
+  border-radius: 6px;
 }
 
 .pipeline-step.is-active {
-  background: rgb(245 158 11 / 14%);
   color: rgb(217 119 6);
+  background: rgb(245 158 11 / 14%);
 }
 
 .pipeline-step.is-done {
-  background: rgb(16 185 129 / 14%);
   color: rgb(5 150 105);
+  background: rgb(16 185 129 / 14%);
 }
 
 .pipeline-step.is-clickable {
@@ -1108,11 +1115,11 @@ function formatDateTime(value?: string) {
   justify-content: center;
   width: 26px;
   height: 26px;
-  border-radius: 999px;
-  background: currentcolor;
-  color: hsl(var(--background));
   font-size: 13px;
   font-weight: 700;
+  color: hsl(var(--background));
+  background: currentcolor;
+  border-radius: 999px;
 }
 
 .content-grid {
@@ -1135,9 +1142,9 @@ function formatDateTime(value?: string) {
 
 .panel-header {
   display: flex;
+  gap: 12px;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
   margin-bottom: 0;
 }
 
@@ -1157,10 +1164,10 @@ function formatDateTime(value?: string) {
 
 .table-actions {
   display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .queue-tools {
@@ -1194,8 +1201,8 @@ function formatDateTime(value?: string) {
 
 .chunk-summary span {
   display: block;
-  color: hsl(var(--muted-foreground));
   font-size: 12px;
+  color: hsl(var(--muted-foreground));
 }
 
 .chunk-summary strong {
@@ -1206,9 +1213,9 @@ function formatDateTime(value?: string) {
 
 .dialog-header {
   display: flex;
+  gap: 12px;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
   width: 100%;
   padding-right: 38px;
 }
@@ -1230,8 +1237,8 @@ function formatDateTime(value?: string) {
 .stage-detail-row {
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
-  align-items: center;
   gap: 10px;
+  align-items: center;
 }
 
 .stage-detail-block {
@@ -1241,13 +1248,13 @@ function formatDateTime(value?: string) {
 .stage-detail-block span {
   display: block;
   margin-bottom: 8px;
-  color: hsl(var(--muted-foreground));
   font-size: 12px;
+  color: hsl(var(--muted-foreground));
 }
 
 .stage-detail-row span {
-  color: hsl(var(--muted-foreground));
   font-size: 12px;
+  color: hsl(var(--muted-foreground));
 }
 
 .stage-detail-row strong {
@@ -1271,10 +1278,10 @@ function formatDateTime(value?: string) {
   padding: 10px;
   margin: 0;
   overflow: auto;
-  border-radius: 6px;
-  background: hsl(var(--muted) / 45%);
   font-size: 12px;
   white-space: pre-wrap;
+  background: hsl(var(--muted) / 45%);
+  border-radius: 6px;
 }
 
 .review-dialog-body {
@@ -1297,8 +1304,8 @@ function formatDateTime(value?: string) {
 
 .review-summary span {
   display: block;
-  color: hsl(var(--muted-foreground));
   font-size: 12px;
+  color: hsl(var(--muted-foreground));
 }
 
 .review-summary strong {
@@ -1306,34 +1313,34 @@ function formatDateTime(value?: string) {
   min-width: 0;
   margin-top: 6px;
   overflow: hidden;
-  font-size: 16px;
   text-overflow: ellipsis;
+  font-size: 16px;
   white-space: nowrap;
 }
 
 .review-paragraphs {
   display: grid;
-  max-height: 620px;
   gap: 10px;
+  max-height: 620px;
   overflow: auto;
 }
 
 .review-paragraph {
   min-width: 0;
   padding: 12px;
+  background: hsl(var(--background));
   border: 1px solid hsl(var(--border));
   border-radius: 6px;
-  background: hsl(var(--background));
 }
 
 .paragraph-meta {
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
   margin-bottom: 10px;
-  color: hsl(var(--muted-foreground));
   font-size: 13px;
+  color: hsl(var(--muted-foreground));
 }
 
 .paragraph-meta strong {

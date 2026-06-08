@@ -19,8 +19,8 @@ import {
 } from 'element-plus';
 
 import { addBondConfig } from '#/api/bond';
-import { deleteTargetConfig } from '#/api/system-config';
 import { addStockConfig } from '#/api/stock';
+import { deleteTargetConfig } from '#/api/system-config';
 
 type DeleteTargetType = 'BOND' | 'INDEX' | 'STOCK';
 
@@ -56,9 +56,7 @@ const bondAddRules: FormRules = {
       trigger: 'blur',
     },
   ],
-  bondName: [
-    { message: '请输入可转债名称', required: true, trigger: 'blur' },
-  ],
+  bondName: [{ message: '请输入可转债名称', required: true, trigger: 'blur' }],
 };
 const stockAddRules: FormRules = {
   stockCode: [
@@ -69,9 +67,7 @@ const stockAddRules: FormRules = {
       trigger: 'blur',
     },
   ],
-  stockName: [
-    { message: '请输入股票名称', required: true, trigger: 'blur' },
-  ],
+  stockName: [{ message: '请输入股票名称', required: true, trigger: 'blur' }],
 };
 const deleteRules: FormRules = {
   targetCode: [
@@ -141,7 +137,9 @@ async function submitTargetDelete() {
       targetCode: deleteForm.targetCode.trim(),
       targetType: deleteForm.targetType,
     });
-    ElMessage.success(`${deleteTypeLabel.value} ${deleteForm.targetCode.trim()} 已物理删除`);
+    ElMessage.success(
+      `${deleteTypeLabel.value} ${deleteForm.targetCode.trim()} 已物理删除`,
+    );
     deleteForm.targetCode = '';
     deleteFormRef.value?.clearValidate();
   } finally {
@@ -266,7 +264,9 @@ function labelOf(targetType: DeleteTargetType) {
           <div class="target-card-header">
             <div>
               <h2>删除标的</h2>
-              <p>按类型和代码物理删除该标的在配置、行情、分时、报告、提醒和观察池里的数据。</p>
+              <p>
+                按类型和代码物理删除该标的在配置、行情、分时、报告、提醒和观察池里的数据。
+              </p>
             </div>
             <ElTag effect="plain" size="small" type="danger">物理删除</ElTag>
           </div>
@@ -327,8 +327,8 @@ function labelOf(targetType: DeleteTargetType) {
 
 .target-card-grid {
   display: grid;
-  gap: 16px;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
 }
 
 .target-card {
@@ -346,17 +346,17 @@ function labelOf(targetType: DeleteTargetType) {
 }
 
 .target-card-header {
-  align-items: flex-start;
   display: flex;
   gap: 16px;
+  align-items: flex-start;
   justify-content: space-between;
 }
 
 .target-form,
 .delete-form {
   display: grid;
-  gap: 4px 12px;
   grid-template-columns: 1fr 1fr auto;
+  gap: 4px 12px;
   margin-top: 18px;
 }
 
@@ -376,18 +376,18 @@ function labelOf(targetType: DeleteTargetType) {
 }
 
 h2 {
-  color: var(--el-text-color-primary);
+  margin: 0;
   font-size: 16px;
   font-weight: 600;
   line-height: 24px;
-  margin: 0;
+  color: var(--el-text-color-primary);
 }
 
 p {
-  color: var(--el-text-color-regular);
+  margin: 8px 0 0;
   font-size: 13px;
   line-height: 20px;
-  margin: 8px 0 0;
+  color: var(--el-text-color-regular);
 }
 
 @media (max-width: 780px) {

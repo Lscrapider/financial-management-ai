@@ -105,11 +105,12 @@ const componentOptions: ComponentOption[] = [
   },
 ];
 
-const targetTypeOptions: Array<{ label: string; value: WorkbenchTargetType }> = [
-  { label: '股票', value: 'STOCK' },
-  { label: '指数', value: 'INDEX' },
-  { label: '可转债', value: 'CONVERTIBLE_BOND' },
-];
+const targetTypeOptions: Array<{ label: string; value: WorkbenchTargetType }> =
+  [
+    { label: '股票', value: 'STOCK' },
+    { label: '指数', value: 'INDEX' },
+    { label: '可转债', value: 'CONVERTIBLE_BOND' },
+  ];
 
 onMounted(() => {
   const reportId = Number(route.query.reportId);
@@ -139,7 +140,9 @@ function applyLayoutValue(value?: boolean | number | string) {
 }
 
 function componentLabel(value?: WorkbenchComponentType) {
-  return componentOptions.find((item) => item.value === value)?.label ?? '空组件';
+  return (
+    componentOptions.find((item) => item.value === value)?.label ?? '空组件'
+  );
 }
 
 function displayTarget(item?: WorkbenchItem) {
@@ -246,7 +249,9 @@ async function onTargetTypeChange() {
 }
 
 async function onTargetChange(targetCode: string) {
-  const selected = targetOptions.value.find((item) => item.targetCode === targetCode);
+  const selected = targetOptions.value.find(
+    (item) => item.targetCode === targetCode,
+  );
   draft.value.targetName = selected?.targetName ?? targetCode;
   draft.value.reportId = undefined;
   if (draft.value.componentType === 'report') {
@@ -393,7 +398,12 @@ function isWorkbenchLayout(value: string): value is WorkbenchLayout {
               :target-name="item.targetName"
               :target-type="item.targetType"
             />
-            <button v-else class="empty-cell" type="button" @click="openConfig(item.i)">
+            <button
+              v-else
+              class="empty-cell"
+              type="button"
+              @click="openConfig(item.i)"
+            >
               <strong>添加组件</strong>
               <span>报告主体 / 走势图 / 盘口数据 / 详情数据</span>
             </button>
@@ -401,7 +411,12 @@ function isWorkbenchLayout(value: string): value is WorkbenchLayout {
         </GridItem>
       </GridLayout>
 
-      <ElDialog v-model="configDialogVisible" title="配置工作台组件" width="760px">
+      <ElDialog
+        v-model="configDialogVisible"
+        class="config-workbench-dialog"
+        title="配置工作台组件"
+        width="min(760px, calc(100vw - 32px))"
+      >
         <div class="config-panel">
           <section>
             <h3>选择组件</h3>
@@ -491,7 +506,11 @@ function isWorkbenchLayout(value: string): value is WorkbenchLayout {
               </ElTableColumn>
             </ElTable>
             <ElEmpty
-              v-if="draft.targetCode && reportHistories.length === 0 && !loadingHistories"
+              v-if="
+                draft.targetCode &&
+                reportHistories.length === 0 &&
+                !loadingHistories
+              "
               description="暂无历史报告"
             />
           </section>
@@ -509,72 +528,83 @@ function isWorkbenchLayout(value: string): value is WorkbenchLayout {
 
 <style scoped>
 .report-workbench {
-  background: var(--el-bg-color-page);
   display: flex;
   flex-direction: column;
   gap: 14px;
   min-height: 100%;
+  background: var(--el-bg-color-page);
 }
 
 .workbench-toolbar {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
+}
+
+.workbench-toolbar > * {
+  min-width: 0;
+}
+
+.workbench-toolbar :deep(.el-radio-group) {
   display: flex;
-  justify-content: space-between;
-  padding: 14px 16px;
+  flex-wrap: wrap;
+  max-width: 100%;
 }
 
 .workbench-toolbar h2 {
+  margin: 0;
   font-size: 18px;
   font-weight: 700;
-  margin: 0;
 }
 
 .workbench-toolbar span,
 .cell-header span,
 .empty-cell span,
 .component-options span {
-  color: var(--el-text-color-secondary);
   font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .workbench-grid {
+  --vgl-placeholder-bg: var(--el-color-primary-light-7);
+
+  min-height: 520px;
   background: var(--el-bg-color-page);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
-  min-height: 520px;
-  --vgl-placeholder-bg: var(--el-color-primary-light-7);
 }
 
 .workbench-cell {
-  background: var(--el-bg-color);
   display: flex;
   flex-direction: column;
-  height: 100%;
   min-width: 0;
+  height: 100%;
   overflow: hidden;
+  background: var(--el-bg-color);
 }
 
 .workbench-cell :deep(.el-card__header) {
-  background: var(--el-fill-color-light);
   flex: 0 0 auto;
+  background: var(--el-fill-color-light);
 }
 
 .workbench-cell :deep(.el-card__body) {
-  background: var(--el-bg-color);
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  background: var(--el-bg-color);
 }
 
 .cell-header {
-  align-items: center;
-  cursor: move;
   display: flex;
   gap: 12px;
+  align-items: center;
   justify-content: space-between;
+  cursor: move;
   user-select: none;
 }
 
@@ -586,50 +616,55 @@ function isWorkbenchLayout(value: string): value is WorkbenchLayout {
 }
 
 .empty-cell {
-  align-items: center;
-  background: var(--el-fill-color-lighter);
-  border: 1px dashed var(--el-border-color);
-  border-radius: 6px;
-  color: inherit;
-  cursor: pointer;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  height: 100%;
+  align-items: center;
   justify-content: center;
   width: 100%;
+  height: 100%;
+  color: inherit;
+  cursor: pointer;
+  background: var(--el-fill-color-lighter);
+  border: 1px dashed var(--el-border-color);
+  border-radius: 6px;
 }
 
 .config-panel {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  min-width: 0;
+}
+
+.config-panel section {
+  min-width: 0;
 }
 
 .config-panel h3 {
+  margin: 0 0 10px;
   font-size: 14px;
   font-weight: 700;
-  margin: 0 0 10px;
 }
 
 .component-options {
   display: grid;
-  gap: 10px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .component-options button {
-  background: var(--el-fill-color-lighter);
-  border: 1px solid transparent;
-  border-radius: 6px;
-  color: inherit;
-  cursor: pointer;
   display: flex;
   flex-direction: column;
   gap: 6px;
   min-height: 82px;
   padding: 12px;
+  color: inherit;
   text-align: left;
+  cursor: pointer;
+  background: var(--el-fill-color-lighter);
+  border: 1px solid transparent;
+  border-radius: 6px;
 }
 
 .component-options button.active {
@@ -638,8 +673,23 @@ function isWorkbenchLayout(value: string): value is WorkbenchLayout {
 
 .target-config {
   display: grid;
+  grid-template-columns: minmax(120px, 140px) minmax(0, 1fr);
   gap: 10px;
-  grid-template-columns: 140px 1fr;
+}
+
+.target-config > * {
+  min-width: 0;
+}
+
+.config-workbench-dialog :deep(.el-dialog__footer) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.config-workbench-dialog :deep(.el-dialog__footer .el-button + .el-button) {
+  margin-left: 0;
 }
 
 @media (max-width: 1200px) {
@@ -650,9 +700,9 @@ function isWorkbenchLayout(value: string): value is WorkbenchLayout {
   }
 
   .workbench-toolbar {
-    align-items: stretch;
     flex-direction: column;
     gap: 12px;
+    align-items: stretch;
   }
 }
 </style>

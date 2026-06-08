@@ -159,21 +159,27 @@ const newReportForm = ref({
 
 const pollingTaskNos = computed(() => Object.keys(pollingStore.tasks));
 const selectedProfile = computed(() =>
-  configProfiles.value.find((profile) => profile.id === selectedProfileId.value),
+  configProfiles.value.find(
+    (profile) => profile.id === selectedProfileId.value,
+  ),
 );
-const configGroupOptions = computed(() =>
-  [...new Set(configProfiles.value.map((profile) => profile.configGroup))],
-);
+const configGroupOptions = computed(() => [
+  ...new Set(configProfiles.value.map((profile) => profile.configGroup)),
+]);
 const filteredConfigProfiles = computed(() =>
   selectedConfigGroup.value
-    ? configProfiles.value.filter((profile) => profile.configGroup === selectedConfigGroup.value)
+    ? configProfiles.value.filter(
+        (profile) => profile.configGroup === selectedConfigGroup.value,
+      )
     : configProfiles.value,
 );
 const renderedReportHtml = computed(() =>
   renderMarkdown(selectedReport.value?.reportText || '暂无报告正文'),
 );
 const selectedReportPrintTitle = computed(() =>
-  selectedReport.value ? `${displayTarget(selectedReport.value)} 分析报告` : '标的分析报告',
+  selectedReport.value
+    ? `${displayTarget(selectedReport.value)} 分析报告`
+    : '标的分析报告',
 );
 const displayParameterGroups = computed<DisplayParameterGroup[]>(() =>
   parameterGroups.value.map((group) => ({
@@ -186,7 +192,9 @@ const coreParameterGroups = computed<DisplayParameterGroup[]>(() =>
   parameterGroups.value
     .map((group) => ({
       ...group,
-      fields: group.fields.filter((field) => CORE_PARAMETER_KEYS.has(field.key)),
+      fields: group.fields.filter((field) =>
+        CORE_PARAMETER_KEYS.has(field.key),
+      ),
     }))
     .filter((group) => group.fields.length > 0)
     .map((group) => ({
@@ -205,15 +213,12 @@ onMounted(async () => {
   }
 });
 
-watch(
-  pollingTaskNos,
-  () => {
-    void loadTargets();
-    if (selectedTarget.value) {
-      void loadHistory(selectedTarget.value);
-    }
-  },
-);
+watch(pollingTaskNos, () => {
+  void loadTargets();
+  if (selectedTarget.value) {
+    void loadHistory(selectedTarget.value);
+  }
+});
 
 watch(
   () => newReportForm.value.targetType,
@@ -313,10 +318,21 @@ function changeConfigGroup(configGroup: string) {
   applyProfile(profile);
 }
 
+function optionExchangeText(option: SceneAnalysisTargetOption) {
+  return `${option.targetCode} · ${option.exchangeCode || '-'}`;
+}
+
+function optionNameText(option: SceneAnalysisTargetOption) {
+  return option.targetName || option.targetCode;
+}
+
 function selectProfile(profileId?: null | number) {
-  const profile = configProfiles.value.find((item) => item.id === profileId)
-    ?? configProfiles.value.find((item) => item.configProfile === 'system_recommended')
-    ?? configProfiles.value[0];
+  const profile =
+    configProfiles.value.find((item) => item.id === profileId) ??
+    configProfiles.value.find(
+      (item) => item.configProfile === 'system_recommended',
+    ) ??
+    configProfiles.value[0];
   selectedProfileId.value = profile?.id ?? null;
   selectedConfigGroup.value = profile?.configGroup ?? '';
   applyProfile(profile);
@@ -329,14 +345,26 @@ function applyProfile(profile?: SceneAnalysisConfigProfile) {
   const config = profile.configJson || {};
   newReportForm.value = {
     configProfile: textValue(config.configProfile, profile.configProfile),
-    dailyKlineLimit: numberValue(config.dailyKlineLimit, DEFAULT_DAILY_KLINE_LIMIT),
-    monthlyKlineLimit: numberValue(config.monthlyKlineLimit, DEFAULT_MONTHLY_KLINE_LIMIT),
-    reportType: textValue(config.reportType, profile.reportType || 'quick_analysis'),
+    dailyKlineLimit: numberValue(
+      config.dailyKlineLimit,
+      DEFAULT_DAILY_KLINE_LIMIT,
+    ),
+    monthlyKlineLimit: numberValue(
+      config.monthlyKlineLimit,
+      DEFAULT_MONTHLY_KLINE_LIMIT,
+    ),
+    reportType: textValue(
+      config.reportType,
+      profile.reportType || 'quick_analysis',
+    ),
     targetCode: newReportForm.value.targetCode,
     targetName: newReportForm.value.targetName,
     targetType: textValue(config.targetType, profile.targetType || 'STOCK'),
     totalChunks: numberValue(config.totalChunks, 10),
-    weeklyKlineLimit: numberValue(config.weeklyKlineLimit, DEFAULT_WEEKLY_KLINE_LIMIT),
+    weeklyKlineLimit: numberValue(
+      config.weeklyKlineLimit,
+      DEFAULT_WEEKLY_KLINE_LIMIT,
+    ),
   };
   parameterValues.value = parameterValuesFromOverrides(config.userOverrides);
 }
@@ -355,7 +383,9 @@ async function searchReportTargetOptions(keyword: string) {
 }
 
 function changeReportTarget(targetCode: string) {
-  const option = targetOptions.value.find((item) => item.targetCode === targetCode);
+  const option = targetOptions.value.find(
+    (item) => item.targetCode === targetCode,
+  );
   newReportForm.value.targetName = option?.targetName || '';
 }
 
@@ -511,7 +541,9 @@ function openReportWorkspace(reportId?: null | number) {
   });
 }
 
-async function regenerate(row: SceneAnalysisReportHistory | SceneAnalysisReportTarget) {
+async function regenerate(
+  row: SceneAnalysisReportHistory | SceneAnalysisReportTarget,
+) {
   regeneratingTaskNo.value = taskNoOf(row);
   try {
     await regenerateSceneReport(regeneratingTaskNo.value);
@@ -530,8 +562,12 @@ function taskNoOf(row: SceneAnalysisReportHistory | SceneAnalysisReportTarget) {
   return 'taskNo' in row ? row.taskNo : row.latestTaskNo;
 }
 
-function displayTarget(row: Pick<SceneAnalysisReportTarget, 'targetCode' | 'targetName'>) {
-  return row.targetName ? `${row.targetName} ${row.targetCode}` : row.targetCode;
+function displayTarget(
+  row: Pick<SceneAnalysisReportTarget, 'targetCode' | 'targetName'>,
+) {
+  return row.targetName
+    ? `${row.targetName} ${row.targetCode}`
+    : row.targetCode;
 }
 
 function statusLabel(status: SceneReportStatus | string) {
@@ -595,32 +631,46 @@ function normalizedDailyKlineLimit() {
 }
 
 function normalizedWeeklyKlineLimit() {
-  return numberValue(newReportForm.value.weeklyKlineLimit, DEFAULT_WEEKLY_KLINE_LIMIT);
+  return numberValue(
+    newReportForm.value.weeklyKlineLimit,
+    DEFAULT_WEEKLY_KLINE_LIMIT,
+  );
 }
 
 function normalizedMonthlyKlineLimit() {
-  return numberValue(newReportForm.value.monthlyKlineLimit, DEFAULT_MONTHLY_KLINE_LIMIT);
+  return numberValue(
+    newReportForm.value.monthlyKlineLimit,
+    DEFAULT_MONTHLY_KLINE_LIMIT,
+  );
 }
 
 function buildUserOverrides() {
   const overrides: Record<string, unknown> = {
     asset_type: assetTypeByTargetType(newReportForm.value.targetType),
   };
-  parameterGroups.value.flatMap((group) => group.fields).forEach((field) => {
-    setNestedValue(overrides, field.path, parameterValues.value[field.key] ?? field.defaultValue);
-  });
+  parameterGroups.value
+    .flatMap((group) => group.fields)
+    .forEach((field) => {
+      setNestedValue(
+        overrides,
+        field.path,
+        parameterValues.value[field.key] ?? field.defaultValue,
+      );
+    });
   return overrides;
 }
 
 function parameterValuesFromOverrides(value: unknown) {
   const overrides = objectValue(value);
   const result = defaultParameterValues();
-  parameterGroups.value.flatMap((group) => group.fields).forEach((field) => {
-    const nestedValue = getNestedValue(overrides, field.path);
-    if (typeof nestedValue === 'number' && Number.isFinite(nestedValue)) {
-      result[field.key] = nestedValue;
-    }
-  });
+  parameterGroups.value
+    .flatMap((group) => group.fields)
+    .forEach((field) => {
+      const nestedValue = getNestedValue(overrides, field.path);
+      if (typeof nestedValue === 'number' && Number.isFinite(nestedValue)) {
+        result[field.key] = nestedValue;
+      }
+    });
   return result;
 }
 
@@ -651,14 +701,22 @@ function getNestedValue(source: Record<string, unknown>, path: string[]) {
   return current;
 }
 
-function setNestedValue(target: Record<string, unknown>, path: string[], value: unknown) {
+function setNestedValue(
+  target: Record<string, unknown>,
+  path: string[],
+  value: unknown,
+) {
   let cursor = target;
   path.forEach((key, index) => {
     if (index === path.length - 1) {
       cursor[key] = value;
       return;
     }
-    if (!cursor[key] || typeof cursor[key] !== 'object' || Array.isArray(cursor[key])) {
+    if (
+      !cursor[key] ||
+      typeof cursor[key] !== 'object' ||
+      Array.isArray(cursor[key])
+    ) {
       cursor[key] = {};
     }
     cursor = cursor[key] as Record<string, unknown>;
@@ -907,7 +965,8 @@ function escapeHtml(text: string) {
         <div class="toolbar-copy">
           <div class="toolbar-title">报告标的</div>
           <div class="toolbar-meta">
-            共 {{ targets.length }} 个标的，{{ pollingTaskNos.length }} 个报告生成中
+            共 {{ targets.length }} 个标的，{{ pollingTaskNos.length }}
+            个报告生成中
           </div>
         </div>
         <div class="toolbar-actions">
@@ -946,7 +1005,11 @@ function escapeHtml(text: string) {
           <ElOption label="指数" value="INDEX" />
           <ElOption label="可转债" value="CONVERTIBLE_BOND" />
         </ElSelect>
-        <ElButton :loading="loadingTargets" type="primary" @click="searchTargets">
+        <ElButton
+          :loading="loadingTargets"
+          type="primary"
+          @click="searchTargets"
+        >
           查询
         </ElButton>
       </div>
@@ -976,7 +1039,9 @@ function escapeHtml(text: string) {
         <ElTableColumn label="历史报告" prop="reportCount" width="100" />
         <ElTableColumn label="最新版本" width="130">
           <template #default="{ row }">
-            {{ generationLabel(row.latestGenerationType) }} #{{ row.latestVersionNo }}
+            {{ generationLabel(row.latestGenerationType) }} #{{
+              row.latestVersionNo
+            }}
           </template>
         </ElTableColumn>
         <ElTableColumn label="最新生成时间" width="180">
@@ -986,34 +1051,46 @@ function escapeHtml(text: string) {
         </ElTableColumn>
         <ElTableColumn label="摘要" min-width="260">
           <template #default="{ row }">
-            <span class="preview-text">{{ row.latestReportPreview || '-' }}</span>
+            <span class="preview-text">{{
+              row.latestReportPreview || '-'
+            }}</span>
           </template>
         </ElTableColumn>
-        <ElTableColumn fixed="right" label="操作" width="310">
+        <ElTableColumn fixed="right" label="操作" width="220">
           <template #default="{ row }">
-            <ElButton link type="primary" @click="openDetail(row.latestReportId)">
-              查看
-            </ElButton>
-            <ElButton link type="primary" @click="openReportWorkspace(row.latestReportId)">
-              工作台
-            </ElButton>
-            <ElButton link type="primary" @click="openHistory(row)">
-              历史
-            </ElButton>
-            <ElPopconfirm
-              title="基于这次报告的上下文重新生成？"
-              @confirm="regenerate(row)"
-            >
-              <template #reference>
-                <ElButton
-                  :loading="regeneratingTaskNo === row.latestTaskNo"
-                  link
-                  type="warning"
-                >
-                  重新生成
-                </ElButton>
-              </template>
-            </ElPopconfirm>
+            <div class="table-action-group">
+              <ElButton
+                link
+                type="primary"
+                @click="openDetail(row.latestReportId)"
+              >
+                查看
+              </ElButton>
+              <ElButton
+                link
+                type="primary"
+                @click="openReportWorkspace(row.latestReportId)"
+              >
+                工作台
+              </ElButton>
+              <ElButton link type="primary" @click="openHistory(row)">
+                历史
+              </ElButton>
+              <ElPopconfirm
+                title="基于这次报告的上下文重新生成？"
+                @confirm="regenerate(row)"
+              >
+                <template #reference>
+                  <ElButton
+                    :loading="regeneratingTaskNo === row.latestTaskNo"
+                    link
+                    type="warning"
+                  >
+                    重新生成
+                  </ElButton>
+                </template>
+              </ElPopconfirm>
+            </div>
           </template>
         </ElTableColumn>
       </ElTable>
@@ -1035,7 +1112,7 @@ function escapeHtml(text: string) {
     <ElDrawer
       v-model="createDrawerVisible"
       destroy-on-close
-      size="620px"
+      size="min(620px, 100vw)"
       title="新建报告任务"
     >
       <div class="create-report-panel">
@@ -1100,8 +1177,8 @@ function escapeHtml(text: string) {
                   :value="option.targetCode"
                 >
                   <div class="target-option">
-                    <strong>{{ option.targetName || option.targetCode }}</strong>
-                    <span>{{ option.targetCode }} · {{ option.exchangeCode || '-' }}</span>
+                    <strong>{{ optionNameText(option) }}</strong>
+                    <span>{{ optionExchangeText(option) }}</span>
                   </div>
                 </ElOption>
               </ElSelect>
@@ -1171,7 +1248,10 @@ function escapeHtml(text: string) {
                 更多参数
               </ElButton>
             </div>
-            <div v-if="coreParameterGroups.length > 0" class="parameter-groups compact">
+            <div
+              v-if="coreParameterGroups.length > 0"
+              class="parameter-groups compact"
+            >
               <section
                 v-for="group in coreParameterGroups"
                 :key="group.name"
@@ -1203,7 +1283,10 @@ function escapeHtml(text: string) {
                             placement="top"
                             :content="parameterTooltip(field)"
                           >
-                            <IconifyIcon class="parameter-info" icon="lucide:info" />
+                            <IconifyIcon
+                              class="parameter-info"
+                              icon="lucide:info"
+                            />
                           </ElTooltip>
                         </div>
                         <div class="parameter-control">
@@ -1258,7 +1341,10 @@ function escapeHtml(text: string) {
             >
               更新当前配置
             </ElButton>
-            <ElPopconfirm title="删除当前自定义配置？" @confirm="deleteCurrentProfile">
+            <ElPopconfirm
+              title="删除当前自定义配置？"
+              @confirm="deleteCurrentProfile"
+            >
               <template #reference>
                 <ElButton :loading="savingProfile" type="danger">
                   删除当前配置
@@ -1269,9 +1355,7 @@ function escapeHtml(text: string) {
         </section>
 
         <div class="drawer-footer">
-          <ElButton @click="createDrawerVisible = false">
-            取消
-          </ElButton>
+          <ElButton @click="createDrawerVisible = false"> 取消 </ElButton>
           <ElButton
             :loading="submittingTask"
             type="primary"
@@ -1287,7 +1371,7 @@ function escapeHtml(text: string) {
       v-model="advancedParameterVisible"
       class="advanced-parameter-dialog"
       title="全部场景参数"
-      width="920px"
+      width="min(920px, calc(100vw - 32px))"
     >
       <section v-loading="loadingParameterSchema" class="parameter-dialog-body">
         <div v-if="displayParameterGroups.length > 0" class="parameter-groups">
@@ -1322,7 +1406,10 @@ function escapeHtml(text: string) {
                         placement="top"
                         :content="parameterTooltip(field)"
                       >
-                        <IconifyIcon class="parameter-info" icon="lucide:info" />
+                        <IconifyIcon
+                          class="parameter-info"
+                          icon="lucide:info"
+                        />
                       </ElTooltip>
                     </div>
                     <div class="parameter-control">
@@ -1348,16 +1435,18 @@ function escapeHtml(text: string) {
         <ElEmpty v-else description="暂无参数配置" />
       </section>
       <template #footer>
-        <ElButton @click="advancedParameterVisible = false">
-          完成
-        </ElButton>
+        <ElButton @click="advancedParameterVisible = false"> 完成 </ElButton>
       </template>
     </ElDialog>
 
     <ElDrawer
       v-model="historyDrawerVisible"
-      :title="selectedTarget ? `${displayTarget(selectedTarget)} 历史报告` : '历史报告'"
-      size="720px"
+      :title="
+        selectedTarget
+          ? `${displayTarget(selectedTarget)} 历史报告`
+          : '历史报告'
+      "
+      size="min(720px, 100vw)"
     >
       <ElTable
         v-loading="loadingHistory"
@@ -1388,7 +1477,11 @@ function escapeHtml(text: string) {
             <ElButton link type="primary" @click="openDetail(row.reportId)">
               查看
             </ElButton>
-            <ElButton link type="primary" @click="openReportWorkspace(row.reportId)">
+            <ElButton
+              link
+              type="primary"
+              @click="openReportWorkspace(row.reportId)"
+            >
               工作台
             </ElButton>
             <ElPopconfirm
@@ -1428,7 +1521,11 @@ function escapeHtml(text: string) {
               <IconifyIcon icon="lucide:file-down" />
               导出 PDF
             </ElButton>
-            <ElButton link type="primary" @click="detailFullscreen = !detailFullscreen">
+            <ElButton
+              link
+              type="primary"
+              @click="detailFullscreen = !detailFullscreen"
+            >
               {{ detailFullscreen ? '退出全屏' : '全屏' }}
             </ElButton>
           </div>
@@ -1453,7 +1550,11 @@ function escapeHtml(text: string) {
               {{ selectedReport.model || '-' }}
             </ElDescriptionsItem>
             <ElDescriptionsItem label="生成时间">
-              {{ formatDateTime(selectedReport.generatedAt || selectedReport.createdAt) }}
+              {{
+                formatDateTime(
+                  selectedReport.generatedAt || selectedReport.createdAt,
+                )
+              }}
             </ElDescriptionsItem>
           </ElDescriptions>
 
@@ -1463,7 +1564,10 @@ function escapeHtml(text: string) {
 
           <section class="detail-section">
             <h3>报告正文</h3>
-            <article class="markdown-report" v-html="renderedReportHtml"></article>
+            <article
+              class="markdown-report"
+              v-html="renderedReportHtml"
+            ></article>
           </section>
         </template>
         <ElEmpty v-else description="暂无报告详情" />
@@ -1481,9 +1585,9 @@ function escapeHtml(text: string) {
 
 .toolbar {
   display: flex;
+  gap: 16px;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
   min-height: 46px;
 }
 
@@ -1502,8 +1606,10 @@ function escapeHtml(text: string) {
 
 .filter-row {
   display: grid;
+  grid-template-columns:
+    minmax(160px, 1fr) minmax(140px, 1fr) minmax(140px, 180px)
+    auto;
   gap: 8px;
-  grid-template-columns: minmax(160px, 1fr) minmax(140px, 1fr) minmax(140px, 180px) auto;
   max-width: 760px;
 }
 
@@ -1528,8 +1634,17 @@ function escapeHtml(text: string) {
 
 .form-grid {
   display: grid;
-  gap: 12px;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.form-grid > * {
+  min-width: 0;
+}
+
+.form-grid :deep(.el-input-number),
+.form-grid :deep(.el-select) {
+  width: 100%;
 }
 
 .form-grid.three-columns {
@@ -1537,26 +1652,37 @@ function escapeHtml(text: string) {
 }
 
 .target-option {
-  align-items: center;
   display: flex;
+  gap: 12px;
+  align-items: center;
   justify-content: space-between;
   width: 100%;
+  min-width: 0;
+}
+
+.target-option strong,
+.target-option span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .target-option span {
-  color: var(--el-text-color-secondary);
+  flex-shrink: 0;
   font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .parameter-panel {
+  padding: 12px 14px 6px;
   border: 1px solid var(--el-border-color-light);
   border-radius: 6px;
-  padding: 12px 14px 6px;
 }
 
 .parameter-panel-heading {
-  align-items: center;
   display: flex;
+  align-items: center;
   justify-content: space-between;
   margin-bottom: 8px;
 }
@@ -1577,21 +1703,21 @@ function escapeHtml(text: string) {
 }
 
 .parameter-group {
-  border-top: 1px solid var(--el-border-color-lighter);
   padding-top: 12px;
+  border-top: 1px solid var(--el-border-color-lighter);
 }
 
 .parameter-group:first-child {
-  border-top: 0;
   padding-top: 0;
+  border-top: 0;
 }
 
 .parameter-group-title {
-  color: var(--el-text-color-primary);
+  margin-bottom: 10px;
   font-size: 13px;
   font-weight: 700;
   line-height: 18px;
-  margin-bottom: 10px;
+  color: var(--el-text-color-primary);
 }
 
 .parameter-section-list {
@@ -1601,17 +1727,17 @@ function escapeHtml(text: string) {
 }
 
 .parameter-section {
+  padding: 10px 12px 2px;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 6px;
-  padding: 10px 12px 2px;
 }
 
 .parameter-section-title {
-  color: var(--el-text-color-regular);
+  margin-bottom: 8px;
   font-size: 12px;
   font-weight: 700;
   line-height: 18px;
-  margin-bottom: 8px;
+  color: var(--el-text-color-regular);
 }
 
 .parameter-list {
@@ -1621,8 +1747,8 @@ function escapeHtml(text: string) {
 }
 
 .parameter-item {
-  border-bottom: 1px solid var(--el-border-color-lighter);
   padding-bottom: 12px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
 .parameter-item:last-child {
@@ -1630,53 +1756,53 @@ function escapeHtml(text: string) {
 }
 
 .parameter-header {
-  align-items: center;
   display: flex;
+  gap: 6px;
+  align-items: center;
   font-size: 13px;
   font-weight: 600;
-  gap: 6px;
   line-height: 18px;
 }
 
 .parameter-info {
+  font-size: 15px;
   color: var(--el-text-color-secondary);
   cursor: help;
-  font-size: 15px;
 }
 
 .parameter-control {
-  align-items: center;
   display: grid;
-  gap: 12px;
   grid-template-columns: minmax(0, 1fr) 58px;
+  gap: 12px;
+  align-items: center;
 }
 
 .parameter-value {
-  color: var(--el-text-color-primary);
   font-size: 12px;
+  color: var(--el-text-color-primary);
   text-align: right;
 }
 
 .parameter-recommended {
-  color: var(--el-text-color-secondary);
+  margin-top: -4px;
   font-size: 12px;
   line-height: 16px;
-  margin-top: -4px;
+  color: var(--el-text-color-secondary);
 }
 
 .parameter-dialog-body {
   max-height: min(70vh, 720px);
-  overflow-y: auto;
   padding-right: 6px;
+  overflow-y: auto;
 }
 
 .profile-save-panel {
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 6px;
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 12px;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 6px;
 }
 
 .profile-save-title {
@@ -1691,17 +1817,17 @@ function escapeHtml(text: string) {
 }
 
 .drawer-footer {
-  align-items: center;
-  background: var(--el-bg-color);
-  border-top: 1px solid var(--el-border-color-light);
-  bottom: 0;
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  left: 0;
-  padding: 12px 20px;
   position: absolute;
   right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 12px 20px;
+  background: var(--el-bg-color);
+  border-top: 1px solid var(--el-border-color-light);
 }
 
 .toolbar-title {
@@ -1712,13 +1838,24 @@ function escapeHtml(text: string) {
 
 .toolbar-meta,
 .target-cell span {
-  color: var(--el-text-color-secondary);
   font-size: 12px;
   line-height: 16px;
+  color: var(--el-text-color-secondary);
 }
 
 .report-table {
   width: 100%;
+}
+
+.table-action-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  align-items: center;
+}
+
+.table-action-group :deep(.el-button + .el-button) {
+  margin-left: 0;
 }
 
 .target-cell {
@@ -1728,8 +1865,8 @@ function escapeHtml(text: string) {
 }
 
 .preview-text {
-  color: var(--el-text-color-regular);
   line-height: 1.5;
+  color: var(--el-text-color-regular);
 }
 
 .detail-panel {
@@ -1740,58 +1877,58 @@ function escapeHtml(text: string) {
 }
 
 .detail-section h3 {
-  font-size: 15px;
   margin: 0 0 8px;
+  font-size: 15px;
 }
 
 .drawer-header {
-  align-items: center;
   display: flex;
+  align-items: center;
   justify-content: space-between;
   width: 100%;
 }
 
 .drawer-header-actions {
-  align-items: center;
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
 .markdown-report {
+  max-height: calc(100vh - 240px);
+  padding: 18px 22px;
+  overflow: auto;
+  line-height: 1.75;
+  color: var(--el-text-color-primary);
   background: var(--el-fill-color-lighter);
   border: 1px solid var(--el-border-color-light);
   border-radius: 6px;
-  color: var(--el-text-color-primary);
-  line-height: 1.75;
-  max-height: calc(100vh - 240px);
-  overflow: auto;
-  padding: 18px 22px;
 }
 
 .error-message {
+  padding: 10px 12px;
+  color: var(--el-color-danger);
   background: var(--el-color-danger-light-9);
   border: 1px solid var(--el-color-danger-light-7);
   border-radius: 6px;
-  color: var(--el-color-danger);
-  padding: 10px 12px;
 }
 
 :deep(.markdown-report h1) {
+  margin: 0 0 18px;
   font-size: 22px;
   line-height: 1.4;
-  margin: 0 0 18px;
 }
 
 :deep(.markdown-report h2) {
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  font-size: 17px;
-  margin: 22px 0 10px;
   padding-bottom: 6px;
+  margin: 22px 0 10px;
+  font-size: 17px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
 :deep(.markdown-report h3) {
-  font-size: 15px;
   margin: 18px 0 8px;
+  font-size: 15px;
 }
 
 :deep(.markdown-report p) {
@@ -1799,8 +1936,8 @@ function escapeHtml(text: string) {
 }
 
 :deep(.markdown-report ul) {
-  margin: 0 0 14px;
   padding-left: 22px;
+  margin: 0 0 14px;
 }
 
 :deep(.markdown-report li) {
@@ -1808,8 +1945,8 @@ function escapeHtml(text: string) {
 }
 
 :deep(.markdown-report .report-reference) {
-  color: var(--el-text-color-primary);
   font-weight: 700;
+  color: var(--el-text-color-primary);
 }
 
 @media (max-width: 768px) {
@@ -1823,8 +1960,17 @@ function escapeHtml(text: string) {
   .profile-save-row,
   .profile-edit-actions,
   .toolbar {
-    align-items: stretch;
     flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbar-actions {
+    flex-wrap: wrap;
+  }
+
+  .pagination-row {
+    justify-content: flex-start;
+    overflow-x: auto;
   }
 }
 </style>

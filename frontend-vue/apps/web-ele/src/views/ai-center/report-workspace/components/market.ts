@@ -1,17 +1,21 @@
 import type { WorkbenchTargetType } from './types';
 
-import type { BondKline, BondIntradayTrend, BondQuote } from '#/api/bond';
-import type { IndexKline, IndexIntradayTrend, IndexQuote } from '#/api/index-market';
+import type { BondIntradayTrend, BondKline, BondQuote } from '#/api/bond';
+import type {
+  IndexIntradayTrend,
+  IndexKline,
+  IndexQuote,
+} from '#/api/index-market';
 import type { StockIntradayTrend, StockKline, StockQuote } from '#/api/stock';
 
 import {
-  listBondKlines,
   listBondIntradayTrends,
+  listBondKlines,
   listBondQuotes,
 } from '#/api/bond';
 import {
-  listIndexKlines,
   listIndexIntradayTrends,
+  listIndexKlines,
   listIndexQuotes,
 } from '#/api/index-market';
 import {
@@ -208,10 +212,11 @@ function bondQuoteToMarketQuote(item: BondQuote): MarketQuote {
   return {
     ...item,
     code: item.bondCode,
-    detailRows: item.quoteDetails?.map((detail) => ({
-      label: detail.fieldName,
-      value: detail.fieldValue,
-    })) ?? quoteFields,
+    detailRows:
+      item.quoteDetails?.map((detail) => ({
+        label: detail.fieldName,
+        value: detail.fieldValue,
+      })) ?? quoteFields,
     name: item.bondName,
     quoteFields,
     targetType: 'CONVERTIBLE_BOND',
@@ -293,10 +298,11 @@ function stockQuoteToMarketQuote(item: StockQuote): MarketQuote {
   return {
     ...item,
     code: item.stockCode,
-    detailRows: item.quoteDetails?.map((detail) => ({
-      label: detail.fieldName,
-      value: detail.fieldValue,
-    })) ?? quoteFields,
+    detailRows:
+      item.quoteDetails?.map((detail) => ({
+        label: detail.fieldName,
+        value: detail.fieldValue,
+      })) ?? quoteFields,
     name: item.stockName,
     quoteFields,
     targetType: 'STOCK',

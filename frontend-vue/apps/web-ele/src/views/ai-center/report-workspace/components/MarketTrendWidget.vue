@@ -15,11 +15,7 @@ import { EchartsUI, useEcharts } from '@vben/plugins/echarts';
 
 import { ElEmpty, ElOption, ElSelect } from 'element-plus';
 
-import {
-  findMarketQuote,
-  listMarketKlines,
-  listMarketTrends,
-} from './market';
+import { findMarketQuote, listMarketKlines, listMarketTrends } from './market';
 
 const props = defineProps<{
   targetCode?: string;
@@ -44,6 +40,14 @@ const adjustTypeOptions: Array<{
   { label: '前复权', value: 'qfq' },
   { label: '不复权', value: 'none' },
 ];
+
+const MARKET_CHART_COLORS = {
+  compare: '#8a929f',
+  fall: '#57d188',
+  price: '#006be6',
+  reference: '#efbd48',
+  rise: '#dc4446',
+} as const;
 
 const periodOptions = computed(() => {
   if (props.targetType === 'INDEX') {
@@ -70,7 +74,9 @@ const periodOptions = computed(() => {
   ];
 });
 
-const hasChartData = computed(() => trends.value.length > 0 || klines.value.length > 0);
+const hasChartData = computed(
+  () => trends.value.length > 0 || klines.value.length > 0,
+);
 const showAdjustTypeSelect = computed(
   () => props.targetType === 'STOCK' && periodType.value !== 'intraday',
 );
@@ -143,11 +149,13 @@ function renderIntradayChart() {
     (item) => item.trendMinute || formatTime(item.trendTime),
   );
   const prices = trends.value.map((item) => toNullableNumber(item.closePrice));
-  const averages = trends.value.map((item) => toNullableNumber(item.averagePrice));
+  const averages = trends.value.map((item) =>
+    toNullableNumber(item.averagePrice),
+  );
   const hasAverage = averages.some((item) => item !== null);
 
   renderEcharts({
-    color: ['#089981', '#f59e0b'],
+    color: [MARKET_CHART_COLORS.price, MARKET_CHART_COLORS.reference],
     grid: {
       bottom: 32,
       left: 44,
@@ -206,14 +214,22 @@ function renderKlineChart() {
     const closePrice = toNumber(item.closePrice);
     return {
       itemStyle: {
-        color: closePrice >= openPrice ? '#ef4444' : '#089981',
+        color:
+          closePrice >= openPrice
+            ? MARKET_CHART_COLORS.rise
+            : MARKET_CHART_COLORS.fall,
       },
       value: toNumber(item.volume),
     };
   });
 
   renderEcharts({
-    color: ['#ef4444', '#f59e0b', '#3b82f6', '#8b5cf6'],
+    color: [
+      MARKET_CHART_COLORS.rise,
+      MARKET_CHART_COLORS.reference,
+      MARKET_CHART_COLORS.price,
+      MARKET_CHART_COLORS.compare,
+    ],
     dataZoom: [
       {
         bottom: 8,
@@ -248,10 +264,10 @@ function renderKlineChart() {
       {
         data: candleData,
         itemStyle: {
-          borderColor: '#ef4444',
-          borderColor0: '#089981',
-          color: '#ef4444',
-          color0: '#089981',
+          borderColor: MARKET_CHART_COLORS.rise,
+          borderColor0: MARKET_CHART_COLORS.fall,
+          color: MARKET_CHART_COLORS.rise,
+          color0: MARKET_CHART_COLORS.fall,
         },
         name: periodLabel(periodType.value),
         type: 'candlestick',
@@ -388,11 +404,7 @@ function toNumber(value?: null | number | string) {
             :value="item.value"
           />
         </ElSelect>
-        <ElSelect
-          v-if="showAdjustTypeSelect"
-          v-model="adjustType"
-          size="small"
-        >
+        <ElSelect v-if="showAdjustTypeSelect" v-model="adjustType" size="small">
           <ElOption
             v-for="item in adjustTypeOptions"
             :key="item.value"
@@ -420,10 +432,10 @@ function toNumber(value?: null | number | string) {
 }
 
 .trend-toolbar {
-  align-items: center;
   display: flex;
   flex: 0 0 auto;
   gap: 10px;
+  align-items: center;
   justify-content: space-between;
 }
 

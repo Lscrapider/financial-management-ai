@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import type { MarketSyncJob } from '#/api/market-sync';
+
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import { Page } from '@vben/common-ui';
@@ -23,10 +25,7 @@ import {
   syncIndexKlineData,
   syncIndexMarketData,
 } from '#/api/index-market';
-import {
-  listLatestFullMarketSyncJobs,
-  type MarketSyncJob,
-} from '#/api/market-sync';
+import { listLatestFullMarketSyncJobs } from '#/api/market-sync';
 import {
   getStockMarketSyncStatus,
   syncStockDailyKlineData,
@@ -37,7 +36,7 @@ import {
 type MarketKind = 'bond' | 'index' | 'stock';
 type PeriodType = 'daily' | 'monthly' | 'weekly';
 type SingleSyncScope = 'kline' | 'trend';
-type SyncKind = MarketKind | 'single';
+type SyncKind = 'single' | MarketKind;
 
 interface SyncItem {
   description: string;
@@ -60,7 +59,8 @@ const syncItems: SyncItem[] = [
     scope: '指数快照 / 分时 / K线',
   },
   {
-    description: '全量同步所有已启用可转债的行情快照、分时数据和日/周/月 K 线。',
+    description:
+      '全量同步所有已启用可转债的行情快照、分时数据和日/周/月 K 线。',
     key: 'bond',
     title: '可转债行情同步',
     scope: '可转债快照 / 分时 / K线',
@@ -156,13 +156,11 @@ async function refreshMarketStatuses(silent = false) {
       index: index.running,
       stock: stock.running,
     };
-    latestJobMap.value = jobs.reduce<Partial<Record<MarketKind, MarketSyncJob>>>(
-      (result, job) => {
-        result[job.targetType] = job;
-        return result;
-      },
-      {},
-    );
+    const jobMap: Partial<Record<MarketKind, MarketSyncJob>> = {};
+    for (const job of jobs) {
+      jobMap[job.targetType] = job;
+    }
+    latestJobMap.value = jobMap;
   } catch {
     if (!silent) {
       ElMessage.error('同步状态刷新失败');
@@ -178,12 +176,18 @@ async function runMarketSync(kind: MarketKind) {
   runningMap.value[kind] = true;
   try {
     const status = await startMarketSync(kind);
-    ElMessage.info(status.started ? `${labelOf(kind)}同步已开始` : `${labelOf(kind)}同步正在执行`);
+    ElMessage.info(
+      status.started
+        ? `${labelOf(kind)}同步已开始`
+        : `${labelOf(kind)}同步正在执行`,
+    );
     const completed = await waitMarketSyncCompleted(kind);
     if (completed) {
       ElMessage.success(`${labelOf(kind)}同步完成`);
     } else {
-      ElMessage.warning(`${labelOf(kind)}同步仍在后台执行，可稍后到行情页面刷新查看`);
+      ElMessage.warning(
+        `${labelOf(kind)}同步仍在后台执行，可稍后到行情页面刷新查看`,
+      );
     }
   } finally {
     await refreshMarketStatuses(true);
@@ -243,7 +247,11 @@ async function startSingleSync(code: string) {
     return syncStockDailyKlineData(code);
   }
   if (singleSyncForm.market === 'index') {
-    return syncIndexKlineData(code, singleSyncForm.periodType, normalizedLimit());
+    return syncIndexKlineData(
+      code,
+      singleSyncForm.periodType,
+      normalizedLimit(),
+    );
   }
   return syncBondKlineData(code, singleSyncForm.periodType, normalizedLimit());
 }
@@ -306,6 +314,10 @@ function triggerLabel(triggerType?: string) {
   return '-';
 }
 
+function triggerText(kind: MarketKind) {
+  return `触发：${triggerLabel(latestJobOf(kind)?.triggerType)}`;
+}
+
 function finishedText(kind: MarketKind) {
   const job = latestJobOf(kind);
   if (isItemRunning(kind)) {
@@ -315,7 +327,7 @@ function finishedText(kind: MarketKind) {
 }
 
 function durationText(durationMs?: number) {
-  if (durationMs == null) {
+  if (durationMs === null || durationMs === undefined) {
     return '-';
   }
   if (durationMs < 1000) {
@@ -334,7 +346,9 @@ const singleSyncLabel = computed(() => {
   if (singleSyncForm.scope === 'trend') {
     return `${singleSyncForm.code.trim()} ${market}分时`;
   }
-  const period = periodOptions.find((item) => item.value === singleSyncForm.periodType)?.label ?? '日 K';
+  const period =
+    periodOptions.find((item) => item.value === singleSyncForm.periodType)
+      ?.label ?? '日 K';
   return `${singleSyncForm.code.trim()} ${market}${period}`;
 });
 
@@ -396,11 +410,7 @@ function labelOf(kind: MarketKind) {
           </ElButton>
         </div>
         <div class="sync-task-list">
-          <div
-            v-for="item in syncItems"
-            :key="item.key"
-            class="sync-task-row"
-          >
+          <div v-for="item in syncItems" :key="item.key" class="sync-task-row">
             <div class="task-title">
               <h3>{{ item.title }}</h3>
               <ElTag effect="plain" size="small">
@@ -410,8 +420,8 @@ function labelOf(kind: MarketKind) {
             <p>{{ item.description }}</p>
             <div class="task-status">
               <span
+                class="status-dot"
                 :class="[
-                  'status-dot',
                   {
                     'is-failed':
                       !isItemRunning(item.key) &&
@@ -419,11 +429,11 @@ function labelOf(kind: MarketKind) {
                     'is-running': isItemRunning(item.key),
                   },
                 ]"
-              />
+              ></span>
               {{ statusLabel(item.key) }}
             </div>
             <div class="task-meta">
-              <span>触发：{{ triggerLabel(latestJobOf(item.key)?.triggerType) }}</span>
+              <span>{{ triggerText(item.key) }}</span>
               <span>完成：{{ finishedText(item.key) }}</span>
             </div>
             <ElButton
@@ -524,8 +534,8 @@ function labelOf(kind: MarketKind) {
 
 .health-grid {
   display: grid;
-  gap: 16px;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
 }
 
 .health-card,
@@ -539,9 +549,9 @@ function labelOf(kind: MarketKind) {
 .panel-header,
 .task-title,
 .task-status {
-  align-items: center;
   display: flex;
   gap: 16px;
+  align-items: center;
   justify-content: space-between;
 }
 
@@ -551,67 +561,67 @@ function labelOf(kind: MarketKind) {
 
 .health-card dl {
   display: grid;
-  gap: 10px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
   margin: 16px 0 0;
 }
 
 .health-card dl div {
+  padding: 10px;
   background: var(--el-fill-color-lighter);
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 6px;
-  padding: 10px;
 }
 
 dt {
-  color: var(--el-text-color-secondary);
   font-size: 12px;
   line-height: 18px;
+  color: var(--el-text-color-secondary);
 }
 
 dd {
-  color: var(--el-text-color-primary);
+  margin: 2px 0 0;
   font-size: 13px;
   line-height: 20px;
-  margin: 2px 0 0;
+  color: var(--el-text-color-primary);
 }
 
 h2 {
-  color: var(--el-text-color-primary);
+  margin: 0;
   font-size: 16px;
   font-weight: 600;
   line-height: 24px;
-  margin: 0;
+  color: var(--el-text-color-primary);
 }
 
 h3 {
-  color: var(--el-text-color-primary);
+  margin: 0;
   font-size: 14px;
   font-weight: 600;
   line-height: 22px;
-  margin: 0;
+  color: var(--el-text-color-primary);
 }
 
 p {
-  color: var(--el-text-color-regular);
+  margin: 8px 0 0;
   font-size: 13px;
   line-height: 20px;
-  margin: 8px 0 0;
+  color: var(--el-text-color-regular);
 }
 
 .sync-task-list {
+  overflow: hidden;
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
-  overflow: hidden;
 }
 
 .sync-task-row {
-  align-items: center;
   display: grid;
-  gap: 16px;
   grid-template-columns:
     minmax(180px, 1.1fr) minmax(240px, 1.8fr) 88px minmax(160px, 1fr)
     132px;
+  gap: 16px;
+  align-items: center;
   padding: 14px 16px;
 }
 
@@ -628,19 +638,19 @@ p {
 }
 
 .task-status {
-  color: var(--el-text-color-regular);
-  font-size: 13px;
   gap: 8px;
   justify-content: flex-start;
+  font-size: 13px;
+  color: var(--el-text-color-regular);
   white-space: nowrap;
 }
 
 .status-dot {
+  display: inline-flex;
+  width: 8px;
+  height: 8px;
   background: #57d188;
   border-radius: 999px;
-  display: inline-flex;
-  height: 8px;
-  width: 8px;
 }
 
 .status-dot.is-running {
@@ -652,19 +662,19 @@ p {
 }
 
 .task-meta {
-  color: var(--el-text-color-secondary);
   display: flex;
   flex-direction: column;
-  font-size: 12px;
   gap: 4px;
+  font-size: 12px;
   line-height: 18px;
+  color: var(--el-text-color-secondary);
 }
 
 .single-sync-form {
-  align-items: flex-end;
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
+  align-items: flex-end;
 }
 
 .single-sync-form label {
@@ -676,9 +686,9 @@ p {
 }
 
 .single-sync-form label span {
-  color: var(--el-text-color-regular);
   font-size: 12px;
   line-height: 18px;
+  color: var(--el-text-color-regular);
 }
 
 .single-sync-button {
@@ -687,8 +697,8 @@ p {
 
 @media (max-width: 960px) {
   .sync-task-row {
-    align-items: stretch;
     grid-template-columns: 1fr;
+    align-items: stretch;
   }
 
   .sync-task-row :deep(.el-button) {
@@ -702,8 +712,8 @@ p {
   }
 
   .panel-header {
-    align-items: stretch;
     flex-direction: column;
+    align-items: stretch;
   }
 
   .single-sync-form,

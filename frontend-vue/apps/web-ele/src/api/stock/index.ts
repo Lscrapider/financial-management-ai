@@ -169,7 +169,11 @@ export function syncStockDailyKlineData(stockCode: string) {
 }
 
 export function addStockConfig(data: StockConfigAddParams) {
-  return requestClient.post<StockConfigAddResult>('/system-config/stocks', data, {
-    timeout: 60_000,
-  });
+  return requestClient.post<StockConfigAddResult>(
+    '/system-config/stocks',
+    data,
+    {
+      timeout: 60_000,
+    },
+  );
 }

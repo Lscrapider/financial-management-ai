@@ -1,5 +1,8 @@
 <script lang="ts" setup>
-import type { SceneAnalysisReportTarget, SceneReportStatus } from '#/api/scene-analysis';
+import type {
+  SceneAnalysisReportTarget,
+  SceneReportStatus,
+} from '#/api/scene-analysis';
 import type { StockAlertConfig } from '#/api/stock-alert';
 import type { WatchGroup } from '#/api/watch-pool';
 
@@ -9,19 +12,19 @@ import { useRouter } from 'vue-router';
 import { Page } from '@vben/common-ui';
 import { IconifyIcon } from '@vben/icons';
 
-import {
-  ElButton,
-  ElCard,
-  ElEmpty,
-  ElSkeleton,
-  ElTag,
-} from 'element-plus';
+import { ElButton, ElCard, ElEmpty, ElSkeleton, ElTag } from 'element-plus';
 
 import { listSceneReportTargets } from '#/api/scene-analysis';
 import { listStockAlerts } from '#/api/stock-alert';
 import { listWatchGroups } from '#/api/watch-pool';
 
-type WorkbenchTargetType = 'BOND' | 'FUND' | 'INDEX' | 'SECTOR' | 'STOCK' | string;
+type WorkbenchTargetType =
+  | 'BOND'
+  | 'FUND'
+  | 'INDEX'
+  | 'SECTOR'
+  | 'STOCK'
+  | string;
 
 const router = useRouter();
 const loading = ref(false);
@@ -37,7 +40,7 @@ const movementGroups = computed(() => {
   return watchGroups.value
     .map((group) => ({
       ...group,
-      items: [...group.items].sort(
+      items: group.items.toSorted(
         (left, right) =>
           Math.abs(toNumber(right.changePercent)) -
           Math.abs(toNumber(left.changePercent)),
@@ -46,13 +49,19 @@ const movementGroups = computed(() => {
     .filter((group) => group.items.length > 0);
 });
 
-const triggeredAlerts = computed(() => alerts.value.filter((item) => item.outOfThreshold));
+const triggeredAlerts = computed(() =>
+  alerts.value.filter((item) => item.outOfThreshold),
+);
 
-const enabledAlerts = computed(() => alerts.value.filter((item) => item.enabled));
+const enabledAlerts = computed(() =>
+  alerts.value.filter((item) => item.enabled),
+);
 
 const alertCoverageCount = computed(() => {
   const enabledAlertKeys = new Set(
-    enabledAlerts.value.map((item) => targetKey(item.targetType, item.stockCode)),
+    enabledAlerts.value.map((item) =>
+      targetKey(item.targetType, item.stockCode),
+    ),
   );
   return watchItems.value.filter((item) =>
     enabledAlertKeys.has(targetKey(item.targetType, item.targetCode)),
@@ -69,7 +78,7 @@ const alertCoveragePercent = computed(() => {
 const nearAlerts = computed(() => {
   return enabledAlerts.value
     .filter((item) => !item.outOfThreshold && alertUsage(item) >= 0.8)
-    .sort((left, right) => alertUsage(right) - alertUsage(left))
+    .toSorted((left, right) => alertUsage(right) - alertUsage(left))
     .slice(0, 5);
 });
 
@@ -81,7 +90,12 @@ const latestReports = computed(() => reports.value.slice(0, 4));
 
 const runningReportCount = computed(() => {
   return reports.value.filter((item) =>
-    ['generating_report', 'pending', 'processing_current_scenes', 'retrieving_knowledge'].includes(item.latestStatus),
+    [
+      'generating_report',
+      'pending',
+      'processing_current_scenes',
+      'retrieving_knowledge',
+    ].includes(item.latestStatus),
   ).length;
 });
 
@@ -90,7 +104,13 @@ const failedReportCount = computed(() => {
 });
 
 const assetTypeStats = computed(() => {
-  const typeOrder: WorkbenchTargetType[] = ['STOCK', 'INDEX', 'BOND', 'FUND', 'SECTOR'];
+  const typeOrder: WorkbenchTargetType[] = [
+    'STOCK',
+    'INDEX',
+    'BOND',
+    'FUND',
+    'SECTOR',
+  ];
   return typeOrder
     .map((type) => ({
       count: watchItems.value.filter((item) => item.targetType === type).length,
@@ -101,34 +121,44 @@ const assetTypeStats = computed(() => {
 });
 
 const marketDirectionSummary = computed(() => {
-  return watchItems.value.reduce(
-    (summary, item) => {
-      const changePercent = toNullableNumber(item.changePercent);
-      if (changePercent === null) {
-        summary.noQuote += 1;
-      } else if (changePercent > 0) {
-        summary.up += 1;
-      } else if (changePercent < 0) {
-        summary.down += 1;
-      } else {
-        summary.flat += 1;
-      }
-      return summary;
-    },
-    { down: 0, flat: 0, noQuote: 0, up: 0 },
-  );
+  const summary = { down: 0, flat: 0, noQuote: 0, up: 0 };
+  for (const item of watchItems.value) {
+    const changePercent = toNullableNumber(item.changePercent);
+    if (changePercent === null) {
+      summary.noQuote += 1;
+    } else if (changePercent > 0) {
+      summary.up += 1;
+    } else if (changePercent < 0) {
+      summary.down += 1;
+    } else {
+      summary.flat += 1;
+    }
+  }
+  return summary;
 });
 
 const marketDirectionItems = computed(() => [
-  { className: 'text-red-500', label: '上涨', value: marketDirectionSummary.value.up },
-  { className: 'text-emerald-500', label: '下跌', value: marketDirectionSummary.value.down },
+  {
+    className: 'text-red-500',
+    label: '上涨',
+    value: marketDirectionSummary.value.up,
+  },
+  {
+    className: 'text-emerald-500',
+    label: '下跌',
+    value: marketDirectionSummary.value.down,
+  },
   { className: '', label: '平盘', value: marketDirectionSummary.value.flat },
-  { className: '', label: '无行情', value: marketDirectionSummary.value.noQuote },
+  {
+    className: '',
+    label: '无行情',
+    value: marketDirectionSummary.value.noQuote,
+  },
 ]);
 
 const topWatchGroups = computed(() => {
-  return [...watchGroups.value]
-    .sort((left, right) => right.items.length - left.items.length)
+  return watchGroups.value
+    .toSorted((left, right) => right.items.length - left.items.length)
     .slice(0, 5);
 });
 
@@ -198,7 +228,10 @@ function targetTypeLabel(type: WorkbenchTargetType) {
 }
 
 function targetTypeTag(type: WorkbenchTargetType) {
-  const tagTypes: Record<string, 'danger' | 'info' | 'primary' | 'success' | 'warning'> = {
+  const tagTypes: Record<
+    string,
+    'danger' | 'info' | 'primary' | 'success' | 'warning'
+  > = {
     BOND: 'warning',
     CONVERTIBLE_BOND: 'warning',
     FUND: 'success',
@@ -315,7 +348,7 @@ function alertStateTag(item: StockAlertConfig) {
   return item.enabled ? 'success' : 'info';
 }
 
-function toNullableNumber(value?: number | string | null) {
+function toNullableNumber(value?: null | number | string) {
   if (value === null || value === undefined || value === '') {
     return null;
   }
@@ -323,7 +356,7 @@ function toNullableNumber(value?: number | string | null) {
   return Number.isFinite(numberValue) ? numberValue : null;
 }
 
-function toNumber(value?: number | string | null) {
+function toNumber(value?: null | number | string) {
   return toNullableNumber(value) ?? 0;
 }
 </script>
@@ -364,7 +397,9 @@ function toNumber(value?: number | string | null) {
           <strong>
             <span class="text-red-500">{{ marketDirectionSummary.up }}</span>
             <span class="summary-separator">/</span>
-            <span class="text-emerald-500">{{ marketDirectionSummary.down }}</span>
+            <span class="text-emerald-500">{{
+              marketDirectionSummary.down
+            }}</span>
           </strong>
         </div>
         <div class="summary-item">
@@ -385,7 +420,9 @@ function toNumber(value?: number | string | null) {
                 <span>观察池异动</span>
                 <small>按涨跌幅绝对值排序</small>
               </div>
-              <ElButton link type="primary" @click="openWatchPool">全部</ElButton>
+              <ElButton link type="primary" @click="openWatchPool">
+                全部
+              </ElButton>
             </div>
           </template>
 
@@ -438,7 +475,9 @@ function toNumber(value?: number | string | null) {
                 <span>资产视图</span>
                 <small>观察池结构和行情分布</small>
               </div>
-              <ElButton link type="primary" @click="openWatchPool">管理</ElButton>
+              <ElButton link type="primary" @click="openWatchPool">
+                管理
+              </ElButton>
             </div>
           </template>
 
@@ -501,10 +540,13 @@ function toNumber(value?: number | string | null) {
               <div>
                 <span>布控与风险</span>
                 <small>
-                  已启用 {{ enabledAlerts.length }} · 覆盖 {{ alertCoverageCount }}/{{ watchItems.length }}
+                  已启用 {{ enabledAlerts.length }} · 覆盖
+                  {{ alertCoverageCount }}/{{ watchItems.length }}
                 </small>
               </div>
-              <ElButton link type="primary" @click="openStockAlert">配置</ElButton>
+              <ElButton link type="primary" @click="openStockAlert">
+                配置
+              </ElButton>
             </div>
           </template>
 
@@ -542,7 +584,8 @@ function toNumber(value?: number | string | null) {
                 <div>
                   <strong>{{ item.stockName }}</strong>
                   <small>
-                    {{ item.stockCode }} · 阈值 {{ formatThreshold(item.thresholdPercent) }}
+                    {{ item.stockCode }} · 阈值
+                    {{ formatThreshold(item.thresholdPercent) }}
                   </small>
                 </div>
               </div>
@@ -573,7 +616,9 @@ function toNumber(value?: number | string | null) {
                   生成中 {{ runningReportCount }} · 失败 {{ failedReportCount }}
                 </small>
               </div>
-              <ElButton link type="primary" @click="openSceneReports">全部</ElButton>
+              <ElButton link type="primary" @click="openSceneReports">
+                全部
+              </ElButton>
             </div>
           </template>
 
@@ -589,10 +634,15 @@ function toNumber(value?: number | string | null) {
                 <div class="report-title">
                   <strong>{{ item.targetName || item.targetCode }}</strong>
                   <small>
-                    {{ targetTypeLabel(item.targetType) }} · {{ item.targetCode }}
+                    {{ targetTypeLabel(item.targetType) }} ·
+                    {{ item.targetCode }}
                   </small>
                 </div>
-                <ElTag :type="statusTag(item.latestStatus)" effect="plain" size="small">
+                <ElTag
+                  :type="statusTag(item.latestStatus)"
+                  effect="plain"
+                  size="small"
+                >
                   {{ statusLabel(item.latestStatus) }}
                 </ElTag>
               </div>
@@ -608,11 +658,15 @@ function toNumber(value?: number | string | null) {
                 </div>
                 <div>
                   <span>生成方式</span>
-                  <strong>{{ generationTypeLabel(item.latestGenerationType) }}</strong>
+                  <strong>{{
+                    generationTypeLabel(item.latestGenerationType)
+                  }}</strong>
                 </div>
                 <div>
                   <span>版本</span>
-                  <strong>{{ item.latestVersionNo ? `v${item.latestVersionNo}` : '-' }}</strong>
+                  <strong>{{
+                    item.latestVersionNo ? `v${item.latestVersionNo}` : '-'
+                  }}</strong>
                 </div>
                 <div>
                   <span>报告数</span>
@@ -622,7 +676,9 @@ function toNumber(value?: number | string | null) {
 
               <div class="report-footer">
                 <span>模型 {{ item.latestModel || '-' }}</span>
-                <span>{{ formatDateTime(item.latestGeneratedAt || item.latestCreatedAt) }}</span>
+                <span>{{
+                  formatDateTime(item.latestGeneratedAt || item.latestCreatedAt)
+                }}</span>
               </div>
             </button>
           </div>
@@ -650,8 +706,8 @@ function toNumber(value?: number | string | null) {
 }
 
 .workbench-hero {
-  align-items: center;
   display: flex;
+  align-items: center;
   justify-content: space-between;
   padding: 20px 24px;
 }
@@ -663,21 +719,21 @@ function toNumber(value?: number | string | null) {
 }
 
 .page-meta {
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
   margin-top: 8px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 
 .hero-actions {
-  align-items: center;
   display: flex;
   gap: 10px;
+  align-items: center;
 }
 
 .summary-grid {
   display: grid;
-  gap: 16px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
 }
 
 .summary-item {
@@ -704,16 +760,16 @@ function toNumber(value?: number | string | null) {
 }
 
 .summary-separator {
-  color: var(--el-text-color-secondary);
-  font-size: 18px;
   margin: 0 4px;
+  font-size: 18px;
+  color: var(--el-text-color-secondary);
 }
 
 .workbench-grid {
-  align-items: stretch;
   display: grid;
-  gap: 16px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
 }
 
 .report-panel {
@@ -723,19 +779,24 @@ function toNumber(value?: number | string | null) {
 .asset-panel,
 .movement-panel,
 .alert-panel {
+  display: flex;
+  flex-direction: column;
   height: 520px;
 }
 
 .asset-panel :deep(.el-card__body),
 .movement-panel :deep(.el-card__body),
 .alert-panel :deep(.el-card__body) {
-  height: calc(100% - 57px);
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
   overflow: hidden;
 }
 
 .panel-header {
-  align-items: center;
   display: flex;
+  align-items: center;
   justify-content: space-between;
 }
 
@@ -747,8 +808,8 @@ function toNumber(value?: number | string | null) {
 
 .panel-header small {
   display: block;
-  font-size: 12px;
   margin-top: 4px;
+  font-size: 12px;
 }
 
 .movement-list,
@@ -765,55 +826,61 @@ function toNumber(value?: number | string | null) {
 .alert-list {
   display: grid;
   gap: 10px;
+  min-height: 0;
   max-height: 100%;
-  overflow-y: auto;
   padding-right: 4px;
+  overflow-y: auto;
   scrollbar-width: thin;
+}
+
+.alert-list {
+  flex: 1;
 }
 
 .asset-overview {
   display: grid;
   gap: 16px;
+  min-height: 0;
   max-height: 100%;
-  overflow-y: auto;
   padding-right: 4px;
+  overflow-y: auto;
   scrollbar-width: thin;
 }
 
 .asset-section {
+  padding: 12px;
   background: var(--el-fill-color-lighter);
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 6px;
-  padding: 12px;
 }
 
 .asset-section-title {
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
   margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .asset-type-grid,
 .direction-grid {
   display: grid;
-  gap: 8px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .asset-type-item,
 .direction-item,
 .group-rank-row {
-  align-items: center;
   display: flex;
+  align-items: center;
   justify-content: space-between;
 }
 
 .asset-type-item,
 .direction-item {
-  background: var(--el-bg-color);
-  border-radius: 6px;
   min-height: 38px;
   padding: 8px;
+  background: var(--el-bg-color);
+  border-radius: 6px;
 }
 
 .asset-type-item strong,
@@ -825,8 +892,8 @@ function toNumber(value?: number | string | null) {
 
 .direction-item span,
 .group-rank-row span {
-  color: var(--el-text-color-secondary);
   font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .group-rank-list {
@@ -835,37 +902,37 @@ function toNumber(value?: number | string | null) {
 }
 
 .group-rank-row {
-  border-bottom: 1px dashed var(--el-border-color-lighter);
   min-height: 30px;
   padding-bottom: 8px;
+  border-bottom: 1px dashed var(--el-border-color-lighter);
 }
 
 .group-rank-row:last-child {
-  border-bottom: 0;
   padding-bottom: 0;
+  border-bottom: 0;
 }
 
 .alert-coverage {
   display: grid;
-  gap: 10px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
   margin-bottom: 12px;
 }
 
 .alert-coverage > div {
-  background: var(--el-fill-color-lighter);
-  border-radius: 6px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   min-height: 68px;
   padding: 12px;
+  background: var(--el-fill-color-lighter);
+  border-radius: 6px;
 }
 
 .alert-coverage span,
 .alert-calm-state span {
-  color: var(--el-text-color-secondary);
   font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .alert-coverage strong {
@@ -874,13 +941,13 @@ function toNumber(value?: number | string | null) {
 }
 
 .alert-calm-state {
-  background: var(--el-fill-color-lighter);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 6px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 14px;
+  background: var(--el-fill-color-lighter);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
 }
 
 .movement-group {
@@ -889,46 +956,46 @@ function toNumber(value?: number | string | null) {
 }
 
 .movement-group + .movement-group {
-  border-top: 1px dashed var(--el-border-color-lighter);
   padding-top: 10px;
+  border-top: 1px dashed var(--el-border-color-lighter);
 }
 
 .movement-group-header {
-  align-items: center;
   display: flex;
+  align-items: center;
   justify-content: space-between;
   padding: 0 2px;
 }
 
 .movement-group-header span {
-  color: var(--el-text-color-primary);
   font-size: 13px;
   font-weight: 700;
+  color: var(--el-text-color-primary);
 }
 
 .movement-group-header small {
-  color: var(--el-text-color-secondary);
   font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .movement-row,
 .alert-row,
 .report-row {
+  display: flex;
+  gap: 12px;
   align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
   background: var(--el-fill-color-lighter);
   border: 1px solid transparent;
   border-radius: 6px;
-  color: inherit;
-  cursor: pointer;
-  display: flex;
-  gap: 12px;
-  justify-content: space-between;
-  padding: 12px;
-  text-align: left;
   transition:
     background-color 0.2s ease,
     border-color 0.2s ease;
-  width: 100%;
 }
 
 .movement-row:hover,
@@ -939,9 +1006,9 @@ function toNumber(value?: number | string | null) {
 }
 
 .target-main {
-  align-items: center;
   display: flex;
   gap: 10px;
+  align-items: center;
   min-width: 0;
 }
 
@@ -961,11 +1028,11 @@ function toNumber(value?: number | string | null) {
 }
 
 .target-metric {
-  align-items: flex-end;
   display: flex;
-  flex-direction: column;
   flex-shrink: 0;
+  flex-direction: column;
   gap: 6px;
+  align-items: flex-end;
   text-align: right;
 }
 
@@ -975,47 +1042,47 @@ function toNumber(value?: number | string | null) {
 }
 
 .report-row {
-  align-items: stretch;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  align-items: stretch;
   justify-content: flex-start;
   min-height: 168px;
 }
 
 .report-row-top {
-  align-items: flex-start;
   display: flex;
   gap: 10px;
+  align-items: flex-start;
   justify-content: space-between;
 }
 
 .report-preview {
-  color: var(--el-text-color-regular);
   display: -webkit-box;
+  min-height: 39px;
+  margin: 0;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
   font-size: 13px;
   line-height: 1.5;
-  margin: 0;
-  min-height: 39px;
-  overflow: hidden;
+  color: var(--el-text-color-regular);
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
 }
 
 .report-meta-grid {
   display: grid;
-  gap: 8px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .report-meta-grid div {
-  background: var(--el-bg-color);
-  border-radius: 6px;
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
   padding: 8px;
+  background: var(--el-bg-color);
+  border-radius: 6px;
 }
 
 .report-meta-grid span,
@@ -1024,18 +1091,18 @@ function toNumber(value?: number | string | null) {
 }
 
 .report-meta-grid strong {
-  font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 13px;
   white-space: nowrap;
 }
 
 .report-footer {
-  border-top: 1px dashed var(--el-border-color-lighter);
   display: flex;
   flex-wrap: wrap;
   gap: 8px 12px;
   padding-top: 10px;
+  border-top: 1px dashed var(--el-border-color-lighter);
 }
 
 @media (max-width: 1200px) {
@@ -1058,9 +1125,9 @@ function toNumber(value?: number | string | null) {
   }
 
   .workbench-hero {
-    align-items: stretch;
     flex-direction: column;
     gap: 16px;
+    align-items: stretch;
   }
 
   .hero-actions,
@@ -1072,15 +1139,31 @@ function toNumber(value?: number | string | null) {
   .movement-panel,
   .asset-panel,
   .alert-panel {
-    height: 460px;
+    height: auto;
+    max-height: min(70vh, 560px);
+  }
+
+  .asset-panel :deep(.el-card__body),
+  .movement-panel :deep(.el-card__body),
+  .alert-panel :deep(.el-card__body) {
+    max-height: calc(min(70vh, 560px) - 57px);
+    overflow-y: auto;
+  }
+
+  .movement-list,
+  .alert-list,
+  .asset-overview {
+    max-height: none;
+    padding-right: 0;
+    overflow: visible;
   }
 
   .hero-actions,
   .movement-row,
   .alert-row,
   .report-row {
-    align-items: stretch;
     flex-direction: column;
+    align-items: stretch;
   }
 
   .target-metric {

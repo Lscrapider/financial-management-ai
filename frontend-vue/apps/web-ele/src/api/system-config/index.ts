@@ -12,7 +12,11 @@ export interface TargetDeleteResult {
 }
 
 export function deleteTargetConfig(data: TargetDeleteParams) {
-  return requestClient.post<TargetDeleteResult>('/system-config/targets/delete', data, {
-    timeout: 60_000,
-  });
+  return requestClient.post<TargetDeleteResult>(
+    '/system-config/targets/delete',
+    data,
+    {
+      timeout: 60_000,
+    },
+  );
 }

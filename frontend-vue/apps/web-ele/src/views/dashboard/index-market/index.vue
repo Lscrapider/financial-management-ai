@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import type { Sort } from 'element-plus';
+
 import type { EchartsUIType } from '@vben/plugins/echarts';
 
 import type {
@@ -23,7 +25,6 @@ import {
   ElTableColumn,
   ElTag,
 } from 'element-plus';
-import type { Sort } from 'element-plus';
 
 import {
   listIndexIntradayTrends,
@@ -44,12 +45,21 @@ const periodOptions = [
   { label: '月K', value: 'monthly' },
 ] as const;
 
+const MARKET_CHART_COLORS = {
+  compare: '#8a929f',
+  fall: '#57d188',
+  price: '#006be6',
+  reference: '#efbd48',
+  rise: '#dc4446',
+} as const;
+
 const chartRef = ref<EchartsUIType>();
 const { renderEcharts } = useEcharts(chartRef);
 const route = useRoute();
 
 const klineLimit = ref(250);
-const klinePeriodType = ref<(typeof periodOptions)[number]['value']>('intraday');
+const klinePeriodType =
+  ref<(typeof periodOptions)[number]['value']>('intraday');
 const klines = ref<IndexKline[]>([]);
 const trends = ref<IndexIntradayTrend[]>([]);
 const loadingKlines = ref(false);
@@ -68,7 +78,10 @@ const latestKline = computed(() => {
 });
 
 const klinePeriodLabel = computed(() => {
-  return periodOptions.find((item) => item.value === klinePeriodType.value)?.label ?? '走势';
+  return (
+    periodOptions.find((item) => item.value === klinePeriodType.value)?.label ??
+    '走势'
+  );
 });
 
 const riseCount = computed(() => {
@@ -98,11 +111,7 @@ async function refreshQuotes() {
     });
     const firstSecid = quotes.value[0]?.secid ?? '';
     const querySecid = normalizeRouteSecid(route.query.secid);
-    selectedSecid.value = quotes.value.some((item) => item.secid === querySecid)
-      ? querySecid
-      : quotes.value.some((item) => item.secid === selectedSecid.value)
-        ? selectedSecid.value
-        : firstSecid;
+    selectedSecid.value = nextSelectedSecid(querySecid, firstSecid);
     await refreshKlines();
   } finally {
     loadingQuotes.value = false;
@@ -184,7 +193,13 @@ function renderKlineChart() {
     axisPointer: {
       link: [{ xAxisIndex: 'all' }],
     },
-    color: ['#ef4444', '#f59e0b', '#3b82f6', '#8b5cf6', '#64748b'],
+    color: [
+      MARKET_CHART_COLORS.rise,
+      MARKET_CHART_COLORS.reference,
+      MARKET_CHART_COLORS.price,
+      MARKET_CHART_COLORS.compare,
+      MARKET_CHART_COLORS.fall,
+    ],
     dataZoom: [
       {
         bottom: 12,
@@ -214,10 +229,10 @@ function renderKlineChart() {
       {
         data: candleData,
         itemStyle: {
-          borderColor: '#ef4444',
-          borderColor0: '#089981',
-          color: '#ef4444',
-          color0: '#089981',
+          borderColor: MARKET_CHART_COLORS.rise,
+          borderColor0: MARKET_CHART_COLORS.fall,
+          color: MARKET_CHART_COLORS.rise,
+          color0: MARKET_CHART_COLORS.fall,
         },
         name: klinePeriodLabel.value,
         type: 'candlestick',
@@ -297,12 +312,14 @@ function renderIntradayChart() {
     (item) => item.trendMinute || formatTime(item.trendTime),
   );
   const prices = trends.value.map((item) => toNullableNumber(item.closePrice));
-  const averages = trends.value.map((item) => toNullableNumber(item.averagePrice));
+  const averages = trends.value.map((item) =>
+    toNullableNumber(item.averagePrice),
+  );
   const hasAverage = averages.some((item) => item !== null);
 
   renderEcharts({
     animation: false,
-    color: ['#089981', '#f59e0b'],
+    color: [MARKET_CHART_COLORS.price, MARKET_CHART_COLORS.reference],
     grid: {
       bottom: 32,
       left: 56,
@@ -423,7 +440,7 @@ function formatVolumeAxis(value: number) {
   return String(value);
 }
 
-function toNullableNumber(value?: number | string | null) {
+function toNullableNumber(value?: null | number | string) {
   if (value === null || value === undefined || value === '') {
     return null;
   }
@@ -431,11 +448,11 @@ function toNullableNumber(value?: number | string | null) {
   return Number.isFinite(numberValue) ? numberValue : null;
 }
 
-function toNumber(value?: number | string | null) {
+function toNumber(value?: null | number | string) {
   return toNullableNumber(value) ?? 0;
 }
 
-function toLineNumber(value?: number | string | null) {
+function toLineNumber(value?: null | number | string) {
   const numberValue = toNullableNumber(value);
   return numberValue && numberValue > 0 ? numberValue : null;
 }
@@ -445,6 +462,16 @@ function normalizeRouteSecid(value: unknown) {
     return typeof value[0] === 'string' ? value[0] : '';
   }
   return typeof value === 'string' ? value : '';
+}
+
+function nextSelectedSecid(querySecid: string, firstSecid: string) {
+  if (quotes.value.some((item) => item.secid === querySecid)) {
+    return querySecid;
+  }
+  if (quotes.value.some((item) => item.secid === selectedSecid.value)) {
+    return selectedSecid.value;
+  }
+  return firstSecid;
 }
 </script>
 
@@ -620,7 +647,11 @@ function normalizeRouteSecid(value: unknown) {
           <ElCard class="kline-panel" shadow="never">
             <template #header>
               <div class="panel-header">
-                <span>{{ klinePeriodLabel === '分时' ? '分时走势' : `${klinePeriodLabel}线` }}</span>
+                <span>{{
+                  klinePeriodLabel === '分时'
+                    ? '分时走势'
+                    : `${klinePeriodLabel}线`
+                }}</span>
                 <div class="header-actions">
                   <ElSelect
                     v-model="klinePeriodType"
@@ -662,7 +693,11 @@ function normalizeRouteSecid(value: unknown) {
             </template>
             <div v-loading="loadingKlines" class="chart-wrap">
               <EchartsUI
-                v-if="klinePeriodType === 'intraday' ? trends.length > 0 : klines.length > 0"
+                v-if="
+                  klinePeriodType === 'intraday'
+                    ? trends.length > 0
+                    : klines.length > 0
+                "
                 ref="chartRef"
                 height="100%"
               />
@@ -683,22 +718,22 @@ function normalizeRouteSecid(value: unknown) {
 }
 
 .overview-band {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
-  display: flex;
-  justify-content: space-between;
-  padding: 20px 24px;
 }
 
 .index-title {
-  align-items: baseline;
   display: flex;
   flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
   font-size: 28px;
   font-weight: 700;
-  gap: 10px;
   line-height: 1.2;
 }
 
@@ -714,14 +749,14 @@ function normalizeRouteSecid(value: unknown) {
 }
 
 .index-meta {
-  font-size: 13px;
   margin-top: 8px;
+  font-size: 13px;
 }
 
 .overview-stats {
   display: grid;
-  gap: 24px;
   grid-template-columns: repeat(3, minmax(84px, 1fr));
+  gap: 24px;
   min-width: 360px;
 }
 
@@ -732,8 +767,8 @@ function normalizeRouteSecid(value: unknown) {
 }
 
 .overview-stat span {
-  color: var(--el-text-color-secondary);
   font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 
 .overview-stat strong {
@@ -743,8 +778,8 @@ function normalizeRouteSecid(value: unknown) {
 
 .content-grid {
   display: grid;
-  gap: 16px;
   grid-template-columns: minmax(520px, 0.95fr) minmax(480px, 1.05fr);
+  gap: 16px;
 }
 
 .detail-column {
@@ -755,17 +790,17 @@ function normalizeRouteSecid(value: unknown) {
 }
 
 .panel-header {
-  align-items: center;
   display: flex;
-  font-weight: 600;
   gap: 12px;
+  align-items: center;
   justify-content: space-between;
+  font-weight: 600;
 }
 
 .header-actions {
-  align-items: center;
   display: flex;
   gap: 10px;
+  align-items: center;
 }
 
 .range-select {
@@ -789,23 +824,23 @@ function normalizeRouteSecid(value: unknown) {
 
 .metric-grid {
   display: grid;
-  gap: 14px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .metric-item {
-  background: var(--el-fill-color-lighter);
-  border-radius: 6px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   min-height: 72px;
   padding: 12px;
+  background: var(--el-fill-color-lighter);
+  border-radius: 6px;
 }
 
 .metric-item span {
-  color: var(--el-text-color-secondary);
   font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 
 .metric-item strong {
@@ -814,8 +849,8 @@ function normalizeRouteSecid(value: unknown) {
 }
 
 .chart-wrap {
-  height: 430px;
   min-width: 0;
+  height: 430px;
 }
 
 @media (max-width: 1200px) {
@@ -826,9 +861,9 @@ function normalizeRouteSecid(value: unknown) {
 
 @media (max-width: 768px) {
   .overview-band {
-    align-items: stretch;
     flex-direction: column;
     gap: 16px;
+    align-items: stretch;
   }
 
   .overview-stats {

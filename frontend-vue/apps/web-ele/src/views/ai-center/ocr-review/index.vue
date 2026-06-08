@@ -1,4 +1,10 @@
 <script lang="ts" setup>
+import type {
+  OcrReviewDetail,
+  OcrReviewDraftContent,
+  OcrReviewParagraph,
+} from '#/api/ocr-review';
+
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
@@ -18,9 +24,6 @@ import {
   getOcrReview,
   saveOcrReviewDraft,
   submitOcrReview,
-  type OcrReviewDetail,
-  type OcrReviewDraftContent,
-  type OcrReviewParagraph,
 } from '#/api/ocr-review';
 
 const route = useRoute();
@@ -48,11 +51,15 @@ const selectedParagraph = computed(() => {
 });
 
 const selectedPageNo = computed(() => {
-  return selectedParagraph.value?.sourcePages?.[0] ?? review.value?.pages[0]?.pageNo;
+  return (
+    selectedParagraph.value?.sourcePages?.[0] ?? review.value?.pages[0]?.pageNo
+  );
 });
 
 const selectedPage = computed(() => {
-  return review.value?.pages.find((item) => item.pageNo === selectedPageNo.value);
+  return review.value?.pages.find(
+    (item) => item.pageNo === selectedPageNo.value,
+  );
 });
 
 const confidenceText = computed(() => {
@@ -123,8 +130,9 @@ function removeParagraph(index: number) {
   content.paragraphs.splice(index, 1);
   renumberParagraphs(content);
   selectedParagraphNo.value =
-    content.paragraphs[Math.min(index, content.paragraphs.length - 1)]
-      ?.paragraphNo;
+    content.paragraphs[
+      Math.min(index, content.paragraphs.length - 1)
+    ]?.paragraphNo;
 }
 
 function mergeWithNext(index: number) {
@@ -138,9 +146,9 @@ function mergeWithNext(index: number) {
     return;
   }
   current.text = `${current.text}\n${next.text}`.trim();
-  current.sourcePages = Array.from(
-    new Set([...current.sourcePages, ...next.sourcePages]),
-  );
+  current.sourcePages = [
+    ...new Set([...current.sourcePages, ...next.sourcePages]),
+  ];
   current.sourceSegments = [...current.sourceSegments, ...next.sourceSegments];
   current.avgConfidence = Number(
     ((current.avgConfidence + next.avgConfidence) / 2).toFixed(4),
@@ -262,7 +270,9 @@ async function goBack() {
           </div>
           <div class="metric-item">
             <span>低置信度</span>
-            <strong>{{ draft?.metrics?.lowConfidenceParagraphCount ?? 0 }}</strong>
+            <strong>{{
+              draft?.metrics?.lowConfidenceParagraphCount ?? 0
+            }}</strong>
           </div>
           <div class="metric-item">
             <span>状态</span>
@@ -276,8 +286,8 @@ async function goBack() {
               <article
                 v-for="(paragraph, index) in paragraphs"
                 :key="paragraph.paragraphNo"
+                class="paragraph-item"
                 :class="[
-                  'paragraph-item',
                   selectedParagraph?.paragraphNo === paragraph.paragraphNo &&
                     'is-active',
                 ]"
@@ -344,7 +354,11 @@ async function goBack() {
                     >
                       复制
                     </ElButton>
-                    <ElButton link type="danger" @click.stop="removeParagraph(index)">
+                    <ElButton
+                      link
+                      type="danger"
+                      @click.stop="removeParagraph(index)"
+                    >
                       删除
                     </ElButton>
                   </div>
@@ -388,16 +402,16 @@ async function goBack() {
 .summary-band,
 .paragraph-panel,
 .image-panel {
+  background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
   border-radius: 8px;
-  background: hsl(var(--card));
 }
 
 .toolbar-band {
   display: flex;
+  gap: 16px;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
   padding: 16px;
   margin-bottom: 16px;
 }
@@ -413,8 +427,8 @@ async function goBack() {
 .image-header span,
 .metric-item span,
 .paragraph-meta span {
-  color: hsl(var(--muted-foreground));
   font-size: 13px;
+  color: hsl(var(--muted-foreground));
 }
 
 .toolbar-actions {
@@ -451,10 +465,10 @@ async function goBack() {
 .paragraph-item {
   padding: 12px;
   margin-bottom: 10px;
+  cursor: pointer;
+  background: hsl(var(--background));
   border: 1px solid hsl(var(--border));
   border-radius: 8px;
-  background: hsl(var(--background));
-  cursor: pointer;
 }
 
 .paragraph-item.is-active {
@@ -465,9 +479,9 @@ async function goBack() {
 .paragraph-meta,
 .paragraph-footer {
   display: flex;
+  gap: 10px;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
   margin-bottom: 10px;
 }
 

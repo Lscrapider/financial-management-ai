@@ -40,7 +40,7 @@ export async function loginApi(data: AuthApi.LoginParams) {
  * 注册
  */
 export async function registerApi(data: AuthApi.RegisterParams) {
-  return requestClient.post<void>('/auth/register', data);
+  return requestClient.post<unknown>('/auth/register', data);
 }
 
 /**
@@ -49,13 +49,9 @@ export async function registerApi(data: AuthApi.RegisterParams) {
 export async function refreshTokenApi() {
   const response = await baseRequestClient.post<{
     data: AuthApi.RefreshTokenResponse;
-  }>(
-    '/auth/refresh',
-    undefined,
-    {
-      withCredentials: true,
-    },
-  );
+  }>('/auth/refresh', undefined, {
+    withCredentials: true,
+  });
   return response.data;
 }
 
