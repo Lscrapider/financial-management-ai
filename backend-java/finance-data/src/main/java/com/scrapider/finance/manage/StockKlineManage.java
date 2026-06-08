@@ -12,10 +12,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class StockKlineManage extends ServiceImpl<StockKlineMapper, StockKlinePO> {
 
+    @Transactional(rollbackFor = Exception.class)
     public void saveKlines(List<StockKlinePO> klines) {
         if (CollUtil.isEmpty(klines)) {
             return;
@@ -24,6 +26,7 @@ public class StockKlineManage extends ServiceImpl<StockKlineMapper, StockKlinePO
         this.saveOrUpdateBatch(klines);
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public void saveDailyKlines(List<StockKlinePO> klines) {
         this.saveKlines(klines);
     }
