@@ -17,6 +17,7 @@ interface AiChatWebSocketMessage {
   content?: string;
   conversationId: string;
   messageId: string;
+  model?: string;
   status?: string;
   type: 'agent_status' | 'final_answer';
 }
@@ -135,7 +136,7 @@ function handleAiChatSocketMessage(data: unknown) {
     answer: response.content || '没有返回内容。',
     answeredAt: response.answeredAt || new Date().toISOString(),
     message: pending.message,
-    model: 'WebSocket Agent',
+    model: response.model || 'AI 研究助手',
   });
 }
 
