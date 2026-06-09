@@ -62,6 +62,13 @@ const currentLevel = computed(() => subMenu?.level ?? 0);
 const isFirstLevel = computed(() => {
   return currentLevel.value === 1;
 });
+const showPopupTitle = computed(() => {
+  return (
+    mode.value === 'vertical' &&
+    rootMenu?.props.collapse &&
+    isTopLevelMenuSubmenu.value
+  );
+});
 
 const contentProps = computed((): HoverCardContentProps => {
   const isHorizontal = mode.value === 'horizontal';
@@ -237,6 +244,9 @@ onBeforeUnmount(() => {
           @mouseenter="(e) => handleMouseenter(e, 100)"
           @mouseleave="() => handleMouseleave(true)"
         >
+          <div v-if="showPopupTitle" :class="nsMenu.e('popup-title')">
+            <slot name="title"></slot>
+          </div>
           <ul
             :class="[nsMenu.b(), is('rounded', rounded)]"
             :style="subMenuStyle"

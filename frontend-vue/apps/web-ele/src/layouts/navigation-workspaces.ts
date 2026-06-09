@@ -115,12 +115,25 @@ function findNavigationWorkspace(
 function getNavigationSidebarMenus(
   workspaces: NavigationWorkspace[] = NAVIGATION_WORKSPACES,
 ): MenuRecordRaw[] {
-  return workspaces.map((workspace) => ({
-    children: [],
-    icon: workspace.icon,
-    name: workspace.label,
-    path: workspace.defaultPath,
-  }));
+  return workspaces.map((workspace) => {
+    const sidebarMenu: MenuRecordRaw = {
+      icon: workspace.icon,
+      name: workspace.label,
+      path:
+        workspace.children.length > 1
+          ? `/navigation-workspace/${workspace.key}`
+          : workspace.defaultPath,
+    };
+
+    if (workspace.children.length > 1) {
+      sidebarMenu.children = workspace.children.map((item) => ({
+        name: item.label,
+        path: item.path,
+      }));
+    }
+
+    return sidebarMenu;
+  });
 }
 
 export {

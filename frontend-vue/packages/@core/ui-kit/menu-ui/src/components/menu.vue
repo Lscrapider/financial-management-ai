@@ -704,6 +704,7 @@ $namespace: vben;
   }
 
   &__popup-container {
+    min-width: 176px;
     max-width: 240px;
     height: unset;
     padding: 0;
@@ -714,10 +715,41 @@ $namespace: vben;
     padding: 10px 0;
     border-radius: var(--menu-item-radius);
 
-    .#{$namespace}-sub-menu-content,
-    .#{$namespace}-menu-item {
-      padding: var(--menu-item-popup-padding-y) var(--menu-item-popup-padding-x);
+    &.is-vertical {
+      padding: 6px 0;
+
+      > .#{$namespace}-menu {
+        padding: 0 6px 4px;
+        background: transparent;
+      }
+
+      .#{$namespace}-sub-menu-content,
+      .#{$namespace}-menu-item {
+        justify-content: flex-start;
+        height: 34px;
+        padding: 0 10px;
+        margin: 2px 0;
+        border-radius: 6px;
+      }
     }
+
+    &:not(.is-vertical) {
+      .#{$namespace}-sub-menu-content,
+      .#{$namespace}-menu-item {
+        padding: var(--menu-item-popup-padding-y)
+          var(--menu-item-popup-padding-x);
+      }
+    }
+  }
+
+  &__popup-title {
+    padding: 9px 12px 8px;
+    margin-bottom: 4px;
+    font-size: 13px;
+    font-weight: 650;
+    line-height: 1;
+    color: hsl(var(--foreground) / 92%);
+    border-bottom: 1px solid hsl(var(--border));
   }
 
   &__icon {

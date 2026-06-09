@@ -68,8 +68,7 @@ const navigationSidebarMenus = computed(() =>
   getNavigationSidebarMenus(visibleNavigationWorkspaces.value),
 );
 const navigationSidebarActive = computed(
-  () =>
-    currentNavigationWorkspace.value?.defaultPath ?? navigationActivePath.value,
+  () => navigationActivePath.value,
 );
 
 const menus = computed(() => [
