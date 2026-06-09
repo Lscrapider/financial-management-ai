@@ -8,6 +8,7 @@ from app.agent.memory.memory_loader import AgentMemoryLoader
 from app.agent.planning.agent_planner import AgentPlanner
 from app.agent.prompts.prompt_builder import AgentPromptBuilder
 from app.agent.runtime.answer_generator import AgentAnswerGenerator
+from app.agent.runtime.agent_loop_runner import AgentLoopRunner
 from app.agent.runtime.tool_call_runner import ToolCallRunner
 from app.agent.services.answer_builder import AgentAnswerBuilder
 from app.agent.tools.conversation_history_tool import ConversationHistoryTool
@@ -38,6 +39,11 @@ class BasicAgentExecutor:
         self._planner = planner or AgentPlanner()
         self._tool_call_runner = tool_call_runner or ToolCallRunner()
         self._answer_generator = answer_generator or AgentAnswerGenerator(answer_builder)
+        self._agent_loop_runner = AgentLoopRunner(
+            planner=self._planner,
+            tool_call_runner=self._tool_call_runner,
+            answer_generator=self._answer_generator,
+        )
 
     def run(self, message_body: dict[str, Any]) -> str:
         user_message = str(message_body.get("userMessage") or "").strip()
@@ -103,30 +109,12 @@ class BasicAgentExecutor:
                 ),
                 tool,
             )
-            plan = self._planner.plan(
+            return self._agent_loop_runner.run(
                 model=model,
                 messages=messages,
-                tools=list(tools_by_name.values()),
-                agent_session_id=agent_session_id,
-            )
-            if plan.standard_tool_calls:
-                tool_messages = self._tool_call_runner.run_standard_tools(
-                    tool_calls=plan.standard_tool_calls,
-                    tools_by_name=tools_by_name,
-                    agent_session_id=agent_session_id,
-                    tool_message_type=ToolMessage,
-                )
-                return self._answer_generator.answer_with_standard_tools(
-                    model=model,
-                    messages=messages,
-                    planning_message=plan.planning_message,
-                    tool_messages=tool_messages,
-                    quote_result=self._tool_registry.last_market_quote_result,
-                    agent_session_id=agent_session_id,
-                )
-            return self._answer_generator.answer_without_tools(
-                content=plan.content,
-                quote_result=self._tool_registry.last_market_quote_result,
+                tools_by_name=tools_by_name,
+                tool_message_type=ToolMessage,
+                quote_result_provider=lambda: self._tool_registry.last_market_quote_result,
                 agent_session_id=agent_session_id,
             )
         except Exception as exc:

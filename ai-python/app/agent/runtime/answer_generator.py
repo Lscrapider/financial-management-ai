@@ -32,6 +32,25 @@ class AgentAnswerGenerator:
         final_message = model.invoke([*messages, planning_message, *tool_messages])
         return self._extract_final_answer(final_message, agent_session_id, "standard", quote_result)
 
+    def answer_from_scratchpad(
+        self,
+        model: Any,
+        messages: list[Any],
+        scratchpad: list[Any],
+        quote_result: dict[str, Any],
+        agent_session_id: str,
+    ) -> str | None:
+        if not scratchpad:
+            logger.warning("langchain scratchpad is empty")
+            return None
+        logger.info(
+            "agent langchain final answer start session_id=%s tool_protocol=loop scratchpad_messages=%s",
+            agent_session_id,
+            len(scratchpad),
+        )
+        final_message = model.invoke([*messages, *scratchpad])
+        return self._extract_final_answer(final_message, agent_session_id, "loop", quote_result)
+
     def answer_without_tools(self, content: str, quote_result: dict[str, Any], agent_session_id: str) -> str | None:
         if not content:
             logger.warning("langchain did not request tool and returned empty content")

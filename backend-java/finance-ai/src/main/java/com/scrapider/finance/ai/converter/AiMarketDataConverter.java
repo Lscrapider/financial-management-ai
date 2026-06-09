@@ -3,10 +3,13 @@ package com.scrapider.finance.ai.converter;
 import com.scrapider.finance.ai.domain.vo.AiDataRequestVO;
 import com.scrapider.finance.ai.domain.vo.AiDatabaseContextVO;
 import com.scrapider.finance.domain.po.BondKlinePO;
+import com.scrapider.finance.domain.po.BondIntradayTrendPO;
 import com.scrapider.finance.domain.po.BondQuoteSnapshotPO;
+import com.scrapider.finance.domain.po.IndexIntradayTrendPO;
 import com.scrapider.finance.domain.po.IndexKlinePO;
 import com.scrapider.finance.domain.po.IndexQuoteSnapshotPO;
 import com.scrapider.finance.domain.po.StockIntradayTrendPO;
+import com.scrapider.finance.domain.po.StockKlinePO;
 import com.scrapider.finance.domain.po.StockQuoteSnapshotPO;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -69,6 +72,26 @@ public final class AiMarketDataConverter {
         return row;
     }
 
+    public static Map<String, Object> stockKlineToMap(StockKlinePO kline) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("stockCode", kline.getStockCode());
+        row.put("stockName", kline.getStockName());
+        row.put("tradeDate", kline.getTradeDate());
+        row.put("openPrice", kline.getOpenPrice());
+        row.put("closePrice", kline.getClosePrice());
+        row.put("highPrice", kline.getHighPrice());
+        row.put("lowPrice", kline.getLowPrice());
+        row.put("changePercent", kline.getChangePercent());
+        row.put("volume", kline.getVolume());
+        row.put("turnoverAmount", kline.getTurnoverAmount());
+        row.put("amplitude", kline.getAmplitude());
+        row.put("turnoverRate", kline.getTurnoverRate());
+        row.put("ma5", kline.getMa5());
+        row.put("ma10", kline.getMa10());
+        row.put("ma20", kline.getMa20());
+        return row;
+    }
+
     public static Map<String, Object> indexQuoteToMap(IndexQuoteSnapshotPO quote) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("indexCode", quote.getIndexCode());
@@ -78,6 +101,20 @@ public final class AiMarketDataConverter {
         row.put("volume", quote.getVolume());
         row.put("turnoverAmount", quote.getTurnoverAmount());
         row.put("syncedAt", quote.getSyncedAt());
+        return row;
+    }
+
+    public static Map<String, Object> indexIntradayToMap(IndexIntradayTrendPO trend) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("indexCode", trend.getIndexCode());
+        row.put("indexName", trend.getIndexName());
+        row.put("trendTime", trend.getTrendTime());
+        row.put("closePrice", trend.getClosePrice());
+        row.put("averagePrice", trend.getAveragePrice());
+        row.put("volume", trend.getVolume());
+        row.put("turnoverAmount", trend.getTurnoverAmount());
+        row.put("previousClosePrice", trend.getPreviousClosePrice());
+        row.put("syncedAt", trend.getSyncedAt());
         return row;
     }
 
@@ -106,6 +143,20 @@ public final class AiMarketDataConverter {
         row.put("turnoverAmount", quote.getTurnoverAmount());
         row.put("bondRating", quote.getBondRating());
         row.put("syncedAt", quote.getSyncedAt());
+        return row;
+    }
+
+    public static Map<String, Object> bondIntradayToMap(BondIntradayTrendPO trend) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("bondCode", trend.getBondCode());
+        row.put("bondName", trend.getBondName());
+        row.put("trendTime", trend.getTrendTime());
+        row.put("closePrice", trend.getClosePrice());
+        row.put("averagePrice", trend.getAveragePrice());
+        row.put("volume", trend.getVolume());
+        row.put("turnoverAmount", trend.getTurnoverAmount());
+        row.put("previousClosePrice", trend.getPreviousClosePrice());
+        row.put("syncedAt", trend.getSyncedAt());
         return row;
     }
 
