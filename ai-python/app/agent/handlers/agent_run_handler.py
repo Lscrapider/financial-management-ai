@@ -39,13 +39,13 @@ class AgentRunHandler(MessageHandler):
             user_id,
             username,
         )
-        answer = self._agent_executor.run(body)
+        run_result = self._agent_executor.run(body)
         logger.info(
             "agent run answer generated session_id=%s conversation_id=%s message_id=%s answer_len=%s",
             agent_session_id,
             body.get("conversationId"),
             body.get("messageId"),
-            len(answer),
+            len(run_result.answer),
         )
         self._callback_client.send_final_answer(
             callback_url=str(body["callbackUrl"]),
@@ -53,7 +53,8 @@ class AgentRunHandler(MessageHandler):
             session_secret=str(body["sessionSecret"]),
             conversation_id=str(body["conversationId"]),
             message_id=str(body["messageId"]),
-            answer=answer,
+            answer=run_result.answer,
+            token_usage_events=run_result.token_usage_events,
         )
         logger.info(
             "agent run final answer callback sent session_id=%s conversation_id=%s message_id=%s",

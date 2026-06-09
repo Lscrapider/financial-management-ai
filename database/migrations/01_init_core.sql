@@ -516,10 +516,19 @@ CREATE TABLE IF NOT EXISTS ai_token_usage_log (
     reasoning_tokens INTEGER NOT NULL DEFAULT 0,
     prompt_cache_hit_tokens INTEGER NOT NULL DEFAULT 0,
     prompt_cache_miss_tokens INTEGER NOT NULL DEFAULT 0,
+    user_id BIGINT,
+    source VARCHAR(32),
+    source_ref_id VARCHAR(128),
+    phase VARCHAR(64),
     raw_response TEXT,
     occurred_at TIMESTAMP NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+
+ALTER TABLE ai_token_usage_log ADD COLUMN IF NOT EXISTS user_id BIGINT;
+ALTER TABLE ai_token_usage_log ADD COLUMN IF NOT EXISTS source VARCHAR(32);
+ALTER TABLE ai_token_usage_log ADD COLUMN IF NOT EXISTS source_ref_id VARCHAR(128);
+ALTER TABLE ai_token_usage_log ADD COLUMN IF NOT EXISTS phase VARCHAR(64);
 
 COMMENT ON TABLE ai_token_usage_log IS 'AI 模型 Token 用量日志表';
 COMMENT ON COLUMN ai_token_usage_log.provider IS '模型供应商，例如 deepseek';
@@ -527,6 +536,10 @@ COMMENT ON COLUMN ai_token_usage_log.model IS '模型名称';
 COMMENT ON COLUMN ai_token_usage_log.prompt_tokens IS '输入 Token 数';
 COMMENT ON COLUMN ai_token_usage_log.completion_tokens IS '输出 Token 数';
 COMMENT ON COLUMN ai_token_usage_log.total_tokens IS '总 Token 数';
+COMMENT ON COLUMN ai_token_usage_log.user_id IS 'Token 用量归属用户 ID';
+COMMENT ON COLUMN ai_token_usage_log.source IS '用量来源：agent、report';
+COMMENT ON COLUMN ai_token_usage_log.source_ref_id IS '来源业务 ID：agent 为 conversation_id，report 为报告 ID';
+COMMENT ON COLUMN ai_token_usage_log.phase IS '模型调用阶段：planning、final_answer、report_generate';
 
 -- ================================================================================
 -- 12. 系统访问日志表

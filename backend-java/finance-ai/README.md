@@ -84,7 +84,6 @@ backend-java/finance-ai/
 | `POST /api/ai/scene-analysis/config-profiles` | 创建报告配置档。 |
 | `PUT /api/ai/scene-analysis/config-profiles/{id}` | 更新报告配置档。 |
 | `DELETE /api/ai/scene-analysis/config-profiles/{id}` | 删除报告配置档。 |
-| `POST /api/ai/token-usage/deepseek-response` | 传入 DeepSeek 原始响应 JSON，提取并保存 Token 用量，原始响应字段会保留入库。 |
 | `GET /api/ai/token-usage/overview` | 查询 Token 用量汇总。 |
 | `GET /api/ai/token-usage/trends` | 查询 Token 用量趋势。 |
 | `GET /api/ai/console/overview` | 查询 AI 控制台总览。 |

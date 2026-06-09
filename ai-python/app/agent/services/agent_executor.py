@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import Any
 
 from app.agent.llm.deepseek_chat import DeepSeekChatModelFactory
@@ -9,6 +10,7 @@ from app.agent.planning.agent_planner import AgentPlanner
 from app.agent.prompts.prompt_builder import AgentPromptBuilder
 from app.agent.runtime.answer_generator import AgentAnswerGenerator
 from app.agent.runtime.agent_loop_runner import AgentLoopRunner
+from app.agent.runtime.token_usage import AgentTokenUsageCollector
 from app.agent.runtime.tool_call_runner import ToolCallRunner
 from app.agent.services.answer_builder import AgentAnswerBuilder
 from app.agent.tools.conversation_history_tool import ConversationHistoryTool
@@ -16,6 +18,12 @@ from app.agent.tools.market_quote_tool import MarketQuoteTool
 from app.agent.tools.tool_registry import AgentToolContext, AgentToolRegistry
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class AgentRunResult:
+    answer: str
+    token_usage_events: list[dict[str, Any]]
 
 
 class BasicAgentExecutor:
@@ -45,7 +53,7 @@ class BasicAgentExecutor:
             answer_generator=self._answer_generator,
         )
 
-    def run(self, message_body: dict[str, Any]) -> str:
+    def run(self, message_body: dict[str, Any]) -> AgentRunResult:
         user_message = str(message_body.get("userMessage") or "").strip()
         agent_session_id = str(message_body["agentSessionId"])
         session_secret = str(message_body["sessionSecret"])
@@ -57,21 +65,21 @@ class BasicAgentExecutor:
             message_body.get("messageId"),
             len(user_message),
         )
-        answer = self._tool_calling_answer(
+        result = self._tool_calling_answer(
             data_gateway_url=data_gateway_url,
             agent_session_id=agent_session_id,
             session_secret=session_secret,
             user_message=user_message,
         )
-        if answer:
+        if result and result.answer:
             logger.info(
                 "agent executor langchain answer done session_id=%s answer_len=%s",
                 agent_session_id,
-                len(answer),
+                len(result.answer),
             )
-            return answer
+            return result
         logger.warning("agent executor failed without model answer session_id=%s", agent_session_id)
-        return "AI Agent 暂时没有完成工具规划，请稍后重试。"
+        return AgentRunResult("AI Agent 暂时没有完成工具规划，请稍后重试。", [])
 
     def _tool_calling_answer(
         self,
@@ -79,7 +87,7 @@ class BasicAgentExecutor:
         agent_session_id: str,
         session_secret: str,
         user_message: str,
-    ) -> str | None:
+    ) -> AgentRunResult | None:
         try:
             from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
             from langchain_core.tools import tool
@@ -89,6 +97,7 @@ class BasicAgentExecutor:
 
         try:
             model = self._model_factory.create()
+            token_usage_collector = AgentTokenUsageCollector()
             history = self._memory_loader.load_short_term_memory(
                 data_gateway_url=data_gateway_url,
                 agent_session_id=agent_session_id,
@@ -109,14 +118,18 @@ class BasicAgentExecutor:
                 ),
                 tool,
             )
-            return self._agent_loop_runner.run(
+            answer = self._agent_loop_runner.run(
                 model=model,
                 messages=messages,
                 tools_by_name=tools_by_name,
                 tool_message_type=ToolMessage,
                 quote_result_provider=lambda: self._tool_registry.last_market_quote_result,
                 agent_session_id=agent_session_id,
+                token_usage_collector=token_usage_collector,
             )
+            if not answer:
+                return None
+            return AgentRunResult(answer, token_usage_collector.events())
         except Exception as exc:
             logger.warning("langchain tool calling failed: %s", exc)
             return None

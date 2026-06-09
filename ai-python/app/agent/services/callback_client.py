@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 from urllib import error, request
 
 from app.agent.services.signature import AgentSignatureSigner
@@ -19,6 +20,7 @@ class AgentCallbackClient:
         conversation_id: str,
         message_id: str,
         answer: str,
+        token_usage_events: list[dict[str, Any]] | None = None,
     ) -> None:
         body = {
             "agentSessionId": agent_session_id,
@@ -27,6 +29,7 @@ class AgentCallbackClient:
             "eventType": "final_answer",
             "payload": {
                 "answer": answer,
+                "tokenUsageEvents": token_usage_events or [],
             },
         }
         self._post(callback_url, body, agent_session_id, session_secret)

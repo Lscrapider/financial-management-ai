@@ -740,18 +740,6 @@
 
 ## AI Token 用量
 
-### 记录 DeepSeek 原始响应用量
-
-`POST /api/ai/token-usage/deepseek-response`
-
-需要 Token。
-
-请求体：DeepSeek Chat Completions 原始响应 JSON，必须包含 `usage`。后端会读取 `id`、`object`、`model`、`created`、`choices` 和 `usage`，其他字段会作为原始响应字段保留入库。
-
-返回：`AiTokenUsageLogVO`
-
-字段：`id`、`provider`、`responseId`、`model`、`finishReason`、`promptTokens`、`completionTokens`、`totalTokens`、`cachedTokens`、`reasoningTokens`、`occurredAt`。
-
 ### Token 用量概览
 
 `GET /api/ai/token-usage/overview`

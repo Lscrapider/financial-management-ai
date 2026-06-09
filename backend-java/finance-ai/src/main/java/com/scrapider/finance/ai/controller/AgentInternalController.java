@@ -10,6 +10,7 @@ import com.scrapider.finance.ai.domain.vo.AiChatWebSocketMessageVO;
 import com.scrapider.finance.ai.service.AgentDataGatewayService;
 import com.scrapider.finance.ai.service.AgentSignatureService;
 import com.scrapider.finance.ai.service.AiChatConversationService;
+import com.scrapider.finance.ai.service.AiTokenUsageService;
 import com.scrapider.finance.ai.websocket.AiChatWebSocketSessionRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.OffsetDateTime;
@@ -26,6 +27,7 @@ public class AgentInternalController {
     private final AgentSignatureService agentSignatureService;
     private final AgentDataGatewayService agentDataGatewayService;
     private final AiChatConversationService aiChatConversationService;
+    private final AiTokenUsageService aiTokenUsageService;
     private final AiChatWebSocketSessionRegistry sessionRegistry;
     private final ObjectMapper objectMapper;
 
@@ -33,11 +35,13 @@ public class AgentInternalController {
             AgentSignatureService agentSignatureService,
             AgentDataGatewayService agentDataGatewayService,
             AiChatConversationService aiChatConversationService,
+            AiTokenUsageService aiTokenUsageService,
             AiChatWebSocketSessionRegistry sessionRegistry,
             ObjectMapper objectMapper) {
         this.agentSignatureService = agentSignatureService;
         this.agentDataGatewayService = agentDataGatewayService;
         this.aiChatConversationService = aiChatConversationService;
+        this.aiTokenUsageService = aiTokenUsageService;
         this.sessionRegistry = sessionRegistry;
         this.objectMapper = objectMapper;
     }
@@ -54,6 +58,7 @@ public class AgentInternalController {
                     session.conversationId(),
                     session.messageId(),
                     answerContent);
+            this.aiTokenUsageService.recordAgentTokenUsage(session, param.payload());
             AiChatWebSocketMessageVO message = AiChatWebSocketMessageVO.finalAnswer(
                     session.conversationId(),
                     session.messageId(),

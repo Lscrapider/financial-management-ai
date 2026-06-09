@@ -17,6 +17,8 @@ import com.scrapider.finance.ai.domain.vo.SceneAnalysisReportVO;
 import com.scrapider.finance.ai.security.CurrentUserContext;
 import com.scrapider.finance.ai.service.SceneAnalysisReportService;
 import com.scrapider.finance.ai.service.AiTokenUsageService;
+import com.scrapider.finance.domain.enums.AiTokenUsagePhaseEnum;
+import com.scrapider.finance.domain.enums.AiTokenUsageSourceEnum;
 import com.scrapider.finance.domain.po.OcrTaskPO;
 import com.scrapider.finance.domain.po.SceneAnalysisReportPO;
 import com.scrapider.finance.domain.po.SceneAnalysisTaskPO;
@@ -204,7 +206,7 @@ public class SceneAnalysisReportServiceImpl implements SceneAnalysisReportServic
 
     private void generateFromTaskSnapshotSafely(String taskNo, Long reportId, String generationType) {
         try {
-            GeneratedReport report = this.generateFromTaskSnapshot(taskNo, generationType);
+            GeneratedReport report = this.generateFromTaskSnapshot(taskNo, reportId, generationType);
             this.sceneAnalysisReportManage.markSuccess(
                     reportId,
                     report.reportContent(),
@@ -222,7 +224,7 @@ public class SceneAnalysisReportServiceImpl implements SceneAnalysisReportServic
         }
     }
 
-    private GeneratedReport generateFromTaskSnapshot(String taskNo, String generationType) {
+    private GeneratedReport generateFromTaskSnapshot(String taskNo, Long reportId, String generationType) {
         SceneAnalysisTaskPO task = this.loadTask(taskNo);
         JsonNode currentScenesPayload = this.requiredObject(task.getCurrentScenesPayload(), "currentScenesPayload");
         ObjectNode reportPayload = this.mutableReportPayload(task.getReportPayload());
@@ -237,7 +239,7 @@ public class SceneAnalysisReportServiceImpl implements SceneAnalysisReportServic
                         allowedChunkIds,
                         SceneAnalysisReportPayloadConverter.outputRequirement(this.objectMapper)));
         log.info("调用 deepseek 请求结束 {}", taskNo);
-        this.recordTokenUsage(deepSeekResponse);
+        this.recordTokenUsage(deepSeekResponse, task, reportId);
         JsonNode reportContent = this.reportContent(deepSeekResponse);
         this.validateChunkReferences(reportContent, allowedChunkIds);
         return new GeneratedReport(
@@ -382,9 +384,14 @@ public class SceneAnalysisReportServiceImpl implements SceneAnalysisReportServic
         return text.trim();
     }
 
-    private void recordTokenUsage(JsonNode response) {
+    private void recordTokenUsage(JsonNode response, SceneAnalysisTaskPO task, Long reportId) {
         try {
-            this.aiTokenUsageService.recordDeepSeekResponse(response);
+            this.aiTokenUsageService.recordDeepSeekResponse(
+                    response,
+                    task.getUserId(),
+                    AiTokenUsageSourceEnum.REPORT,
+                    String.valueOf(reportId),
+                    AiTokenUsagePhaseEnum.REPORT_GENERATE);
         } catch (RuntimeException ex) {
             LOGGER.warn("Failed to record scene analysis token usage.", ex);
         }

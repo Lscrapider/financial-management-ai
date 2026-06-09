@@ -2,6 +2,8 @@ package com.scrapider.finance.domain.po;
 
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.scrapider.finance.domain.enums.AiTokenUsagePhaseEnum;
+import com.scrapider.finance.domain.enums.AiTokenUsageSourceEnum;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -27,6 +29,10 @@ public class AiTokenUsageLogPO {
     private Integer reasoningTokens;
     private Integer promptCacheHitTokens;
     private Integer promptCacheMissTokens;
+    private Long userId;
+    private String source;
+    private String sourceRefId;
+    private String phase;
     private String rawResponse;
     private LocalDateTime occurredAt;
     private LocalDateTime createdAt;
@@ -55,6 +61,50 @@ public class AiTokenUsageLogPO {
         return log;
     }
 
+    public static AiTokenUsageLogPO fromDeepSeekResponse(
+            JsonNode response,
+            Long userId,
+            AiTokenUsageSourceEnum source,
+            String sourceRefId,
+            AiTokenUsagePhaseEnum phase) {
+        AiTokenUsageLogPO log = fromDeepSeekResponse(response);
+        log.applyAttribution(userId, source, sourceRefId, phase);
+        return log;
+    }
+
+    public static AiTokenUsageLogPO fromAgentUsageEvent(
+            JsonNode event,
+            Long userId,
+            String conversationId,
+            AiTokenUsagePhaseEnum phase) {
+        AiTokenUsageLogPO log = new AiTokenUsageLogPO();
+        log.setProvider(DEEPSEEK_PROVIDER);
+        log.setResponseId(text(event, "responseId"));
+        log.setObjectType(text(event, "objectType"));
+        log.setModel(text(event, "model"));
+        log.setFinishReason(text(event, "finishReason"));
+        log.setPromptTokens(intValue(event, "promptTokens"));
+        log.setCompletionTokens(intValue(event, "completionTokens"));
+        log.setTotalTokens(intValue(event, "totalTokens"));
+        log.setCachedTokens(intValue(event, "cachedTokens"));
+        log.setReasoningTokens(intValue(event, "reasoningTokens"));
+        log.setRawResponse(rawResponse(event));
+        log.setOccurredAt(LocalDateTime.now());
+        log.applyAttribution(userId, AiTokenUsageSourceEnum.AGENT, conversationId, phase);
+        return log;
+    }
+
+    public void applyAttribution(
+            Long userId,
+            AiTokenUsageSourceEnum source,
+            String sourceRefId,
+            AiTokenUsagePhaseEnum phase) {
+        this.setUserId(userId);
+        this.setSource(source == null ? null : source.getCode());
+        this.setSourceRefId(sourceRefId);
+        this.setPhase(phase == null ? null : phase.getCode());
+    }
+
     private static LocalDateTime createdAt(JsonNode response) {
         long created = response.path("created").asLong(0L);
         if (created <= 0L) {
@@ -70,5 +120,16 @@ public class AiTokenUsageLogPO {
     private static String text(JsonNode node, String fieldName) {
         JsonNode value = node.path(fieldName);
         return value.isMissingNode() || value.isNull() ? null : value.asText();
+    }
+
+    private static String rawResponse(JsonNode event) {
+        JsonNode rawResponse = event.path("rawResponse");
+        if (rawResponse.isMissingNode() || rawResponse.isNull()) {
+            return event.toString();
+        }
+        if (rawResponse.isTextual()) {
+            return rawResponse.asText();
+        }
+        return rawResponse.toString();
     }
 }

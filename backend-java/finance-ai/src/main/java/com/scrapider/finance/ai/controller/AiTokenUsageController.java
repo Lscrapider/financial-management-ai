@@ -1,15 +1,11 @@
 package com.scrapider.finance.ai.controller;
 
-import com.scrapider.finance.ai.domain.param.AiTokenUsageDeepSeekResponseParam;
-import com.scrapider.finance.ai.domain.vo.AiTokenUsageLogVO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageOverviewVO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageTrendVO;
 import com.scrapider.finance.ai.service.AiTokenUsageService;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,12 +18,6 @@ public class AiTokenUsageController {
 
     public AiTokenUsageController(AiTokenUsageService aiTokenUsageService) {
         this.aiTokenUsageService = aiTokenUsageService;
-    }
-
-    @PostMapping("/deepseek-response")
-    public ResponseEntity<AiTokenUsageLogVO> recordDeepSeekResponse(
-            @RequestBody AiTokenUsageDeepSeekResponseParam param) {
-        return ResponseEntity.ok(this.aiTokenUsageService.recordDeepSeekResponse(param));
     }
 
     @GetMapping("/overview")

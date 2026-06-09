@@ -36,6 +36,10 @@ CREATE INDEX IF NOT EXISTS idx_stock_kline_stock_period_adjust_date
     ON stock_kline (stock_code, period_type, adjust_type, trade_date DESC);
 CREATE INDEX IF NOT EXISTS idx_ai_token_usage_log_occurred_at ON ai_token_usage_log (occurred_at DESC);
 CREATE INDEX IF NOT EXISTS idx_ai_token_usage_log_provider_model ON ai_token_usage_log (provider, model);
+CREATE INDEX IF NOT EXISTS idx_ai_token_usage_log_user_source_occurred
+    ON ai_token_usage_log (user_id, source, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ai_token_usage_log_source_ref
+    ON ai_token_usage_log (source, source_ref_id, occurred_at DESC);
 CREATE INDEX IF NOT EXISTS idx_app_visit_log_occurred_at ON app_visit_log (occurred_at DESC);
 CREATE INDEX IF NOT EXISTS idx_app_visit_log_username ON app_visit_log (username);
 

@@ -3,11 +3,13 @@ package com.scrapider.finance.ai.service.impl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scrapider.finance.ai.converter.AiTokenUsageConverter;
-import com.scrapider.finance.ai.domain.param.AiTokenUsageDeepSeekResponseParam;
+import com.scrapider.finance.ai.domain.dto.AgentSessionDTO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageLogVO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageOverviewVO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageTrendVO;
 import com.scrapider.finance.ai.service.AiTokenUsageService;
+import com.scrapider.finance.domain.enums.AiTokenUsagePhaseEnum;
+import com.scrapider.finance.domain.enums.AiTokenUsageSourceEnum;
 import com.scrapider.finance.domain.po.AiTokenUsageLogPO;
 import com.scrapider.finance.manage.AiTokenUsageLogManage;
 import java.time.LocalDateTime;
@@ -36,20 +38,22 @@ public class AiTokenUsageServiceImpl implements AiTokenUsageService {
     }
 
     @Override
-    public AiTokenUsageLogVO recordDeepSeekResponse(JsonNode response) {
+    public AiTokenUsageLogVO recordDeepSeekResponse(
+            JsonNode response,
+            Long userId,
+            AiTokenUsageSourceEnum source,
+            String sourceRefId,
+            AiTokenUsagePhaseEnum phase) {
         if (response == null || response.isNull() || response.path("usage").isMissingNode()) {
             throw new IllegalArgumentException("DeepSeek response usage must not be empty");
         }
-        AiTokenUsageLogPO saved = this.aiTokenUsageLogManage.saveLog(AiTokenUsageLogPO.fromDeepSeekResponse(response));
+        AiTokenUsageLogPO saved = this.aiTokenUsageLogManage.saveLog(AiTokenUsageLogPO.fromDeepSeekResponse(
+                response,
+                userId,
+                source,
+                sourceRefId,
+                phase));
         return AiTokenUsageLogVO.fromPO(saved);
-    }
-
-    @Override
-    public AiTokenUsageLogVO recordDeepSeekResponse(AiTokenUsageDeepSeekResponseParam param) {
-        if (param == null) {
-            throw new IllegalArgumentException("DeepSeek response usage must not be empty");
-        }
-        return this.recordDeepSeekResponse(param.toJsonNode(this.objectMapper));
     }
 
     @Override
@@ -68,6 +72,45 @@ public class AiTokenUsageServiceImpl implements AiTokenUsageService {
                     this.objectMapper));
         } catch (RuntimeException ex) {
             LOGGER.warn("Failed to record AI token usage", ex);
+        }
+    }
+
+    @Override
+    public void recordAgentTokenUsage(AgentSessionDTO session, JsonNode payload) {
+        if (session == null || payload == null || payload.isNull()) {
+            return;
+        }
+        JsonNode events = payload.path("tokenUsageEvents");
+        if (!events.isArray() || events.size() == 0) {
+            return;
+        }
+        for (JsonNode event : events) {
+            this.recordAgentTokenUsageEvent(session, event);
+        }
+    }
+
+    private void recordAgentTokenUsageEvent(AgentSessionDTO session, JsonNode event) {
+        if (event == null || event.isNull()) {
+            return;
+        }
+        AiTokenUsagePhaseEnum phase = AiTokenUsagePhaseEnum.fromCode(event.path("phase").asText(""));
+        if (phase == null) {
+            LOGGER.warn("Skip AI agent token usage with invalid phase sessionId={} phase={}",
+                    session.agentSessionId(),
+                    event.path("phase").asText(""));
+            return;
+        }
+        if (event.path("totalTokens").asInt(0) <= 0) {
+            return;
+        }
+        try {
+            this.aiTokenUsageLogManage.saveLog(AiTokenUsageLogPO.fromAgentUsageEvent(
+                    event,
+                    session.userId(),
+                    session.conversationId(),
+                    phase));
+        } catch (RuntimeException ex) {
+            LOGGER.warn("Failed to record AI agent token usage sessionId={}", session.agentSessionId(), ex);
         }
     }
 

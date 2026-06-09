@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from app.agent.runtime.token_usage import AgentTokenUsageCollector
 from app.agent.services.answer_builder import AgentAnswerBuilder
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,7 @@ class AgentAnswerGenerator:
         tool_messages: list[Any],
         quote_result: dict[str, Any],
         agent_session_id: str,
+        token_usage_collector: AgentTokenUsageCollector | None = None,
     ) -> str | None:
         if not tool_messages:
             logger.warning("langchain tool calls did not produce tool messages")
@@ -30,6 +32,8 @@ class AgentAnswerGenerator:
             len(tool_messages),
         )
         final_message = model.invoke([*messages, planning_message, *tool_messages])
+        if token_usage_collector:
+            token_usage_collector.add_message(final_message, "final_answer")
         return self._extract_final_answer(final_message, agent_session_id, "standard", quote_result)
 
     def answer_from_scratchpad(
@@ -39,6 +43,7 @@ class AgentAnswerGenerator:
         scratchpad: list[Any],
         quote_result: dict[str, Any],
         agent_session_id: str,
+        token_usage_collector: AgentTokenUsageCollector | None = None,
     ) -> str | None:
         if not scratchpad:
             logger.warning("langchain scratchpad is empty")
@@ -49,6 +54,8 @@ class AgentAnswerGenerator:
             len(scratchpad),
         )
         final_message = model.invoke([*messages, *scratchpad])
+        if token_usage_collector:
+            token_usage_collector.add_message(final_message, "final_answer")
         return self._extract_final_answer(final_message, agent_session_id, "loop", quote_result)
 
     def answer_without_tools(self, content: str, quote_result: dict[str, Any], agent_session_id: str) -> str | None:

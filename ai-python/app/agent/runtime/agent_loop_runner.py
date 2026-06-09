@@ -8,6 +8,7 @@ from app.agent.runtime.agent_trace import AgentTrace
 from app.agent.runtime.answer_generator import AgentAnswerGenerator
 from app.agent.runtime.tool_call_budget import ToolCallBudget
 from app.agent.runtime.tool_call_runner import ToolCallRunner
+from app.agent.runtime.token_usage import AgentTokenUsageCollector
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ class AgentLoopRunner:
         quote_result_provider: Any,
         agent_session_id: str,
         budget: ToolCallBudget | None = None,
+        token_usage_collector: AgentTokenUsageCollector | None = None,
     ) -> str | None:
         active_budget = budget or ToolCallBudget()
         trace = AgentTrace()
@@ -49,6 +51,8 @@ class AgentLoopRunner:
                 tools=list(tools_by_name.values()),
                 agent_session_id=agent_session_id,
             )
+            if token_usage_collector:
+                token_usage_collector.add_message(plan.planning_message, "planning")
             last_plan_content = plan.content
             if not plan.standard_tool_calls:
                 if plan.content:
@@ -64,6 +68,7 @@ class AgentLoopRunner:
                         scratchpad=scratchpad,
                         quote_result=quote_result_provider(),
                         agent_session_id=agent_session_id,
+                        token_usage_collector=token_usage_collector,
                     )
                 return self._answer_generator.answer_without_tools(
                     content=plan.content,
@@ -105,6 +110,7 @@ class AgentLoopRunner:
                 scratchpad=scratchpad,
                 quote_result=quote_result_provider(),
                 agent_session_id=agent_session_id,
+                token_usage_collector=token_usage_collector,
             )
         return self._answer_generator.answer_without_tools(
             content=last_plan_content,
