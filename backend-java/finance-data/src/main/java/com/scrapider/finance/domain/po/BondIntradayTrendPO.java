@@ -50,7 +50,10 @@ public class BondIntradayTrendPO {
         trend.setClosePrice(StockMarketJsonParser.decimal(parts[1]));
         trend.setVolume(StockMarketJsonParser.longValue(parts[2]));
         trend.setTurnoverAmount(StockMarketJsonParser.decimal(parts[3]));
-        trend.setAveragePrice(calculateAveragePrice(trend.getTurnoverAmount(), trend.getVolume()));
+        trend.setAveragePrice(calculateAveragePrice(
+                trend.getTurnoverAmount(),
+                trend.getVolume(),
+                trend.getClosePrice()));
         trend.setPreviousClosePrice(previousClosePrice);
         trend.setSyncedAt(syncedAt);
         return trend;
@@ -85,9 +88,14 @@ public class BondIntradayTrendPO {
         trend.setSecid(stringValue(record.getValueByKey("secid")));
         trend.setTrendTime(toLocalDateTime(record.getTime(), zoneId));
         trend.setClosePrice(decimalValue(record.getValueByKey("closePrice")));
+        BigDecimal storedAveragePrice = decimalValue(record.getValueByKey("averagePrice"));
         trend.setVolume(longValue(record.getValueByKey("volume")));
         trend.setTurnoverAmount(decimalValue(record.getValueByKey("turnoverAmount")));
-        trend.setAveragePrice(calculateAveragePrice(trend.getTurnoverAmount(), trend.getVolume()));
+        BigDecimal calculatedAveragePrice = calculateAveragePrice(
+                trend.getTurnoverAmount(),
+                trend.getVolume(),
+                trend.getClosePrice());
+        trend.setAveragePrice(calculatedAveragePrice == null ? storedAveragePrice : calculatedAveragePrice);
         trend.setPreviousClosePrice(decimalValue(record.getValueByKey("previousClosePrice")));
         trend.setSyncedAt(toSyncedAt(record.getValueByKey("syncedAtEpoch"), zoneId));
         return trend;
@@ -103,11 +111,40 @@ public class BondIntradayTrendPO {
         return value == null ? null : StockMarketJsonParser.decimal(String.valueOf(value));
     }
 
-    private static BigDecimal calculateAveragePrice(BigDecimal turnoverAmount, Long volume) {
-        if (turnoverAmount == null || volume == null || volume <= 0) {
+    private static BigDecimal calculateAveragePrice(
+            BigDecimal turnoverAmount,
+            Long volume,
+            BigDecimal closePrice) {
+        if (turnoverAmount == null || volume == null || volume <= 0 || closePrice == null || closePrice.signum() <= 0) {
             return null;
         }
-        return turnoverAmount.divide(BigDecimal.valueOf(volume * 10L), 4, RoundingMode.HALF_UP);
+        BigDecimal direct = divideAveragePrice(turnoverAmount, volume, 1);
+        BigDecimal tenTimes = divideAveragePrice(turnoverAmount, volume, 10);
+        BigDecimal hundredTimes = divideAveragePrice(turnoverAmount, volume, 100);
+        return closestToClosePrice(closePrice, direct, tenTimes, hundredTimes);
+    }
+
+    private static BigDecimal divideAveragePrice(BigDecimal turnoverAmount, Long volume, long unitMultiplier) {
+        return turnoverAmount.divide(
+                BigDecimal.valueOf(volume).multiply(BigDecimal.valueOf(unitMultiplier)),
+                4,
+                RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal closestToClosePrice(BigDecimal closePrice, BigDecimal... candidates) {
+        BigDecimal best = null;
+        BigDecimal bestDistance = null;
+        for (BigDecimal candidate : candidates) {
+            if (candidate == null || candidate.signum() <= 0) {
+                continue;
+            }
+            BigDecimal distance = candidate.subtract(closePrice).abs();
+            if (bestDistance == null || distance.compareTo(bestDistance) < 0) {
+                best = candidate;
+                bestDistance = distance;
+            }
+        }
+        return best;
     }
 
     private static Long longValue(Object value) {
