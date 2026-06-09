@@ -106,14 +106,14 @@ public final class AiAgentDomainToolDataConverter {
     }
 
     private static <T> Map<String, Object> distributionSummary(List<T> rows, Function<T, BigDecimal> valueExtractor) {
+        BigDecimal latest = rows == null || rows.isEmpty() ? null : valueExtractor.apply(rows.get(0));
         List<BigDecimal> values = rows == null ? List.of() : rows.stream()
                 .map(valueExtractor)
                 .filter(value -> value != null)
                 .toList();
-        if (values.isEmpty()) {
+        if (latest == null && values.isEmpty()) {
             return Map.of();
         }
-        BigDecimal latest = values.get(0);
         BigDecimal min = values.stream().min(BigDecimal::compareTo).orElse(null);
         BigDecimal max = values.stream().max(BigDecimal::compareTo).orElse(null);
         BigDecimal sum = values.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -122,7 +122,9 @@ public final class AiAgentDomainToolDataConverter {
         summary.put("count", values.size());
         summary.put("min", min);
         summary.put("max", max);
-        summary.put("average", sum.divide(BigDecimal.valueOf(values.size()), 6, RoundingMode.HALF_UP).stripTrailingZeros());
+        summary.put("average", values.isEmpty()
+                ? null
+                : sum.divide(BigDecimal.valueOf(values.size()), 6, RoundingMode.HALF_UP).stripTrailingZeros());
         summary.put("percentileRank", percentileRank(latest, values));
         return compact(summary);
     }

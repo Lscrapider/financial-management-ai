@@ -35,6 +35,8 @@ public class StockFundamentalContextActionHandler implements AgentDataActionHand
     private static final int MAX_LIMIT = 30;
     private static final int VALUATION_HISTORY_LIMIT = 120;
     private static final int DIVIDEND_HISTORY_LIMIT = 10;
+    private static final int TARGET_CANDIDATE_QUERY_LIMIT = 6;
+    private static final int TARGET_CANDIDATE_RESULT_LIMIT = 5;
     private static final String SECTION_VALUATION = "valuation";
     private static final String SECTION_FINANCIAL_INDICATORS = "financialIndicators";
 
@@ -112,7 +114,10 @@ public class StockFundamentalContextActionHandler implements AgentDataActionHand
                 return new ResolvedStockTarget(
                         config.getStockCode(),
                         StrUtil.blankToDefault(config.getStockName(), targetName),
-                        true);
+                        true,
+                        true,
+                        null,
+                        List.of());
             }
             List<StockQuoteSnapshotPO> quotes = this.stockQuoteSnapshotManage.listByStockCodes(List.of(targetCode));
             if (!quotes.isEmpty()) {
@@ -120,56 +125,109 @@ public class StockFundamentalContextActionHandler implements AgentDataActionHand
                 return new ResolvedStockTarget(
                         quote.getStockCode(),
                         StrUtil.blankToDefault(quote.getStockName(), targetName),
-                        true);
+                        true,
+                        true,
+                        null,
+                        List.of());
             }
-            return new ResolvedStockTarget(targetCode, targetName, true);
+            return new ResolvedStockTarget(targetCode, targetName, true, false, "stock_target", List.of());
         }
         if (StrUtil.isBlank(targetName)) {
-            return new ResolvedStockTarget(null, null, false);
+            return new ResolvedStockTarget(null, null, false, false, "stock_target", List.of());
         }
-        StockConfigPO config = this.findStockConfigByName(targetName);
+        StockConfigPO config = this.findExactStockConfigByName(targetName);
         if (config != null) {
             return new ResolvedStockTarget(
                     config.getStockCode(),
                     StrUtil.blankToDefault(config.getStockName(), targetName),
-                    true);
+                    false,
+                    true,
+                    null,
+                    List.of());
         }
-        StockQuoteSnapshotPO quote = this.findStockQuoteByName(targetName);
+        StockQuoteSnapshotPO quote = this.findExactStockQuoteByName(targetName);
         if (quote != null) {
             return new ResolvedStockTarget(
                     quote.getStockCode(),
                     StrUtil.blankToDefault(quote.getStockName(), targetName),
-                    true);
+                    false,
+                    true,
+                    null,
+                    List.of());
         }
-        return new ResolvedStockTarget(null, targetName, false);
+        List<StockTargetCandidate> candidates = this.findStockCandidatesByName(targetName);
+        if (candidates.size() == 1) {
+            StockTargetCandidate candidate = candidates.get(0);
+            return new ResolvedStockTarget(
+                    candidate.targetCode(),
+                    StrUtil.blankToDefault(candidate.targetName(), targetName),
+                    false,
+                    true,
+                    null,
+                    List.of());
+        }
+        if (candidates.size() > 1) {
+            return new ResolvedStockTarget(
+                    null,
+                    targetName,
+                    false,
+                    false,
+                    "ambiguous_stock_target",
+                    candidates.stream().limit(TARGET_CANDIDATE_RESULT_LIMIT).toList());
+        }
+        return new ResolvedStockTarget(null, targetName, false, false, "stock_target", List.of());
     }
 
-    private StockConfigPO findStockConfigByName(String targetName) {
-        StockConfigPO config = this.stockConfigManage.getOne(
-                new LambdaQueryWrapper<StockConfigPO>()
-                        .eq(StockConfigPO::getStockName, targetName)
-                        .last("LIMIT 1"));
-        if (config != null) {
-            return config;
-        }
+    private StockConfigPO findExactStockConfigByName(String targetName) {
         return this.stockConfigManage.getOne(
                 new LambdaQueryWrapper<StockConfigPO>()
-                        .like(StockConfigPO::getStockName, targetName)
+                        .eq(StockConfigPO::getStockName, targetName)
+                        .orderByAsc(StockConfigPO::getStockCode)
                         .last("LIMIT 1"));
     }
 
-    private StockQuoteSnapshotPO findStockQuoteByName(String targetName) {
-        StockQuoteSnapshotPO quote = this.stockQuoteSnapshotManage.getOne(
-                new LambdaQueryWrapper<StockQuoteSnapshotPO>()
-                        .eq(StockQuoteSnapshotPO::getStockName, targetName)
-                        .last("LIMIT 1"));
-        if (quote != null) {
-            return quote;
-        }
+    private StockQuoteSnapshotPO findExactStockQuoteByName(String targetName) {
         return this.stockQuoteSnapshotManage.getOne(
                 new LambdaQueryWrapper<StockQuoteSnapshotPO>()
-                        .like(StockQuoteSnapshotPO::getStockName, targetName)
+                        .eq(StockQuoteSnapshotPO::getStockName, targetName)
+                        .orderByAsc(StockQuoteSnapshotPO::getStockCode)
                         .last("LIMIT 1"));
+    }
+
+    private List<StockTargetCandidate> findStockCandidatesByName(String targetName) {
+        Map<String, StockTargetCandidate> candidateMap = new LinkedHashMap<>();
+        this.findStockConfigCandidatesByName(targetName).forEach(config ->
+                candidateMap.putIfAbsent(config.getStockCode(), new StockTargetCandidate(
+                        config.getStockCode(),
+                        config.getStockName())));
+        this.findStockQuoteCandidatesByName(targetName).forEach(quote ->
+                candidateMap.putIfAbsent(quote.getStockCode(), new StockTargetCandidate(
+                        quote.getStockCode(),
+                        quote.getStockName())));
+        return candidateMap.values().stream()
+                .limit(TARGET_CANDIDATE_QUERY_LIMIT)
+                .toList();
+    }
+
+    private List<StockConfigPO> findStockConfigCandidatesByName(String targetName) {
+        return this.stockConfigManage.list(new LambdaQueryWrapper<StockConfigPO>()
+                .apply("stock_name LIKE {0} ESCAPE '\\\\'", "%" + this.escapeLikeValue(targetName) + "%")
+                .orderByAsc(StockConfigPO::getStockCode)
+                .last("LIMIT " + TARGET_CANDIDATE_QUERY_LIMIT));
+    }
+
+    private List<StockQuoteSnapshotPO> findStockQuoteCandidatesByName(String targetName) {
+        return this.stockQuoteSnapshotManage.list(new LambdaQueryWrapper<StockQuoteSnapshotPO>()
+                .apply("stock_name LIKE {0} ESCAPE '\\\\'", "%" + this.escapeLikeValue(targetName) + "%")
+                .orderByAsc(StockQuoteSnapshotPO::getStockCode)
+                .last("LIMIT " + TARGET_CANDIDATE_QUERY_LIMIT));
+    }
+
+    private String escapeLikeValue(String value) {
+        return value
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
     }
 
     private Map<String, Object> dataCompleteness(
@@ -179,7 +237,14 @@ public class StockFundamentalContextActionHandler implements AgentDataActionHand
             List<StockDividendHistoryPO> dividends,
             List<StockFinancialIndicatorPO> indicators) {
         Map<String, Object> row = new LinkedHashMap<>();
-        row.put("targetResolved", target.resolved());
+        row.put("targetCodeProvided", target.targetCodeProvided());
+        row.put("targetResolved", target.targetResolved());
+        row.put("missingReason", target.missingReason());
+        if (!target.targetCandidates().isEmpty()) {
+            row.put("targetCandidates", target.targetCandidates().stream()
+                    .map(StockTargetCandidate::toMap)
+                    .toList());
+        }
         row.put("requestedSections", List.copyOf(sections));
         row.put("valuationRequested", sections.contains(SECTION_VALUATION));
         row.put("valuationHistoryCount", valuations.size());
@@ -246,6 +311,22 @@ public class StockFundamentalContextActionHandler implements AgentDataActionHand
         return StrUtil.trimToNull(value.asText());
     }
 
-    private record ResolvedStockTarget(String targetCode, String targetName, boolean resolved) {
+    private record ResolvedStockTarget(
+            String targetCode,
+            String targetName,
+            boolean targetCodeProvided,
+            boolean targetResolved,
+            String missingReason,
+            List<StockTargetCandidate> targetCandidates) {
+    }
+
+    private record StockTargetCandidate(String targetCode, String targetName) {
+
+        private Map<String, Object> toMap() {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("targetCode", this.targetCode);
+            row.put("targetName", this.targetName);
+            return row;
+        }
     }
 }
