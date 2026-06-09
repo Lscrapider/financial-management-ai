@@ -68,7 +68,7 @@ public class StockFundamentalContextActionHandler implements AgentDataActionHand
         String targetCode = this.textParam(params, "targetCode");
         String targetName = this.textParam(params, "targetName");
         Set<String> sections = this.normalizeSections(params);
-        int limit = this.normalizeLimit(param);
+        int limit = this.normalizeLimit(params);
         ResolvedStockTarget target = this.resolveTarget(targetCode, targetName);
 
         List<StockValuationHistoryPO> valuations = List.of();
@@ -224,13 +224,12 @@ public class StockFundamentalContextActionHandler implements AgentDataActionHand
         }
     }
 
-    private int normalizeLimit(AgentDataQueryParam param) {
-        Integer limit = param.limit();
-        JsonNode params = param.params();
-        if ((limit == null || limit <= 0) && params != null && params.has("limit")) {
-            limit = params.get("limit").asInt(DEFAULT_LIMIT);
+    private int normalizeLimit(JsonNode params) {
+        if (params == null || params.isNull() || !params.has("limit")) {
+            return DEFAULT_LIMIT;
         }
-        if (limit == null || limit <= 0) {
+        int limit = params.get("limit").asInt(DEFAULT_LIMIT);
+        if (limit <= 0) {
             return DEFAULT_LIMIT;
         }
         return Math.min(limit, MAX_LIMIT);
