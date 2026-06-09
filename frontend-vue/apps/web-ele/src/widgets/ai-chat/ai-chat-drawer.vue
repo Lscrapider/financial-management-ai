@@ -10,6 +10,8 @@ import {
   ref,
 } from 'vue';
 
+import MarkdownIt from 'markdown-it';
+
 import {
   CornerDownLeft,
   Eraser,
@@ -64,6 +66,40 @@ const enlargedPanelHeight = 720;
 const minPanelWidth = 360;
 const minPanelHeight = 420;
 const quickPrompts = ['解释今日异动', '列复盘清单', '查相关知识'];
+
+const markdownRenderer = new MarkdownIt({
+  breaks: true,
+  html: false,
+  linkify: true,
+});
+const renderTableOpen = markdownRenderer.renderer.rules.table_open;
+const renderTableClose = markdownRenderer.renderer.rules.table_close;
+
+markdownRenderer.renderer.rules.table_open = (
+  tokens,
+  index,
+  options,
+  env,
+  self,
+) => {
+  const tableOpen = renderTableOpen
+    ? renderTableOpen(tokens, index, options, env, self)
+    : self.renderToken(tokens, index, options);
+  return `<div class="markdown-table-wrap">${tableOpen}`;
+};
+
+markdownRenderer.renderer.rules.table_close = (
+  tokens,
+  index,
+  options,
+  env,
+  self,
+) => {
+  const tableClose = renderTableClose
+    ? renderTableClose(tokens, index, options, env, self)
+    : self.renderToken(tokens, index, options);
+  return `${tableClose}</div>`;
+};
 
 const open = ref(false);
 const input = ref('');
@@ -480,70 +516,7 @@ function handleViewportResize() {
 }
 
 function renderMessage(content: string) {
-  const lines = escapeHtml(content).split('\n');
-  const html: string[] = [];
-  let listOpen = false;
-
-  lines.forEach((line) => {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      if (listOpen) {
-        html.push('</ul>');
-        listOpen = false;
-      }
-      return;
-    }
-
-    const bullet = trimmed.match(/^[-*]\s+(.+)$/);
-    const ordered = trimmed.match(/^\d+[.)]\s+(.+)$/);
-    if (bullet || ordered) {
-      if (!listOpen) {
-        html.push('<ul>');
-        listOpen = true;
-      }
-      html.push(
-        `<li>${formatInline((bullet?.[1] ?? ordered?.[1]) || '')}</li>`,
-      );
-      return;
-    }
-
-    if (listOpen) {
-      html.push('</ul>');
-      listOpen = false;
-    }
-
-    if (trimmed.startsWith('### ')) {
-      html.push(`<h4>${formatInline(trimmed.slice(4))}</h4>`);
-      return;
-    }
-    if (trimmed.startsWith('## ')) {
-      html.push(`<h3>${formatInline(trimmed.slice(3))}</h3>`);
-      return;
-    }
-    if (trimmed.startsWith('# ')) {
-      html.push(`<h2>${formatInline(trimmed.slice(2))}</h2>`);
-      return;
-    }
-    html.push(`<p>${formatInline(trimmed)}</p>`);
-  });
-
-  if (listOpen) {
-    html.push('</ul>');
-  }
-  return html.join('');
-}
-
-function formatInline(content: string) {
-  return content.replaceAll(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-}
-
-function escapeHtml(content: string) {
-  return content
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
+  return markdownRenderer.render(content || '');
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -945,18 +918,43 @@ onBeforeUnmount(() => {
   white-space: normal;
 }
 
+.rendered-content :deep(h1),
 .rendered-content :deep(h2),
 .rendered-content :deep(h3),
-.rendered-content :deep(h4) {
+.rendered-content :deep(h4),
+.rendered-content :deep(h5),
+.rendered-content :deep(h6) {
   margin: 12px 0 8px;
   font-weight: 700;
   line-height: 1.35;
 }
 
+.rendered-content :deep(h1) {
+  font-size: 16px;
+}
+
+.rendered-content :deep(h2) {
+  font-size: 15px;
+}
+
+.rendered-content :deep(h3),
+.rendered-content :deep(h4),
+.rendered-content :deep(h5),
+.rendered-content :deep(h6) {
+  font-size: 14px;
+}
+
+.rendered-content :deep(h1:first-child),
 .rendered-content :deep(h2:first-child),
 .rendered-content :deep(h3:first-child),
 .rendered-content :deep(h4:first-child),
+.rendered-content :deep(h5:first-child),
+.rendered-content :deep(h6:first-child),
 .rendered-content :deep(p:first-child),
+.rendered-content :deep(blockquote:first-child),
+.rendered-content :deep(.markdown-table-wrap:first-child),
+.rendered-content :deep(ol:first-child),
+.rendered-content :deep(pre:first-child),
 .rendered-content :deep(ul:first-child) {
   margin-top: 0;
 }
@@ -965,6 +963,7 @@ onBeforeUnmount(() => {
   margin: 8px 0;
 }
 
+.rendered-content :deep(ol),
 .rendered-content :deep(ul) {
   padding-left: 20px;
   margin: 8px 0;
@@ -978,7 +977,102 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 
+.rendered-content :deep(a) {
+  color: var(--el-color-primary);
+  text-decoration: none;
+}
+
+.rendered-content :deep(a:hover) {
+  text-decoration: underline;
+}
+
+.rendered-content :deep(blockquote) {
+  margin: 10px 0;
+  padding: 2px 0 2px 10px;
+  color: var(--el-text-color-secondary);
+  border-left: 3px solid var(--el-border-color);
+}
+
+.rendered-content :deep(code) {
+  padding: 1px 4px;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    monospace;
+  font-size: 12px;
+  color: var(--el-color-danger);
+  background: var(--el-fill-color-light);
+  border-radius: 4px;
+}
+
+.rendered-content :deep(pre) {
+  margin: 10px 0;
+  overflow-x: auto;
+  background: var(--el-fill-color-light);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+}
+
+.rendered-content :deep(pre code) {
+  display: block;
+  padding: 10px;
+  color: var(--el-text-color-primary);
+  white-space: pre;
+  background: transparent;
+}
+
+.rendered-content :deep(hr) {
+  height: 1px;
+  margin: 12px 0;
+  background: var(--el-border-color-lighter);
+  border: 0;
+}
+
+.rendered-content :deep(.markdown-table-wrap) {
+  max-width: 100%;
+  margin: 10px 0;
+  overflow-x: auto;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+}
+
+.rendered-content :deep(table) {
+  width: 100%;
+  min-width: 320px;
+  font-size: 12px;
+  line-height: 1.55;
+  table-layout: auto;
+  border-collapse: collapse;
+  background: var(--el-bg-color);
+}
+
+.rendered-content :deep(th),
+.rendered-content :deep(td) {
+  padding: 7px 9px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+.rendered-content :deep(th) {
+  font-weight: 700;
+  color: var(--el-text-color-primary);
+  white-space: nowrap;
+  background: var(--el-fill-color-light);
+}
+
+.rendered-content :deep(td) {
+  color: var(--el-text-color-regular);
+}
+
+.rendered-content :deep(tr:last-child td) {
+  border-bottom: 0;
+}
+
 .rendered-content :deep(p:last-child),
+.rendered-content :deep(blockquote:last-child),
+.rendered-content :deep(.markdown-table-wrap:last-child),
+.rendered-content :deep(ol:last-child),
+.rendered-content :deep(pre:last-child),
 .rendered-content :deep(ul:last-child) {
   margin-bottom: 0;
 }

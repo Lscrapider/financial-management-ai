@@ -49,6 +49,7 @@
     "dayjs": "catalog:",
     "element-plus": "catalog:",
     "grid-layout-plus": "^1.1.1",
+    "markdown-it": "^14.2.0",
     "pinia": "catalog:",
     "vue": "catalog:",
     "vue-router": "catalog:"
@@ -57,6 +58,7 @@
     "@capacitor/android": "^6.2.0",
     "@capacitor/cli": "^6.2.0",
     "@capacitor/core": "^6.2.0",
+    "@types/markdown-it": "^14.1.2",
     "unplugin-element-plus": "catalog:",
     "vite-plugin-pwa": "catalog:"
   }
