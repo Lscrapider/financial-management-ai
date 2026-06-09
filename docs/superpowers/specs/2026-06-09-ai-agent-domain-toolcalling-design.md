@@ -62,11 +62,11 @@ stock_fundamental_context(
 
 `sections` 可选值：
 
-- `valuation_history`
+- `valuation`
 - `financial_indicator`
-- `dividend_history`
+- `dividend`
 
-默认返回全部分区。`limit` 控制每个历史分区最多返回条数，Java 侧应设置上限，避免模型上下文膨胀。
+默认返回全部分区。`limit` 控制财务指标和分红历史最多返回条数，Java 侧应设置上限，避免模型上下文膨胀。
 
 内部数据来源：
 
@@ -83,31 +83,59 @@ stock_fundamental_context(
     "targetCode": "002958",
     "targetName": "青农商行"
   },
-  "valuationHistory": [
-    {
-      "tradeDate": "2026-06-09",
+  "valuation": {
+    "current": {
       "peTtm": 5.04,
-      "pbMrq": 0.43,
-      "totalMarketValue": 16100000000
+      "pbRatio": 0.43
+    },
+    "historySummary": {
+      "peTtm": {
+        "latest": 5.04,
+        "count": 120,
+        "min": 4.21,
+        "max": 8.92,
+        "average": 6.18,
+        "percentileRank": 0.22
+      },
+      "pbMrq": {
+        "latest": 0.43,
+        "count": 120,
+        "min": 0.38,
+        "max": 0.72,
+        "average": 0.53,
+        "percentileRank": 0.19
+      }
+    },
+    "dividend": {
+      "latest": {
+        "reportDate": "2025-12-31",
+        "exDividendDate": "2026-05-20",
+        "pretaxBonusRmb": 1.2,
+        "dividendRatio": 4.1,
+        "implPlanProfile": "10派1.20元",
+        "assignProgress": "已实施"
+      },
+      "estimatedDividendYieldPct": 4.13,
+      "historySummary": {
+        "yieldPctLatest": 4.13,
+        "count": 5,
+        "yieldPctMin": 2.8,
+        "yieldPctMax": 4.6,
+        "yieldPctAverage": 3.7,
+        "yieldPctPercentileRank": 0.8
+      }
     }
-  ],
+  },
   "financialIndicators": [
     {
       "reportDate": "2026-03-31",
       "reportType": "quarter",
-      "revenue": 1230000000,
-      "netProfit": 320000000,
-      "roe": 2.1,
+      "reportDateName": "2026一季报",
+      "totalOperateRevenue": 1230000000,
+      "parentNetProfit": 320000000,
+      "roeWeighted": 2.1,
       "netInterestMargin": 1.82,
       "nonPerformingLoanRatio": 1.28
-    }
-  ],
-  "dividendHistory": [
-    {
-      "reportDate": "2025-12-31",
-      "exDividendDate": "2026-05-20",
-      "cashDividendPerShare": 0.12,
-      "dividendYield": 4.1
     }
   ],
   "dataCompleteness": {
@@ -119,9 +147,9 @@ stock_fundamental_context(
 
 字段策略：
 
-- 估值历史保留日期和估值变化需要的字段。
-- 财务指标保留报告期、营收、利润、ROE、利润率、资产负债类和银行专项关键字段。
-- 分红历史保留报告期、除权日、分红金额、股息率等字段。
+- 估值分区沿用现有 Python 场景分析口径，只输出 `peTtm`、`pbMrq` 和分红收益率摘要，不直接返回完整估值历史。
+- 第一版不输出 `peLar`、`psTtm`、`pegCar`，也不改现有标签处理器。
+- 财务指标按 `reportDate DESC` 返回最近 N 期，可能包含一季报、中报、三季报和年报。
 - 不返回实时价格、涨跌幅、成交额、换手率等快照字段。
 
 ### convertible_bond_context
@@ -270,20 +298,42 @@ scene_report_context(
 
 ### stock_fundamental_context
 
-`valuationHistory` 只保留：
+`valuation` 分区只保留：
 
 ```text
-tradeDate
-peTtm
-peLar
-pbMrq
-psTtm
-pegCar
+current.peTtm
+current.pbRatio
+historySummary.peTtm.latest
+historySummary.peTtm.count
+historySummary.peTtm.min
+historySummary.peTtm.max
+historySummary.peTtm.average
+historySummary.peTtm.percentileRank
+historySummary.pbMrq.latest
+historySummary.pbMrq.count
+historySummary.pbMrq.min
+historySummary.pbMrq.max
+historySummary.pbMrq.average
+historySummary.pbMrq.percentileRank
+dividend.latest.reportDate
+dividend.latest.exDividendDate
+dividend.latest.pretaxBonusRmb
+dividend.latest.dividendRatio
+dividend.latest.implPlanProfile
+dividend.latest.assignProgress
+dividend.estimatedDividendYieldPct
+dividend.historySummary.yieldPctLatest
+dividend.historySummary.count
+dividend.historySummary.yieldPctMin
+dividend.historySummary.yieldPctMax
+dividend.historySummary.yieldPctAverage
+dividend.historySummary.yieldPctPercentileRank
 ```
 
-`valuationHistory` 排除：
+`valuation` 分区排除：
 
 ```text
+valuationHistory
 id
 stockCode
 stockName
@@ -297,6 +347,9 @@ closePrice
 changeRate
 totalShares
 freeSharesA
+peLar
+psTtm
+pegCar
 source
 rawResponse
 syncedAt
@@ -304,7 +357,7 @@ createdAt
 updatedAt
 ```
 
-说明：`closePrice`、`changeRate`、市值和股本类字段与快照或行情序列语义重叠。估值历史只表达 PE、PB、PS、PEG 的时间变化。
+说明：第一版估值分区沿用现有 Python 场景分析口径，只处理 `peTtm`、`pbMrq` 和分红收益率。`peLar`、`psTtm`、`pegCar` 暂不进入 Agent 工具上下文，也不改现有标签处理器。
 
 `financialIndicators` 只保留：
 
@@ -349,7 +402,7 @@ createdAt
 updatedAt
 ```
 
-`dividendHistory` 只保留：
+`dividend` 数据来源只保留：
 
 ```text
 reportDate
@@ -362,7 +415,7 @@ implPlanProfile
 assignProgress
 ```
 
-`dividendHistory` 排除：
+`dividend` 数据来源排除：
 
 ```text
 id
