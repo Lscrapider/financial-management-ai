@@ -21,16 +21,34 @@ public class AiTokenUsageLogManage extends ServiceImpl<AiTokenUsageLogMapper, Ai
         return log;
     }
 
-    public AiTokenUsageSummaryDTO summarySince(LocalDateTime startTime) {
-        return this.baseMapper.summarySince(startTime);
+    public AiTokenUsageSummaryDTO summary(
+            LocalDateTime startTime,
+            LocalDateTime endTime,
+            String source,
+            String phase,
+            String model,
+            Collection<Long> userIds) {
+        return this.baseMapper.summary(startTime, endTime, source, phase, model, userIds);
     }
 
-    public List<AiTokenUsageCostSummaryDTO> costSummarySince(LocalDateTime startTime) {
-        return this.baseMapper.costSummarySince(startTime);
+    public List<AiTokenUsageCostSummaryDTO> costSummary(
+            LocalDateTime startTime,
+            LocalDateTime endTime,
+            String source,
+            String phase,
+            String model,
+            Collection<Long> userIds) {
+        return this.baseMapper.costSummary(startTime, endTime, source, phase, model, userIds);
     }
 
-    public List<AiTokenUsageTrendDTO> trendSince(LocalDateTime startTime) {
-        return this.baseMapper.trendSince(startTime);
+    public List<AiTokenUsageTrendDTO> trend(
+            LocalDateTime startTime,
+            LocalDateTime endTime,
+            String source,
+            String phase,
+            String model,
+            Collection<Long> userIds) {
+        return this.baseMapper.trend(startTime, endTime, source, phase, model, userIds);
     }
 
     public Page<AiTokenUsageLogPO> pageLogs(
@@ -72,4 +90,5 @@ public class AiTokenUsageLogManage extends ServiceImpl<AiTokenUsageLogMapper, Ai
                 .orderByDesc(AiTokenUsageLogPO::getId)
                 .page(Page.of(pageNum, pageSize));
     }
+
 }

@@ -59,6 +59,7 @@ export interface AiTokenUsageLogPage {
 }
 
 export interface AiTokenUsageLogPageParams {
+  days?: number;
   endTime?: string;
   model?: string;
   pageNum?: number;
@@ -69,16 +70,21 @@ export interface AiTokenUsageLogPageParams {
   username?: string;
 }
 
-export function getAiTokenUsageOverview(days = 30) {
+export type AiTokenUsageQueryParams = Omit<
+  AiTokenUsageLogPageParams,
+  'pageNum' | 'pageSize'
+>;
+
+export function getAiTokenUsageOverview(params: AiTokenUsageQueryParams) {
   return requestClient.get<AiTokenUsageOverview>('/ai/token-usage/overview', {
-    params: { days },
+    params,
     responseReturn: 'body',
   });
 }
 
-export function listAiTokenUsageTrends(days = 30) {
+export function listAiTokenUsageTrends(params: AiTokenUsageQueryParams) {
   return requestClient.get<AiTokenUsageTrend[]>('/ai/token-usage/trends', {
-    params: { days },
+    params,
     responseReturn: 'body',
   });
 }

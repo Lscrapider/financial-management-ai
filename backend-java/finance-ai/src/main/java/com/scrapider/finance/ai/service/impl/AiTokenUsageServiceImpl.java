@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scrapider.finance.ai.converter.AiTokenUsageConverter;
 import com.scrapider.finance.ai.domain.dto.AgentSessionDTO;
 import com.scrapider.finance.ai.domain.param.AiTokenUsageLogPageParam;
+import com.scrapider.finance.ai.domain.param.AiTokenUsageQueryParam;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageLogPageVO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageLogVO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageOverviewVO;
@@ -136,17 +137,42 @@ public class AiTokenUsageServiceImpl implements AiTokenUsageService {
     }
 
     @Override
-    public AiTokenUsageOverviewVO overview(Integer days) {
-        LocalDateTime startTime = LocalDateTime.now().minusDays(this.normalize(days, DEFAULT_OVERVIEW_DAYS, MAX_OVERVIEW_DAYS));
+    public AiTokenUsageOverviewVO overview(AiTokenUsageQueryParam param) {
+        TokenUsageQuery query = this.buildQuery(param, DEFAULT_OVERVIEW_DAYS, MAX_OVERVIEW_DAYS);
+        if (query.emptyUserFilter()) {
+            return AiTokenUsageOverviewVO.fromDTO(null, this.aiTokenUsageCostCalculator.calculateTotal(List.of()));
+        }
         return AiTokenUsageOverviewVO.fromDTO(
-                this.aiTokenUsageLogManage.summarySince(startTime),
-                this.aiTokenUsageCostCalculator.calculateTotal(this.aiTokenUsageLogManage.costSummarySince(startTime)));
+                this.aiTokenUsageLogManage.summary(
+                        query.startTime(),
+                        query.endTime(),
+                        query.source(),
+                        query.phase(),
+                        query.model(),
+                        query.userIds()),
+                this.aiTokenUsageCostCalculator.calculateTotal(this.aiTokenUsageLogManage.costSummary(
+                        query.startTime(),
+                        query.endTime(),
+                        query.source(),
+                        query.phase(),
+                        query.model(),
+                        query.userIds())));
     }
 
     @Override
-    public List<AiTokenUsageTrendVO> trends(Integer days) {
-        LocalDateTime startTime = LocalDateTime.now().minusDays(this.normalize(days, DEFAULT_TREND_DAYS, MAX_TREND_DAYS));
-        return this.aiTokenUsageLogManage.trendSince(startTime).stream()
+    public List<AiTokenUsageTrendVO> trends(AiTokenUsageQueryParam param) {
+        TokenUsageQuery query = this.buildQuery(param, DEFAULT_TREND_DAYS, MAX_TREND_DAYS);
+        if (query.emptyUserFilter()) {
+            return List.of();
+        }
+        return this.aiTokenUsageLogManage.trend(
+                        query.startTime(),
+                        query.endTime(),
+                        query.source(),
+                        query.phase(),
+                        query.model(),
+                        query.userIds())
+                .stream()
                 .map(AiTokenUsageTrendVO::fromDTO)
                 .toList();
     }
@@ -156,23 +182,40 @@ public class AiTokenUsageServiceImpl implements AiTokenUsageService {
         AiTokenUsageLogPageParam query = param == null ? new AiTokenUsageLogPageParam() : param;
         int pageNum = this.normalizePageNum(query.getPageNum());
         int pageSize = this.normalizePageSize(query.getPageSize());
-        this.validateTimeRange(query.getStartTime(), query.getEndTime());
-        String source = this.normalizeSource(query.getSource());
-        String phase = this.normalizePhase(query.getPhase());
-        Set<Long> filteredUserIds = this.filteredUserIds(query.getUsername());
-        if (filteredUserIds != null && filteredUserIds.isEmpty()) {
+        TokenUsageQuery tokenUsageQuery = this.buildQuery(query, DEFAULT_OVERVIEW_DAYS, MAX_OVERVIEW_DAYS);
+        if (tokenUsageQuery.emptyUserFilter()) {
             return AiTokenUsageLogPageVO.fromPage(Page.of(pageNum, pageSize));
         }
         Page<AiTokenUsageLogPO> page = this.aiTokenUsageLogManage.pageLogs(
                 pageNum,
                 pageSize,
-                query.getStartTime(),
-                query.getEndTime(),
+                tokenUsageQuery.startTime(),
+                tokenUsageQuery.endTime(),
+                tokenUsageQuery.source(),
+                tokenUsageQuery.phase(),
+                tokenUsageQuery.model(),
+                tokenUsageQuery.userIds());
+        return AiTokenUsageLogPageVO.fromPage(page, this.usernameMap(page), this.aiTokenUsageCostCalculator);
+    }
+
+    private TokenUsageQuery buildQuery(AiTokenUsageQueryParam param, int defaultDays, int maxDays) {
+        AiTokenUsageQueryParam query = param == null ? new AiTokenUsageQueryParam() : param;
+        LocalDateTime startTime = query.getStartTime() == null
+                ? LocalDateTime.now().minusDays(this.normalize(query.getDays(), defaultDays, maxDays))
+                : query.getStartTime();
+        LocalDateTime endTime = query.getEndTime();
+        this.validateTimeRange(startTime, endTime);
+        String source = this.normalizeSource(query.getSource());
+        String phase = this.normalizePhase(query.getPhase());
+        Set<Long> filteredUserIds = this.filteredUserIds(query.getUsername());
+        return new TokenUsageQuery(
+                startTime,
+                endTime,
                 source,
                 phase,
                 StrUtil.trimToNull(query.getModel()),
-                filteredUserIds);
-        return AiTokenUsageLogPageVO.fromPage(page, this.usernameMap(page), this.aiTokenUsageCostCalculator);
+                filteredUserIds,
+                filteredUserIds != null && filteredUserIds.isEmpty());
     }
 
     private int normalize(Integer value, int defaultValue, int maxValue) {
@@ -244,5 +287,15 @@ public class AiTokenUsageServiceImpl implements AiTokenUsageService {
         }
         return this.appUserManage.listUsersByIds(userIds).stream()
                 .collect(Collectors.toMap(AppUserPO::getId, AppUserPO::getUsername, (left, right) -> left));
+    }
+
+    private record TokenUsageQuery(
+            LocalDateTime startTime,
+            LocalDateTime endTime,
+            String source,
+            String phase,
+            String model,
+            Set<Long> userIds,
+            boolean emptyUserFilter) {
     }
 }

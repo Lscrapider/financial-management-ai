@@ -3,6 +3,7 @@ import type {
   AiTokenUsageLog,
   AiTokenUsageLogPageParams,
   AiTokenUsageOverview,
+  AiTokenUsageQueryParams,
   AiTokenUsageTrend,
 } from '#/api/ai-token-usage';
 
@@ -85,6 +86,8 @@ const filters = reactive<FilterForm>({
   timeRange: [],
   username: '',
 });
+const appliedQueryParams = ref<AiTokenUsageQueryParams>({ days: PERIOD_DAYS });
+const appliedPeriodLabel = ref(`近 ${PERIOD_DAYS} 天`);
 
 const hasData = computed(
   () => Boolean(overview.value) || trends.value.length > 0 || logs.value.length > 0,
@@ -94,7 +97,7 @@ const metricCards = computed<MetricCard[]>(() => {
   const data = overview.value;
   return [
     {
-      detail: `近 ${PERIOD_DAYS} 天模型调用预估费用`,
+      detail: `${appliedPeriodLabel.value}模型调用预估费用`,
       label: '总消耗',
       tone: 'cost',
       value: formatCost(data?.estimatedCost?.totalCost, data?.estimatedCost?.currency),
@@ -131,20 +134,26 @@ onMounted(() => {
 async function loadPage(silent = false) {
   if (loading.value) return;
   loading.value = true;
+  tableLoading.value = true;
+  const queryParams = buildQueryParams();
   try {
-    const [overviewResult, trendResult] = await Promise.all([
-      getAiTokenUsageOverview(PERIOD_DAYS),
-      listAiTokenUsageTrends(PERIOD_DAYS),
+    const [overviewResult, trendResult, logPage] = await Promise.all([
+      getAiTokenUsageOverview(queryParams),
+      listAiTokenUsageTrends(queryParams),
+      listAiTokenUsageLogs(buildLogParams(queryParams)),
     ]);
+    appliedQueryParams.value = queryParams;
+    appliedPeriodLabel.value = periodLabel(queryParams);
     overview.value = overviewResult;
     trends.value = trendResult;
-    await loadLogs();
+    applyLogPage(logPage);
   } catch {
     if (!silent) {
       ElMessage.error('Token 用量数据刷新失败');
     }
   } finally {
     loading.value = false;
+    tableLoading.value = false;
   }
 }
 
@@ -152,11 +161,8 @@ async function loadLogs() {
   if (tableLoading.value) return;
   tableLoading.value = true;
   try {
-    const page = await listAiTokenUsageLogs(buildLogParams());
-    logs.value = page.records;
-    total.value = page.total;
-    pageNum.value = page.pageNum;
-    pageSize.value = page.pageSize;
+    const page = await listAiTokenUsageLogs(buildLogParams(appliedQueryParams.value));
+    applyLogPage(page);
   } catch {
     ElMessage.error('Token 用量明细加载失败');
   } finally {
@@ -164,13 +170,20 @@ async function loadLogs() {
   }
 }
 
-function buildLogParams(): AiTokenUsageLogPageParams {
-  const [startTime, endTime] = filters.timeRange;
+function buildLogParams(queryParams: AiTokenUsageQueryParams): AiTokenUsageLogPageParams {
   return {
-    endTime,
-    model: emptyToUndefined(filters.model),
+    ...queryParams,
     pageNum: pageNum.value,
     pageSize: pageSize.value,
+  };
+}
+
+function buildQueryParams(): AiTokenUsageQueryParams {
+  const [startTime, endTime] = filters.timeRange;
+  return {
+    days: PERIOD_DAYS,
+    endTime,
+    model: emptyToUndefined(filters.model),
     phase: emptyToUndefined(filters.phase),
     source: emptyToUndefined(filters.source),
     startTime,
@@ -178,9 +191,28 @@ function buildLogParams(): AiTokenUsageLogPageParams {
   };
 }
 
+function periodLabel(params: AiTokenUsageQueryParams) {
+  if (params.startTime || params.endTime) {
+    return '筛选范围';
+  }
+  return `近 ${PERIOD_DAYS} 天`;
+}
+
+function applyLogPage(page: {
+  pageNum: number;
+  pageSize: number;
+  records: AiTokenUsageLog[];
+  total: number;
+}) {
+  logs.value = page.records;
+  total.value = page.total;
+  pageNum.value = page.pageNum;
+  pageSize.value = page.pageSize;
+}
+
 function handleSearch() {
   pageNum.value = 1;
-  void loadLogs();
+  void loadPage();
 }
 
 function handleReset() {
@@ -190,7 +222,7 @@ function handleReset() {
   filters.timeRange = [];
   filters.username = '';
   pageNum.value = 1;
-  void loadLogs();
+  void loadPage();
 }
 
 function handlePageChange(value: number) {
@@ -291,7 +323,7 @@ function formatTime(value?: null | string) {
         <ElCard class="usage-panel" shadow="never">
           <div class="panel-header">
             <div>
-              <h3>近 {{ PERIOD_DAYS }} 天趋势</h3>
+              <h3>{{ appliedPeriodLabel }}趋势</h3>
               <p>输入与输出 Token 消耗变化。</p>
             </div>
             <ElTag effect="plain" size="small">AI</ElTag>
