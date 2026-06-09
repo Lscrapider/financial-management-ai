@@ -13,7 +13,7 @@
 1. 保持 `market_quote` 作为唯一行情快照工具，不在新增工具里重复实时价格、涨跌幅、成交、换手等快照字段。
 2. 新增股票基本面聚合工具，覆盖财务指标、分红历史和估值历史。
 3. 新增可转债聚合工具，覆盖基础条款、每日估值历史和转股/余额变化。
-4. 新增报告上下文工具，允许 Agent 查询当前用户已有报告和报告详情。
+4. 新增报告上下文工具，允许 Agent 查询当前用户已有报告文本。
 5. 隐藏底层表结构，模型只面对业务语义清晰的工具。
 6. 所有工具保持只读，不引入交易、修改观察池或触发报告生成等写操作。
 
@@ -208,7 +208,7 @@ convertible_bond_context(
 
 ### scene_report_context
 
-新增已有报告查询工具，只读取 `scene_analysis_report`。
+新增已有报告查询工具，只读取 `scene_analysis_report.report_text`。
 
 建议工具签名：
 
@@ -223,8 +223,8 @@ scene_report_context(
 
 行为：
 
-- 有 `report_id` 时，查询当前用户可见的报告详情。
-- 无 `report_id` 且有 `target_type`、`target_code` 时，查询该标的最近报告列表。
+- 有 `report_id` 时，查询当前用户可见的报告文本。
+- 无 `report_id` 且有 `target_type`、`target_code` 时，查询该标的最近成功报告文本。
 - 无足够定位参数时，返回参数不足错误，不自动枚举用户全部报告。
 
 权限边界：
@@ -237,21 +237,17 @@ scene_report_context(
 
 ```json
 {
-  "target": {
-    "targetType": "stock",
-    "targetCode": "002958",
-    "targetName": "青农商行"
-  },
   "reports": [
     {
       "reportId": 123,
+      "targetType": "stock",
+      "targetCode": "002958",
+      "targetName": "青农商行",
       "reportType": "quick_analysis",
       "versionNo": 1,
       "status": "success",
       "generatedAt": "2026-06-09T18:20:00",
-      "title": "青农商行快速分析",
-      "conclusion": "估值偏低但成长弹性有限",
-      "reportTextPreview": "..."
+      "reportText": "..."
     }
   ],
   "dataCompleteness": {
@@ -264,44 +260,251 @@ scene_report_context(
 边界：
 
 - 第一版不触发新报告生成。
-- 报告正文需要截断，默认只返回摘要和预览。
-- 仅当用户明确要求“报告详情”或传入 `report_id` 时返回较长正文。
+- 工具只返回 `report_text`，不解析 `report_content`，不额外拆 `title`、`conclusion` 或 `preview`。
+- 为控制上下文长度，Java 侧对 `report_text` 做长度上限截断，并在 metadata 中标记是否截断。
+- 当用户明确要求某份报告或传入 `report_id` 时，优先返回该报告文本；否则返回最近成功报告文本。
 
 ## 字段去重规则
 
-新增工具统一应用输出层字段去重，不修改数据库 schema。
+新增工具统一应用输出层字段白名单，不修改数据库 schema。实现时优先使用白名单 converter，而不是把 PO 转成 Map 后再按黑名单删除，避免未来 PO 新增字段后自动暴露给模型。
 
-通用删除字段：
+### stock_fundamental_context
 
-- `id`
-- `rawResponse`
-- `source`
-- `createdAt`
-- `updatedAt`
-- `syncedAt`
-- `secid`
-- `secucode`
-- `tsCode`
-- `marketCode`
-- `exchangeCode`
+`valuationHistory` 只保留：
 
-身份字段处理：
+```text
+tradeDate
+peTtm
+peLar
+pbMrq
+psTtm
+pegCar
+```
 
-- 顶层 `target` 统一放一次 `targetType`、`targetCode`、`targetName`。
-- 分区列表内不重复 `stockCode`、`stockName`、`bondCode`、`bondName`。
+`valuationHistory` 排除：
 
-快照字段处理：
+```text
+id
+stockCode
+stockName
+secid
+secucode
+boardCode
+boardName
+totalMarketCap
+floatMarketCap
+closePrice
+changeRate
+totalShares
+freeSharesA
+source
+rawResponse
+syncedAt
+createdAt
+updatedAt
+```
 
-- `latestPrice`
-- `changePercent`
-- `changeAmount`
-- `turnover`
-- `volume`
-- `turnoverRate`
-- `amplitude`
-- `volumeRatio`
+说明：`closePrice`、`changeRate`、市值和股本类字段与快照或行情序列语义重叠。估值历史只表达 PE、PB、PS、PEG 的时间变化。
 
-这些字段只由 `market_quote` 返回。新工具如果需要解释历史估值变化，应返回历史日期和估值字段，而不是重复当前快照。
+`financialIndicators` 只保留：
+
+```text
+reportDate
+reportType
+reportDateName
+noticeDate
+epsBasic
+bps
+totalOperateRevenue
+parentNetProfit
+totalOperateRevenueYoy
+parentNetProfitYoy
+roeWeighted
+debtAssetRatio
+totalDeposits
+grossLoans
+loanToDepositRatio
+capitalAdequacyRatio
+coreTier1CapitalAdequacyRatio
+firstAdequacyRatio
+nonPerformingLoanRatio
+provisionCoverageRatio
+netInterestSpread
+netInterestMargin
+loanProvisionRatio
+```
+
+`financialIndicators` 排除：
+
+```text
+id
+stockCode
+stockName
+secucode
+orgType
+source
+rawResponse
+syncedAt
+createdAt
+updatedAt
+```
+
+`dividendHistory` 只保留：
+
+```text
+reportDate
+exDividendDate
+planNoticeDate
+equityRecordDate
+pretaxBonusRmb
+dividendRatio
+implPlanProfile
+assignProgress
+```
+
+`dividendHistory` 排除：
+
+```text
+id
+stockCode
+stockName
+secucode
+basicEps
+bvps
+parentNetProfitYoy
+source
+rawResponse
+syncedAt
+createdAt
+updatedAt
+```
+
+说明：`basicEps`、`bvps`、`parentNetProfitYoy` 已由财务指标分区表达，不在分红分区重复返回。
+
+### convertible_bond_context
+
+`basic` 只保留：
+
+```text
+underlyingStockCode
+underlyingStockName
+rating
+issueSize
+remainingSize
+firstConversionPrice
+conversionPrice
+valueDate
+maturityDate
+maturityCallPrice
+couponRate
+payPerYear
+conversionStartDate
+conversionEndDate
+redeemClause
+putbackClause
+resetClause
+```
+
+`basic` 排除：
+
+```text
+id
+bondCode
+bondName
+tsCode
+source
+rawResponse
+syncedAt
+createdAt
+updatedAt
+```
+
+`valuationHistory` 只保留：
+
+```text
+tradeDate
+conversionValue
+premiumRate
+pureBondValue
+pureBondPremiumRate
+ytm
+```
+
+`valuationHistory` 排除：
+
+```text
+id
+bondCode
+bondName
+tsCode
+closePrice
+volume
+turnoverAmount
+source
+rawResponse
+syncedAt
+createdAt
+updatedAt
+```
+
+说明：`closePrice`、`volume`、`turnoverAmount` 属于快照或行情序列，不放入可转债估值工具。
+
+`shareChanges` 只保留：
+
+```text
+endDate
+issueSize
+conversionPrice
+conversionValue
+conversionVolume
+conversionRatio
+remainingSize
+```
+
+`shareChanges` 排除：
+
+```text
+id
+bondCode
+bondName
+tsCode
+source
+rawResponse
+syncedAt
+createdAt
+updatedAt
+```
+
+### scene_report_context
+
+报告工具只保留：
+
+```text
+reportId
+targetType
+targetCode
+targetName
+reportType
+generationType
+versionNo
+status
+generatedAt
+reportText
+```
+
+报告工具排除：
+
+```text
+taskId
+taskNo
+reportContent
+model
+createdAt
+updatedAt
+errorMessage
+```
+
+说明：`errorMessage` 只在报告状态为 `failed` 时返回，否则不返回。成功报告只把 `report_text` 原文作为上下文交给模型。
 
 ## 数据流
 
@@ -368,4 +571,3 @@ Prompt 中补充以下选择规则：
 5. `convertible_bond_context` 不返回可转债快照实时字段。
 6. `scene_report_context` 只能返回当前 Agent Session 用户可见报告。
 7. Prompt 中工具选择规则不会要求模型按底层表名调用工具。
-
