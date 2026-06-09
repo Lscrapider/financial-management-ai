@@ -754,7 +754,9 @@
 
 返回：`AiTokenUsageOverviewVO`
 
-字段：`requestCount`、`promptTokens`、`completionTokens`、`totalTokens`、`cachedTokens`、`reasoningTokens`、`latestOccurredAt`。
+字段：`requestCount`、`promptTokens`、`completionTokens`、`totalTokens`、`cachedTokens`、`reasoningTokens`、`estimatedCost`、`latestOccurredAt`。
+
+`estimatedCost` 为周期内按模型价格配置实时汇总的预估总消耗，不入库。
 
 ### Token 用量趋势
 
@@ -790,13 +792,14 @@
 | `phase` | string | 否 | 无 | 调用阶段，如 `planning`、`final_answer`、`report_generate` |
 | `model` | string | 否 | 无 | 模型名称 |
 | `username` | string | 否 | 无 | 用户名，支持模糊匹配 |
-| `responseId` | string | 否 | 无 | 模型响应 ID，精确匹配 |
 
 返回：`AiTokenUsageLogPageVO`
 
 分页字段：`records`、`total`、`pageNum`、`pageSize`、`pages`。
 
-明细字段：`id`、`provider`、`responseId`、`objectType`、`userId`、`username`、`source`、`phase`、`model`、`finishReason`、`promptTokens`、`completionTokens`、`totalTokens`、`cachedTokens`、`reasoningTokens`、`promptCacheHitTokens`、`promptCacheMissTokens`、`occurredAt`、`createdAt`。分页明细不返回 `rawResponse`。
+明细字段：`id`、`provider`、`responseId`、`objectType`、`userId`、`username`、`source`、`phase`、`model`、`finishReason`、`promptTokens`、`completionTokens`、`totalTokens`、`cachedTokens`、`reasoningTokens`、`promptCacheHitTokens`、`promptCacheMissTokens`、`estimatedCost`、`occurredAt`、`createdAt`。分页明细不返回 `rawResponse`。
+
+`estimatedCost` 为后端按模型价格配置实时计算的预估费用，不入库。包含：`cacheHitInputCost`、`cacheMissInputCost`、`outputCost`、`totalCost`、`currency`。模型未配置价格时返回 `null`。
 
 ## AI 控制台
 

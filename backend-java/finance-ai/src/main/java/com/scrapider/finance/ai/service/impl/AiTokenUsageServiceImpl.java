@@ -11,6 +11,7 @@ import com.scrapider.finance.ai.domain.vo.AiTokenUsageLogPageVO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageLogVO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageOverviewVO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageTrendVO;
+import com.scrapider.finance.ai.service.AiTokenUsageCostCalculator;
 import com.scrapider.finance.ai.service.AiTokenUsageService;
 import com.scrapider.finance.domain.enums.AiTokenUsagePhaseEnum;
 import com.scrapider.finance.domain.enums.AiTokenUsageSourceEnum;
@@ -43,14 +44,17 @@ public class AiTokenUsageServiceImpl implements AiTokenUsageService {
 
     private final AiTokenUsageLogManage aiTokenUsageLogManage;
     private final AppUserManage appUserManage;
+    private final AiTokenUsageCostCalculator aiTokenUsageCostCalculator;
     private final ObjectMapper objectMapper;
 
     public AiTokenUsageServiceImpl(
             AiTokenUsageLogManage aiTokenUsageLogManage,
             AppUserManage appUserManage,
+            AiTokenUsageCostCalculator aiTokenUsageCostCalculator,
             ObjectMapper objectMapper) {
         this.aiTokenUsageLogManage = aiTokenUsageLogManage;
         this.appUserManage = appUserManage;
+        this.aiTokenUsageCostCalculator = aiTokenUsageCostCalculator;
         this.objectMapper = objectMapper;
     }
 
@@ -134,7 +138,9 @@ public class AiTokenUsageServiceImpl implements AiTokenUsageService {
     @Override
     public AiTokenUsageOverviewVO overview(Integer days) {
         LocalDateTime startTime = LocalDateTime.now().minusDays(this.normalize(days, DEFAULT_OVERVIEW_DAYS, MAX_OVERVIEW_DAYS));
-        return AiTokenUsageOverviewVO.fromDTO(this.aiTokenUsageLogManage.summarySince(startTime));
+        return AiTokenUsageOverviewVO.fromDTO(
+                this.aiTokenUsageLogManage.summarySince(startTime),
+                this.aiTokenUsageCostCalculator.calculateTotal(this.aiTokenUsageLogManage.costSummarySince(startTime)));
     }
 
     @Override
@@ -165,9 +171,8 @@ public class AiTokenUsageServiceImpl implements AiTokenUsageService {
                 source,
                 phase,
                 StrUtil.trimToNull(query.getModel()),
-                filteredUserIds,
-                StrUtil.trimToNull(query.getResponseId()));
-        return AiTokenUsageLogPageVO.fromPage(page, this.usernameMap(page));
+                filteredUserIds);
+        return AiTokenUsageLogPageVO.fromPage(page, this.usernameMap(page), this.aiTokenUsageCostCalculator);
     }
 
     private int normalize(Integer value, int defaultValue, int maxValue) {

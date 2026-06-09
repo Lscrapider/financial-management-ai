@@ -10,11 +10,16 @@ public record AiTokenUsageOverviewVO(
         Long totalTokens,
         Long cachedTokens,
         Long reasoningTokens,
+        AiTokenUsageCostVO estimatedCost,
         LocalDateTime latestOccurredAt) {
 
     public static AiTokenUsageOverviewVO fromDTO(AiTokenUsageSummaryDTO dto) {
+        return fromDTO(dto, null);
+    }
+
+    public static AiTokenUsageOverviewVO fromDTO(AiTokenUsageSummaryDTO dto, AiTokenUsageCostVO estimatedCost) {
         if (dto == null) {
-            return new AiTokenUsageOverviewVO(0L, 0L, 0L, 0L, 0L, 0L, null);
+            return new AiTokenUsageOverviewVO(0L, 0L, 0L, 0L, 0L, 0L, estimatedCost, null);
         }
         return new AiTokenUsageOverviewVO(
                 value(dto.getRequestCount()),
@@ -23,6 +28,7 @@ public record AiTokenUsageOverviewVO(
                 value(dto.getTotalTokens()),
                 value(dto.getCachedTokens()),
                 value(dto.getReasoningTokens()),
+                estimatedCost,
                 dto.getLatestOccurredAt());
     }
 

@@ -18,7 +18,6 @@ public class AiTokenUsageLogPageParam {
     private String phase;
     private String model;
     private String username;
-    private String responseId;
 
     public Integer getPageNum() {
         return this.pageNum;
@@ -84,11 +83,4 @@ public class AiTokenUsageLogPageParam {
         this.username = username;
     }
 
-    public String getResponseId() {
-        return this.responseId;
-    }
-
-    public void setResponseId(String responseId) {
-        this.responseId = responseId;
-    }
 }

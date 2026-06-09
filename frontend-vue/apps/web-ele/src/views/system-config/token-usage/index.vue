@@ -51,6 +51,7 @@ type FilterForm = {
 interface MetricCard {
   detail: string;
   label: string;
+  tone?: 'cost';
   value: string;
 }
 
@@ -92,6 +93,12 @@ const hasData = computed(
 const metricCards = computed<MetricCard[]>(() => {
   const data = overview.value;
   return [
+    {
+      detail: `近 ${PERIOD_DAYS} 天模型调用预估费用`,
+      label: '总消耗',
+      tone: 'cost',
+      value: formatCost(data?.estimatedCost?.totalCost, data?.estimatedCost?.currency),
+    },
     {
       detail: `最近调用 ${formatTime(data?.latestOccurredAt)}`,
       label: '请求次数',
@@ -225,6 +232,16 @@ function formatNumber(value?: null | number) {
   return Number(value ?? 0).toLocaleString();
 }
 
+function formatCost(value?: null | number, currency?: null | string) {
+  if (value === null || value === undefined) return '-';
+  const unit = currency === 'CNY' ? '元' : (currency ?? '');
+  const formatted = Number(value).toLocaleString('zh-CN', {
+    maximumFractionDigits: 6,
+    minimumFractionDigits: 2,
+  });
+  return unit ? `${formatted} ${unit}` : formatted;
+}
+
 function formatTime(value?: null | string) {
   if (!value) return '暂无';
   const date = new Date(value);
@@ -262,6 +279,7 @@ function formatTime(value?: null | string) {
             v-for="item in metricCards"
             :key="item.label"
             class="metric-card"
+            :class="{ 'is-cost': item.tone === 'cost' }"
             shadow="never"
           >
             <span>{{ item.label }}</span>
@@ -382,6 +400,11 @@ function formatTime(value?: null | string) {
                 {{ formatNumber(row.reasoningTokens) }}
               </template>
             </ElTableColumn>
+            <ElTableColumn align="right" label="预估费用" min-width="120">
+              <template #default="{ row }">
+                {{ formatCost(row.estimatedCost?.totalCost, row.estimatedCost?.currency) }}
+              </template>
+            </ElTableColumn>
             <ElTableColumn fixed="right" label="操作" width="88">
               <template #default="{ row }">
                 <ElButton link type="primary" @click="openDetail(row)">
@@ -438,6 +461,38 @@ function formatTime(value?: null | string) {
           <ElDescriptionsItem label="缓存未命中">
             {{ formatNumber(selectedLog.promptCacheMissTokens) }}
           </ElDescriptionsItem>
+          <ElDescriptionsItem label="缓存命中费用">
+            {{
+              formatCost(
+                selectedLog.estimatedCost?.cacheHitInputCost,
+                selectedLog.estimatedCost?.currency,
+              )
+            }}
+          </ElDescriptionsItem>
+          <ElDescriptionsItem label="缓存未命中费用">
+            {{
+              formatCost(
+                selectedLog.estimatedCost?.cacheMissInputCost,
+                selectedLog.estimatedCost?.currency,
+              )
+            }}
+          </ElDescriptionsItem>
+          <ElDescriptionsItem label="输出费用">
+            {{
+              formatCost(
+                selectedLog.estimatedCost?.outputCost,
+                selectedLog.estimatedCost?.currency,
+              )
+            }}
+          </ElDescriptionsItem>
+          <ElDescriptionsItem label="预估总费用">
+            {{
+              formatCost(
+                selectedLog.estimatedCost?.totalCost,
+                selectedLog.estimatedCost?.currency,
+              )
+            }}
+          </ElDescriptionsItem>
         </ElDescriptions>
       </template>
     </ElDrawer>
@@ -464,6 +519,15 @@ function formatTime(value?: null | string) {
   border-radius: 8px;
 }
 
+.metric-card.is-cost {
+  background: linear-gradient(
+    135deg,
+    rgb(64 158 255 / 12%),
+    var(--el-bg-color) 58%
+  );
+  border-color: rgb(64 158 255 / 42%);
+}
+
 .metric-card span {
   font-size: 12px;
   line-height: 18px;
@@ -477,6 +541,11 @@ function formatTime(value?: null | string) {
   font-weight: 700;
   line-height: 1.1;
   color: var(--el-text-color-primary);
+}
+
+.metric-card.is-cost strong {
+  font-size: 30px;
+  color: var(--el-color-primary);
 }
 
 .metric-card p,

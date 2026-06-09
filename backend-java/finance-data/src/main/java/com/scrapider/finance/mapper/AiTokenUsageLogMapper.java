@@ -1,6 +1,7 @@
 package com.scrapider.finance.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.scrapider.finance.domain.dto.AiTokenUsageCostSummaryDTO;
 import com.scrapider.finance.domain.dto.AiTokenUsageSummaryDTO;
 import com.scrapider.finance.domain.dto.AiTokenUsageTrendDTO;
 import com.scrapider.finance.domain.po.AiTokenUsageLogPO;
@@ -26,6 +27,20 @@ public interface AiTokenUsageLogMapper extends BaseMapper<AiTokenUsageLogPO> {
             WHERE occurred_at >= #{startTime}
             """)
     AiTokenUsageSummaryDTO summarySince(@Param("startTime") LocalDateTime startTime);
+
+    @Select("""
+            SELECT
+                model,
+                COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens,
+                COALESCE(SUM(completion_tokens), 0) AS completion_tokens,
+                COALESCE(SUM(cached_tokens), 0) AS cached_tokens,
+                COALESCE(SUM(prompt_cache_hit_tokens), 0) AS prompt_cache_hit_tokens,
+                COALESCE(SUM(prompt_cache_miss_tokens), 0) AS prompt_cache_miss_tokens
+            FROM ai_token_usage_log
+            WHERE occurred_at >= #{startTime}
+            GROUP BY model
+            """)
+    List<AiTokenUsageCostSummaryDTO> costSummarySince(@Param("startTime") LocalDateTime startTime);
 
     @Select("""
             SELECT

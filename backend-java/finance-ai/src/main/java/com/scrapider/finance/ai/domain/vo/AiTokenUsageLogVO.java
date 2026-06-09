@@ -21,6 +21,7 @@ public record AiTokenUsageLogVO(
         Integer reasoningTokens,
         Integer promptCacheHitTokens,
         Integer promptCacheMissTokens,
+        AiTokenUsageCostVO estimatedCost,
         LocalDateTime occurredAt,
         LocalDateTime createdAt) {
 
@@ -29,6 +30,13 @@ public record AiTokenUsageLogVO(
     }
 
     public static AiTokenUsageLogVO fromPO(AiTokenUsageLogPO po, String username) {
+        return fromPO(po, username, null);
+    }
+
+    public static AiTokenUsageLogVO fromPO(
+            AiTokenUsageLogPO po,
+            String username,
+            AiTokenUsageCostVO estimatedCost) {
         return new AiTokenUsageLogVO(
                 po.getId(),
                 po.getProvider(),
@@ -47,6 +55,7 @@ public record AiTokenUsageLogVO(
                 po.getReasoningTokens(),
                 po.getPromptCacheHitTokens(),
                 po.getPromptCacheMissTokens(),
+                estimatedCost,
                 po.getOccurredAt(),
                 po.getCreatedAt());
     }

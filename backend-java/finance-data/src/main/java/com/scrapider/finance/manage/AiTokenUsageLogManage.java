@@ -3,6 +3,7 @@ package com.scrapider.finance.manage;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.scrapider.finance.domain.dto.AiTokenUsageCostSummaryDTO;
 import com.scrapider.finance.domain.dto.AiTokenUsageSummaryDTO;
 import com.scrapider.finance.domain.dto.AiTokenUsageTrendDTO;
 import com.scrapider.finance.domain.po.AiTokenUsageLogPO;
@@ -24,6 +25,10 @@ public class AiTokenUsageLogManage extends ServiceImpl<AiTokenUsageLogMapper, Ai
         return this.baseMapper.summarySince(startTime);
     }
 
+    public List<AiTokenUsageCostSummaryDTO> costSummarySince(LocalDateTime startTime) {
+        return this.baseMapper.costSummarySince(startTime);
+    }
+
     public List<AiTokenUsageTrendDTO> trendSince(LocalDateTime startTime) {
         return this.baseMapper.trendSince(startTime);
     }
@@ -36,8 +41,7 @@ public class AiTokenUsageLogManage extends ServiceImpl<AiTokenUsageLogMapper, Ai
             String source,
             String phase,
             String model,
-            Collection<Long> userIds,
-            String responseId) {
+            Collection<Long> userIds) {
         return this.lambdaQuery()
                 .select(
                         AiTokenUsageLogPO::getId,
@@ -64,7 +68,6 @@ public class AiTokenUsageLogManage extends ServiceImpl<AiTokenUsageLogMapper, Ai
                 .eq(StrUtil.isNotBlank(phase), AiTokenUsageLogPO::getPhase, phase)
                 .eq(StrUtil.isNotBlank(model), AiTokenUsageLogPO::getModel, model)
                 .in(userIds != null && !userIds.isEmpty(), AiTokenUsageLogPO::getUserId, userIds)
-                .eq(StrUtil.isNotBlank(responseId), AiTokenUsageLogPO::getResponseId, responseId)
                 .orderByDesc(AiTokenUsageLogPO::getOccurredAt)
                 .orderByDesc(AiTokenUsageLogPO::getId)
                 .page(Page.of(pageNum, pageSize));

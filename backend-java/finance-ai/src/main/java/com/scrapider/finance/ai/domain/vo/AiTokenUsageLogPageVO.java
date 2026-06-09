@@ -1,6 +1,7 @@
 package com.scrapider.finance.ai.domain.vo;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.scrapider.finance.ai.service.AiTokenUsageCostCalculator;
 import com.scrapider.finance.domain.po.AiTokenUsageLogPO;
 import java.util.List;
 import java.util.Map;
@@ -17,9 +18,19 @@ public record AiTokenUsageLogPageVO(
     }
 
     public static AiTokenUsageLogPageVO fromPage(Page<AiTokenUsageLogPO> page, Map<Long, String> usernameMap) {
+        return fromPage(page, usernameMap, null);
+    }
+
+    public static AiTokenUsageLogPageVO fromPage(
+            Page<AiTokenUsageLogPO> page,
+            Map<Long, String> usernameMap,
+            AiTokenUsageCostCalculator costCalculator) {
         return new AiTokenUsageLogPageVO(
                 page.getRecords().stream()
-                        .map(po -> AiTokenUsageLogVO.fromPO(po, usernameMap.get(po.getUserId())))
+                        .map(po -> AiTokenUsageLogVO.fromPO(
+                                po,
+                                usernameMap.get(po.getUserId()),
+                                costCalculator == null ? null : costCalculator.calculate(po)))
                         .toList(),
                 page.getTotal(),
                 page.getCurrent(),
