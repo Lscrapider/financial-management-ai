@@ -10,7 +10,7 @@ import com.scrapider.finance.ai.domain.vo.KnowledgeChunkVO;
 import com.scrapider.finance.ai.domain.vo.KnowledgeOverviewVO;
 import com.scrapider.finance.ai.domain.vo.KnowledgeStatsVO;
 import com.scrapider.finance.ai.service.KnowledgeService;
-import com.scrapider.finance.ai.service.OcrTaskMessagePublisher;
+import com.scrapider.finance.ai.publisher.OcrTaskMessagePublisher;
 import com.scrapider.finance.domain.param.KnowledgeChunkUpdateParam;
 import com.scrapider.finance.domain.po.KnowledgeVectorPO;
 import com.scrapider.finance.domain.po.OcrTaskPO;

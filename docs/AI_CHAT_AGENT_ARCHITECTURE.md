@@ -65,6 +65,45 @@ Java
 - 不直接调用大模型。
 - 不执行 Planner、Memory、Tool Calling 和 Answer 逻辑。
 
+Java 后端按 Maven 模块拆分：
+
+```text
+finance-app
+  主启动模块，只负责装配和启动 Spring Boot 应用。
+
+finance-security
+  JWT、LoginUser、TokenStore、刷新会话、Bearer Token 过滤器和 Spring Security 配置。
+
+finance-service
+  普通业务能力模块，提供行情、配置、观察池、预警、Auth 入口和外部数据 API。
+
+finance-ai
+  AI Chat Agent Java 侧编排模块，提供 WebSocket、Agent Session、HMAC 签名、
+  RabbitMQ 启动消息、内部数据网关、callback 和对话记忆。
+```
+
+依赖方向：
+
+```text
+finance-app -> finance-ai -> finance-service -> finance-security -> finance-data
+finance-app -> finance-service
+finance-app -> finance-security
+finance-app -> finance-data
+```
+
+`finance-ai` 依赖 `finance-service` 是为了 Tool Calling 的 Java 数据查询能力，例如 `market.quote` 需要调用 `StockMarketQueryService`、`IndexMarketQueryService` 和 `BondMarketQueryService`。`finance-service` 不再依赖 `finance-ai`，避免 AI 模块和主业务模块互相引用。
+
+内部数据网关使用 action handler 策略分发：
+
+```text
+AgentDataGatewayServiceImpl
+  -> Map<action, AgentDataActionHandler>
+      -> ConversationHistoryActionHandler
+      -> MarketQuoteActionHandler
+```
+
+后续新增 `security.resolve`、`market.kline`、`financial.indicator` 等 action 时，新增独立 `AgentDataActionHandler` 实现类并注册为 Spring Bean，不再修改 `AgentDataGatewayServiceImpl` 的 if/switch 分支。
+
 ### Python Agent
 
 - 消费 RabbitMQ 中的 Agent 启动消息。

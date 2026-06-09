@@ -113,3 +113,4 @@ docker-compose.override.yml
 /.impeccable
 /.claude/
 /.*/
+/backend-java/finance-app/src/main/resources/application.yml

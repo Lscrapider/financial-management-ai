@@ -9,7 +9,7 @@ import com.scrapider.finance.domain.vo.BondConfigAddResultVO;
 import com.scrapider.finance.domain.vo.StockConfigAddResultVO;
 import com.scrapider.finance.manage.BondConfigManage;
 import com.scrapider.finance.manage.ConvertibleBondBasicManage;
-import com.scrapider.finance.service.ConvertibleBondDataProvider;
+import com.scrapider.finance.service.provider.ConvertibleBondDataProvider;
 import com.scrapider.finance.service.SystemConfigBondService;
 import com.scrapider.finance.service.SystemConfigStockService;
 import com.scrapider.finance.task.BondMarketSyncTask;

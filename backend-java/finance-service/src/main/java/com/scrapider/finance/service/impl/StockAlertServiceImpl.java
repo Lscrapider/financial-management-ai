@@ -23,7 +23,6 @@ import com.scrapider.finance.manage.StockAlertConfigManage;
 import com.scrapider.finance.manage.StockConfigManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
 import com.scrapider.finance.security.LoginUser;
-import com.scrapider.finance.service.StockAlertMailService;
 import com.scrapider.finance.service.StockAlertService;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -33,6 +32,9 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -52,7 +54,10 @@ public class StockAlertServiceImpl implements StockAlertService {
     private final BondConfigManage bondConfigManage;
     private final BondQuoteSnapshotManage bondQuoteSnapshotManage;
     private final AppUserManage appUserManage;
-    private final StockAlertMailService stockAlertMailService;
+    private final JavaMailSender mailSender;
+
+    @Value("${spring.mail.username:}")
+    private String mailFrom;
 
     public StockAlertServiceImpl(
             StockAlertConfigManage stockAlertConfigManage,
@@ -63,7 +68,7 @@ public class StockAlertServiceImpl implements StockAlertService {
             BondConfigManage bondConfigManage,
             BondQuoteSnapshotManage bondQuoteSnapshotManage,
             AppUserManage appUserManage,
-            StockAlertMailService stockAlertMailService) {
+            JavaMailSender mailSender) {
         this.stockAlertConfigManage = stockAlertConfigManage;
         this.stockConfigManage = stockConfigManage;
         this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
@@ -72,7 +77,7 @@ public class StockAlertServiceImpl implements StockAlertService {
         this.bondConfigManage = bondConfigManage;
         this.bondQuoteSnapshotManage = bondQuoteSnapshotManage;
         this.appUserManage = appUserManage;
-        this.stockAlertMailService = stockAlertMailService;
+        this.mailSender = mailSender;
     }
 
     private record QuoteSnapshot(BigDecimal latestPrice, BigDecimal changePercent, LocalDateTime syncedAt) {}
@@ -323,7 +328,7 @@ public class StockAlertServiceImpl implements StockAlertService {
             return;
         }
         try {
-            this.stockAlertMailService.sendAlert(
+            this.sendAlertMail(
                     user, config,
                     snapshot.latestPrice(),
                     snapshot.changePercent(),
@@ -339,6 +344,67 @@ public class StockAlertServiceImpl implements StockAlertService {
                     config.getStockCode(),
                     ex);
         }
+    }
+
+    private void sendAlertMail(
+            AppUserPO user,
+            StockAlertConfigPO config,
+            BigDecimal latestPrice,
+            BigDecimal changePercent,
+            String syncedAt) {
+        if (StrUtil.isBlank(this.mailFrom)) {
+            throw new IllegalStateException("spring.mail.username must not be blank.");
+        }
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(this.mailFrom);
+        message.setTo(user.getEmail());
+        message.setSubject(this.alertMailSubject(config, changePercent));
+        message.setText(this.alertMailContent(config, latestPrice, changePercent, syncedAt));
+        this.mailSender.send(message);
+    }
+
+    private String alertMailSubject(StockAlertConfigPO config, BigDecimal changePercent) {
+        return String.format(
+                "%s涨跌幅提醒：%s(%s) %s%%",
+                this.typeLabel(config.getTargetType()),
+                config.getStockName(),
+                config.getStockCode(),
+                this.format(changePercent));
+    }
+
+    private String alertMailContent(
+            StockAlertConfigPO config,
+            BigDecimal latestPrice,
+            BigDecimal changePercent,
+            String syncedAt) {
+        return String.format(
+                """
+                您关注的%s已超过涨跌幅提醒阈值。
+
+                目标：%s(%s)
+                当前价格：%s
+                当前涨跌幅：%s%%
+                配置阈值：%s%%
+                """,
+                this.typeLabel(config.getTargetType()),
+                config.getStockName(),
+                config.getStockCode(),
+                this.format(latestPrice),
+                this.format(changePercent),
+                this.format(config.getThresholdPercent()));
+    }
+
+    private String typeLabel(String targetType) {
+        return switch (targetType) {
+            case TYPE_STOCK -> "股票";
+            case TYPE_INDEX -> "指数";
+            case TYPE_BOND -> "可转债";
+            default -> "目标";
+        };
+    }
+
+    private String format(BigDecimal value) {
+        return value == null ? "-" : value.stripTrailingZeros().toPlainString();
     }
 
     private void resetAlertActiveIfNeeded(StockAlertConfigPO config) {

@@ -1,21 +1,21 @@
 package com.scrapider.finance.ai.task;
 
 import com.scrapider.finance.ai.domain.dto.OcrQualityValidateMessageDTO;
-import com.scrapider.finance.ai.service.OcrReviewInitializationService;
+import com.scrapider.finance.ai.service.OcrReviewService;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
 @Component
 public class OcrQualityValidateMessageListener {
 
-    private final OcrReviewInitializationService ocrReviewInitializationService;
+    private final OcrReviewService ocrReviewService;
 
-    public OcrQualityValidateMessageListener(OcrReviewInitializationService ocrReviewInitializationService) {
-        this.ocrReviewInitializationService = ocrReviewInitializationService;
+    public OcrQualityValidateMessageListener(OcrReviewService ocrReviewService) {
+        this.ocrReviewService = ocrReviewService;
     }
 
     @RabbitListener(queues = "${finance.ocr.rabbitmq.quality-validate-queue:finance.ocr.quality.validate}")
     public void handle(OcrQualityValidateMessageDTO message) {
-        this.ocrReviewInitializationService.initialize(message);
+        this.ocrReviewService.initialize(message);
     }
 }

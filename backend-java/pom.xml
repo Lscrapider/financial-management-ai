@@ -13,7 +13,9 @@
 
     <modules>
         <module>finance-data</module>
-        <module>finance-ai</module>
+        <module>finance-security</module>
         <module>finance-service</module>
+        <module>finance-ai</module>
+        <module>finance-app</module>
     </modules>
 </project>

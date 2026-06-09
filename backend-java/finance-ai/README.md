@@ -2,11 +2,14 @@
 
 ## 模块定位
 
-`finance-ai` 是理财分析 AI 项目的 AI 编排模块，不独立启动。`finance-service` 依赖本模块，并由主应用扫描 `com.scrapider.finance` 根包后暴露 `/api/ai/**` 接口。
+`finance-ai` 是理财分析 AI 项目的 AI 编排模块，不独立启动。应用由 `finance-app` 启动并扫描 `com.scrapider.finance` 根包后暴露 `/api/ai/**`、`/api/knowledge/**`、`/internal/agent/**` 和 AI Chat WebSocket 能力。`finance-ai` 依赖 `finance-service`，用于 Tool Calling 数据网关查询行情和业务数据。
+
+外部行情、基本面和估值数据 API 不放在本模块，统一放在 `finance-service`。本模块只编排 AI 流程，并通过 `finance-service` 的业务服务获取数据。
 
 ## 主要能力
 
 - AI Chat：面向个人投资研究的理财分析对话。
+- AI Chat Agent：承载 Java 侧 WebSocket、Agent Session、HMAC 签名、RabbitMQ 启动消息、内部数据网关和 Python callback。
 - Query Rewrite：将用户问题改写为结构化意图、数据范围和后端可执行的数据请求。
 - 行情上下文查询：根据 Query Rewrite 结果查询股票/指数行情数据，并提供给最终回答模型。
 - Token 用量记录：记录 Spring AI ChatResponse 或 DeepSeek 原始响应中的 Token 用量。
@@ -28,13 +31,19 @@ backend-java/finance-ai/
     ├── domain/
     │   ├── param/               # AI 请求参数
     │   └── vo/                  # AI 返回对象
+    ├── messaging/               # Agent 对话清理消息消费
+    ├── chat/                    # AI Chat 内部 Query Rewrite 和行情上下文查询
+    ├── provider/                # 场景分析标的数据组装 Provider
+    ├── publisher/               # Agent、OCR、场景分析 RabbitMQ 消息发布
+    ├── websocket/               # AI Chat WebSocket 连接、握手和会话注册
     └── service/
-        └── impl/                # Chat、Rewrite、行情查询、统计实现
+        ├── *.java               # Controller 依赖的 Service 接口
+        └── impl/                # Service 实现、Agent 数据网关和场景分析内部管线组件
 ```
 
 ## 转换层约定
 
-`converter` 包集中处理本模块的对象拷贝、PO/DTO/VO 装配、对象转 Map、Map 转对象、报告配置档 VO 装配和业务字段收敛。`service.impl` 只保留流程编排、校验、取数、算法计算和外部调用；新增功能如果需要手动转换对象或 Map，应优先复用已有 converter，无法复用时新增语义明确的 converter 类。
+`converter` 包集中处理本模块的对象拷贝、PO/DTO/VO 装配、对象转 Map、Map 转对象、报告配置档 VO 装配和业务字段收敛。`service` 根目录只放 Controller 依赖的 Service 接口，`service.impl` 放接口实现和必要的内部协作组件；Chat 内部协作类放入 `chat`，场景分析标的数据组装类放入 `provider`。新增功能如果需要手动转换对象或 Map，应优先复用已有 converter，无法复用时新增语义明确的 converter 类。
 
 ## 接口分组
 
@@ -269,5 +278,5 @@ mvn -pl backend-java/finance-ai -am package
 验证完整 Java 后端 Reactor 时，在 `backend-java` 目录执行：
 
 ```bash
-mvn test
+mvn -pl finance-app -am test
 ```

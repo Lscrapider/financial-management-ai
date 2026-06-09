@@ -15,7 +15,7 @@ import com.scrapider.finance.ai.domain.vo.OcrTaskPageVO;
 import com.scrapider.finance.ai.domain.vo.OcrTaskVO;
 import com.scrapider.finance.ai.service.ManualKnowledgeService;
 import com.scrapider.finance.ai.service.OcrFileStorageService;
-import com.scrapider.finance.ai.service.OcrTaskMessagePublisher;
+import com.scrapider.finance.ai.publisher.OcrTaskMessagePublisher;
 import com.scrapider.finance.domain.enums.OcrTaskStatusEnum;
 import com.scrapider.finance.domain.po.OcrReviewPO;
 import com.scrapider.finance.domain.po.OcrTaskPO;

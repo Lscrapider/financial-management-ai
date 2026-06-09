@@ -20,7 +20,7 @@ import com.scrapider.finance.manage.StockConfigManage;
 import com.scrapider.finance.manage.StockIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.StockKlineManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
-import com.scrapider.finance.service.HistoricalKlineProvider;
+import com.scrapider.finance.service.provider.HistoricalKlineProvider;
 import com.scrapider.finance.service.StockMarketQueryService;
 import java.time.LocalDate;
 import java.util.Arrays;

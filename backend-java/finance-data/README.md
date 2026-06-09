@@ -2,7 +2,7 @@
 
 ## 模块定位
 
-`finance-data` 是 Java 后端的公共数据层模块，不独立启动。它被 `finance-service` 和 `finance-ai` 依赖，用于集中放置领域对象、数据库访问对象、Mapper、Manage 封装、请求参数、返回对象和 InfluxDB 配置。
+`finance-data` 是 Java 后端的公共数据层模块，不独立启动。它被 `finance-security`、`finance-service` 和 `finance-ai` 依赖，用于集中放置领域对象、数据库访问对象、Mapper、Manage 封装、请求参数、返回对象和 InfluxDB 配置。
 
 ## 主要职责
 

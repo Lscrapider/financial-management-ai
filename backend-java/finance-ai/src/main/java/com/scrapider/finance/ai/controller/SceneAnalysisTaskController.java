@@ -7,8 +7,7 @@ import com.scrapider.finance.ai.domain.vo.SceneAnalysisReportHistoryVO;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisReportTargetPageVO;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisReportVO;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisSubmitVO;
-import com.scrapider.finance.ai.service.SceneAnalysisReportGenerationService;
-import com.scrapider.finance.ai.service.SceneAnalysisReportQueryService;
+import com.scrapider.finance.ai.service.SceneAnalysisReportService;
 import com.scrapider.finance.ai.service.SceneAnalysisTaskService;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
@@ -25,16 +24,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class SceneAnalysisTaskController {
 
     private final SceneAnalysisTaskService sceneAnalysisTaskService;
-    private final SceneAnalysisReportGenerationService sceneAnalysisReportGenerationService;
-    private final SceneAnalysisReportQueryService sceneAnalysisReportQueryService;
+    private final SceneAnalysisReportService sceneAnalysisReportService;
 
     public SceneAnalysisTaskController(
             SceneAnalysisTaskService sceneAnalysisTaskService,
-            SceneAnalysisReportGenerationService sceneAnalysisReportGenerationService,
-            SceneAnalysisReportQueryService sceneAnalysisReportQueryService) {
+            SceneAnalysisReportService sceneAnalysisReportService) {
         this.sceneAnalysisTaskService = sceneAnalysisTaskService;
-        this.sceneAnalysisReportGenerationService = sceneAnalysisReportGenerationService;
-        this.sceneAnalysisReportQueryService = sceneAnalysisReportQueryService;
+        this.sceneAnalysisReportService = sceneAnalysisReportService;
     }
 
     @PostMapping
@@ -52,13 +48,13 @@ public class SceneAnalysisTaskController {
 
     @PostMapping("/{taskNo}/report/regenerate")
     public ResponseEntity<Void> regenerateReport(@PathVariable String taskNo) {
-        this.sceneAnalysisReportGenerationService.regenerateFromStoredContext(taskNo);
+        this.sceneAnalysisReportService.regenerateFromStoredContext(taskNo);
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("/{taskNo}/report")
     public ResponseEntity<SceneAnalysisReportVO> report(@PathVariable String taskNo) {
-        return ResponseEntity.ok(this.sceneAnalysisReportGenerationService.getReport(taskNo));
+        return ResponseEntity.ok(this.sceneAnalysisReportService.getReport(taskNo));
     }
 
     @GetMapping("/reports/targets")
@@ -68,7 +64,7 @@ public class SceneAnalysisTaskController {
             @RequestParam(required = false) String targetName,
             @RequestParam(required = false) String targetCode,
             @RequestParam(required = false) String targetType) {
-        return ResponseEntity.ok(this.sceneAnalysisReportQueryService
+        return ResponseEntity.ok(this.sceneAnalysisReportService
                 .pageTargets(pageNum, pageSize, targetName, targetCode, targetType));
     }
 
@@ -76,11 +72,11 @@ public class SceneAnalysisTaskController {
     public ResponseEntity<List<SceneAnalysisReportHistoryVO>> reports(
             @RequestParam String targetType,
             @RequestParam String targetCode) {
-        return ResponseEntity.ok(this.sceneAnalysisReportQueryService.listHistory(targetType, targetCode));
+        return ResponseEntity.ok(this.sceneAnalysisReportService.listHistory(targetType, targetCode));
     }
 
     @GetMapping("/reports/{reportId}")
     public ResponseEntity<SceneAnalysisReportDetailVO> reportDetail(@PathVariable Long reportId) {
-        return ResponseEntity.ok(this.sceneAnalysisReportQueryService.detail(reportId));
+        return ResponseEntity.ok(this.sceneAnalysisReportService.detail(reportId));
     }
 }

@@ -1,21 +1,21 @@
-# finance-service 主业务服务
+# finance-service 主业务模块
 
 ## 服务定位
 
-`finance-service` 是理财分析 AI 项目的 Spring Boot 主应用，负责应用启动、HTTP 接口、安全认证、行情同步任务、外部行情 API 调用和业务编排。公共数据层来自 `finance-data`，AI 能力来自 `finance-ai`。
+`finance-service` 是理财分析 AI 项目的主业务模块，不独立启动。它负责认证业务入口、用户设置、行情同步任务、外部行情 API 调用、观察池、预警和普通业务编排。应用由 `finance-app` 启动，公共数据层来自 `finance-data`，登录态能力来自 `finance-security`，AI Agent 与知识库能力来自 `finance-ai`。
 
 ## 基础信息
 
 - 包名：`com.scrapider.finance`
-- 启动类：`FinanceApplication`
+- 启动模块：`finance-app`
 - 默认端口：`8081`
 - Web 框架：Spring Boot 3.x
-- 权限：Spring Security + 内存 TokenStore
+- 权限：来自 `finance-security`
 - ORM：MyBatis-Plus
 - 定时任务：Spring Scheduling
 - 关系型数据库：PostgreSQL
 - 时序数据库：InfluxDB
-- 外部行情源：腾讯行情接口
+- 外部数据源：腾讯行情、Tushare、东方财富
 
 ## 目录结构
 
@@ -25,15 +25,15 @@ backend-java/finance-service/
 ├── pom.xml
 └── src/main/
     ├── java/com/scrapider/finance/
-    │   ├── FinanceApplication.java            # Spring Boot 启动类
-    │   ├── api/                               # 外部行情 API 调用
-    │   ├── config/                            # 安全、RestTemplate、WebMvc、DeepSeek 请求配置
+    │   ├── api/                               # 腾讯行情、Tushare、东方财富等外部数据 API
+    │   ├── config/                            # RestTemplate、WebMvc、DeepSeek 请求配置
     │   ├── converter/                         # 认证、行情查询、观察池、预警、系统配置等对象转换
     │   ├── controller/                        # Auth、行情、观察池、预警接口
     │   ├── interceptor/                       # 访问日志拦截器
-    │   ├── security/                          # 登录用户、Bearer Token 过滤器、TokenStore、密码编码
     │   ├── service/                           # 业务服务接口
-    │   │   └── impl/                          # 业务服务实现
+    │   │   ├── impl/                          # 业务服务实现
+    │   │   └── provider/                      # 行情、K 线、基本面等数据提供者接口
+    │   │       └── impl/                      # 腾讯行情、Tushare、东方财富 provider 实现
     │   └── task/                              # 股票和指数行情同步任务
     └── resources/
         └── application.yml                    # 应用配置
@@ -41,7 +41,7 @@ backend-java/finance-service/
 
 ## 转换层约定
 
-`converter` 包负责本模块的对象拷贝、PO/DTO/VO 装配、对象转 Map、Map 转对象和业务字段收敛。行情查询结果的 PO 到 VO 转换由 `MarketQueryConverter` 统一处理，`service.impl` 只保留业务流程、校验、查询、同步和事务编排；新增手动转换逻辑时应放入 converter，避免在业务服务中分散维护。
+`converter` 包负责本模块的对象拷贝、PO/DTO/VO 装配、对象转 Map、Map 转对象和业务字段收敛。行情查询结果的 PO 到 VO 转换由 `MarketQueryConverter` 统一处理，`service.impl` 只保留业务流程、校验、查询、同步和事务编排；可替换的数据源能力放入 `service.provider` 和 `service.provider.impl`；新增手动转换逻辑时应放入 converter，避免在业务服务中分散维护。
 
 ## 接口分组
 
@@ -54,8 +54,8 @@ backend-java/finance-service/
 | 可转债 | `/api/bonds/**` | 可转债最新行情列表、可转债日 K、同步状态和手动同步。 |
 | 投资观察池 | `/api/watch-pool/**` | 观察池分组和标的管理。 |
 | 股票预警 | `/api/stock-alerts/**` | 股票/指数/可转债预警配置、标的选项和手动检查。 |
-| AI | `/api/ai/**` | 由 `finance-ai` 提供，随主应用启动后暴露，包括 Chat、OCR、Token 用量和控制台指标。 |
-| 知识库 | `/api/knowledge/**` | 由 `finance-ai` 提供，随主应用启动后暴露，包括知识库分页、统计、概览和 chunk 编辑。 |
+| AI | `/api/ai/**` | 由 `finance-ai` 提供，随 `finance-app` 启动后暴露，包括 Chat、OCR、Token 用量和控制台指标。 |
+| 知识库 | `/api/knowledge/**` | 由 `finance-ai` 提供，随 `finance-app` 启动后暴露，包括知识库分页、统计、概览和 chunk 编辑。 |
 
 `docs/API_DOCUMENTATION.md` 中维护了接口级参数和返回字段说明。
 
@@ -197,7 +197,7 @@ role: admin
 项目未提交 Maven Wrapper，本地需要先安装 Maven，并使用 JDK 17+。
 
 ```bash
-mvn -pl backend-java/finance-service -am spring-boot:run
+mvn -pl backend-java/finance-app -am spring-boot:run
 ```
 
 ### Docker 启动
@@ -211,7 +211,7 @@ docker compose -f docker/docker-compose.yml up --build finance-service
 ## 构建
 
 ```bash
-mvn -pl backend-java/finance-service -am package
+mvn -pl backend-java/finance-app -am package
 ```
 
 验证完整 Java 后端 Reactor 时，也可以在 `backend-java` 目录执行：

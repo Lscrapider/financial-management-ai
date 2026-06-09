@@ -10,10 +10,9 @@ import com.scrapider.finance.ai.domain.param.SceneAnalysisCurrentScenesPayloadPa
 import com.scrapider.finance.ai.domain.param.SceneAnalysisSubmitParam;
 import com.scrapider.finance.ai.domain.param.SceneRetrievalEmbeddingParam;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisSubmitVO;
+import com.scrapider.finance.ai.publisher.SceneAnalysisMessagePublisher;
 import com.scrapider.finance.ai.security.CurrentUserContext;
-import com.scrapider.finance.ai.service.SceneAnalysisMessagePublisher;
 import com.scrapider.finance.ai.service.SceneAnalysisTaskService;
-import com.scrapider.finance.ai.service.SceneReportPipelineService;
 import com.scrapider.finance.ai.service.SceneTargetDataProvider;
 import com.scrapider.finance.domain.po.SceneAnalysisTaskPO;
 import com.scrapider.finance.manage.SceneAnalysisTaskManage;
@@ -28,19 +27,19 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
     private final ObjectMapper objectMapper;
     private final SceneAnalysisMessagePublisher sceneAnalysisMessagePublisher;
     private final SceneAnalysisTaskManage sceneAnalysisTaskManage;
-    private final SceneReportPipelineService sceneReportPipelineService;
+    private final SceneAnalysisTaskPipeline sceneAnalysisTaskPipeline;
     private final List<SceneTargetDataProvider> targetDataProviders;
 
     public SceneAnalysisTaskServiceImpl(
             ObjectMapper objectMapper,
             SceneAnalysisMessagePublisher sceneAnalysisMessagePublisher,
             SceneAnalysisTaskManage sceneAnalysisTaskManage,
-            SceneReportPipelineService sceneReportPipelineService,
+            SceneAnalysisTaskPipeline sceneAnalysisTaskPipeline,
             List<SceneTargetDataProvider> targetDataProviders) {
         this.objectMapper = objectMapper;
         this.sceneAnalysisMessagePublisher = sceneAnalysisMessagePublisher;
         this.sceneAnalysisTaskManage = sceneAnalysisTaskManage;
-        this.sceneReportPipelineService = sceneReportPipelineService;
+        this.sceneAnalysisTaskPipeline = sceneAnalysisTaskPipeline;
         this.targetDataProviders = targetDataProviders;
     }
 
@@ -90,10 +89,10 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
                 this.sceneAnalysisTaskManage.markCurrentScenesReady(
                         taskNo,
                         this.objectMapper.valueToTree(currentScenesPayload));
-                this.sceneReportPipelineService.start(taskNo, currentScenesPayload);
+                this.sceneAnalysisTaskPipeline.start(taskNo, currentScenesPayload);
                 return;
             }
-            this.sceneReportPipelineService.continueWithRetrievalEmbeddings(taskNo, retrievalEmbeddings);
+            this.sceneAnalysisTaskPipeline.continueWithRetrievalEmbeddings(taskNo, retrievalEmbeddings);
         } catch (Exception ex) {
             this.sceneAnalysisTaskManage.markFailed(taskNo, ex.getMessage());
             throw ex;

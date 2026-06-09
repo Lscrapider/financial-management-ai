@@ -1,31 +1,42 @@
 # Java 后端模块
 
-本目录是理财分析 AI 项目的 Java 后端聚合工程，采用 Maven 多模块组织。后端应用由 `finance-service` 启动，公共数据层由 `finance-data` 提供，AI 编排能力由 `finance-ai` 提供。
+本目录是理财分析 AI 项目的 Java 后端聚合工程，采用 Maven 多模块组织。后端应用由 `finance-app` 启动，公共数据层由 `finance-data` 提供，登录态能力由 `finance-security` 提供，业务能力由 `finance-service` 和 `finance-ai` 提供。
 
 ## 模块划分
 
 | 模块 | 是否独立启动 | 主要职责 |
 | --- | --- | --- |
-| `finance-service` | 是 | Spring Boot 主应用、认证登录、用户设置、行情查询与同步、观察池、预警、安全配置和应用配置。 |
+| `finance-app` | 是 | Spring Boot 主启动模块，只负责装配各业务模块并启动应用。 |
 | `finance-data` | 否 | 公共领域对象、请求参数、返回对象、MyBatis-Plus Mapper、Manage 封装、PostgreSQL 表映射和 InfluxDB 读写配置。 |
-| `finance-ai` | 否 | AI Chat、Query Rewrite、行情上下文、OCR、手动知识导入、知识库、投资报告、Token 用量统计和 AI 控制台指标。 |
+| `finance-security` | 否 | JWT、登录用户、TokenStore、刷新会话、Bearer Token 过滤器和 Spring Security 配置。 |
+| `finance-service` | 否 | 认证入口、用户设置、行情查询与同步、观察池、预警、外部行情 API 和普通业务编排。 |
+| `finance-ai` | 否 | AI Chat、Agent、Tool Calling 数据网关、WebSocket、Query Rewrite、OCR、知识库、投资报告、Token 用量统计和 AI 控制台指标。 |
 
 ## 调用关系
 
 ```text
+finance-app
+├── 依赖 finance-ai：装配 AI Chat、Agent、OCR、知识库和报告能力
+├── 依赖 finance-service：装配行情、认证入口、观察池和预警能力
+├── 依赖 finance-security：装配登录态和安全过滤器
+└── 依赖 finance-data：装配数据访问层
+
+finance-ai
+└── 依赖 finance-service：Tool Calling 通过业务服务查询行情和业务数据
+
 finance-service
-├── 依赖 finance-data：复用 PO / VO / Param / Mapper / Manage / InfluxDB 配置
-└── 依赖 finance-ai：暴露 /api/ai/** 接口和 AI 业务能力
+└── 依赖 finance-security / finance-data：复用登录态和数据访问能力
 
 外部请求 -> Controller -> Service -> Manage / API / Mapper -> Domain
 ```
 
-`finance-service` 的 `FinanceApplication` 会扫描 `com.scrapider.finance` 根包，因此 `finance-data` 和 `finance-ai` 中同根包下的 Bean 会随主应用一起装配。
+`finance-app` 的 `FinanceApplication` 会扫描 `com.scrapider.finance` 根包，因此各模块中同根包下的 Bean 会随主应用一起装配。
 
 ## 分层约定
 
 - `controller` 只处理 HTTP 入参、权限边界和响应包装。
 - `service` / `service.impl` 负责业务流程、校验、外部调用和事务编排。
+- `service.provider` / `service.provider.impl` 负责可替换的数据提供者接口和具体数据源实现。
 - `manage` / `mapper` 负责数据访问封装。
 - `converter` 负责对象拷贝、PO/DTO/VO 装配、对象转 Map、Map 转对象和业务语义明确的字段收敛。
 
@@ -51,7 +62,7 @@ finance-service
 在项目根目录执行：
 
 ```bash
-mvn -pl backend-java/finance-service -am spring-boot:run
+mvn -pl backend-java/finance-app -am spring-boot:run
 ```
 
 默认端口为 `8081`。
@@ -66,7 +77,7 @@ docker compose -f docker/docker-compose.yml up --build finance-service
 
 ## 构建
 
-构建整个 Java 后端聚合工程。推荐进入 `backend-java` 目录执行，这会编译 `finance-data`、`finance-ai` 和 `finance-service` 三个子模块：
+构建整个 Java 后端聚合工程。推荐进入 `backend-java` 目录执行，这会编译 `finance-data`、`finance-security`、`finance-service`、`finance-ai` 和 `finance-app`：
 
 ```bash
 cd backend-java
@@ -76,15 +87,17 @@ mvn package
 也可以在项目根目录直接指定主服务模块及其依赖：
 
 ```bash
-mvn -pl backend-java/finance-service -am package
+mvn -pl backend-java/finance-app -am package
 ```
 
 构建单个模块及其依赖：
 
 ```bash
 mvn -pl backend-java/finance-data -am package
-mvn -pl backend-java/finance-ai -am package
+mvn -pl backend-java/finance-security -am package
 mvn -pl backend-java/finance-service -am package
+mvn -pl backend-java/finance-ai -am package
+mvn -pl backend-java/finance-app -am package
 ```
 
 ## 配置入口
@@ -137,5 +150,6 @@ backend-java/finance-service/src/main/resources/application.yml
 ## 数据来源
 
 - 股票/指数/可转债最新行情、股票分时、股票/指数/可转债日 K：腾讯行情接口。
+- 股票基本面、估值、财务指标和分红数据：东方财富或 Tushare，由 `finance-service` 提供数据 API 和 `service.provider`。
 - 行情快照、日 K、用户、观察池、预警、OCR、知识库、报告、Token 用量、访问日志：PostgreSQL。
 - 股票分钟分时走势：InfluxDB。

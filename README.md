@@ -34,9 +34,11 @@
 | 文档 | 说明 |
 | --- | --- |
 | [backend-java/README.md](./backend-java/README.md) | Java 后端聚合工程说明。 |
+| [backend-java/finance-app/README.md](./backend-java/finance-app/README.md) | Java 后端启动模块说明。 |
 | [backend-java/finance-data/README.md](./backend-java/finance-data/README.md) | Java 公共数据层模块说明，包括领域对象、Mapper、Manage、Param、VO 和 InfluxDB 配置。 |
+| [backend-java/finance-security/README.md](./backend-java/finance-security/README.md) | Java 安全与登录态模块说明。 |
 | [backend-java/finance-ai/README.md](./backend-java/finance-ai/README.md) | Java AI 能力模块说明，包括 AI Chat、OCR 上传、人工复核和知识库接口。 |
-| [backend-java/finance-service/README.md](./backend-java/finance-service/README.md) | Java 主服务说明。 |
+| [backend-java/finance-service/README.md](./backend-java/finance-service/README.md) | Java 主业务模块说明。 |
 | [database/README.md](./database/README.md) | 数据库和迁移脚本说明。 |
 | [frontend-vue/README.md](./frontend-vue/README.md) | 前端工程说明。 |
 
@@ -122,16 +124,24 @@ financial-management-ai/
 │   └── img/                          # 文档图片素材
 ├── backend-java/                     # Java 后端聚合目录
 │   ├── pom.xml                       # Java 后端聚合工程配置
-│   ├── finance-service/              # 主业务 Java 服务
-│   │   ├── Dockerfile                # 主业务服务 Docker 构建文件
-│   │   ├── pom.xml                   # 主业务服务 Maven 配置
+│   ├── finance-app/                  # Java 后端启动模块
+│   │   ├── pom.xml                   # 启动模块 Maven 配置
+│   │   └── src/main/java/com/scrapider/finance/
+│   │       └── FinanceApplication.java # Spring Boot 启动类
+│   ├── finance-security/             # 安全与登录态模块
+│   │   ├── pom.xml                   # 安全模块 Maven 配置
+│   │   └── src/main/java/com/scrapider/finance/
+│   │       ├── config/               # Spring Security 配置
+│   │       └── security/             # JWT、LoginUser、TokenStore
+│   ├── finance-service/              # 主业务 Java 模块
+│   │   ├── Dockerfile                # Java 服务 Docker 构建文件
+│   │   ├── pom.xml                   # 主业务模块 Maven 配置
 │   │   └── src/
 │   │       ├── main/
 │   │       │   ├── java/
 │   │       │   │   └── com/scrapider/finance/
-│   │       │   │       ├── FinanceApplication.java # Spring Boot 启动类
 │   │       │   │       ├── controller/             # 控制层
-│   │       │   │       ├── service/                # 服务层接口
+│   │       │   │       ├── service/                # 服务层接口、provider 接口与实现
 │   │       │   │       ├── manage/                 # MyBatis-Plus 管理封装
 │   │       │   │       ├── mapper/                 # MyBatis-Plus Mapper
 │   │       │   │       └── domain/                 # 领域对象
