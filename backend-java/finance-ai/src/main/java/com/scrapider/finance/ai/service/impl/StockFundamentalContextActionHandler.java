@@ -281,10 +281,12 @@ public class StockFundamentalContextActionHandler implements AgentDataActionHand
         if (section == null) {
             return;
         }
-        if (SECTION_VALUATION.equals(section)) {
+        if (SECTION_VALUATION.equals(section) || "dividend".equals(section)) {
             sections.add(SECTION_VALUATION);
         }
-        if (SECTION_FINANCIAL_INDICATORS.equals(section) || "financial_indicators".equals(section)) {
+        if (SECTION_FINANCIAL_INDICATORS.equals(section)
+                || "financial_indicators".equals(section)
+                || "financial_indicator".equals(section)) {
             sections.add(SECTION_FINANCIAL_INDICATORS);
         }
     }

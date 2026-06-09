@@ -3,9 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from app.agent.tools.convertible_bond_context_tool import ConvertibleBondContextTool
 from app.agent.tools.market_intraday_summary_tool import MarketIntradaySummaryTool
 from app.agent.tools.market_kline_trend_tool import MarketKlineTrendTool
 from app.agent.tools.market_quote_tool import MarketQuoteTool
+from app.agent.tools.scene_report_context_tool import SceneReportContextTool
+from app.agent.tools.stock_fundamental_context_tool import StockFundamentalContextTool
 from app.agent.tools.watch_pool_context_tool import WatchPoolContextTool
 
 
@@ -23,11 +26,17 @@ class AgentToolRegistry:
         watch_pool_context_tool: WatchPoolContextTool | None = None,
         market_kline_trend_tool: MarketKlineTrendTool | None = None,
         market_intraday_summary_tool: MarketIntradaySummaryTool | None = None,
+        stock_fundamental_context_tool: StockFundamentalContextTool | None = None,
+        convertible_bond_context_tool: ConvertibleBondContextTool | None = None,
+        scene_report_context_tool: SceneReportContextTool | None = None,
     ) -> None:
         self._market_quote_tool = market_quote_tool or MarketQuoteTool()
         self._watch_pool_context_tool = watch_pool_context_tool or WatchPoolContextTool()
         self._market_kline_trend_tool = market_kline_trend_tool or MarketKlineTrendTool()
         self._market_intraday_summary_tool = market_intraday_summary_tool or MarketIntradaySummaryTool()
+        self._stock_fundamental_context_tool = stock_fundamental_context_tool or StockFundamentalContextTool()
+        self._convertible_bond_context_tool = convertible_bond_context_tool or ConvertibleBondContextTool()
+        self._scene_report_context_tool = scene_report_context_tool or SceneReportContextTool()
 
     def build_langchain_tools(self, context: AgentToolContext, tool_decorator: Any) -> dict[str, Any]:
         @tool_decorator
@@ -37,7 +46,7 @@ class AgentToolRegistry:
             target_name: str | None = None,
             limit: int = 5,
         ) -> str:
-            """查询股票、指数或债券的最新行情快照，适合回答当前价格、涨跌幅、成交、换手等实时事实；不要用它分析K线趋势、分时路径或观察池。target_type 只能是 stock、index、bond。"""
+            """查询股票、指数或债券的最新行情快照，适合回答当前价格、涨跌幅、成交、换手和最新报价事实；不要用它分析K线趋势、分时路径、观察池、财务基本面、可转债条款或历史报告。target_type 只能是 stock、index、bond。"""
             return self._market_quote_tool.invoke(
                 data_gateway_url=context.data_gateway_url,
                 agent_session_id=context.agent_session_id,
@@ -96,11 +105,68 @@ class AgentToolRegistry:
                 target_name=target_name,
             )
 
+        @tool_decorator
+        def stock_fundamental_context(
+            target_code: str | None = None,
+            target_name: str | None = None,
+            sections: list[str] | None = None,
+            limit: int = 4,
+        ) -> str:
+            """查询股票财务、分红、PE/PB历史估值位置等基本面上下文；当前价格、涨跌幅、成交、换手和最新报价事实仍必须使用 market_quote。sections 默认 valuation、financial_indicator、dividend。"""
+            return self._stock_fundamental_context_tool.invoke(
+                data_gateway_url=context.data_gateway_url,
+                agent_session_id=context.agent_session_id,
+                session_secret=context.session_secret,
+                target_code=target_code,
+                target_name=target_name,
+                sections=sections,
+                limit=limit,
+            )
+
+        @tool_decorator
+        def convertible_bond_context(
+            target_code: str | None = None,
+            target_name: str | None = None,
+            sections: list[str] | None = None,
+            limit: int = 8,
+        ) -> str:
+            """查询可转债条款、溢价率历史、纯债价值、YTM和余额变化上下文；当前价格、涨跌幅、成交、换手和最新报价事实仍必须使用 market_quote。sections 默认 basic、valuation_history、share_change。"""
+            return self._convertible_bond_context_tool.invoke(
+                data_gateway_url=context.data_gateway_url,
+                agent_session_id=context.agent_session_id,
+                session_secret=context.session_secret,
+                target_code=target_code,
+                target_name=target_name,
+                sections=sections,
+                limit=limit,
+            )
+
+        @tool_decorator
+        def scene_report_context(
+            target_type: str | None = None,
+            target_code: str | None = None,
+            report_id: str | None = None,
+            limit: int = 1,
+        ) -> str:
+            """查询已有报告文本和历史报告结论；有 report_id 时返回报告正文，有 target_code 时返回该标的报告，二者都为空时返回最近报告摘要列表；当前价格、涨跌幅、成交、换手和最新报价事实仍必须使用 market_quote。"""
+            return self._scene_report_context_tool.invoke(
+                data_gateway_url=context.data_gateway_url,
+                agent_session_id=context.agent_session_id,
+                session_secret=context.session_secret,
+                target_type=target_type,
+                target_code=target_code,
+                report_id=report_id,
+                limit=limit,
+            )
+
         return {
             "market_quote": market_quote,
             "watch_pool_context": watch_pool_context,
             "market_kline_trend": market_kline_trend,
             "market_intraday_summary": market_intraday_summary,
+            "stock_fundamental_context": stock_fundamental_context,
+            "convertible_bond_context": convertible_bond_context,
+            "scene_report_context": scene_report_context,
         }
 
     @property

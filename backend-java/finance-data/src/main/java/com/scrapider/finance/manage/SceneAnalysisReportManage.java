@@ -56,6 +56,32 @@ public class SceneAnalysisReportManage extends ServiceImpl<SceneAnalysisReportMa
         return this.baseMapper.findByIdForOwner(reportId, ownerUserId);
     }
 
+    public List<SceneAnalysisReportPO> listLatestSuccessByTarget(
+            String targetType,
+            String targetCode,
+            Long ownerUserId,
+            int limit) {
+        int safeLimit = Math.max(1, Math.min(limit, 3));
+        return this.baseMapper.listLatestByTargetAndStatus(
+                targetType,
+                targetCode,
+                SceneAnalysisTaskStatusEnum.SUCCESS.getCode(),
+                ownerUserId,
+                safeLimit);
+    }
+
+    public List<SceneAnalysisReportHistoryDTO> listLatestSuccessSummaries(
+            String targetType,
+            Long ownerUserId,
+            int limit) {
+        int safeLimit = Math.max(1, Math.min(limit, 10));
+        return this.baseMapper.listLatestByStatus(
+                targetType,
+                SceneAnalysisTaskStatusEnum.SUCCESS.getCode(),
+                ownerUserId,
+                safeLimit);
+    }
+
     public void markSuccess(Long reportId, JsonNode reportContent, String reportText, String model) {
         LocalDateTime now = LocalDateTime.now();
         this.baseMapper.markSuccess(

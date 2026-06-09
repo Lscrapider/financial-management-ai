@@ -247,6 +247,63 @@ public interface SceneAnalysisReportMapper extends BaseMapper<SceneAnalysisRepor
             @Param("reportId") Long reportId,
             @Param("ownerUserId") Long ownerUserId);
 
+    @Select("""
+            <script>
+            SELECT r.*
+            FROM scene_analysis_report r
+            JOIN scene_analysis_task t ON t.id = r.task_id
+            WHERE r.target_type = #{targetType}
+              AND r.target_code = #{targetCode}
+              AND r.status = #{status}
+            <if test="ownerUserId != null">
+              AND t.user_id = #{ownerUserId}
+            </if>
+            ORDER BY COALESCE(r.generated_at, r.created_at) DESC, r.id DESC
+            LIMIT #{limit}
+            </script>
+            """)
+    @ResultMap("sceneAnalysisReportMap")
+    List<SceneAnalysisReportPO> listLatestByTargetAndStatus(
+            @Param("targetType") String targetType,
+            @Param("targetCode") String targetCode,
+            @Param("status") String status,
+            @Param("ownerUserId") Long ownerUserId,
+            @Param("limit") int limit);
+
+    @Select("""
+            <script>
+            SELECT
+                r.id AS report_id,
+                r.task_no,
+                r.target_type,
+                r.target_code,
+                r.target_name,
+                r.report_type,
+                r.generation_type,
+                r.version_no,
+                r.status,
+                r.generated_at,
+                r.created_at
+            FROM scene_analysis_report r
+            JOIN scene_analysis_task t ON t.id = r.task_id
+            WHERE r.status = #{status}
+            <if test="targetType != null and targetType != ''">
+              AND r.target_type = #{targetType}
+            </if>
+            <if test="ownerUserId != null">
+              AND t.user_id = #{ownerUserId}
+            </if>
+            ORDER BY COALESCE(r.generated_at, r.created_at) DESC, r.id DESC
+            LIMIT #{limit}
+            </script>
+            """)
+    @ResultMap("sceneAnalysisReportHistoryMap")
+    List<SceneAnalysisReportHistoryDTO> listLatestByStatus(
+            @Param("targetType") String targetType,
+            @Param("status") String status,
+            @Param("ownerUserId") Long ownerUserId,
+            @Param("limit") int limit);
+
     @Update("""
             UPDATE scene_analysis_report
             SET status = #{status},

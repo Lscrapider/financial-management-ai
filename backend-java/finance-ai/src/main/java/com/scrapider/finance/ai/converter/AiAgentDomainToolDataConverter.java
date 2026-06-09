@@ -1,5 +1,10 @@
 package com.scrapider.finance.ai.converter;
 
+import com.scrapider.finance.domain.po.ConvertibleBondBasicPO;
+import com.scrapider.finance.domain.po.ConvertibleBondDailyValuationPO;
+import com.scrapider.finance.domain.po.ConvertibleBondSharePO;
+import com.scrapider.finance.domain.dto.SceneAnalysisReportHistoryDTO;
+import com.scrapider.finance.domain.po.SceneAnalysisReportPO;
 import com.scrapider.finance.domain.po.StockDividendHistoryPO;
 import com.scrapider.finance.domain.po.StockFinancialIndicatorPO;
 import com.scrapider.finance.domain.po.StockValuationHistoryPO;
@@ -23,6 +28,14 @@ public final class AiAgentDomainToolDataConverter {
         return compact(target);
     }
 
+    public static Map<String, Object> bondTarget(String targetCode, String targetName) {
+        Map<String, Object> target = new LinkedHashMap<>();
+        target.put("targetType", "bond");
+        target.put("targetCode", targetCode);
+        target.put("targetName", targetName);
+        return compact(target);
+    }
+
     public static Map<String, Object> stockValuation(
             List<StockValuationHistoryPO> valuations,
             List<StockDividendHistoryPO> dividends) {
@@ -40,7 +53,7 @@ public final class AiAgentDomainToolDataConverter {
         Map<String, Object> valuation = new LinkedHashMap<>();
         valuation.put("current", compact(current));
         valuation.put("historySummary", compact(historySummary));
-        valuation.put("dividend", stockDividend(dividends));
+        valuation.put("dividend", stockDividend(dividends, latest == null ? null : latest.getClosePrice()));
         return compact(valuation);
     }
 
@@ -53,15 +66,131 @@ public final class AiAgentDomainToolDataConverter {
                 .toList();
     }
 
-    private static Map<String, Object> stockDividend(List<StockDividendHistoryPO> dividends) {
+    public static Map<String, Object> convertibleBondBasic(ConvertibleBondBasicPO basic) {
+        if (basic == null) {
+            return Map.of();
+        }
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("underlyingStockCode", basic.getUnderlyingStockCode());
+        row.put("underlyingStockName", basic.getUnderlyingStockName());
+        row.put("rating", basic.getRating());
+        row.put("issueSize", basic.getIssueSize());
+        row.put("remainingSize", basic.getRemainingSize());
+        row.put("firstConversionPrice", basic.getFirstConversionPrice());
+        row.put("conversionPrice", basic.getConversionPrice());
+        row.put("valueDate", basic.getValueDate());
+        row.put("maturityDate", basic.getMaturityDate());
+        row.put("maturityCallPrice", basic.getMaturityCallPrice());
+        row.put("couponRate", basic.getCouponRate());
+        row.put("payPerYear", basic.getPayPerYear());
+        row.put("conversionStartDate", basic.getConversionStartDate());
+        row.put("conversionEndDate", basic.getConversionEndDate());
+        row.put("redeemClause", basic.getRedeemClause());
+        row.put("putbackClause", basic.getPutbackClause());
+        row.put("resetClause", basic.getResetClause());
+        return compact(row);
+    }
+
+    public static List<Map<String, Object>> convertibleBondValuationHistory(
+            List<ConvertibleBondDailyValuationPO> valuations) {
+        if (valuations == null || valuations.isEmpty()) {
+            return List.of();
+        }
+        return valuations.stream()
+                .map(AiAgentDomainToolDataConverter::convertibleBondValuation)
+                .toList();
+    }
+
+    public static List<Map<String, Object>> convertibleBondShareChanges(List<ConvertibleBondSharePO> shares) {
+        if (shares == null || shares.isEmpty()) {
+            return List.of();
+        }
+        return shares.stream()
+                .map(AiAgentDomainToolDataConverter::convertibleBondShare)
+                .toList();
+    }
+
+    public static List<Map<String, Object>> sceneReports(List<SceneAnalysisReportPO> reports, int maxTextChars) {
+        if (reports == null || reports.isEmpty()) {
+            return List.of();
+        }
+        return reports.stream()
+                .map(report -> sceneReport(report, maxTextChars))
+                .toList();
+    }
+
+    public static List<Map<String, Object>> sceneReportSummaries(List<SceneAnalysisReportHistoryDTO> reports) {
+        if (reports == null || reports.isEmpty()) {
+            return List.of();
+        }
+        return reports.stream()
+                .map(AiAgentDomainToolDataConverter::sceneReportSummary)
+                .toList();
+    }
+
+    public static Map<String, Object> sceneReport(SceneAnalysisReportPO report, int maxTextChars) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        if (report == null) {
+            return row;
+        }
+        row.put("reportId", report.getId());
+        row.put("targetType", report.getTargetType());
+        row.put("targetCode", report.getTargetCode());
+        row.put("targetName", report.getTargetName());
+        row.put("reportType", report.getReportType());
+        row.put("generationType", report.getGenerationType());
+        row.put("versionNo", report.getVersionNo());
+        row.put("status", report.getStatus());
+        row.put("generatedAt", report.getGeneratedAt());
+        row.put("reportText", truncate(report.getReportText(), maxTextChars));
+        return compact(row);
+    }
+
+    private static Map<String, Object> sceneReportSummary(SceneAnalysisReportHistoryDTO report) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("reportId", report.getReportId());
+        row.put("targetType", report.getTargetType());
+        row.put("targetCode", report.getTargetCode());
+        row.put("targetName", report.getTargetName());
+        row.put("reportType", report.getReportType());
+        row.put("generationType", report.getGenerationType());
+        row.put("versionNo", report.getVersionNo());
+        row.put("status", report.getStatus());
+        row.put("generatedAt", report.getGeneratedAt());
+        row.put("createdAt", report.getCreatedAt());
+        return compact(row);
+    }
+
+    private static Map<String, Object> convertibleBondValuation(ConvertibleBondDailyValuationPO valuation) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("tradeDate", valuation.getTradeDate());
+        row.put("conversionValue", valuation.getConversionValue());
+        row.put("premiumRate", valuation.getPremiumRate());
+        row.put("pureBondValue", valuation.getPureBondValue());
+        row.put("pureBondPremiumRate", valuation.getPureBondPremiumRate());
+        row.put("ytm", valuation.getYtm());
+        return compact(row);
+    }
+
+    private static Map<String, Object> convertibleBondShare(ConvertibleBondSharePO share) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("endDate", share.getEndDate());
+        row.put("issueSize", share.getIssueSize());
+        row.put("conversionPrice", share.getConversionPrice());
+        row.put("conversionValue", share.getConversionValue());
+        row.put("conversionVolume", share.getConversionVolume());
+        row.put("conversionRatio", share.getConversionRatio());
+        row.put("remainingSize", share.getRemainingSize());
+        return compact(row);
+    }
+
+    private static Map<String, Object> stockDividend(List<StockDividendHistoryPO> dividends, BigDecimal currentPrice) {
         Map<String, Object> dividend = new LinkedHashMap<>();
         if (dividends != null && !dividends.isEmpty()) {
-            dividend.put("latest", stockDividendLatest(dividends.get(0)));
-
-            Map<String, Object> historySummary = new LinkedHashMap<>();
-            historySummary.put("pretaxBonusRmb", distributionSummary(dividends, StockDividendHistoryPO::getPretaxBonusRmb));
-            historySummary.put("dividendRatio", distributionSummary(dividends, StockDividendHistoryPO::getDividendRatio));
-            dividend.put("historySummary", compact(historySummary));
+            Map<String, Object> latest = stockDividendLatest(dividends.get(0));
+            dividend.put("latest", latest);
+            dividend.put("estimatedDividendYieldPct", dividendYieldPct(dividends.get(0), currentPrice));
+            dividend.put("historySummary", dividendYieldHistorySummary(dividends, currentPrice));
         }
         return compact(dividend);
     }
@@ -75,6 +204,46 @@ public final class AiAgentDomainToolDataConverter {
         row.put("implPlanProfile", dividend.getImplPlanProfile());
         row.put("assignProgress", dividend.getAssignProgress());
         return compact(row);
+    }
+
+    private static Map<String, Object> dividendYieldHistorySummary(
+            List<StockDividendHistoryPO> dividends,
+            BigDecimal currentPrice) {
+        List<BigDecimal> values = dividends == null ? List.of() : dividends.stream()
+                .map(dividend -> dividendYieldPct(dividend, currentPrice))
+                .filter(value -> value != null)
+                .toList();
+        if (values.isEmpty()) {
+            return Map.of();
+        }
+        BigDecimal latest = values.get(0);
+        BigDecimal min = values.stream().min(BigDecimal::compareTo).orElse(null);
+        BigDecimal max = values.stream().max(BigDecimal::compareTo).orElse(null);
+        BigDecimal sum = values.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("yieldPctLatest", latest);
+        summary.put("count", values.size());
+        summary.put("yieldPctMin", min);
+        summary.put("yieldPctMax", max);
+        summary.put("yieldPctAverage", sum.divide(BigDecimal.valueOf(values.size()), 6, RoundingMode.HALF_UP)
+                .stripTrailingZeros());
+        summary.put("yieldPctPercentileRank", percentileRank(latest, values));
+        return compact(summary);
+    }
+
+    private static BigDecimal dividendYieldPct(StockDividendHistoryPO dividend, BigDecimal currentPrice) {
+        if (dividend == null
+                || dividend.getPretaxBonusRmb() == null
+                || currentPrice == null
+                || currentPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            return null;
+        }
+        return dividend.getPretaxBonusRmb()
+                .divide(BigDecimal.TEN, 10, RoundingMode.HALF_UP)
+                .divide(currentPrice, 10, RoundingMode.HALF_UP)
+                .multiply(BigDecimal.valueOf(100))
+                .setScale(6, RoundingMode.HALF_UP)
+                .stripTrailingZeros();
     }
 
     private static Map<String, Object> stockFinancialIndicator(StockFinancialIndicatorPO indicator) {
@@ -150,5 +319,26 @@ public final class AiAgentDomainToolDataConverter {
             result.put(key, value);
         });
         return result;
+    }
+
+    private static String truncate(String value, int maxChars) {
+        if (value == null || maxChars <= 0 || value.length() <= maxChars) {
+            return value;
+        }
+        return value.substring(0, maxChars);
+    }
+
+    public static boolean isReportTextTruncated(SceneAnalysisReportPO report, int maxChars) {
+        if (report == null) {
+            return false;
+        }
+        return isTruncated(report.getReportText(), maxChars);
+    }
+
+    private static boolean isTruncated(String value, int maxChars) {
+        if (value == null || maxChars <= 0) {
+            return false;
+        }
+        return value.length() > maxChars;
     }
 }

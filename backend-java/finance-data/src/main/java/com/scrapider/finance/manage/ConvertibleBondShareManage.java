@@ -19,6 +19,16 @@ public class ConvertibleBondShareManage extends ServiceImpl<ConvertibleBondShare
                 .last("LIMIT 1"));
     }
 
+    public List<ConvertibleBondSharePO> listByBondCode(String bondCode, Integer limit) {
+        LambdaQueryWrapper<ConvertibleBondSharePO> wrapper = new LambdaQueryWrapper<ConvertibleBondSharePO>()
+                .eq(StrUtil.isNotBlank(bondCode), ConvertibleBondSharePO::getBondCode, bondCode)
+                .orderByDesc(ConvertibleBondSharePO::getEndDate);
+        if (limit != null && limit > 0) {
+            wrapper.last("LIMIT " + limit);
+        }
+        return this.list(wrapper);
+    }
+
     public void saveShares(List<ConvertibleBondSharePO> shares) {
         if (CollUtil.isEmpty(shares)) {
             return;
