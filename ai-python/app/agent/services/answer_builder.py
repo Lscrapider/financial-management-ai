@@ -1,21 +1,10 @@
 from __future__ import annotations
 
-import logging
 from typing import Any
-
-from app.agent.adapters.deepseek_tool_call_adapter import DeepSeekToolCallAdapter
-
-logger = logging.getLogger(__name__)
 
 
 class AgentAnswerBuilder:
-    def __init__(self, tool_call_adapter: DeepSeekToolCallAdapter | None = None) -> None:
-        self._tool_call_adapter = tool_call_adapter or DeepSeekToolCallAdapter()
-
     def answer_or_fallback(self, content: str, quote_result: dict[str, Any]) -> str:
-        if self._tool_call_adapter.is_dsml_tool_call(content):
-            logger.warning("agent final answer is dsml tool call, fallback answer will be used")
-            return self.fallback_answer(quote_result)
         return content.strip()
 
     def fallback_answer(self, quote_result: dict[str, Any]) -> str:
