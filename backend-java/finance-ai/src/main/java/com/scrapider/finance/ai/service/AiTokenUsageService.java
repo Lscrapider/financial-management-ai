@@ -2,6 +2,8 @@ package com.scrapider.finance.ai.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.scrapider.finance.ai.domain.dto.AgentSessionDTO;
+import com.scrapider.finance.ai.domain.param.AiTokenUsageLogPageParam;
+import com.scrapider.finance.ai.domain.vo.AiTokenUsageLogPageVO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageLogVO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageOverviewVO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageTrendVO;
@@ -26,4 +28,6 @@ public interface AiTokenUsageService {
     AiTokenUsageOverviewVO overview(Integer days);
 
     List<AiTokenUsageTrendVO> trends(Integer hours);
+
+    AiTokenUsageLogPageVO pageLogs(AiTokenUsageLogPageParam param);
 }

@@ -35,6 +35,7 @@ import {
   listStockAlerts,
   saveStockAlert,
 } from '#/api/stock-alert';
+import PageHero from '#/components/page-hero/index.vue';
 
 interface AlertFormState {
   enabled: boolean;
@@ -292,32 +293,29 @@ function toNumber(value?: null | number | string) {
 </script>
 
 <template>
-  <Page title="涨跌幅提醒">
+  <Page>
     <div class="stock-alert-page">
-      <section class="overview-band">
-        <div>
-          <div class="page-title">涨跌幅提醒</div>
-          <div class="page-meta">
-            关注股票/指数/可转债并配置阈值，越界时按用户邮箱通知发送提醒。
-          </div>
+      <PageHero
+        description="关注股票、指数和可转债并配置阈值，越界时按用户邮箱发送提醒。"
+        title="涨跌幅提醒"
+      />
+
+      <section class="overview-stats" aria-label="提醒概览">
+        <div class="overview-stat">
+          <span>关注数量</span>
+          <strong>{{ alerts.length }}</strong>
         </div>
-        <div class="overview-stats">
-          <div class="overview-stat">
-            <span>关注数量</span>
-            <strong>{{ alerts.length }}</strong>
-          </div>
-          <div class="overview-stat">
-            <span>越界数量</span>
-            <strong class="text-red-500">
-              {{ alerts.filter((item) => item.outOfThreshold).length }}
-            </strong>
-          </div>
-          <div class="overview-stat">
-            <span>启用数量</span>
-            <strong>
-              {{ alerts.filter((item) => item.enabled).length }}
-            </strong>
-          </div>
+        <div class="overview-stat">
+          <span>越界数量</span>
+          <strong class="text-red-500">
+            {{ alerts.filter((item) => item.outOfThreshold).length }}
+          </strong>
+        </div>
+        <div class="overview-stat">
+          <span>启用数量</span>
+          <strong>
+            {{ alerts.filter((item) => item.enabled).length }}
+          </strong>
         </div>
       </section>
 
@@ -570,39 +568,28 @@ function toNumber(value?: null | number | string) {
   gap: 16px;
 }
 
-.overview-band {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20px 24px;
+.overview-stats {
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
 }
 
-.page-title {
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.page-meta {
-  margin-top: 8px;
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
-}
-
 .overview-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(84px, 1fr));
-  gap: 24px;
-  min-width: 360px;
+  gap: 0;
+  overflow: hidden;
 }
 
 .overview-stat {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  padding: 16px 20px;
+}
+
+.overview-stat + .overview-stat {
+  border-left: 1px solid var(--el-border-color-light);
 }
 
 .overview-stat span,
@@ -612,8 +599,8 @@ function toNumber(value?: null | number | string) {
 }
 
 .overview-stat strong {
-  font-size: 24px;
-  line-height: 1.15;
+  font-size: 26px;
+  line-height: 1.1;
 }
 
 .panel-header {
@@ -679,14 +666,17 @@ function toNumber(value?: null | number | string) {
 }
 
 @media (max-width: 768px) {
-  .overview-band,
   .panel-header {
     flex-direction: column;
     align-items: stretch;
   }
 
   .overview-stats {
-    min-width: 0;
+    grid-template-columns: 1fr;
+  }
+  .overview-stat + .overview-stat {
+    border-top: 1px solid var(--el-border-color-light);
+    border-left: 0;
   }
 }
 </style>

@@ -1,19 +1,28 @@
 package com.scrapider.finance.ai.service.impl;
 
+import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scrapider.finance.ai.converter.AiTokenUsageConverter;
 import com.scrapider.finance.ai.domain.dto.AgentSessionDTO;
+import com.scrapider.finance.ai.domain.param.AiTokenUsageLogPageParam;
+import com.scrapider.finance.ai.domain.vo.AiTokenUsageLogPageVO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageLogVO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageOverviewVO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageTrendVO;
 import com.scrapider.finance.ai.service.AiTokenUsageService;
 import com.scrapider.finance.domain.enums.AiTokenUsagePhaseEnum;
 import com.scrapider.finance.domain.enums.AiTokenUsageSourceEnum;
+import com.scrapider.finance.domain.po.AppUserPO;
 import com.scrapider.finance.domain.po.AiTokenUsageLogPO;
+import com.scrapider.finance.manage.AppUserManage;
 import com.scrapider.finance.manage.AiTokenUsageLogManage;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.metadata.Usage;
@@ -28,12 +37,20 @@ public class AiTokenUsageServiceImpl implements AiTokenUsageService {
     private static final int MAX_OVERVIEW_DAYS = 365;
     private static final int DEFAULT_TREND_DAYS = 7;
     private static final int MAX_TREND_DAYS = 365;
+    private static final int DEFAULT_PAGE_NUM = 1;
+    private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final int MAX_PAGE_SIZE = 200;
 
     private final AiTokenUsageLogManage aiTokenUsageLogManage;
+    private final AppUserManage appUserManage;
     private final ObjectMapper objectMapper;
 
-    public AiTokenUsageServiceImpl(AiTokenUsageLogManage aiTokenUsageLogManage, ObjectMapper objectMapper) {
+    public AiTokenUsageServiceImpl(
+            AiTokenUsageLogManage aiTokenUsageLogManage,
+            AppUserManage appUserManage,
+            ObjectMapper objectMapper) {
         this.aiTokenUsageLogManage = aiTokenUsageLogManage;
+        this.appUserManage = appUserManage;
         this.objectMapper = objectMapper;
     }
 
@@ -128,10 +145,99 @@ public class AiTokenUsageServiceImpl implements AiTokenUsageService {
                 .toList();
     }
 
+    @Override
+    public AiTokenUsageLogPageVO pageLogs(AiTokenUsageLogPageParam param) {
+        AiTokenUsageLogPageParam query = param == null ? new AiTokenUsageLogPageParam() : param;
+        int pageNum = this.normalizePageNum(query.getPageNum());
+        int pageSize = this.normalizePageSize(query.getPageSize());
+        this.validateTimeRange(query.getStartTime(), query.getEndTime());
+        String source = this.normalizeSource(query.getSource());
+        String phase = this.normalizePhase(query.getPhase());
+        Set<Long> filteredUserIds = this.filteredUserIds(query.getUsername());
+        if (filteredUserIds != null && filteredUserIds.isEmpty()) {
+            return AiTokenUsageLogPageVO.fromPage(Page.of(pageNum, pageSize));
+        }
+        Page<AiTokenUsageLogPO> page = this.aiTokenUsageLogManage.pageLogs(
+                pageNum,
+                pageSize,
+                query.getStartTime(),
+                query.getEndTime(),
+                source,
+                phase,
+                StrUtil.trimToNull(query.getModel()),
+                filteredUserIds,
+                StrUtil.trimToNull(query.getResponseId()));
+        return AiTokenUsageLogPageVO.fromPage(page, this.usernameMap(page));
+    }
+
     private int normalize(Integer value, int defaultValue, int maxValue) {
         if (value == null || value < 1) {
             return defaultValue;
         }
         return Math.min(value, maxValue);
+    }
+
+    private int normalizePageNum(Integer pageNum) {
+        if (pageNum == null || pageNum <= 0) {
+            return DEFAULT_PAGE_NUM;
+        }
+        return pageNum;
+    }
+
+    private int normalizePageSize(Integer pageSize) {
+        if (pageSize == null || pageSize <= 0) {
+            return DEFAULT_PAGE_SIZE;
+        }
+        return Math.min(pageSize, MAX_PAGE_SIZE);
+    }
+
+    private void validateTimeRange(LocalDateTime startTime, LocalDateTime endTime) {
+        if (startTime != null && endTime != null && startTime.isAfter(endTime)) {
+            throw new IllegalArgumentException("startTime must be before endTime");
+        }
+    }
+
+    private String normalizeSource(String source) {
+        String normalizedSource = StrUtil.trimToNull(source);
+        if (normalizedSource == null) {
+            return null;
+        }
+        if (AiTokenUsageSourceEnum.fromCode(normalizedSource) == null) {
+            throw new IllegalArgumentException("unsupported token usage source: " + normalizedSource);
+        }
+        return normalizedSource;
+    }
+
+    private String normalizePhase(String phase) {
+        String normalizedPhase = StrUtil.trimToNull(phase);
+        if (normalizedPhase == null) {
+            return null;
+        }
+        if (AiTokenUsagePhaseEnum.fromCode(normalizedPhase) == null) {
+            throw new IllegalArgumentException("unsupported token usage phase: " + normalizedPhase);
+        }
+        return normalizedPhase;
+    }
+
+    private Set<Long> filteredUserIds(String username) {
+        String normalizedUsername = StrUtil.trimToNull(username);
+        if (normalizedUsername == null) {
+            return null;
+        }
+        return this.appUserManage.listUsersByUsername(normalizedUsername).stream()
+                .map(AppUserPO::getId)
+                .collect(Collectors.toSet());
+    }
+
+    private Map<Long, String> usernameMap(Page<AiTokenUsageLogPO> page) {
+        Set<Long> userIds = page.getRecords().stream()
+                .map(AiTokenUsageLogPO::getUserId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (userIds.isEmpty()) {
+            return Map.of();
+        }
+        return this.appUserManage.listUsersByIds(userIds).stream()
+                .collect(Collectors.toMap(AppUserPO::getId, AppUserPO::getUsername, (left, right) -> left));
     }
 }

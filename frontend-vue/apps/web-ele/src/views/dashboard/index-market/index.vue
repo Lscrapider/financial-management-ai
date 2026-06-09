@@ -31,6 +31,7 @@ import {
   listIndexKlines,
   listIndexQuotes,
 } from '#/api/index-market';
+import PageHero from '#/components/page-hero/index.vue';
 
 const rangeOptions = [
   { label: '近60日', value: 60 },
@@ -476,8 +477,13 @@ function nextSelectedSecid(querySecid: string, firstSecid: string) {
 </script>
 
 <template>
-  <Page title="指数行情">
+  <Page>
     <div class="index-market-page">
+      <PageHero
+        description="查看指数快照、行情走势和 K 线数据。"
+        title="指数行情"
+      />
+
       <section class="overview-band">
         <div>
           <div class="index-title">

@@ -21,6 +21,7 @@ import {
 import { addBondConfig } from '#/api/bond';
 import { addStockConfig } from '#/api/stock';
 import { deleteTargetConfig } from '#/api/system-config';
+import PageHero from '#/components/page-hero/index.vue';
 
 type DeleteTargetType = 'BOND' | 'INDEX' | 'STOCK';
 
@@ -159,8 +160,13 @@ function labelOf(targetType: DeleteTargetType) {
 </script>
 
 <template>
-  <Page title="标的配置">
+  <Page>
     <div class="target-config-page">
+      <PageHero
+        description="维护股票、指数和可转债基础标的，新增后可同步行情数据。"
+        title="标的配置"
+      />
+
       <section class="target-card-grid">
         <ElCard class="target-card" shadow="never">
           <div class="target-card-header">

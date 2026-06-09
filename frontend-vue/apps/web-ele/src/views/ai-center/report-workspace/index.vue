@@ -34,6 +34,7 @@ import {
   listSceneReportHistory,
   searchSceneAnalysisTargets,
 } from '#/api/scene-analysis';
+import PageHero from '#/components/page-hero/index.vue';
 
 import MarketDetailWidget from './components/MarketDetailWidget.vue';
 import MarketQuoteWidget from './components/MarketQuoteWidget.vue';
@@ -317,27 +318,29 @@ function isWorkbenchLayout(value: string): value is WorkbenchLayout {
 </script>
 
 <template>
-  <Page title="报告工作台">
+  <Page>
     <div class="report-workbench">
-      <section class="workbench-toolbar">
-        <div>
-          <h2>报告工作台</h2>
-          <span>选择初始布局后，可拖动卡片位置并拖拽右下角调整大小</span>
-        </div>
-        <ElRadioGroup
-          :model-value="layout"
-          size="small"
-          @change="applyLayoutValue"
-        >
-          <ElRadioButton
-            v-for="item in layoutOptions"
-            :key="item.value"
-            :value="item.value"
+      <PageHero
+        description="选择初始布局后，可拖动卡片位置并拖拽右下角调整大小。"
+        title="报告工作台"
+      >
+        <template #actions>
+          <ElRadioGroup
+            :model-value="layout"
+            class="layout-switcher"
+            size="small"
+            @change="applyLayoutValue"
           >
-            {{ item.label }}
-          </ElRadioButton>
-        </ElRadioGroup>
-      </section>
+            <ElRadioButton
+              v-for="item in layoutOptions"
+              :key="item.value"
+              :value="item.value"
+            >
+              {{ item.label }}
+            </ElRadioButton>
+          </ElRadioGroup>
+        </template>
+      </PageHero>
 
       <GridLayout
         v-model:layout="workbenchItems"
@@ -535,33 +538,12 @@ function isWorkbenchLayout(value: string): value is WorkbenchLayout {
   background: var(--el-bg-color-page);
 }
 
-.workbench-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-}
-
-.workbench-toolbar > * {
-  min-width: 0;
-}
-
-.workbench-toolbar :deep(.el-radio-group) {
+.layout-switcher {
   display: flex;
   flex-wrap: wrap;
   max-width: 100%;
 }
 
-.workbench-toolbar h2 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.workbench-toolbar span,
 .cell-header span,
 .empty-cell span,
 .component-options span {
@@ -697,12 +679,6 @@ function isWorkbenchLayout(value: string): value is WorkbenchLayout {
   .component-options,
   .target-config {
     grid-template-columns: 1fr !important;
-  }
-
-  .workbench-toolbar {
-    flex-direction: column;
-    gap: 12px;
-    align-items: stretch;
   }
 }
 </style>

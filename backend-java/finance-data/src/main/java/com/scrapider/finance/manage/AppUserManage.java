@@ -2,6 +2,7 @@ package com.scrapider.finance.manage;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import cn.hutool.core.util.StrUtil;
 import com.scrapider.finance.domain.po.AppUserPO;
 import com.scrapider.finance.mapper.AppUserMapper;
 import java.util.Collection;
@@ -28,5 +29,12 @@ public class AppUserManage extends ServiceImpl<AppUserMapper, AppUserPO> {
             return List.of();
         }
         return this.list(new LambdaQueryWrapper<AppUserPO>().in(AppUserPO::getId, userIds));
+    }
+
+    public List<AppUserPO> listUsersByUsername(String username) {
+        if (StrUtil.isBlank(username)) {
+            return List.of();
+        }
+        return this.list(new LambdaQueryWrapper<AppUserPO>().like(AppUserPO::getUsername, StrUtil.trim(username)));
     }
 }

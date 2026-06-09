@@ -30,6 +30,7 @@ import {
   listStockKlines,
   listStockQuotes,
 } from '#/api/stock';
+import PageHero from '#/components/page-hero/index.vue';
 
 type KlineAdjustType = 'hfq' | 'none' | 'qfq';
 type TrendPeriod = 'daily' | 'intraday' | 'monthly' | 'weekly';
@@ -679,8 +680,13 @@ function toNumber(value?: null | number | string) {
 </script>
 
 <template>
-  <Page title="股票行情">
+  <Page>
     <div class="stock-workspace">
+      <PageHero
+        description="查看股票快照、行情走势和交易明细。"
+        title="股票行情"
+      />
+
       <section class="market-index-section">
         <div class="section-header">
           <div>

@@ -29,6 +29,7 @@ import {
   listBondKlines,
   listBondQuotes,
 } from '#/api/bond';
+import PageHero from '#/components/page-hero/index.vue';
 
 const rangeOptions = [
   { label: '近60日', value: 60 },
@@ -495,8 +496,13 @@ function nextSelectedSecid(querySecid: string, firstSecid: string) {
 </script>
 
 <template>
-  <Page title="可转债行情">
+  <Page>
     <div class="bond-market-page">
+      <PageHero
+        description="查看可转债快照、盘口和 K 线趋势。"
+        title="可转债行情"
+      />
+
       <section class="overview-band">
         <div>
           <div class="bond-title">

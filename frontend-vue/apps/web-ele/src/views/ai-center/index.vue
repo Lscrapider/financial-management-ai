@@ -42,6 +42,7 @@ import {
   pageOcrTasks,
   submitOcrTask,
 } from '#/api/ocr-task';
+import PageHero from '#/components/page-hero/index.vue';
 
 type ProcessingStatus = OcrTask['status'];
 type ProcessingStage = OcrTask['currentStage'];
@@ -503,8 +504,13 @@ function formatDateTime(value?: string) {
 </script>
 
 <template>
-  <Page title="AI中心">
+  <Page>
     <div class="ai-center-page">
+      <PageHero
+        description="查看 OCR、报告生成和知识入库任务的处理进度。"
+        title="AI中心"
+      />
+
       <section class="submit-panel">
         <div class="panel-header">
           <div>
@@ -1016,6 +1022,9 @@ function formatDateTime(value?: string) {
 
 <style scoped>
 .ai-center-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   padding: 4px 0 24px;
 }
 
@@ -1023,7 +1032,6 @@ function formatDateTime(value?: string) {
   display: grid;
   grid-template-columns: repeat(5, minmax(120px, 1fr));
   gap: 12px;
-  margin-bottom: 16px;
 }
 
 .metric-item,
@@ -1036,8 +1044,10 @@ function formatDateTime(value?: string) {
 }
 
 .submit-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   padding: 16px;
-  margin-bottom: 16px;
 }
 
 .upload-content {
@@ -1077,7 +1087,6 @@ function formatDateTime(value?: string) {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
   padding: 14px;
-  margin-bottom: 16px;
 }
 
 .pipeline-step {

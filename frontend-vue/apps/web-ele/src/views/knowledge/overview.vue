@@ -11,6 +11,7 @@ import { Page } from '@vben/common-ui';
 import { ElCard, ElCol, ElRow, ElTable, ElTableColumn } from 'element-plus';
 
 import { getKnowledgeOverview } from '#/api/knowledge';
+import PageHero from '#/components/page-hero/index.vue';
 
 import {
   CATEGORY_TAG_TYPES,
@@ -175,8 +176,13 @@ onMounted(() => {
 </script>
 
 <template>
-  <Page title="知识库概览">
+  <Page>
     <div class="overview-page" v-loading="loading">
+      <PageHero
+        description="查看知识库来源、分块数量和最近入库情况。"
+        title="知识库概览"
+      />
+
       <ElRow :gutter="16" class="stats-row">
         <ElCol :xs="12" :sm="6">
           <ElCard shadow="hover" class="stat-card">

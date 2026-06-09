@@ -25,6 +25,7 @@ import {
   saveOcrReviewDraft,
   submitOcrReview,
 } from '#/api/ocr-review';
+import PageHero from '#/components/page-hero/index.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -227,8 +228,13 @@ async function goBack() {
 </script>
 
 <template>
-  <Page title="OCR人工复核">
+  <Page>
     <div class="review-page">
+      <PageHero
+        description="复核 OCR 识别结果并提交入库处理。"
+        title="OCR人工复核"
+      />
+
       <section class="toolbar-band">
         <div>
           <h2>{{ hasTaskNo ? taskNo : '未选择复核任务' }}</h2>

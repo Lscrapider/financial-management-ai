@@ -32,6 +32,7 @@
   },
   "systemConfig": {
     "title": "System Config",
+    "tokenUsage": "Token Usage",
     "targetConfig": "Target Config",
     "dataSync": "Data Sync"
   }

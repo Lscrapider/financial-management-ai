@@ -52,6 +52,7 @@ import {
   submitSceneAnalysisTask,
   updateSceneAnalysisConfigProfile,
 } from '#/api/scene-analysis';
+import PageHero from '#/components/page-hero/index.vue';
 import { useReportPollingStore } from '#/store';
 
 interface ParameterField {
@@ -959,8 +960,13 @@ function escapeHtml(text: string) {
 </script>
 
 <template>
-  <Page title="标的分析报告">
+  <Page>
     <div class="scene-report-page">
+      <PageHero
+        description="生成、查看和复用股票、指数、可转债分析报告。"
+        title="标的分析报告"
+      />
+
       <div class="toolbar">
         <div class="toolbar-copy">
           <div class="toolbar-title">报告标的</div>

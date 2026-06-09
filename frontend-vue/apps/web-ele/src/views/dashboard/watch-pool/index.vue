@@ -35,6 +35,7 @@ import {
   saveWatchGroup,
   saveWatchItem,
 } from '#/api/watch-pool';
+import PageHero from '#/components/page-hero/index.vue';
 
 import { useColumnResize } from './useColumnResize';
 
@@ -495,8 +496,13 @@ function positionPnL(
 </script>
 
 <template>
-  <Page title="投资观察池">
+  <Page>
     <div class="watch-pool">
+      <PageHero
+        description="维护投资观察标的、分组和提醒阈值。"
+        title="投资观察池"
+      />
+
       <section v-loading="loadingGroups" class="group-toolbar">
         <div class="group-tabs">
           <button

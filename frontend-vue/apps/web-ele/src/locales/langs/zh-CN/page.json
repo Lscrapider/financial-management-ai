@@ -32,6 +32,7 @@
   },
   "systemConfig": {
     "title": "系统配置",
+    "tokenUsage": "Token 用量",
     "targetConfig": "标的配置",
     "dataSync": "数据同步"
   }

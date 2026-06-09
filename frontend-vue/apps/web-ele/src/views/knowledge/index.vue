@@ -32,6 +32,7 @@ import {
   getKnowledgeStats,
   updateKnowledgeChunk,
 } from '#/api/knowledge';
+import PageHero from '#/components/page-hero/index.vue';
 
 import {
   CATEGORY_TAG_TYPES,
@@ -299,8 +300,13 @@ onMounted(async () => {
 </script>
 
 <template>
-  <Page title="知识库">
+  <Page>
     <div class="knowledge-page">
+      <PageHero
+        description="浏览、筛选和维护向量化后的知识条目。"
+        title="知识库"
+      />
+
       <ElRow :gutter="16" class="stats-row">
         <ElCol :xs="12" :sm="6">
           <ElCard shadow="hover" class="stat-card">

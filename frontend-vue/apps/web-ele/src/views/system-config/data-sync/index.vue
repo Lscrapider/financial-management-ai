@@ -32,6 +32,7 @@ import {
   syncStockMarketData,
   syncStockTrendData,
 } from '#/api/stock';
+import PageHero from '#/components/page-hero/index.vue';
 
 type MarketKind = 'bond' | 'index' | 'stock';
 type PeriodType = 'daily' | 'monthly' | 'weekly';
@@ -364,8 +365,13 @@ function labelOf(kind: MarketKind) {
 </script>
 
 <template>
-  <Page title="数据同步">
+  <Page>
     <div class="data-sync-page">
+      <PageHero
+        description="同步股票、指数和可转债行情数据，并查看最近任务状态。"
+        title="数据同步"
+      />
+
       <section class="health-grid">
         <ElCard
           v-for="item in healthItems"

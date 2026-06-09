@@ -17,6 +17,7 @@ import { ElButton, ElCard, ElEmpty, ElSkeleton, ElTag } from 'element-plus';
 import { listSceneReportTargets } from '#/api/scene-analysis';
 import { listStockAlerts } from '#/api/stock-alert';
 import { listWatchGroups } from '#/api/watch-pool';
+import PageHero from '#/components/page-hero/index.vue';
 
 type WorkbenchTargetType =
   | 'BOND'
@@ -495,14 +496,11 @@ function toNumber(value?: null | number | string) {
 <template>
   <Page>
     <div class="investment-workbench">
-      <section class="workbench-hero">
-        <div>
-          <div class="page-title">投资工作台</div>
-          <div class="page-meta">
-            聚合观察池异动、资产结构、布控风险和报告动态，优先呈现今天需要关注的投资研究信号。
-          </div>
-        </div>
-        <div class="hero-actions">
+      <PageHero
+        description="聚合观察池异动、资产结构、布控风险和报告动态，优先呈现今天需要关注的投资研究信号。"
+        title="投资工作台"
+      >
+        <template #actions>
           <ElButton :loading="loading" @click="refreshWorkbench">
             <IconifyIcon icon="lucide:refresh-cw" />
             刷新
@@ -511,8 +509,8 @@ function toNumber(value?: null | number | string) {
             <IconifyIcon icon="lucide:spool" />
             查看观察池
           </ElButton>
-        </div>
-      </section>
+        </template>
+      </PageHero>
 
       <section class="summary-grid">
         <div class="summary-item">
@@ -934,37 +932,11 @@ function toNumber(value?: null | number | string) {
   gap: 16px;
 }
 
-.workbench-hero,
 .summary-item,
 .workbench-panel {
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
-}
-
-.workbench-hero {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20px 24px;
-}
-
-.page-title {
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.page-meta {
-  margin-top: 8px;
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
-}
-
-.hero-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
 }
 
 .summary-grid {
@@ -1709,12 +1681,6 @@ function toNumber(value?: null | number | string) {
 }
 
 @media (max-width: 768px) {
-  .workbench-hero {
-    flex-direction: column;
-    gap: 16px;
-    align-items: stretch;
-  }
-
   .summary-grid,
   .cockpit-grid,
   .cockpit-side-stack,
@@ -1745,7 +1711,6 @@ function toNumber(value?: null | number | string) {
     overflow: visible;
   }
 
-  .hero-actions,
   .action-row,
   .movement-row,
   .alert-row,

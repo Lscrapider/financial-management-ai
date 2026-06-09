@@ -7,9 +7,10 @@ public record AiTokenUsageLogVO(
         Long id,
         String provider,
         String responseId,
+        String objectType,
         Long userId,
+        String username,
         String source,
-        String sourceRefId,
         String phase,
         String model,
         String finishReason,
@@ -18,16 +19,24 @@ public record AiTokenUsageLogVO(
         Integer totalTokens,
         Integer cachedTokens,
         Integer reasoningTokens,
-        LocalDateTime occurredAt) {
+        Integer promptCacheHitTokens,
+        Integer promptCacheMissTokens,
+        LocalDateTime occurredAt,
+        LocalDateTime createdAt) {
 
     public static AiTokenUsageLogVO fromPO(AiTokenUsageLogPO po) {
+        return fromPO(po, null);
+    }
+
+    public static AiTokenUsageLogVO fromPO(AiTokenUsageLogPO po, String username) {
         return new AiTokenUsageLogVO(
                 po.getId(),
                 po.getProvider(),
                 po.getResponseId(),
+                po.getObjectType(),
                 po.getUserId(),
+                username,
                 po.getSource(),
-                po.getSourceRefId(),
                 po.getPhase(),
                 po.getModel(),
                 po.getFinishReason(),
@@ -36,6 +45,9 @@ public record AiTokenUsageLogVO(
                 po.getTotalTokens(),
                 po.getCachedTokens(),
                 po.getReasoningTokens(),
-                po.getOccurredAt());
+                po.getPromptCacheHitTokens(),
+                po.getPromptCacheMissTokens(),
+                po.getOccurredAt(),
+                po.getCreatedAt());
     }
 }

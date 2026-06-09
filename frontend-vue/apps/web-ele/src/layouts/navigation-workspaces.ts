@@ -79,6 +79,7 @@ const NAVIGATION_WORKSPACES: NavigationWorkspace[] = [
   {
     children: [
       { label: '系统监控', path: '/analytics' },
+      { label: 'Token 用量', path: '/token-usage' },
       { label: '标的配置', path: '/target-config' },
       { label: '数据同步', path: '/data-sync' },
     ],

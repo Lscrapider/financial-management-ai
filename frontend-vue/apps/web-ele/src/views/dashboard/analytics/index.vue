@@ -18,6 +18,7 @@ import {
   listAiTokenUsageTrends,
   listAppVisitTrends,
 } from '#/api/console';
+import PageHero from '#/components/page-hero/index.vue';
 import { listLatestFullMarketSyncJobs } from '#/api/market-sync';
 
 import AnalyticsTrends from './analytics-trends.vue';
@@ -267,20 +268,23 @@ function formatTime(value?: string) {
 </script>
 
 <template>
-  <Page title="系统监控">
+  <Page>
     <div class="monitor-page">
-      <section class="monitor-toolbar">
-        <div>
-          <h2>运行扫描</h2>
-          <p>
-            聚合访问日志、AI Token 和行情同步任务，快速确认系统是否正常写入。
-          </p>
-        </div>
-        <ElButton :loading="loading" type="primary" @click="loadMonitorData()">
-          <IconifyIcon icon="lucide:refresh-cw" />
-          刷新监控
-        </ElButton>
-      </section>
+      <PageHero
+        description="聚合访问日志、AI Token 和行情同步任务，快速确认系统是否正常写入。"
+        title="系统监控"
+      >
+        <template #actions>
+          <ElButton
+            :loading="loading"
+            type="primary"
+            @click="loadMonitorData()"
+          >
+            <IconifyIcon icon="lucide:refresh-cw" />
+            刷新监控
+          </ElButton>
+        </template>
+      </PageHero>
 
       <ElSkeleton v-if="loading && !hasRuntimeData" :rows="10" animated />
 
@@ -384,23 +388,6 @@ function formatTime(value?: string) {
   gap: 16px;
 }
 
-.monitor-toolbar {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 18px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-}
-
-.monitor-toolbar :deep(.el-button span) {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-}
-
 .metric-grid,
 .chart-grid {
   display: grid;
@@ -451,17 +438,16 @@ function formatTime(value?: string) {
 .metric-card strong {
   display: block;
   margin-top: 14px;
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 700;
-  line-height: 34px;
+  line-height: 1.1;
   color: var(--el-text-color-primary);
 }
 
 .metric-card p,
 .metric-card small,
 .panel-header p,
-.signal-main p,
-.monitor-toolbar p {
+.signal-main p {
   margin: 0;
   font-size: 13px;
   line-height: 20px;
@@ -483,17 +469,11 @@ function formatTime(value?: string) {
   margin-bottom: 14px;
 }
 
-h2,
 h3,
 h4 {
   margin: 0;
   font-weight: 600;
   color: var(--el-text-color-primary);
-}
-
-h2 {
-  font-size: 16px;
-  line-height: 24px;
 }
 
 h3 {
@@ -582,14 +562,9 @@ h4 {
 }
 
 @media (max-width: 640px) {
-  .monitor-toolbar,
   .panel-header {
     flex-direction: column;
     align-items: stretch;
-  }
-
-  .monitor-toolbar :deep(.el-button) {
-    width: 100%;
   }
 
   .chart-box {

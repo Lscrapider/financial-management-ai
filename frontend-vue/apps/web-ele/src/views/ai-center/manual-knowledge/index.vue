@@ -29,6 +29,7 @@ import {
   saveManualKnowledgeDraft,
   submitManualKnowledgeTask,
 } from '#/api/manual-knowledge';
+import PageHero from '#/components/page-hero/index.vue';
 
 type ManualTask = {
   chunks: number;
@@ -285,30 +286,28 @@ function formatDateTime(value?: string) {
 </script>
 
 <template>
-  <Page title="手动知识导入">
+  <Page>
     <div class="manual-page">
-      <section class="toolbar-band">
-        <div>
-          <h2>手动文本入库</h2>
-          <span>{{ MANUAL_INTRO_TEXT }}</span>
-        </div>
-        <div class="toolbar-actions">
-          <ElSelect
-            v-model="statusFilter"
-            class="status-filter"
-            @change="changeStatusFilter"
-          >
-            <ElOption
-              v-for="item in statusFilterOptions"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value"
-            />
-          </ElSelect>
-          <ElButton :loading="loadingTasks" @click="loadTasks">刷新</ElButton>
-          <ElButton type="primary" @click="openCreate">新增</ElButton>
-        </div>
-      </section>
+      <PageHero :description="MANUAL_INTRO_TEXT" title="手动知识导入">
+        <template #actions>
+          <div class="toolbar-actions">
+            <ElSelect
+              v-model="statusFilter"
+              class="status-filter"
+              @change="changeStatusFilter"
+            >
+              <ElOption
+                v-for="item in statusFilterOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </ElSelect>
+            <ElButton :loading="loadingTasks" @click="loadTasks">刷新</ElButton>
+            <ElButton type="primary" @click="openCreate">新增</ElButton>
+          </div>
+        </template>
+      </PageHero>
 
       <section class="summary-band">
         <div class="metric-item">
@@ -481,31 +480,11 @@ function formatDateTime(value?: string) {
   gap: 16px;
 }
 
-.toolbar-band,
 .summary-band,
 .table-band {
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
-}
-
-.toolbar-band {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 18px 20px;
-}
-
-.toolbar-band h2 {
-  margin: 0 0 6px;
-  font-size: 20px;
-  font-weight: 650;
-}
-
-.toolbar-band span {
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
 }
 
 .toolbar-actions {
@@ -536,8 +515,8 @@ function formatDateTime(value?: string) {
 }
 
 .metric-item strong {
-  font-size: 24px;
-  line-height: 1.2;
+  font-size: 26px;
+  line-height: 1.1;
 }
 
 .table-band {
@@ -597,11 +576,6 @@ function formatDateTime(value?: string) {
 }
 
 @media (max-width: 900px) {
-  .toolbar-band {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
   .toolbar-actions {
     flex-wrap: wrap;
   }

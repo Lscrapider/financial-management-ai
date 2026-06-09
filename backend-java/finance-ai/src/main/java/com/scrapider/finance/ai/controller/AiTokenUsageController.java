@@ -1,11 +1,14 @@
 package com.scrapider.finance.ai.controller;
 
+import com.scrapider.finance.ai.domain.param.AiTokenUsageLogPageParam;
+import com.scrapider.finance.ai.domain.vo.AiTokenUsageLogPageVO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageOverviewVO;
 import com.scrapider.finance.ai.domain.vo.AiTokenUsageTrendVO;
 import com.scrapider.finance.ai.service.AiTokenUsageService;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,5 +31,10 @@ public class AiTokenUsageController {
     @GetMapping("/trends")
     public ResponseEntity<List<AiTokenUsageTrendVO>> trends(@RequestParam(required = false) Integer days) {
         return ResponseEntity.ok(this.aiTokenUsageService.trends(days));
+    }
+
+    @GetMapping("/logs")
+    public ResponseEntity<AiTokenUsageLogPageVO> logs(@ModelAttribute AiTokenUsageLogPageParam param) {
+        return ResponseEntity.ok(this.aiTokenUsageService.pageLogs(param));
     }
 }

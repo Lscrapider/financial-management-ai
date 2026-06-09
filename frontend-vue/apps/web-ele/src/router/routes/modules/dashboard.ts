@@ -90,6 +90,17 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
+        name: 'TokenUsage',
+        path: '/token-usage',
+        component: () =>
+          import('#/views/system-config/token-usage/index.vue'),
+        meta: {
+          authority: ['admin'],
+          icon: 'lucide:activity',
+          title: $t('page.systemConfig.tokenUsage'),
+        },
+      },
+      {
         name: 'TargetConfig',
         path: '/target-config',
         component: () =>
