@@ -12,6 +12,11 @@ export interface AiChatResponse {
   model?: string;
 }
 
+export interface AiChatProgress {
+  content?: string;
+  status?: string;
+}
+
 interface AiChatWebSocketMessage {
   answeredAt?: string;
   content?: string;
@@ -19,11 +24,12 @@ interface AiChatWebSocketMessage {
   messageId: string;
   model?: string;
   status?: string;
-  type: 'agent_status' | 'final_answer';
+  type: 'agent_progress' | 'agent_status' | 'final_answer';
 }
 
 interface PendingMessage {
   message: string;
+  onProgress?: (progress: AiChatProgress) => void;
   reject: (reason?: unknown) => void;
   resolve: (response: AiChatResponse) => void;
 }
@@ -35,7 +41,10 @@ let socket: null | WebSocket = null;
 let connectingPromise: null | Promise<WebSocket> = null;
 let pendingMessage: null | PendingMessage = null;
 
-export async function sendAiChatMessage(data: AiChatRequest) {
+export async function sendAiChatMessage(
+  data: AiChatRequest,
+  onProgress?: (progress: AiChatProgress) => void,
+) {
   const ws = await connectAiChatSocket();
   return new Promise<AiChatResponse>((resolve, reject) => {
     if (pendingMessage) {
@@ -46,6 +55,7 @@ export async function sendAiChatMessage(data: AiChatRequest) {
     const messageId = createMessageId();
     pendingMessage = {
       message: data.message,
+      onProgress,
       reject,
       resolve,
     };
@@ -126,6 +136,14 @@ function handleAiChatSocketMessage(data: unknown) {
   }
 
   const response = JSON.parse(String(data)) as AiChatWebSocketMessage;
+  if (response.type === 'agent_progress') {
+    pendingMessage.onProgress?.({
+      content: response.content,
+      status: response.status,
+    });
+    return;
+  }
+
   if (response.type !== 'final_answer') {
     return;
   }

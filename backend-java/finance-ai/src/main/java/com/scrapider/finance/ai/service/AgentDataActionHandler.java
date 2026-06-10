@@ -8,5 +8,9 @@ public interface AgentDataActionHandler {
 
     String action();
 
+    default String runningMessage(AgentDataQueryParam param) {
+        return "正在查询相关数据";
+    }
+
     AgentDataGatewayResponseVO handle(AgentSessionDTO session, AgentDataQueryParam param);
 }

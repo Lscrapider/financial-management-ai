@@ -68,6 +68,11 @@ public class MarketQuoteActionHandler implements AgentDataActionHandler {
     }
 
     @Override
+    public String runningMessage(AgentDataQueryParam param) {
+        return "正在查询最新行情";
+    }
+
+    @Override
     public AgentDataGatewayResponseVO handle(AgentSessionDTO session, AgentDataQueryParam param) {
         String targetType = StrUtil.blankToDefault(this.textParam(param.params(), "targetType"), "stock");
         String targetCode = this.textParam(param.params(), "targetCode");

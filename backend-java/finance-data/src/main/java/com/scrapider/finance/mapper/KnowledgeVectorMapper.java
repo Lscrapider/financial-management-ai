@@ -9,6 +9,7 @@ import java.util.Map;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
@@ -57,6 +58,34 @@ public interface KnowledgeVectorMapper extends BaseMapper<KnowledgeVectorPO> {
             """)
     List<KnowledgeVectorSearchDTO> searchBySemantic(
             @Param("scene") String scene,
+            @Param("queryEmbedding") String queryEmbedding,
+            @Param("limit") int limit);
+
+    @ResultMap("knowledgeVectorSearchResult")
+    @Select("""
+            <script>
+            SELECT id,
+                   task_no,
+                   chunk_index,
+                   text,
+                   metadata,
+                   GREATEST(0, 1 - (embedding &lt;=&gt; CAST(#{queryEmbedding} AS vector))) AS semantic_score
+            FROM knowledge_vector
+            WHERE embedding IS NOT NULL
+              AND COALESCE((metadata ->> 'deleted')::boolean, false) = false
+            <if test='scenes != null and scenes.size() > 0'>
+              AND (
+                <foreach collection='scenes' item='scene' separator=' OR '>
+                  metadata -> 'scenes' -> #{scene} IS NOT NULL
+                </foreach>
+              )
+            </if>
+            ORDER BY embedding &lt;=&gt; CAST(#{queryEmbedding} AS vector)
+            LIMIT #{limit}
+            </script>
+            """)
+    List<KnowledgeVectorSearchDTO> searchBySemanticScenes(
+            @Param("scenes") List<String> scenes,
             @Param("queryEmbedding") String queryEmbedding,
             @Param("limit") int limit);
 }

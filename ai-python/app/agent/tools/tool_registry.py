@@ -4,10 +4,12 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.agent.tools.convertible_bond_context_tool import ConvertibleBondContextTool
+from app.agent.tools.knowledge_search_tool import KnowledgeSearchTool
 from app.agent.tools.market_intraday_summary_tool import MarketIntradaySummaryTool
 from app.agent.tools.market_kline_trend_tool import MarketKlineTrendTool
 from app.agent.tools.market_quote_tool import MarketQuoteTool
 from app.agent.tools.scene_report_context_tool import SceneReportContextTool
+from app.agent.tools.scene_signal_context_tool import SceneSignalContextTool
 from app.agent.tools.stock_fundamental_context_tool import StockFundamentalContextTool
 from app.agent.tools.watch_pool_context_tool import WatchPoolContextTool
 
@@ -29,6 +31,8 @@ class AgentToolRegistry:
         stock_fundamental_context_tool: StockFundamentalContextTool | None = None,
         convertible_bond_context_tool: ConvertibleBondContextTool | None = None,
         scene_report_context_tool: SceneReportContextTool | None = None,
+        scene_signal_context_tool: SceneSignalContextTool | None = None,
+        knowledge_search_tool: KnowledgeSearchTool | None = None,
     ) -> None:
         self._market_quote_tool = market_quote_tool or MarketQuoteTool()
         self._watch_pool_context_tool = watch_pool_context_tool or WatchPoolContextTool()
@@ -37,6 +41,8 @@ class AgentToolRegistry:
         self._stock_fundamental_context_tool = stock_fundamental_context_tool or StockFundamentalContextTool()
         self._convertible_bond_context_tool = convertible_bond_context_tool or ConvertibleBondContextTool()
         self._scene_report_context_tool = scene_report_context_tool or SceneReportContextTool()
+        self._scene_signal_context_tool = scene_signal_context_tool or SceneSignalContextTool()
+        self._knowledge_search_tool = knowledge_search_tool or KnowledgeSearchTool()
 
     def build_langchain_tools(self, context: AgentToolContext, tool_decorator: Any) -> dict[str, Any]:
         @tool_decorator
@@ -159,6 +165,44 @@ class AgentToolRegistry:
                 limit=limit,
             )
 
+        @tool_decorator
+        def scene_signal_context(
+            target_type: str = "stock",
+            target_code: str | None = None,
+            target_name: str | None = None,
+            scenes: list[str] | None = None,
+            total_chunks: int = 6,
+        ) -> str:
+            """按指定场景计算当前标的的系统场景信号，适合具体标的的估值、趋势、情绪、风险策略、仓位和止损问题；scenes 只能从 asset、price、volume、trend、valuation、sentiment、risk_strategy 中选择。返回处理器原始 payload 形态。"""
+            return self._scene_signal_context_tool.invoke(
+                data_gateway_url=context.data_gateway_url,
+                agent_session_id=context.agent_session_id,
+                session_secret=context.session_secret,
+                target_type=target_type,
+                target_code=target_code,
+                target_name=target_name,
+                scenes=scenes,
+                total_chunks=total_chunks,
+            )
+
+        @tool_decorator
+        def knowledge_search(
+            query_text: str,
+            scenes: list[str] | None = None,
+            tags: dict[str, list[str]] | None = None,
+            limit: int = 5,
+        ) -> str:
+            """基于投资知识库检索简洁知识片段，适合在 scene_signal_context 得到场景标签后补充方法、风险和策略依据；返回内容只包含文件名和 chunk 文本。"""
+            return self._knowledge_search_tool.invoke(
+                data_gateway_url=context.data_gateway_url,
+                agent_session_id=context.agent_session_id,
+                session_secret=context.session_secret,
+                query_text=query_text,
+                scenes=scenes,
+                tags=tags,
+                limit=limit,
+            )
+
         return {
             "market_quote": market_quote,
             "watch_pool_context": watch_pool_context,
@@ -167,6 +211,8 @@ class AgentToolRegistry:
             "stock_fundamental_context": stock_fundamental_context,
             "convertible_bond_context": convertible_bond_context,
             "scene_report_context": scene_report_context,
+            "scene_signal_context": scene_signal_context,
+            "knowledge_search": knowledge_search,
         }
 
     @property

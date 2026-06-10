@@ -32,4 +32,19 @@ public record AiChatWebSocketMessageVO(
                 content,
                 answeredAt);
     }
+
+    public static AiChatWebSocketMessageVO agentProgress(
+            String conversationId,
+            String messageId,
+            String status,
+            String content,
+            String answeredAt) {
+        return new AiChatWebSocketMessageVO(
+                "agent_progress",
+                conversationId,
+                messageId,
+                status,
+                content,
+                answeredAt);
+    }
 }

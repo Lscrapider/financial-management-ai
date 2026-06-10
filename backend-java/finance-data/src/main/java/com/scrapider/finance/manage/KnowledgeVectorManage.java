@@ -83,6 +83,10 @@ public class KnowledgeVectorManage extends ServiceImpl<KnowledgeVectorMapper, Kn
         return this.baseMapper.searchBySemantic(scene, queryEmbedding, limit);
     }
 
+    public List<KnowledgeVectorSearchDTO> searchBySemantic(List<String> scenes, String queryEmbedding, int limit) {
+        return this.baseMapper.searchBySemanticScenes(scenes, queryEmbedding, limit);
+    }
+
     public Map<String, Object> stats() {
         long chunkCount = this.count();
         long taskCount = this.baseMapper.countDistinctTaskNo();

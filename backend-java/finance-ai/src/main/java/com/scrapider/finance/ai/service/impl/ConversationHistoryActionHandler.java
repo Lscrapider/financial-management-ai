@@ -30,6 +30,11 @@ public class ConversationHistoryActionHandler implements AgentDataActionHandler 
     }
 
     @Override
+    public String runningMessage(AgentDataQueryParam param) {
+        return "正在读取对话上下文";
+    }
+
+    @Override
     public AgentDataGatewayResponseVO handle(AgentSessionDTO session, AgentDataQueryParam param) {
         int limit = this.normalizeLimit(param);
         List<Map<String, Object>> rows = this.aiChatConversationService.listHistory(

@@ -58,6 +58,11 @@ public class WatchPoolContextActionHandler implements AgentDataActionHandler {
     }
 
     @Override
+    public String runningMessage(AgentDataQueryParam param) {
+        return "正在读取观察池上下文";
+    }
+
+    @Override
     public AgentDataGatewayResponseVO handle(AgentSessionDTO session, AgentDataQueryParam param) {
         int limit = this.normalizeLimit(param);
         List<WatchGroupPO> groups = this.watchGroupManage.listByUserId(session.userId());

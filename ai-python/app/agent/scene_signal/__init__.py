@@ -1,0 +1,1 @@
+"""Agent scene signal helpers."""

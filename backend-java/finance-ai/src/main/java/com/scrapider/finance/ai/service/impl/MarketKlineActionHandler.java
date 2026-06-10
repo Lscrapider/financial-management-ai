@@ -63,6 +63,11 @@ public class MarketKlineActionHandler implements AgentDataActionHandler {
     }
 
     @Override
+    public String runningMessage(AgentDataQueryParam param) {
+        return "正在分析K线趋势";
+    }
+
+    @Override
     public AgentDataGatewayResponseVO handle(AgentSessionDTO session, AgentDataQueryParam param) {
         JsonNode params = param.params();
         String targetType = this.normalizeTargetType(this.textParam(params, "targetType"));

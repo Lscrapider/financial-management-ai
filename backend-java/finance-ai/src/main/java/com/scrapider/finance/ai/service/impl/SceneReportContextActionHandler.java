@@ -38,6 +38,11 @@ public class SceneReportContextActionHandler implements AgentDataActionHandler {
     }
 
     @Override
+    public String runningMessage(AgentDataQueryParam param) {
+        return "正在读取历史分析报告";
+    }
+
+    @Override
     public AgentDataGatewayResponseVO handle(AgentSessionDTO session, AgentDataQueryParam param) {
         JsonNode params = param.params();
         Long reportId = this.longParam(params, "reportId");

@@ -57,6 +57,11 @@ public class MarketIntradayActionHandler implements AgentDataActionHandler {
     }
 
     @Override
+    public String runningMessage(AgentDataQueryParam param) {
+        return "正在分析分时走势";
+    }
+
+    @Override
     public AgentDataGatewayResponseVO handle(AgentSessionDTO session, AgentDataQueryParam param) {
         JsonNode params = param.params();
         String targetType = this.normalizeTargetType(this.textParam(params, "targetType"));

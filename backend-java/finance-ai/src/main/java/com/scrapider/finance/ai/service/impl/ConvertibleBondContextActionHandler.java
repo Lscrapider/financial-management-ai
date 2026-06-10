@@ -58,6 +58,11 @@ public class ConvertibleBondContextActionHandler implements AgentDataActionHandl
     }
 
     @Override
+    public String runningMessage(AgentDataQueryParam param) {
+        return "正在查询可转债条款和估值数据";
+    }
+
+    @Override
     public AgentDataGatewayResponseVO handle(AgentSessionDTO session, AgentDataQueryParam param) {
         JsonNode params = param.params();
         String targetCode = this.textParam(params, "targetCode");

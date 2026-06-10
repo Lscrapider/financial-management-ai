@@ -30,6 +30,7 @@ export interface AiTokenUsageLog {
   objectType?: null | string;
   occurredAt?: null | string;
   phase?: null | string;
+  phaseLabel?: null | string;
   promptCacheHitTokens: number;
   promptCacheMissTokens: number;
   promptTokens: number;

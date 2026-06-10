@@ -64,7 +64,11 @@ const SOURCE_OPTIONS = [
 ];
 const PHASE_OPTIONS = [
   { label: '规划', value: 'planning' },
-  { label: '最终回答', value: 'final_answer' },
+  { label: '初始规划', value: 'initial_planning' },
+  { label: '工具后续规划', value: 'tool_followup_planning' },
+  { label: '直接回答', value: 'direct_answer' },
+  { label: '基于工具结果回答', value: 'tool_result_answer' },
+  { label: '最终整理回答', value: 'final_answer' },
   { label: '报告生成', value: 'report_generate' },
 ];
 
@@ -249,6 +253,10 @@ function phaseLabel(value?: null | string) {
   return PHASE_OPTIONS.find((item) => item.value === value)?.label ?? value ?? '-';
 }
 
+function logPhaseLabel(log?: AiTokenUsageLog) {
+  return log?.phaseLabel || phaseLabel(log?.phase);
+}
+
 function tagType(value?: null | string) {
   if (value === 'report') return 'warning';
   if (value === 'agent') return 'success';
@@ -408,7 +416,7 @@ function formatTime(value?: null | string) {
             </ElTableColumn>
             <ElTableColumn label="阶段" min-width="120">
               <template #default="{ row }">
-                {{ phaseLabel(row.phase) }}
+                {{ logPhaseLabel(row) }}
               </template>
             </ElTableColumn>
             <ElTableColumn label="模型" min-width="150" prop="model" show-overflow-tooltip />
@@ -476,7 +484,7 @@ function formatTime(value?: null | string) {
             {{ sourceLabel(selectedLog.source) }}
           </ElDescriptionsItem>
           <ElDescriptionsItem label="阶段">
-            {{ phaseLabel(selectedLog.phase) }}
+            {{ logPhaseLabel(selectedLog) }}
           </ElDescriptionsItem>
           <ElDescriptionsItem label="用户名">
             {{ selectedLog.username || '-' }}

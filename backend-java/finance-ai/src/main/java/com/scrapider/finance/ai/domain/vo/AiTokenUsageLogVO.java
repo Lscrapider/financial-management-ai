@@ -1,5 +1,6 @@
 package com.scrapider.finance.ai.domain.vo;
 
+import com.scrapider.finance.domain.enums.AiTokenUsagePhaseEnum;
 import com.scrapider.finance.domain.po.AiTokenUsageLogPO;
 import java.time.LocalDateTime;
 
@@ -12,6 +13,7 @@ public record AiTokenUsageLogVO(
         String username,
         String source,
         String phase,
+        String phaseLabel,
         String model,
         String finishReason,
         Integer promptTokens,
@@ -46,6 +48,7 @@ public record AiTokenUsageLogVO(
                 username,
                 po.getSource(),
                 po.getPhase(),
+                phaseLabel(po.getPhase()),
                 po.getModel(),
                 po.getFinishReason(),
                 po.getPromptTokens(),
@@ -58,5 +61,10 @@ public record AiTokenUsageLogVO(
                 estimatedCost,
                 po.getOccurredAt(),
                 po.getCreatedAt());
+    }
+
+    private static String phaseLabel(String phase) {
+        AiTokenUsagePhaseEnum phaseEnum = AiTokenUsagePhaseEnum.fromCode(phase);
+        return phaseEnum == null ? phase : phaseEnum.getLabel();
     }
 }

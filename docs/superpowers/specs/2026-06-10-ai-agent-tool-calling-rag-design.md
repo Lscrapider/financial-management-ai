@@ -29,6 +29,7 @@
 - 不把七大场景白名单做成单独工具；白名单通过 prompt、tool schema 或 enum 约束。
 - 不让 LLM 自由创造场景或标签。
 - 不把 RAG 召回分数、chunkId、taskNo、matchedTags、finalScore 暴露给 LLM。
+- 不把场景计算元参数暴露给 LLM，包括 `config.parameters`、`userOverrides`、base metrics、原始 marketContext 和原始行情序列。
 - 不把场景处理器结果做进程级、会话级或长期内存缓存。
 - 不改知识库 chunk 入库打标签流程。
 
@@ -43,14 +44,14 @@
           -> 返回 SceneAnalysisMessageDTO 数据包
       -> Python 复用现有 scene_analysis processors
       -> 单次工具调用内处理依赖和结果复用
-      -> 只返回请求 scenes 的 tags/evidence
+      -> 只返回请求 scenes 的处理器结果
   -> LLM 基于用户问题和 scene signals 生成 queryText + scenes + tags
   -> Python knowledge_search tool
       -> Python 使用现有 embedding model 生成 queryEmbedding
       -> Java data gateway action = knowledge.search
           -> Java 校验 session、scope、limit、scenes、tags
           -> Java 查询 knowledge_vector
-          -> Java 结合语义分和标签匹配重排
+          -> Java 结合语义分、同场景标签匹配和交叉场景标签命中重排
       -> Python 返回极简 chunks 给 LLM
   -> LLM 基于 chunks 生成最终回答
 ```
@@ -68,7 +69,8 @@ action = scene.signal_data
 职责：
 
 - 校验 Agent session 和 scope。
-- 从参数中读取 `targetType`、`targetCode`、`targetName`、K 线 limit 等可选项。
+- 从参数中读取 `targetType`、`targetCode`、`targetName`、`totalChunks`、K 线 limit 等可选项。
+- 校验 `totalChunks` 由 Agent 控制，默认 6，最大不超过 10，最小为 1。
 - 复用现有 `SceneTargetDataProvider` 列表按 `targetType` 找 provider。
 - 调用 `buildMessage(taskNo, targetCode, SceneAnalysisSubmitParam)` 拼装 `SceneAnalysisMessageDTO`。
 - 不保存 `SceneAnalysisTaskPO`。
@@ -82,13 +84,14 @@ action = scene.signal_data
   "targetType": "STOCK",
   "targetCode": "002958",
   "targetName": "青农商行",
+  "totalChunks": 6,
   "dailyKlineLimit": 90,
   "weeklyKlineLimit": 52,
   "monthlyKlineLimit": 60
 }
 ```
 
-`totalChunks` 对 Agent 没有实际意义，但 `SceneAnalysisMessageDTO` 结构需要该字段。action 内部可以使用默认值，例如 `6`，只用于兼容现有处理器输入格式。
+`totalChunks` 由 Agent 根据本轮需要控制，用于影响后续场景信号和 RAG 召回的知识片段预算。Java 侧必须做上限保护，最大值为 `10`；未传时使用默认值 `6`。
 
 返回：
 
@@ -134,7 +137,9 @@ action = knowledge.search
 - 校验 `scenes` 和 `tags` 只能来自现有白名单。
 - 限制 `limit`，默认 5，最大不超过 8。
 - 查询 `knowledge_vector`，排除 `metadata.deleted = true` 的 chunk。
-- 结合语义相似度和标签匹配重排。
+- 结合语义相似度、同场景标签匹配和交叉场景标签命中重排。
+- 综合分沿用报告流程权重：`finalScore = 0.45 * semanticScore + 0.45 * tagMatchScore + 0.10 * crossSceneScore`。
+- `crossSceneScore` 表示 chunk 除主命中场景外，还命中其他请求场景标签的程度；每多命中一个其他场景加 `0.1`，最高 `0.3`。
 - 返回给 Python 的结果可以包含内部字段，但 Python tool 返回给 LLM 时必须裁剪。
 
 参数建议：
@@ -162,6 +167,7 @@ Java 内部返回可包含：
   "taskNo": "ocr-...",
   "semanticScore": 0.82,
   "tagMatchScore": 0.5,
+  "crossSceneScore": 0.1,
   "finalScore": 0.74
 }
 ```
@@ -180,17 +186,21 @@ scene_signal_context(
     target_code: str | None = None,
     target_name: str | None = None,
     scenes: list[str] | None = None,
+    total_chunks: int = 6,
 ) -> str
 ```
 
 工具职责：
 
 - 读取 LLM 传入的 `scenes`。
+- 读取 LLM 传入的 `total_chunks`，并交给 Java `scene.signal_data` 做最终上限校验。
 - 调用 Java `scene.signal_data` 获取处理器输入包。
 - 使用现有 `BaseMetricsCalculator` 和 `SceneAnalysisContext` 构建上下文。
 - 直接调用现有处理器，不新增标签算法。
 - 根据依赖关系预跑必要处理器，并在单次工具调用内复用结果。
 - 只返回 LLM 请求的场景，不返回依赖场景，除非依赖场景也在请求列表里。
+- 返回结构直接复用现有处理器 payload 形态，不二次改写标签、证据、分数或 queryText。
+- 不返回计算元参数、原始输入包或完整行情序列。
 
 ### 场景依赖复用
 
@@ -251,24 +261,40 @@ results["risk_strategy"] = RiskStrategyProcessor().process(
 )
 ```
 
-返回给 LLM 的结构：
+返回给 LLM 的结构应直接复用 `current_scene_result._module_payload()` 的字段形态。工具只做 requested scene 过滤，不改写单个场景模块的 payload。
 
 ```json
 {
   "sceneSignals": {
     "valuation": {
-      "tags": ["low_pb", "high_dividend"],
-      "evidence": ["PB处于历史低位", "股息率较高"]
+      "score": 0.82,
+      "level": "high",
+      "direction": "positive",
+      "tags": {
+        "low_pb": 0.92,
+        "high_dividend": 0.76
+      },
+      "evidence": ["PB处于历史低位", "股息率较高"],
+      "queryText": "估值分析，低市净率、高股息。PB处于历史低位，股息率较高。"
     },
     "risk_strategy": {
-      "tags": ["position_control", "valuation_trap_risk"],
-      "evidence": ["低估值仍需结合趋势和盈利质量确认"]
+      "score": 0.74,
+      "level": "high",
+      "direction": "risk",
+      "tags": {
+        "position_control": 0.81,
+        "risk_control": 0.66
+      },
+      "evidence": ["低估值仍需结合趋势和盈利质量确认"],
+      "queryText": "风险策略分析，仓位控制、风险控制。低估值仍需结合趋势和盈利质量确认。"
     }
   }
 }
 ```
 
-默认不返回 score。如果后续发现 LLM 需要强弱排序，可以返回分桶后的 `level`，仍不返回原始数值分。
+不得把 `tags` 从 `{tag: score}` 改成列表，不得重写 `evidence`，不得重新合成 `score`、`level` 或 `direction`。如果处理器通过 `query_text()` 生成 `queryText`，直接使用该值；如果处理器提供 `extra`，保持和报告流程一致的字段形态。是否返回 `extra` 由具体处理器现有 payload 决定，Agent tool 不再自行发明新的字段。
+
+`scene.signal_data` 返回的 `SceneAnalysisMessageDTO` 只允许在 Python tool 内部使用。`config.parameters`、`base_metrics`、`market_context` 和完整 K 线、分时、估值历史等原始序列不得透传给 LLM。LLM 只能看到被请求场景对应的处理器输出 payload。
 
 ### knowledge_search tool
 
@@ -326,13 +352,14 @@ knowledge_search(
 
 1. Java `scene.signal_data` 能复用 `SceneTargetDataProvider.buildMessage()` 返回和报告流程同结构的数据包。
 2. `scene.signal_data` 不写入 `scene_analysis_task`，不发布 RabbitMQ。
-3. Python `scene_signal_context` 对 `risk_strategy` 能自动预跑 `trend`、`valuation`、`sentiment`，且同一处理器单次调用内只跑一次。
-4. `scene_signal_context` 返回中只包含 LLM 请求的场景。
-5. 工具调用结束后不保留处理器结果缓存。
-6. `knowledge_search` 返回给 LLM 的 chunk 只包含 `filename` 和 `content`。
-7. Java `knowledge.search` 能校验七大场景和子标签白名单。
-8. Agent 对“低PB高股息银行股是否是价值陷阱”类问题能形成 `valuation + risk_strategy` 的 RAG 查询。
-9. 问普通闲聊、技术解释、无关问题时不调用 RAG 工具。
+3. `scene.signal_data` 接受 Agent 传入的 `totalChunks`，并把最大值限制为 10。
+4. Python `scene_signal_context` 对 `risk_strategy` 能自动预跑 `trend`、`valuation`、`sentiment`，且同一处理器单次调用内只跑一次。
+5. `scene_signal_context` 返回中只包含 LLM 请求的场景，且单个场景 payload 复用处理器输出形态，不做二次变形。
+6. 工具调用结束后不保留处理器结果缓存。
+7. `knowledge_search` 返回给 LLM 的 chunk 只包含 `filename` 和 `content`。
+8. Java `knowledge.search` 能校验七大场景和子标签白名单。
+9. Agent 对“低PB高股息银行股是否是价值陷阱”类问题能形成 `valuation + risk_strategy` 的 RAG 查询。
+10. 问普通闲聊、技术解释、无关问题时不调用 RAG 工具。
 
 ## 实施顺序
 
@@ -342,4 +369,3 @@ knowledge_search(
 4. Python 新增 `knowledge_search` 工具，并裁剪 LLM tool result。
 5. 更新 Agent 工具注册和 prompt 选择规则。
 6. 做编译、静态检查和手动工具链验证。
-

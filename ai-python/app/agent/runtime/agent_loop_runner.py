@@ -51,17 +51,25 @@ class AgentLoopRunner:
                 tools=list(tools_by_name.values()),
                 agent_session_id=agent_session_id,
             )
-            if token_usage_collector:
-                token_usage_collector.add_message(plan.planning_message, "planning")
             last_plan_content = plan.content
             if not plan.standard_tool_calls:
                 if plan.content:
+                    self._record_planning_usage(
+                        token_usage_collector,
+                        plan.planning_message,
+                        "tool_result_answer" if scratchpad else "direct_answer",
+                    )
                     return self._answer_generator.answer_without_tools(
                         content=plan.content,
                         quote_result=quote_result_provider(),
                         agent_session_id=agent_session_id,
                     )
                 if scratchpad:
+                    self._record_planning_usage(
+                        token_usage_collector,
+                        plan.planning_message,
+                        "tool_followup_planning",
+                    )
                     return self._answer_generator.answer_from_scratchpad(
                         model=model,
                         messages=messages,
@@ -70,12 +78,18 @@ class AgentLoopRunner:
                         agent_session_id=agent_session_id,
                         token_usage_collector=token_usage_collector,
                     )
+                self._record_planning_usage(token_usage_collector, plan.planning_message, "initial_planning")
                 return self._answer_generator.answer_without_tools(
                     content=plan.content,
                     quote_result=quote_result_provider(),
                     agent_session_id=agent_session_id,
                 )
 
+            self._record_planning_usage(
+                token_usage_collector,
+                plan.planning_message,
+                "tool_followup_planning" if scratchpad else "initial_planning",
+            )
             trimmed_calls = active_budget.trim_tool_calls(plan.standard_tool_calls)
             if not trimmed_calls:
                 logger.info("agent loop no tool calls left after budget trim session_id=%s step=%s", agent_session_id, step_index)
@@ -117,6 +131,15 @@ class AgentLoopRunner:
             quote_result=quote_result_provider(),
             agent_session_id=agent_session_id,
         )
+
+    def _record_planning_usage(
+        self,
+        token_usage_collector: AgentTokenUsageCollector | None,
+        planning_message: Any,
+        phase: str,
+    ) -> None:
+        if token_usage_collector:
+            token_usage_collector.add_message(planning_message, phase)
 
     def _planning_message_with_tool_calls(self, planning_message: Any, tool_calls: list[dict[str, Any]]) -> Any:
         original_tool_calls = getattr(planning_message, "tool_calls", []) or []

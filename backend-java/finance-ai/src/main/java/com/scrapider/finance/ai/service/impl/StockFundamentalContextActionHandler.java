@@ -65,6 +65,11 @@ public class StockFundamentalContextActionHandler implements AgentDataActionHand
     }
 
     @Override
+    public String runningMessage(AgentDataQueryParam param) {
+        return "正在查询财务和估值数据";
+    }
+
+    @Override
     public AgentDataGatewayResponseVO handle(AgentSessionDTO session, AgentDataQueryParam param) {
         JsonNode params = param.params();
         String targetCode = this.textParam(params, "targetCode");

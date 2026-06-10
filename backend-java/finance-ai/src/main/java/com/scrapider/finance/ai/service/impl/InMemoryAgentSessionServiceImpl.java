@@ -25,6 +25,7 @@ public class InMemoryAgentSessionServiceImpl implements AgentSessionService {
             "stock.fundamental_context",
             "convertible_bond.context",
             "scene_report.context",
+            "scene.signal_data",
             "knowledge.search",
             "report.latest",
             "watch_pool.context",

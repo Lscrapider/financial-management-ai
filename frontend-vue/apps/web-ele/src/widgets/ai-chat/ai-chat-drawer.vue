@@ -106,6 +106,7 @@ const input = ref('');
 const fullscreen = ref(false);
 const enlarged = ref(false);
 const loading = ref(false);
+const progressText = ref('');
 const messages = ref<ChatMessage[]>([]);
 const scrollbarRef = ref<InstanceType<typeof ElScrollbar>>();
 const viewport = reactive({
@@ -219,10 +220,16 @@ async function submitMessage() {
   input.value = '';
   messages.value.push(createMessage('user', content));
   loading.value = true;
+  progressText.value = '正在分析';
   scrollToBottom();
 
   try {
-    const response = await sendAiChatMessage({ message: content });
+    const response = await sendAiChatMessage({ message: content }, (progress) => {
+      if (progress.status === 'running' && progress.content) {
+        progressText.value = progress.content;
+      }
+      scrollToBottom();
+    });
     messages.value.push(createAssistantMessage(response));
   } catch {
     messages.value.push(
@@ -230,6 +237,7 @@ async function submitMessage() {
     );
   } finally {
     loading.value = false;
+    progressText.value = '';
     scrollToBottom();
   }
 }
@@ -651,7 +659,9 @@ onBeforeUnmount(() => {
             </div>
             <div class="message-main">
               <div class="message-bubble pending">
-                <span class="pending-text">正在分析</span>
+                <span aria-live="polite" class="pending-text">
+                  {{ progressText || '正在分析' }}
+                </span>
                 <span aria-hidden="true" class="pending-dots">
                   <span></span>
                   <span></span>
@@ -1110,7 +1120,8 @@ onBeforeUnmount(() => {
 }
 
 .pending-text {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .pending-dots {
