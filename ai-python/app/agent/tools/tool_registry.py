@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.agent.tools.convertible_bond_context_tool import ConvertibleBondContextTool
+from app.agent.tools.conversation_history_tool import ConversationHistoryTool
 from app.agent.tools.knowledge_search_tool import KnowledgeSearchTool
 from app.agent.tools.market_intraday_summary_tool import MarketIntradaySummaryTool
 from app.agent.tools.market_kline_trend_tool import MarketKlineTrendTool
@@ -33,6 +34,7 @@ class AgentToolRegistry:
         scene_report_context_tool: SceneReportContextTool | None = None,
         scene_signal_context_tool: SceneSignalContextTool | None = None,
         knowledge_search_tool: KnowledgeSearchTool | None = None,
+        memory_context_tool: ConversationHistoryTool | None = None,
     ) -> None:
         self._market_quote_tool = market_quote_tool or MarketQuoteTool()
         self._watch_pool_context_tool = watch_pool_context_tool or WatchPoolContextTool()
@@ -43,8 +45,20 @@ class AgentToolRegistry:
         self._scene_report_context_tool = scene_report_context_tool or SceneReportContextTool()
         self._scene_signal_context_tool = scene_signal_context_tool or SceneSignalContextTool()
         self._knowledge_search_tool = knowledge_search_tool or KnowledgeSearchTool()
+        self._memory_context_tool = memory_context_tool or ConversationHistoryTool()
 
     def build_langchain_tools(self, context: AgentToolContext, tool_decorator: Any) -> dict[str, Any]:
+        @tool_decorator
+        def memory_context(mode: str = "reference") -> str:
+            """按需读取当前会话短期记忆；仅当当前问题依赖历史指代、刚才、继续、具体分析下、上面那个等上下文时调用。mode 可用 reference 或 continue_task。不要用于全市场推荐、重新筛选、当前问题已明确标的的新任务。"""
+            return self._memory_context_tool.invoke(
+                data_gateway_url=context.data_gateway_url,
+                agent_session_id=context.agent_session_id,
+                session_secret=context.session_secret,
+                mode=mode,
+                limit=ConversationHistoryTool.MEMORY_WINDOW,
+            )
+
         @tool_decorator
         def market_quote(
             target_type: str = "stock",
@@ -204,6 +218,7 @@ class AgentToolRegistry:
             )
 
         return {
+            "memory_context": memory_context,
             "market_quote": market_quote,
             "watch_pool_context": watch_pool_context,
             "market_kline_trend": market_kline_trend,

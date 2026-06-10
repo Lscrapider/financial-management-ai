@@ -43,7 +43,10 @@ class BasicAgentExecutor:
         self._model_factory = model_factory or DeepSeekChatModelFactory()
         self._memory_loader = memory_loader or AgentMemoryLoader(conversation_history_tool)
         self._prompt_builder = prompt_builder or AgentPromptBuilder()
-        self._tool_registry = tool_registry or AgentToolRegistry(market_quote_tool)
+        self._tool_registry = tool_registry or AgentToolRegistry(
+            market_quote_tool=market_quote_tool,
+            memory_context_tool=conversation_history_tool,
+        )
         self._planner = planner or AgentPlanner()
         self._tool_call_runner = tool_call_runner or ToolCallRunner()
         self._answer_generator = answer_generator or AgentAnswerGenerator(answer_builder)
@@ -98,17 +101,11 @@ class BasicAgentExecutor:
         try:
             model = self._model_factory.create()
             token_usage_collector = AgentTokenUsageCollector()
-            history = self._memory_loader.load_short_term_memory(
-                data_gateway_url=data_gateway_url,
-                agent_session_id=agent_session_id,
-                session_secret=session_secret,
-                limit=20,
-            )
             messages = self._prompt_builder.build_messages(
                 system_message_type=SystemMessage,
                 human_message_type=HumanMessage,
                 user_message=user_message,
-                history=history,
+                history=[],
             )
             tools_by_name = self._tool_registry.build_langchain_tools(
                 AgentToolContext(
