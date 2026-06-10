@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from collections.abc import Callable
 from typing import Any
 
 from app.agent.llm.deepseek_chat import DeepSeekChatModelFactory
@@ -56,7 +57,11 @@ class BasicAgentExecutor:
             answer_generator=self._answer_generator,
         )
 
-    def run(self, message_body: dict[str, Any]) -> AgentRunResult:
+    def run(
+        self,
+        message_body: dict[str, Any],
+        answer_delta_callback: Callable[[str], None] | None = None,
+    ) -> AgentRunResult:
         user_message = str(message_body.get("userMessage") or "").strip()
         agent_session_id = str(message_body["agentSessionId"])
         session_secret = str(message_body["sessionSecret"])
@@ -73,6 +78,7 @@ class BasicAgentExecutor:
             agent_session_id=agent_session_id,
             session_secret=session_secret,
             user_message=user_message,
+            answer_delta_callback=answer_delta_callback,
         )
         if result and result.answer:
             logger.info(
@@ -90,6 +96,7 @@ class BasicAgentExecutor:
         agent_session_id: str,
         session_secret: str,
         user_message: str,
+        answer_delta_callback: Callable[[str], None] | None = None,
     ) -> AgentRunResult | None:
         try:
             from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
@@ -123,6 +130,7 @@ class BasicAgentExecutor:
                 quote_result_provider=lambda: self._tool_registry.last_market_quote_result,
                 agent_session_id=agent_session_id,
                 token_usage_collector=token_usage_collector,
+                answer_delta_callback=answer_delta_callback,
             )
             if not answer:
                 return None

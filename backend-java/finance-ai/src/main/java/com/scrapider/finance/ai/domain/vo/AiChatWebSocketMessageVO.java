@@ -47,4 +47,18 @@ public record AiChatWebSocketMessageVO(
                 content,
                 answeredAt);
     }
+
+    public static AiChatWebSocketMessageVO answerDelta(
+            String conversationId,
+            String messageId,
+            String content,
+            String answeredAt) {
+        return new AiChatWebSocketMessageVO(
+                "answer_delta",
+                conversationId,
+                messageId,
+                null,
+                content,
+                answeredAt);
+    }
 }

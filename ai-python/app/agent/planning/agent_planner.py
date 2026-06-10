@@ -18,7 +18,13 @@ class AgentPlan:
 
 
 class AgentPlanner:
-    def plan(self, model: Any, messages: list[Any], tools: list[Any], agent_session_id: str) -> AgentPlan:
+    def plan(
+        self,
+        model: Any,
+        messages: list[Any],
+        tools: list[Any],
+        agent_session_id: str,
+    ) -> AgentPlan:
         logger.info(
             "agent langchain tool planning start session_id=%s model=%s base_url=%s thinking_type=%s",
             agent_session_id,

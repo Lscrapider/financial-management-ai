@@ -17,6 +17,11 @@ export interface AiChatProgress {
   status?: string;
 }
 
+export interface AiChatDelta {
+  answer: string;
+  content: string;
+}
+
 interface AiChatWebSocketMessage {
   answeredAt?: string;
   content?: string;
@@ -24,11 +29,13 @@ interface AiChatWebSocketMessage {
   messageId: string;
   model?: string;
   status?: string;
-  type: 'agent_progress' | 'agent_status' | 'final_answer';
+  type: 'agent_progress' | 'agent_status' | 'answer_delta' | 'final_answer';
 }
 
 interface PendingMessage {
+  answer: string;
   message: string;
+  onDelta?: (delta: AiChatDelta) => void;
   onProgress?: (progress: AiChatProgress) => void;
   reject: (reason?: unknown) => void;
   resolve: (response: AiChatResponse) => void;
@@ -44,6 +51,7 @@ let pendingMessage: null | PendingMessage = null;
 export async function sendAiChatMessage(
   data: AiChatRequest,
   onProgress?: (progress: AiChatProgress) => void,
+  onDelta?: (delta: AiChatDelta) => void,
 ) {
   const ws = await connectAiChatSocket();
   return new Promise<AiChatResponse>((resolve, reject) => {
@@ -54,7 +62,9 @@ export async function sendAiChatMessage(
 
     const messageId = createMessageId();
     pendingMessage = {
+      answer: '',
       message: data.message,
+      onDelta,
       onProgress,
       reject,
       resolve,
@@ -144,6 +154,18 @@ function handleAiChatSocketMessage(data: unknown) {
     return;
   }
 
+  if (response.type === 'answer_delta') {
+    const content = response.content || '';
+    if (content) {
+      pendingMessage.answer += content;
+      pendingMessage.onDelta?.({
+        answer: pendingMessage.answer,
+        content,
+      });
+    }
+    return;
+  }
+
   if (response.type !== 'final_answer') {
     return;
   }
@@ -151,7 +173,7 @@ function handleAiChatSocketMessage(data: unknown) {
   const pending = pendingMessage;
   pendingMessage = null;
   pending.resolve({
-    answer: response.content || '没有返回内容。',
+    answer: response.content || pending.answer || '没有返回内容。',
     answeredAt: response.answeredAt || new Date().toISOString(),
     message: pending.message,
     model: response.model || 'AI 研究助手',
