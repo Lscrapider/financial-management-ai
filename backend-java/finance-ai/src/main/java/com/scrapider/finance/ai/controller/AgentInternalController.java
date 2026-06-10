@@ -51,6 +51,17 @@ public class AgentInternalController {
         AgentSessionDTO session = this.agentSignatureService.verify(request, rawBody);
         AgentCallbackParam param = this.objectMapper.readValue(rawBody, AgentCallbackParam.class);
         this.requireSameSession(session, param);
+        if ("answer_delta".equals(param.eventType())) {
+            String deltaContent = this.deltaContent(param.payload());
+            if (!deltaContent.isEmpty()) {
+                this.sendToConversation(session, AiChatWebSocketMessageVO.answerDelta(
+                        session.conversationId(),
+                        session.messageId(),
+                        deltaContent,
+                        OffsetDateTime.now().toString()));
+            }
+            return ResponseEntity.ok().build();
+        }
         if ("final_answer".equals(param.eventType())) {
             String answerContent = this.answerContent(param.payload());
             this.aiChatConversationService.saveAssistantMessage(
@@ -64,10 +75,7 @@ public class AgentInternalController {
                     session.messageId(),
                     answerContent,
                     OffsetDateTime.now().toString());
-            this.sessionRegistry.sendToConversation(
-                    session.userId(),
-                    session.conversationId(),
-                    this.objectMapper.writeValueAsString(message));
+            this.sendToConversation(session, message);
         }
         return ResponseEntity.ok().build();
     }
@@ -115,5 +123,27 @@ public class AgentInternalController {
             return content.asText();
         }
         return payload.toString();
+    }
+
+    private String deltaContent(JsonNode payload) {
+        if (payload == null || payload.isNull()) {
+            return "";
+        }
+        JsonNode delta = payload.get("delta");
+        if (delta != null && delta.isTextual()) {
+            return delta.asText();
+        }
+        JsonNode content = payload.get("content");
+        if (content != null && content.isTextual()) {
+            return content.asText();
+        }
+        return "";
+    }
+
+    private void sendToConversation(AgentSessionDTO session, AiChatWebSocketMessageVO message) throws Exception {
+        this.sessionRegistry.sendToConversation(
+                session.userId(),
+                session.conversationId(),
+                this.objectMapper.writeValueAsString(message));
     }
 }

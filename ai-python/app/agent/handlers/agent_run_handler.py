@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Callable
 from typing import Any
 
 from app.agent.services.callback_client import AgentCallbackClient
@@ -39,7 +40,10 @@ class AgentRunHandler(MessageHandler):
             user_id,
             username,
         )
-        run_result = self._agent_executor.run(body)
+        run_result = self._agent_executor.run(
+            body,
+            answer_delta_callback=self._answer_delta_callback(body, agent_session_id),
+        )
         logger.info(
             "agent run answer generated session_id=%s conversation_id=%s message_id=%s answer_len=%s",
             agent_session_id,
@@ -63,6 +67,30 @@ class AgentRunHandler(MessageHandler):
             body.get("messageId"),
         )
         return HandlerResult()
+
+    def _answer_delta_callback(self, body: dict[str, Any], agent_session_id: str) -> Callable[[str], None]:
+        def callback(delta: str) -> None:
+            if not delta:
+                return
+            try:
+                self._callback_client.send_answer_delta(
+                    callback_url=str(body["callbackUrl"]),
+                    agent_session_id=agent_session_id,
+                    session_secret=str(body["sessionSecret"]),
+                    conversation_id=str(body["conversationId"]),
+                    message_id=str(body["messageId"]),
+                    delta=delta,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "agent run answer delta callback failed session_id=%s conversation_id=%s message_id=%s error=%s",
+                    agent_session_id,
+                    body.get("conversationId"),
+                    body.get("messageId"),
+                    exc,
+                )
+
+        return callback
 
     def _require(self, body: dict[str, Any], key: str) -> None:
         value = body.get(key)

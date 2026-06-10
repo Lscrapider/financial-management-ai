@@ -34,6 +34,26 @@ class AgentCallbackClient:
         }
         self._post(callback_url, body, agent_session_id, session_secret)
 
+    def send_answer_delta(
+        self,
+        callback_url: str,
+        agent_session_id: str,
+        session_secret: str,
+        conversation_id: str,
+        message_id: str,
+        delta: str,
+    ) -> None:
+        body = {
+            "agentSessionId": agent_session_id,
+            "conversationId": conversation_id,
+            "messageId": message_id,
+            "eventType": "answer_delta",
+            "payload": {
+                "delta": delta,
+            },
+        }
+        self._post(callback_url, body, agent_session_id, session_secret)
+
     def _post(
         self,
         url: str,

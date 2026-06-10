@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from typing import Any
 
 from app.agent.planning.agent_planner import AgentPlanner
@@ -34,6 +35,7 @@ class AgentLoopRunner:
         agent_session_id: str,
         budget: ToolCallBudget | None = None,
         token_usage_collector: AgentTokenUsageCollector | None = None,
+        answer_delta_callback: Callable[[str], None] | None = None,
     ) -> str | None:
         active_budget = budget or ToolCallBudget()
         trace = AgentTrace()
@@ -53,17 +55,6 @@ class AgentLoopRunner:
             )
             last_plan_content = plan.content
             if not plan.standard_tool_calls:
-                if plan.content:
-                    self._record_planning_usage(
-                        token_usage_collector,
-                        plan.planning_message,
-                        "tool_result_answer" if scratchpad else "direct_answer",
-                    )
-                    return self._answer_generator.answer_without_tools(
-                        content=plan.content,
-                        quote_result=quote_result_provider(),
-                        agent_session_id=agent_session_id,
-                    )
                 if scratchpad:
                     self._record_planning_usage(
                         token_usage_collector,
@@ -77,6 +68,18 @@ class AgentLoopRunner:
                         quote_result=quote_result_provider(),
                         agent_session_id=agent_session_id,
                         token_usage_collector=token_usage_collector,
+                        answer_delta_callback=answer_delta_callback,
+                    )
+                if plan.content:
+                    self._record_planning_usage(
+                        token_usage_collector,
+                        plan.planning_message,
+                        "direct_answer",
+                    )
+                    return self._answer_generator.answer_without_tools(
+                        content=plan.content,
+                        quote_result=quote_result_provider(),
+                        agent_session_id=agent_session_id,
                     )
                 self._record_planning_usage(token_usage_collector, plan.planning_message, "initial_planning")
                 return self._answer_generator.answer_without_tools(
@@ -125,6 +128,7 @@ class AgentLoopRunner:
                 quote_result=quote_result_provider(),
                 agent_session_id=agent_session_id,
                 token_usage_collector=token_usage_collector,
+                answer_delta_callback=answer_delta_callback,
             )
         return self._answer_generator.answer_without_tools(
             content=last_plan_content,

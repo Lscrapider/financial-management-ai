@@ -5,6 +5,7 @@ from typing import Any
 
 from app.agent.planning.agent_planner import AgentPlan
 from app.agent.runtime.agent_loop_runner import AgentLoopRunner
+from app.agent.runtime.tool_call_budget import ToolCallBudget
 from app.agent.runtime.token_usage import AgentTokenUsageCollector
 
 
@@ -15,13 +16,27 @@ class FakeMessage:
     usage_metadata: dict[str, Any] | None = None
     response_metadata: dict[str, Any] | None = None
 
+    def __add__(self, other: "FakeMessage") -> "FakeMessage":
+        return FakeMessage(
+            content=f"{self.content}{other.content}",
+            tool_calls=[*(self.tool_calls or []), *(other.tool_calls or [])],
+            usage_metadata=other.usage_metadata or self.usage_metadata,
+            response_metadata=other.response_metadata or self.response_metadata,
+        )
+
 
 class FakePlanner:
     def __init__(self, plans: list[AgentPlan]) -> None:
         self._plans = plans
         self.messages_seen: list[list[Any]] = []
 
-    def plan(self, model: Any, messages: list[Any], tools: list[Any], agent_session_id: str) -> AgentPlan:
+    def plan(
+        self,
+        model: Any,
+        messages: list[Any],
+        tools: list[Any],
+        agent_session_id: str,
+    ) -> AgentPlan:
         self.messages_seen.append(messages)
         return self._plans.pop(0)
 
@@ -44,6 +59,14 @@ class FakeToolRunner:
                 "all_failed": False,
             },
         )()
+
+
+class FakeStreamingModel:
+    def stream(self, messages: list[Any]) -> list[FakeMessage]:
+        return [
+            message("基于工具"),
+            message("生成回答。"),
+        ]
 
 
 @dataclass
@@ -82,9 +105,10 @@ def test_direct_answer_records_direct_answer_phase() -> None:
     assert [event["phase"] for event in collector.events()] == ["direct_answer"]
 
 
-def test_tool_result_answer_records_tool_result_answer_phase() -> None:
+def test_tool_result_answer_streams_final_answer_after_followup_planning() -> None:
     collector = AgentTokenUsageCollector()
     tool_call = {"id": "call-1", "name": "market_quote", "args": {}}
+    deltas: list[str] = []
     runner = AgentLoopRunner(
         planner=FakePlanner([
             AgentPlan(message("", [tool_call]), [tool_call], ""),
@@ -94,17 +118,45 @@ def test_tool_result_answer_records_tool_result_answer_phase() -> None:
     )
 
     answer = runner.run(
-        model=object(),
+        model=FakeStreamingModel(),
         messages=[],
         tools_by_name={},
         tool_message_type=FakeToolMessage,
         quote_result_provider=lambda: {},
         agent_session_id="session-1",
         token_usage_collector=collector,
+        answer_delta_callback=deltas.append,
     )
 
-    assert answer == "基于工具回答"
+    assert answer == "基于工具生成回答。"
+    assert deltas == ["基于工具生成回答。"]
     assert [event["phase"] for event in collector.events()] == [
         "initial_planning",
-        "tool_result_answer",
+        "tool_followup_planning",
+        "final_answer",
     ]
+
+
+def test_scratchpad_fallback_streams_final_answer() -> None:
+    tool_call = {"id": "call-1", "name": "market_quote", "args": {}}
+    deltas: list[str] = []
+    runner = AgentLoopRunner(
+        planner=FakePlanner([
+            AgentPlan(message("", [tool_call]), [tool_call], ""),
+        ]),
+        tool_call_runner=FakeToolRunner(),
+    )
+
+    answer = runner.run(
+        model=FakeStreamingModel(),
+        messages=[],
+        tools_by_name={},
+        tool_message_type=FakeToolMessage,
+        quote_result_provider=lambda: {},
+        agent_session_id="session-1",
+        budget=ToolCallBudget(max_steps=1),
+        answer_delta_callback=deltas.append,
+    )
+
+    assert answer == "基于工具生成回答。"
+    assert deltas == ["基于工具生成回答。"]

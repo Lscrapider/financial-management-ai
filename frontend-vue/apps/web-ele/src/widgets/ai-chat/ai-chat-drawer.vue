@@ -129,6 +129,10 @@ const interactionState = reactive({
 });
 
 const isMobile = computed(() => viewport.width <= mobileBreakpoint);
+const hasStreamingAnswer = computed(() => {
+  const latestMessage = messages.value[messages.value.length - 1];
+  return loading.value && latestMessage?.role === 'assistant' && !!latestMessage.content;
+});
 
 const triggerStyle = computed(() => ({
   left: `${triggerPosition.left}px`,
@@ -221,25 +225,62 @@ async function submitMessage() {
   messages.value.push(createMessage('user', content));
   loading.value = true;
   progressText.value = '正在分析';
+  let streamingMessageId: null | number = null;
   scrollToBottom();
 
   try {
-    const response = await sendAiChatMessage({ message: content }, (progress) => {
-      if (progress.status === 'running' && progress.content) {
-        progressText.value = progress.content;
-      }
-      scrollToBottom();
-    });
-    messages.value.push(createAssistantMessage(response));
-  } catch {
-    messages.value.push(
-      createMessage('assistant', 'AI 服务暂时不可用，请稍后再试。'),
+    const response = await sendAiChatMessage(
+      { message: content },
+      (progress) => {
+        if (progress.status === 'running' && progress.content) {
+          progressText.value = progress.content;
+        }
+        scrollToBottom();
+      },
+      (delta) => {
+        let streamingMessage = findMessageById(streamingMessageId);
+        if (!streamingMessage) {
+          streamingMessage = createMessage('assistant', '');
+          streamingMessage.model = 'AI 研究助手';
+          streamingMessageId = streamingMessage.id;
+          messages.value.push(streamingMessage);
+        }
+        streamingMessage.content = delta.answer;
+        progressText.value = '正在生成回答';
+        scrollToBottom();
+      },
     );
+    const streamingMessage = findMessageById(streamingMessageId);
+    if (streamingMessage) {
+      streamingMessage.content = response.answer || streamingMessage.content;
+      streamingMessage.createdAt = formatTime(
+        response.answeredAt ? new Date(response.answeredAt) : new Date(),
+      );
+      streamingMessage.model = response.model;
+    } else {
+      messages.value.push(createAssistantMessage(response));
+    }
+  } catch {
+    const streamingMessage = findMessageById(streamingMessageId);
+    if (streamingMessage?.content) {
+      streamingMessage.content = `${streamingMessage.content}\n\n（连接中断，回答可能不完整。）`;
+    } else {
+      messages.value.push(
+        createMessage('assistant', 'AI 服务暂时不可用，请稍后再试。'),
+      );
+    }
   } finally {
     loading.value = false;
     progressText.value = '';
     scrollToBottom();
   }
+}
+
+function findMessageById(id: null | number) {
+  if (id === null) {
+    return undefined;
+  }
+  return messages.value.find((message) => message.id === id);
 }
 
 function handleInputKeydown(event: Event | KeyboardEvent) {
@@ -653,7 +694,7 @@ onBeforeUnmount(() => {
               </div>
             </div>
           </div>
-          <div v-if="loading" class="message-row assistant">
+          <div v-if="loading && !hasStreamingAnswer" class="message-row assistant">
             <div class="message-avatar">
               <MessageSquareCode :size="16" />
             </div>

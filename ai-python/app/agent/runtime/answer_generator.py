@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from typing import Any
 
 from app.agent.runtime.token_usage import AgentTokenUsageCollector
 from app.agent.services.answer_builder import AgentAnswerBuilder
 
 logger = logging.getLogger(__name__)
+
+STREAM_DELTA_MIN_CHARS = 24
+STREAM_DELTA_FLUSH_SUFFIXES = ("。", "！", "？", "；", "\n")
 
 
 class AgentAnswerGenerator:
@@ -22,6 +26,7 @@ class AgentAnswerGenerator:
         quote_result: dict[str, Any],
         agent_session_id: str,
         token_usage_collector: AgentTokenUsageCollector | None = None,
+        answer_delta_callback: Callable[[str], None] | None = None,
     ) -> str | None:
         if not tool_messages:
             logger.warning("langchain tool calls did not produce tool messages")
@@ -44,6 +49,7 @@ class AgentAnswerGenerator:
         quote_result: dict[str, Any],
         agent_session_id: str,
         token_usage_collector: AgentTokenUsageCollector | None = None,
+        answer_delta_callback: Callable[[str], None] | None = None,
     ) -> str | None:
         if not scratchpad:
             logger.warning("langchain scratchpad is empty")
@@ -53,7 +59,11 @@ class AgentAnswerGenerator:
             agent_session_id,
             len(scratchpad),
         )
-        final_message = model.invoke([*messages, *scratchpad])
+        final_message = self._final_message(
+            model=model,
+            messages=[*messages, *scratchpad],
+            answer_delta_callback=answer_delta_callback,
+        )
         if token_usage_collector:
             token_usage_collector.add_message(final_message, "final_answer")
         return self._extract_final_answer(final_message, agent_session_id, "loop", quote_result)
@@ -85,3 +95,36 @@ class AgentAnswerGenerator:
         if content:
             return self._answer_builder.answer_or_fallback(str(content), quote_result)
         return self._answer_builder.fallback_answer(quote_result)
+
+    def _final_message(
+        self,
+        model: Any,
+        messages: list[Any],
+        answer_delta_callback: Callable[[str], None] | None,
+    ) -> Any:
+        if answer_delta_callback is None or not hasattr(model, "stream"):
+            return model.invoke(messages)
+
+        final_message = None
+        pending_delta = ""
+        for chunk in model.stream(messages):
+            final_message = chunk if final_message is None else final_message + chunk
+            content = getattr(chunk, "content", "") or ""
+            if not isinstance(content, str) or not content:
+                continue
+            pending_delta += content
+            if self._should_flush_delta(pending_delta):
+                self._send_delta(answer_delta_callback, pending_delta)
+                pending_delta = ""
+        if pending_delta:
+            self._send_delta(answer_delta_callback, pending_delta)
+        return final_message if final_message is not None else model.invoke(messages)
+
+    def _should_flush_delta(self, delta: str) -> bool:
+        return len(delta) >= STREAM_DELTA_MIN_CHARS or delta.endswith(STREAM_DELTA_FLUSH_SUFFIXES)
+
+    def _send_delta(self, answer_delta_callback: Callable[[str], None], delta: str) -> None:
+        try:
+            answer_delta_callback(delta)
+        except Exception as exc:
+            logger.warning("agent answer delta callback failed: %s", exc)
