@@ -754,7 +754,7 @@
 | `startTime` | string | 否 | 无 | 开始时间，格式如 `2026-06-01T00:00:00` |
 | `endTime` | string | 否 | 无 | 结束时间，格式如 `2026-06-09T23:59:59` |
 | `source` | string | 否 | 无 | 用量来源，如 `agent`、`report` |
-| `phase` | string | 否 | 无 | 调用阶段，如 `planning`、`final_answer`、`report_generate` |
+| `phase` | string | 否 | 无 | 调用阶段，如 `initial_planning`、`tool_followup_planning`、`direct_answer`、`final_answer`、`report_generate` |
 | `model` | string | 否 | 无 | 模型名称 |
 | `username` | string | 否 | 无 | 用户名，支持模糊匹配 |
 
@@ -778,7 +778,7 @@
 | `startTime` | string | 否 | 无 | 开始时间，格式如 `2026-06-01T00:00:00` |
 | `endTime` | string | 否 | 无 | 结束时间，格式如 `2026-06-09T23:59:59` |
 | `source` | string | 否 | 无 | 用量来源，如 `agent`、`report` |
-| `phase` | string | 否 | 无 | 调用阶段，如 `planning`、`final_answer`、`report_generate` |
+| `phase` | string | 否 | 无 | 调用阶段，如 `initial_planning`、`tool_followup_planning`、`direct_answer`、`final_answer`、`report_generate` |
 | `model` | string | 否 | 无 | 模型名称 |
 | `username` | string | 否 | 无 | 用户名，支持模糊匹配 |
 
@@ -802,7 +802,7 @@
 | `startTime` | string | 否 | 无 | 开始时间，格式如 `2026-06-01T00:00:00` |
 | `endTime` | string | 否 | 无 | 结束时间，格式如 `2026-06-09T23:59:59` |
 | `source` | string | 否 | 无 | 用量来源，如 `agent`、`report` |
-| `phase` | string | 否 | 无 | 调用阶段，如 `planning`、`final_answer`、`report_generate` |
+| `phase` | string | 否 | 无 | 调用阶段，如 `initial_planning`、`tool_followup_planning`、`direct_answer`、`final_answer`、`report_generate` |
 | `model` | string | 否 | 无 | 模型名称 |
 | `username` | string | 否 | 无 | 用户名，支持模糊匹配 |
 

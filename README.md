@@ -236,6 +236,8 @@ financial-management-ai/
 - Java 只负责用户鉴权、WebSocket 推送、RabbitMQ 启动消息、内部数据网关、callback 接收和 HMAC 签名校验。
 - Python Agent 查询业务数据时只调用 Java 暴露的受控数据网关，不直接访问数据库，不传 SQL。
 - AI Chat 对话以 `userId + conversationId` 作为短期记忆边界，`conversationId` 由 Java 在 WebSocket 握手时生成或复用，Python 每次 Agent Run 通过 `conversation.history` 固定召回最近 20 条上下文。
+- 工具链路较慢时，Python 只在最终用户可见答案阶段通过 `answer_delta` 流式回传；planner 和工具规划阶段不流式，避免工具调用内容泄露到对话框。
+- Java 对 `answer_delta` 只做 WebSocket 推送，不保存对话、不记录 Token；`final_answer` 才保存 assistant message 并记录 Token 用量。
 - WebSocket 关闭后不立即清理短期消息；Java 在 activeCount 归零时发送 30 分钟延迟 cleanup，版本一致时先保存 `ai_user_memory` 对话摘要，再删除 `ai_chat_message`。
 
 ### 投资报告模块
@@ -325,16 +327,18 @@ Python Tool 通过 HMAC 签名调用 Java 内部数据网关查询业务数据
   ↓
 Java 校验签名、nonce、过期时间、scope 和用户数据边界后返回受控数据
   ↓
-Python 将工具结果回填给 LLM，由 LLM 生成最终答案
+Python 将工具结果回填给 LLM，继续判断是否需要后续工具
   ↓
-Python 通过 callback 回传过程事件和最终答案
+工具链路结束后，Python 在最终答案生成阶段通过 answer_delta 流式回传内容
   ↓
-Java 保存 assistant message，并通过 WebSocket 推送给前端
+Python 通过 callback 回传 final_answer
+  ↓
+Java 保存 assistant message、记录 Token 用量，并通过 WebSocket 推送完整最终答案给前端
   ↓
 WebSocket 关闭 30 分钟后，版本一致则摘要入 ai_user_memory 并删除短期消息
 ```
 
-AI Chat 当前是一次性 Tool Calling：模型只负责提出工具调用请求，Python 执行工具，Java 数据网关查询业务数据，工具结果再回填给模型生成最终答案。后续可以按工具结果类型扩展为两种策略：简单查询由代码直接格式化返回，复杂行情和知识库结果交给模型分析。
+AI Chat 当前是有限循环 Tool Calling：模型负责提出工具调用请求和判断是否还需要后续工具，Python 执行工具，Java 数据网关查询业务数据，工具结果再回填给模型生成最终答案。直接回答分支保持快速返回；工具链路后的最终答案才启用流式输出。
 
 知识库处理流程：
 

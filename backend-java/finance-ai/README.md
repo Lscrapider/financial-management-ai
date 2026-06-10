@@ -9,7 +9,7 @@
 ## 主要能力
 
 - AI Chat：面向个人投资研究的理财分析对话。
-- AI Chat Agent：承载 Java 侧 WebSocket、Agent Session、HMAC 签名、RabbitMQ 启动消息、内部数据网关和 Python callback。
+- AI Chat Agent：承载 Java 侧 WebSocket、Agent Session、HMAC 签名、RabbitMQ 启动消息、内部数据网关、Python callback 和最终答案流式推送。
 - Query Rewrite：将用户问题改写为结构化意图、数据范围和后端可执行的数据请求。
 - 行情上下文查询：根据 Query Rewrite 结果查询股票/指数行情数据，并提供给最终回答模型。
 - Token 用量记录：记录 Spring AI ChatResponse 或 DeepSeek 原始响应中的 Token 用量。
@@ -112,6 +112,18 @@ backend-java/finance-ai/
 - 需要行情数据的问题会按结构化 `dataRequests` 查询数据库。
 - 如果数据库没有足够数据，系统提示要求模型明确说明缺少数据，不编造具体数值。
 - 回答原则为清晰、克制，区分事实、推断和风险提示，不提供确定性买卖建议。
+
+## Agent WebSocket 与 Callback
+
+Agent 化 AI Chat 由前端 WebSocket 发送用户消息，Java 保存 user message、创建 Agent Session 并通过 RabbitMQ 触发 Python worker。Python worker 使用 Java 内部数据网关查询受控业务数据，不直接访问数据库。
+
+Python callback 事件按用途区分：
+
+- `agent_progress`：过程状态，只通过 WebSocket 推送给当前会话。
+- `answer_delta`：最终答案生成阶段的流式增量，只通过 WebSocket 推送，不保存对话、不记录 Token。
+- `final_answer`：完整最终答案，Java 保存 assistant message，记录 Agent Token 用量，并通过 WebSocket 推送给前端覆盖流式增量内容。
+
+Planner 和工具规划阶段不做流式输出，避免模型工具调用内容进入用户对话框；工具链路结束后的最终用户可见答案才流式输出。直接回答分支保持快速返回，不额外发起一次流式最终答案调用。
 
 ## Query Rewrite 输出
 

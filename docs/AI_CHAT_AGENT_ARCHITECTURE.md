@@ -13,7 +13,7 @@
 - Java 通过 RabbitMQ 触发 Python Agent 流程。
 - Python 基于 LangChain 承载 LLM、Planner、Memory、Tool Calling、Answer 等 Agent 执行逻辑。
 - Python 需要查询数据库或业务数据时，通过 Java 暴露的内部数据网关 HTTP 接口获取。
-- Python 生成过程事件和最终答案后，通过 Java 内部 callback 接口回传。
+- Python 生成过程事件、最终答案流式增量和最终答案后，通过 Java 内部 callback 接口回传。
 - Java 再通过 WebSocket 将 Agent 事件推送给前端。
 - Java 不直接调用 LLM，不参与 Agent 规划和答案生成。
 
@@ -36,10 +36,12 @@ Java
   -> 查询数据库、InfluxDB、知识库或业务服务
   -> 返回受控数据
 Python Worker
-  -> 基于 LangChain 工具结果、记忆和原始问题生成过程事件或最终答案
+  -> 基于 LangChain 工具结果、记忆和原始问题生成过程事件、最终答案增量或最终答案
   -> 通过 HTTP callback 回传 Java
 Java
   -> 校验 callback 签名
+  -> answer_delta 只通过 WebSocket 推送给前端
+  -> final_answer 保存 assistant message 和 Token 用量后再推送前端
   -> 通过 WebSocket 推送给前端
 ```
 
@@ -49,7 +51,8 @@ Java
 
 - 与 Java 建立 WebSocket 连接。
 - 发送用户问题。
-- 接收 Agent 过程事件、工具调用进度、最终答案和错误提示。
+- 接收 Agent 过程事件、工具调用进度、最终答案增量、最终答案和错误提示。
+- 对同一条 assistant message 累积 `answer_delta`，收到 `final_answer` 后用完整答案覆盖，保证页面最终内容与入库内容一致。
 - 不接触 `sessionSecret`。
 
 ### Java 后端
@@ -62,6 +65,8 @@ Java
 - 校验 Python HTTP 请求的 HMAC 签名。
 - 控制工具白名单、查询 limit、用户权限和数据隔离。
 - 通过 WebSocket 向前端推送消息。
+- `answer_delta` 只做 WebSocket 推送，不保存对话、不记录 Token。
+- `final_answer` 负责保存 assistant message、记录 Token 用量并推送最终答案。
 - 不直接调用大模型。
 - 不执行 Planner、Memory、Tool Calling 和 Answer 逻辑。
 
@@ -186,17 +191,21 @@ KnowledgeSearchTool
 
 ### Tool Calling 执行语义
 
-当前第一版 Agent Executor 是一次性 Tool Calling 流程，不是循环式多工具 Agent。
+当前 Agent Executor 是有限循环 Tool Calling 流程。Planner 只负责判断是否需要工具和生成标准 `tool_calls`，不做流式输出；工具执行后的最终用户可见答案由 AnswerGenerator 生成，并在工具链路较慢时通过 `answer_delta` 流式推送。
 
 ```text
 1. Python 将当前问题、短期记忆和工具定义发送给 LLM
 2. LLM 只负责判断是否需要工具，并返回结构化 tool_calls
 3. Python 读取 tool_calls，由代码执行对应 LangChain Tool
 4. LangChain Tool 通过 Java 内部数据网关查询业务数据
-5. Python 将工具结果包装为 ToolMessage，再次发送给 LLM
-6. LLM 基于工具结果生成最终答案
-7. Python callback Java，Java 通过 WebSocket 推送前端
+5. Python 将工具结果包装为 ToolMessage，继续交给 Planner 判断是否还需要后续工具
+6. 如果仍有 tool_calls，继续执行下一轮工具
+7. 如果已有工具结果且不再需要工具，AnswerGenerator 基于 scratchpad 生成最终答案
+8. AnswerGenerator 使用模型 stream 输出 `answer_delta`，并保留完整 final message 用于 Token 统计
+9. Python callback Java，Java 通过 WebSocket 推送增量和最终答案
 ```
+
+如果模型一开始就不需要工具并直接回答，当前走 `direct_answer` 快速返回，不额外发起一次最终答案流式模型调用。
 
 模型不会直接调用 Java 接口，也不会直接访问数据库。Tool Calling 的本质是：
 
@@ -205,7 +214,7 @@ KnowledgeSearchTool
 Python 执行工具
 Java 执行业务数据查询
 Python 把结果交回模型
-模型生成最终答案
+模型生成最终答案或最终答案增量
 ```
 
 这条链路可以理解为两层调用：
@@ -587,6 +596,20 @@ POST /internal/agent/callback
 }
 ```
 
+最终答案增量示例：
+
+```json
+{
+  "agentSessionId": "sid-xxx",
+  "conversationId": "conv-xxx",
+  "messageId": "msg-xxx",
+  "eventType": "answer_delta",
+  "payload": {
+    "delta": "基于当前行情和知识库资料，"
+  }
+}
+```
+
 最终答案示例：
 
 ```json
@@ -614,8 +637,9 @@ Java 收到 callback 后：
 1. 校验 HMAC 签名
 2. 校验 Agent Session
 3. 校验 conversationId 和 messageId 是否匹配
-4. 持久化必要的对话事件
-5. 通过 WebSocket 推送给前端
+4. answer_delta：仅通过 WebSocket 推送前端，不保存对话，不记录 Token
+5. final_answer：保存 assistant message，记录 Token 用量
+6. final_answer：通过 WebSocket 推送完整最终答案给前端
 ```
 
 ## 响应数据格式
