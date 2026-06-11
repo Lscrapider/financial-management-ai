@@ -153,9 +153,13 @@ RabbitMQ AgentRunHandler
       -> AnswerGenerator
       -> LangChain Tools
           -> MarketQuoteTool
-          -> MarketKlineTool
+          -> MarketKlineTrendTool
+          -> MarketIntradaySummaryTool
+          -> StockFundamentalContextTool
+          -> ConvertibleBondContextTool
           -> KnowledgeSearchTool
-          -> ReportLatestTool
+          -> SceneReportContextTool
+          -> SceneSignalContextTool
           -> WatchPoolContextTool
       -> AgentCallbackClient
 ```
@@ -175,14 +179,17 @@ app/agent/
   graph/
     graph_runner.py          # LangGraph 组装和执行入口
     routing.py               # 条件边路由
+    intent_policy.py         # 轻量问题分层、工具白名单和预算降档策略
     state.py                 # Graph 状态定义
     profile_context.py       # 画像和短期记忆上下文注入
     nodes/                   # context/profile/memory/planner/tools/final 节点
   prompts/
     prompt_builder.py        # system prompt、memory prompt、当前问题 prompt
+    final_answer_prompt_builder.py # final_stream 专用 system/user prompt 与证据包组装
   runtime/
     tool_call_runner.py      # 执行工具调用
-    answer_generator.py      # 工具结果回填模型并生成答案
+    agent_execution_budget.py # 工具循环、总调用数、单步调用数、超时和 final 回退预算
+    answer_generator.py      # final-only 流式回答、重试和工具协议输出保护
   tools/
     tool_registry.py         # LangChain 工具注册
     market_quote_tool.py     # 行情工具
@@ -240,7 +247,7 @@ Graph State 保存节点之间共享的最小必要状态：
 - `scratchpad`：planner/tool/final_decision 之间传递的模型消息、ToolMessage 和中间观察。
 - `pending_tool_calls`：planner 生成、等待 tools 节点执行的标准工具调用。
 - `planning_nudges`：final_decision 认为证据不足时写给 planner 的补充规划提示。
-- `evidence_records`：工具返回结果的结构化摘要，用于 final_decision 和 final_stream。
+- `evidence_records`：工具返回结果的结构化摘要，用于 final_decision，以及 final_stream 组装最终回答证据包。
 - `tool_result_cache`：工具结果缓存，避免相同语义参数重复调用 Java 数据网关。
 - `final_decision`、`final_backtrack_count`、`stop_reason`、`answer`：最终阶段的判定、回退次数、停止原因和最终答案。
 
@@ -254,13 +261,50 @@ Graph Deps 保存运行依赖，例如模型、工具表、答案生成器、工
 - `planner`：绑定 LangChain tools 调用 LLM，负责生成标准 `tool_calls` 或给出不需要工具的快速回答内容，不向前端流式输出。
 - `tools`：执行 planner 生成的工具调用，通过 Java 数据网关拿业务数据，并维护 `scratchpad`、`evidence_records` 和 `tool_result_cache`。
 - `final_decision`：不绑定工具、不流式输出。它基于系统 prompt、用户问题、画像、记忆和全部工具结果判断是否可以回答；如果缺少关键证据，只写入 `planning_nudges` 并路由回 planner。
-- `final_stream`：唯一允许推送 `answer_delta` 的节点。它不绑定工具，必须基于现有上下文输出自然语言正文。
+- `final_stream`：唯一允许推送 `answer_delta` 的节点。它不绑定工具，不复用 agent system prompt，不传原始 `AIMessage(tool_calls)` 或 `ToolMessage`；进入该节点后先由 `FinalAnswerPromptBuilder` 基于 state 组装 final system prompt 和 final user prompt，再用普通 LLM stream 生成自然语言正文。
+
+### Final Answer Prompt 结构
+
+`final_stream` 不是继续跑 agent scratchpad，而是做一次最终回答专用的普通 LLM 调用：
+
+```text
+System:
+  你是个人投资研究助手的最终回答生成器
+  只允许输出中文自然语言
+  不允许工具调用、DSML、tool_calls、invoke、JSON 工具片段
+  不暴露工具名、字段名、缓存 key、chunkId、taskNo、queryText、tags 等内部信息
+  交易建议由当前问题意图、用户画像边界和证据共同决定
+
+User:
+  【当前用户问题】
+  【用户画像】
+  【短期记忆】
+  【证据充分性判断】
+  【流程停止原因】
+  【已获取证据】
+    1. 行情快照
+       数据来源说明
+       证据内容
+    2. 多周期 K 线趋势
+       数据来源说明
+       证据内容
+    ...
+  【要求】
+```
+
+交易建议的边界由三层共同决定：
+
+- 当前用户问题负责判断是否存在交易决策意图，例如能不能买、会不会涨、该不该卖、仓位、止盈止损等。
+- 用户画像负责限制建议强度，例如不能给明确买卖、只能给条件建议、或可以给轻仓试错建议。
+- 已获取证据负责支撑结论；没有证据覆盖的维度不能展开，证据不足时必须说明不足并给保守结论。
+
+如果用户只是泛看或资料查询，不主动输出买入、卖出、加仓、减仓、仓位比例、止盈止损价位等交易指令；如果用户有交易决策意图且画像允许、证据支撑，可以按画像边界输出条件、仓位边界和退出条件。没有可用用户画像时，不给明确买卖指令。
 
 ### 路由与防循环规则
 
 `planner` 只有两条出口：有标准 `tool_calls` 进入 `tools`，没有工具调用进入 `final_decision`。`tools` 执行后如果预算仍允许，回到 `planner` 让模型判断是否还需要下一步工具；如果预算、失败或超时触发停止条件，直接进入 `final_decision`。
 
-`final_decision` 如果输出 `need_tool`，不会自己调用工具，而是把缺失证据摘要写入 `planning_nudges` 后回到 `planner`。这样所有工具调用仍只从 planner 产生，避免 final 阶段输出 DSML 或伪工具调用。回退次数和工具预算耗尽后，`need_tool` 会转成 `insufficient`，随后进入 `final_stream`，并明确要求模型不能再调用工具，只能基于现有数据回答。
+`final_decision` 如果输出 `need_tool`，不会自己调用工具，而是把缺失证据摘要写入 `planning_nudges` 后回到 `planner`。这样所有工具调用仍只从 planner 产生。回退次数和工具预算耗尽后，`need_tool` 会转成 `insufficient`，随后进入 `final_stream`。`final_stream` 会重新组装最终回答 prompt，把工具结果整理为普通文本证据包，彻底隔离工具协议上下文。
 
 ### Tool Calling 执行语义
 
@@ -275,20 +319,45 @@ Graph Deps 保存运行依赖，例如模型、工具表、答案生成器、工
 6. Python 将工具结果包装为 ToolMessage，继续交给 planner 判断是否还需要后续工具
 7. 如果 planner 认为不需要继续查工具，进入 final_decision 做证据充分性判断
 8. 如果 final_decision 认为证据不足且仍可查工具，写入 planning_nudges 并回到 planner
-9. 如果 final_decision 返回 ready 或 insufficient，进入 final_stream 生成最终自然语言答案
-10. final_stream 使用模型 stream 输出 `answer_delta`，并保留完整 final message 用于 Token 统计
-11. Python callback Java，Java 通过 WebSocket 推送增量和最终答案
+9. 如果 final_decision 返回 ready 或 insufficient，进入 final_stream
+10. final_stream 通过 FinalAnswerPromptBuilder 组装 final system prompt 和 final user prompt，final user prompt 包含用户问题、画像、记忆、证据充分性判断、停止原因和已获取证据
+11. final_stream 使用普通模型 stream 输出 `answer_delta`，并保留完整 final message 用于 Token 统计
+12. Python callback Java，Java 通过 WebSocket 推送增量和最终答案
 ```
 
 默认执行预算由 `AgentExecutionBudget` 统一控制：`max_steps=6`、`max_tool_calls_total=10`、`max_tool_calls_per_step=4`、`timeout_seconds=50`、`max_final_backtracks=2`。Java 可从 `app_user.agent_execution_budget_json` 读取用户级预算并通过 RMQ 顶层字段 `executionBudget` 传给 Python；字段为空或非法时 Python 使用默认预算并做安全上限夹取。缓存命中的重复工具结果不占用每步真实新工具调用数量。
+
+`context_gate` 还会做一次轻量规则意图分级，并在不改变图结构的前提下收紧本轮工具规划；如果没有命中 `brief` 或 `focused`，不会写入额外 planner 约束，按改动前的完整工具流程继续执行：
+
+- `brief`：用户明确只是“看看某个标的”时，只绑定 `market_quote`、`market_kline_trend`，预算降到 `max_steps=1`、`max_tool_calls_total=2`、`max_final_backtracks=0`。
+- `focused`：用户明确指定趋势、估值、基本面、分时、报告、观察池、知识库等维度时，只绑定对应维度工具，预算降到 `max_steps=2`、`max_tool_calls_total=4`、`max_final_backtracks=1`。
+- 未命中降档：包括买卖建议、完整研究、复杂表达或规则不确定的问题，不绑定工具白名单、不追加 planner hint，并直接使用用户配置预算。
 
 ### 流式输出与直出路径
 
 Graph 中只有 `final_stream` 允许向前端推送流式 `answer_delta`；planner、tools 和 final_decision 都不直接产生用户可见文本。
 
-`final_stream` 仍有程序级输出保护：如果流式内容或最终完整回答包含 DSML、tool_calls、invoke 等工具调用格式，Python 会停止继续发送该段 delta，并尝试把完整结果改写为自然语言正文。最终入库和前端展示都只能使用自然语言答案。
+`final_stream` 会把最终回答当作一次普通 LLM 调用：只发送 final system prompt 和 final user prompt，不传 planner 的工具调用消息，也不传原始 ToolMessage。final system prompt 只声明最终回答边界；final user prompt 承载用户问题、用户画像、短期记忆、证据充分性判断、流程停止原因和普通文本证据包。这样即使 planner 或 final_decision 之前出现过工具意图，最终模型也只能基于整理后的证据写正文。
+
+`final_stream` 仍有程序级输出保护：如果流式内容或最终完整回答包含 DSML、tool_calls、invoke 等工具调用格式，Python 会停止继续发送该段 delta，并用更强的自然语言约束重新流式生成。最多重试 3 次，仍失败时返回固定文案：`AI 服务暂时不可用，请稍后重试。` 最终入库和前端展示都只能使用自然语言答案或固定失败文案。
 
 如果模型一开始就不需要工具并直接回答，当前使用 planner 返回内容快速返回，不额外发起一次最终答案流式模型调用。
+
+### 手动评测脚本
+
+AI Chat 真实链路手动评测脚本放在 Python 测试目录：
+
+```bash
+python3 ai-python/test/ai_chat_smoke_eval.py \
+  --base-url http://localhost:8081 \
+  --username admin \
+  --password 123456 \
+  --budget-yuan 0.5 \
+  --output tmp/ai-chat-eval.json \
+  --split-output-dir tmp/ai-chat-eval-cases
+```
+
+脚本会登录 Java 后端、建立 AI Chat WebSocket、按用例发送消息、记录首个 `answer_delta` 延迟、最终耗时、是否出现工具协议文本、Token 和预估费用。脚本用于人工效果评测，不作为自动化单元测试默认执行。
 
 ### Token 计费阶段
 
@@ -308,7 +377,7 @@ answer_readiness_check:
   final_decision 判断证据是否足够，以及是否需要回 planner
 
 final_answer:
-  final_stream 流式生成最终答案，以及流式失败后的非流式兜底
+  final_stream 使用 final 专用 prompt 流式生成最终答案；失败、空内容或工具协议输出最多流式重试 3 次
 ```
 
 ### 两层调用边界

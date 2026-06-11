@@ -4,40 +4,13 @@ import json
 import logging
 from typing import Any
 
+from app.agent.graph.intent_policy import TRADE_ADVICE_KEYWORDS, classify_query_intent
 from app.agent.graph.state import AgentGraphState, merge_state, message_with_content
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_FALLBACK_PROFILE_REQUIRED = True
 DEFAULT_FALLBACK_MEMORY_MODE = "continue_task"
-
-PROFILE_INTENT_KEYWORDS = (
-    "买卖建议",
-    "操作建议",
-    "能买吗",
-    "要买吗",
-    "要不要买",
-    "要不要卖",
-    "能不能买",
-    "能不能卖",
-    "可以买吗",
-    "可以卖吗",
-    "加仓",
-    "减仓",
-    "补仓",
-    "建仓",
-    "清仓",
-    "仓位",
-    "止盈",
-    "止损",
-    "买点",
-    "卖点",
-    "buy",
-    "sell",
-    "position",
-    "stop loss",
-    "take profit",
-)
 
 MEMORY_REFERENCE_KEYWORDS = (
     "这个股票",
@@ -90,6 +63,8 @@ MEMORY_SKIP_KEYWORDS = (
 def context_gate_node(state: AgentGraphState) -> AgentGraphState:
     user_text = _message_text(state.get("messages") or [])
     normalized_text = user_text.lower()
+    intent_policy = classify_query_intent(user_text)
+    effective_budget = intent_policy.apply_budget(state["budget"])
     rule_profile_required = _requires_profile(normalized_text)
     memory_skip = _skips_memory(normalized_text)
     rule_memory_mode = None if memory_skip else _memory_mode(normalized_text)
@@ -100,15 +75,25 @@ def context_gate_node(state: AgentGraphState) -> AgentGraphState:
     profile_required = rule_profile_required or fallback_profile_required
     memory_mode = None if memory_skip else rule_memory_mode or fallback_memory_mode
     logger.info(
-        "agent graph context gate session_id=%s profile_required=%s memory_mode=%s rule_profile=%s rule_memory=%s",
+        "agent graph context gate session_id=%s profile_required=%s memory_mode=%s rule_profile=%s rule_memory=%s query_depth=%s allowed_tools=%s max_steps=%s max_tool_calls_total=%s max_tool_calls_per_step=%s max_final_backtracks=%s",
         state["agent_session_id"],
         profile_required,
         memory_mode,
         rule_profile_required,
         rule_memory_mode,
+        intent_policy.query_depth,
+        intent_policy.allowed_tools,
+        effective_budget.max_steps,
+        effective_budget.max_tool_calls_total,
+        effective_budget.max_tool_calls_per_step,
+        effective_budget.max_final_backtracks,
     )
     return merge_state(
         state,
+        budget=effective_budget,
+        query_depth=intent_policy.query_depth,
+        allowed_tool_names=list(intent_policy.allowed_tools),
+        planner_intent_hint=intent_policy.planner_hint,
         profile_required=profile_required,
         memory_required=memory_mode is not None,
         memory_mode=memory_mode,
@@ -123,7 +108,7 @@ def _message_text(messages: list[Any]) -> str:
 
 
 def _requires_profile(text: str) -> bool:
-    return any(keyword.lower() in text for keyword in PROFILE_INTENT_KEYWORDS)
+    return any(keyword.lower() in text for keyword in TRADE_ADVICE_KEYWORDS)
 
 
 def _skips_memory(text: str) -> bool:

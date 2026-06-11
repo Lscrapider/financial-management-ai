@@ -64,6 +64,18 @@ class AgentExecutionBudget:
             ),
         )
 
+    def capped_by(self, ceiling: "AgentExecutionBudget") -> "AgentExecutionBudget":
+        return AgentExecutionBudget(
+            max_steps=min(self.max_steps, ceiling.max_steps),
+            max_tool_calls_total=min(self.max_tool_calls_total, ceiling.max_tool_calls_total),
+            max_tool_calls_per_step=min(self.max_tool_calls_per_step, ceiling.max_tool_calls_per_step),
+            timeout_seconds=min(self.timeout_seconds, ceiling.timeout_seconds),
+            max_final_backtracks=min(self.max_final_backtracks, ceiling.max_final_backtracks),
+            started_at=self.started_at,
+            total_tool_calls=self.total_tool_calls,
+            seen_signatures=set(self.seen_signatures),
+        )
+
     def step_allowed(self, step_index: int) -> bool:
         return step_index < self.max_steps and not self.timed_out()
 

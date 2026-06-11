@@ -238,7 +238,7 @@ def test_tool_result_answer_streams_final_answer_after_followup_planning() -> No
         for item in model.invoke_messages[1]
     )
     assert any(
-        "不能给出明确买入" in str(getattr(item, "content", ""))
+        "不能给出明确买卖指令" in str(getattr(item, "content", ""))
         for item in model.stream_messages[0]
     )
     assert [event["phase"] for event in collector.events()] == [
@@ -250,7 +250,7 @@ def test_tool_result_answer_streams_final_answer_after_followup_planning() -> No
     ]
 
 
-def test_final_stream_clears_planner_message_content_but_keeps_tool_calls() -> None:
+def test_final_stream_uses_plain_final_prompt_without_tool_call_messages() -> None:
     collector = AgentTokenUsageCollector()
     tool_call = {"id": "call-1", "name": "market_quote", "args": {}}
     runner = AgentGraphRunner(tool_call_runner=FakeToolRunner())
@@ -277,9 +277,10 @@ def test_final_stream_clears_planner_message_content_but_keeps_tool_calls() -> N
         "RAG 召回" not in str(getattr(item, "content", ""))
         for item in final_messages
     )
+    assert all(not getattr(item, "tool_calls", None) for item in final_messages)
     assert any(
-        getattr(item, "content", None) == ""
-        and getattr(item, "tool_calls", None) == [tool_call]
+        "【已获取证据】" in str(getattr(item, "content", ""))
+        and "工具结果" in str(getattr(item, "content", ""))
         for item in final_messages
     )
 
@@ -394,20 +395,21 @@ def test_final_stream_gets_guard_when_decision_needs_tool_but_budget_stops() -> 
         answer_delta_callback=deltas.append,
     )
 
-    assert result.answer == "证据不足，不能继续调用工具，只能基于已有数据给出保守结论。"
+    assert result.answer == "AI 服务暂时不可用，请稍后重试。"
     assert deltas == []
     assert any(
-        "不能再调用任何工具" in str(getattr(item, "content", ""))
+        "不得输出 DSML" in str(getattr(item, "content", ""))
         for item in model.stream_messages[0]
     )
     assert any(
-        "不得输出 DSML" in str(getattr(item, "content", ""))
+        "工具预算已耗尽" in str(getattr(item, "content", ""))
         for item in model.stream_messages[0]
     )
     assert [event["phase"] for event in collector.events()] == [
         "context_gate",
         "initial_planning",
         "answer_readiness_check",
+        "final_answer",
         "final_answer",
         "final_answer",
     ]

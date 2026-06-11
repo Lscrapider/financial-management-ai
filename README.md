@@ -22,7 +22,7 @@
 | --- |---------------------------------------------------------------------------------|
 | [docs/REPORT_PIPELINE.md](./docs/REPORT_PIPELINE.md) | AI 分析报告全链路实现说明。                                                                 |
 | [docs/OCR_PIPELINE.md](./docs/OCR_PIPELINE.md) | OCR 全链路实现说明，包括 Java/Python 边界、RabbitMQ 队列、阶段消息、MinIO 产物、人工复核、chunk 打标、软删除和向量入库。 |
-| [docs/AI_CHAT_AGENT_ARCHITECTURE.md](./docs/AI_CHAT_AGENT_ARCHITECTURE.md) | AI Chat Agent 化架构方案，说明 WebSocket、RabbitMQ、Python LangChain、Java 数据网关和 HMAC 内部签名逻辑。 |
+| [docs/AI_CHAT_AGENT_ARCHITECTURE.md](./docs/AI_CHAT_AGENT_ARCHITECTURE.md) | AI Chat Agent 化架构方案，说明 WebSocket、RabbitMQ、Python LangGraph、Tool Calling、最终流式回答、Java 数据网关和 HMAC 内部签名逻辑。 |
 | [docs/API_DOCUMENTATION.md](./docs/API_DOCUMENTATION.md) | 后端接口文档，记录主要 API 的请求方式、请求参数和响应结构。                                                |
 | [docs/COMPLETED_REQUIREMENTS.md](./docs/COMPLETED_REQUIREMENTS.md) | 已完成需求记录，用于追踪阶段性功能交付情况。                                                          |
 | [docs/chunk入库打标签文档.md](./docs/chunk入库打标签文档.md) | Chunk 场景标签规则和 LLM 打标方案。                                                         |
@@ -236,9 +236,11 @@ financial-management-ai/
 - Java 只负责用户鉴权、WebSocket 推送、RabbitMQ 启动消息、内部数据网关、callback 接收和 HMAC 签名校验。
 - Python Agent 查询业务数据时只调用 Java 暴露的受控数据网关，不直接访问数据库，不传 SQL。
 - AI Chat 对话以 `userId + conversationId` 作为短期记忆边界，`conversationId` 由 Java 在 WebSocket 握手时生成或复用；Python 通过 `context_gate` 判断当前问题是否需要用户画像或短期记忆，只有需要指代消解或延续任务时才通过 `conversation.history` 读取最近上下文。
+- Python 通过 `context_gate` 做轻量意图分层：泛看类问题降到低成本行情和趋势初看，指定维度问题只绑定相关工具，买卖建议和复杂研究继续使用用户配置的完整执行预算。
 - 工具链路较慢时，Python 只在 `final_stream` 最终用户可见答案阶段通过 `answer_delta` 流式回传；planner、tools 和 final_decision 阶段不流式，避免工具调用内容泄露到对话框。
+- `final_stream` 不再复用 planner scratchpad，也不把原始 `AIMessage(tool_calls)` 或 `ToolMessage` 传给最终模型；它会重新组装 final system prompt 和 final user prompt，把用户问题、画像、记忆、证据充分性、停止原因和工具结果整理成普通文本证据包。
 - Java 对 `answer_delta` 只做 WebSocket 推送，不保存对话、不记录 Token；`final_answer` 才保存 assistant message 并记录 Token 用量。
-- final answer 有程序级保护，如果模型在最终阶段输出 DSML、tool_calls 或 invoke 等工具调用格式，会停止发送该段增量并尝试改写成自然语言正文。
+- final answer 有程序级保护，如果模型在最终阶段输出 DSML、tool_calls 或 invoke 等工具调用格式，会停止发送该段增量并最多重试 3 次生成自然语言正文。
 - WebSocket 关闭后不立即清理短期消息；Java 在 activeCount 归零时发送 30 分钟延迟 cleanup，版本一致时先保存 `ai_user_memory` 对话摘要，再删除 `ai_chat_message`。
 
 ### 投资报告模块
@@ -336,7 +338,7 @@ Python 将工具结果回填给 planner，继续判断是否需要后续工具
   ↓
 final_decision 判断证据是否足够；证据不足且预算允许时回到 planner 补工具
   ↓
-final_stream 生成最终自然语言答案，并通过 answer_delta 流式回传内容
+final_stream 使用 final 专用 prompt 和普通文本证据包生成自然语言答案，并通过 answer_delta 流式回传内容
   ↓
 Python 通过 callback 回传 final_answer
   ↓
@@ -345,7 +347,7 @@ Java 保存 assistant message、记录 Token 用量，并通过 WebSocket 推送
 WebSocket 关闭 30 分钟后，版本一致则摘要入 ai_user_memory 并删除短期消息
 ```
 
-AI Chat 当前由 LangGraph 编排 Tool Calling：`context_gate -> load_profile? -> load_memory? -> planner -> tools -> final_decision -> final_stream`。模型负责提出标准工具调用请求，Python 执行工具，Java 数据网关查询业务数据；`final_decision` 可在证据不足且预算允许时回到 planner 补工具，只有 `final_stream` 能输出用户可见的流式自然语言答案。直接回答分支保持快速返回；工具链路后的最终答案才启用流式输出。
+AI Chat 当前由 LangGraph 编排 Tool Calling：`context_gate -> load_profile? -> load_memory? -> planner -> tools -> final_decision -> final_stream`。模型负责提出标准工具调用请求，Python 执行工具，Java 数据网关查询业务数据；`final_decision` 可在证据不足且预算允许时回到 planner 补工具，只有 `final_stream` 能输出用户可见的流式自然语言答案。直接回答分支保持快速返回；工具链路后的最终答案才启用流式输出，并且最终模型只能看到整理后的证据包，不再看到工具协议消息。
 
 知识库处理流程：
 

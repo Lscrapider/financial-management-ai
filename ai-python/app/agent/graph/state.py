@@ -11,6 +11,7 @@ from app.agent.runtime.token_usage import AgentTokenUsageCollector
 
 FinalDecisionStatus = Literal["ready", "need_tool", "insufficient"]
 MemoryMode = Literal["reference", "continue_task"]
+QueryDepth = Literal["brief", "focused", "default"]
 
 
 class EvidenceRecord(TypedDict):
@@ -59,6 +60,9 @@ class AgentGraphState(TypedDict, total=False):
     planning_message: Any
     plan_content: str
     planning_nudges: list[str]
+    query_depth: QueryDepth
+    allowed_tool_names: list[str]
+    planner_intent_hint: str
     profile_required: bool
     psych_profile: dict[str, Any] | None
     memory_required: bool
@@ -89,6 +93,9 @@ def initial_state(
         "pending_tool_calls": [],
         "plan_content": "",
         "planning_nudges": [],
+        "query_depth": "default",
+        "allowed_tool_names": [],
+        "planner_intent_hint": "",
         "profile_required": False,
         "psych_profile": None,
         "memory_required": False,

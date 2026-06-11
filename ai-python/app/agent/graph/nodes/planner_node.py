@@ -14,16 +14,19 @@ logger = logging.getLogger(__name__)
 def planner_node(state: AgentGraphState) -> AgentGraphState:
     deps = state["deps"]
     messages = _planning_messages(state)
+    tools_by_name = _allowed_tools_by_name(state)
     logger.info(
-        "agent graph planning start session_id=%s step=%s model=%s base_url=%s thinking_type=%s",
+        "agent graph planning start session_id=%s step=%s model=%s base_url=%s thinking_type=%s query_depth=%s allowed_tools=%s",
         state["agent_session_id"],
         state.get("step_index", 0),
         settings.deepseek.model,
         settings.deepseek.base_url,
         settings.deepseek.thinking_type,
+        state.get("query_depth"),
+        tuple(tools_by_name.keys()),
     )
-    planning_message = deps.model.bind_tools(list(deps.tools_by_name.values())).invoke(messages)
-    standard_tool_calls = getattr(planning_message, "tool_calls", []) or []
+    planning_message = deps.model.bind_tools(list(tools_by_name.values())).invoke(messages)
+    standard_tool_calls = _allowed_tool_calls(getattr(planning_message, "tool_calls", []) or [], tools_by_name)
     content = str(getattr(planning_message, "content", "") or "").strip()
     logger.info(
         "agent graph planning done session_id=%s step=%s standard_tool_calls=%s content_preview=%s tool_calls_preview=%s",
@@ -57,6 +60,17 @@ def _planning_messages(state: AgentGraphState) -> list[Any]:
         *base_messages,
         *state.get("scratchpad", []),
     ]
+    intent_hint = state.get("planner_intent_hint")
+    if intent_hint:
+        intent_message = message_with_content(
+            state["messages"],
+            "本轮工具规划约束：\n"
+            f"- 问题深度：{state.get('query_depth') or 'brief'}\n"
+            f"- 允许工具：{', '.join(state.get('allowed_tool_names') or [])}\n"
+            f"- 约束说明：{intent_hint}",
+        )
+        if intent_message is not None:
+            messages.append(intent_message)
     planning_nudges = state.get("planning_nudges") or []
     if not planning_nudges:
         return messages
@@ -74,6 +88,27 @@ def _record_planning_usage(state: AgentGraphState, planning_message: Any) -> Non
         return
     phase = "tool_followup_planning" if state.get("scratchpad") else "initial_planning"
     collector.add_message(planning_message, phase)
+
+
+def _allowed_tools_by_name(state: AgentGraphState) -> dict[str, Any]:
+    tools_by_name = state["deps"].tools_by_name
+    allowed_tool_names = state.get("allowed_tool_names") or list(tools_by_name.keys())
+    return {
+        tool_name: tools_by_name[tool_name]
+        for tool_name in allowed_tool_names
+        if tool_name in tools_by_name
+    }
+
+
+def _allowed_tool_calls(tool_calls: list[dict[str, Any]], tools_by_name: dict[str, Any]) -> list[dict[str, Any]]:
+    if not tools_by_name:
+        return tool_calls
+    allowed_names = set(tools_by_name)
+    return [
+        tool_call
+        for tool_call in tool_calls
+        if str(tool_call.get("name") or "") in allowed_names
+    ]
 
 
 def _preview(value: Any, limit: int = 200) -> str:
