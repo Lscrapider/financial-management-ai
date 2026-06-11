@@ -28,7 +28,7 @@ Java
   -> 通过 RabbitMQ 发布 agent.run.start 消息
 Python Worker
   -> 消费 RabbitMQ 消息
-  -> 初始化 Python LangChain Agent
+  -> 初始化 Python LangGraph Agent
   -> 调用 LLM 做意图理解、工具规划和答案生成
   -> 需要业务数据时调用 Java 内部数据网关
 Java

@@ -68,7 +68,7 @@
 
 - Python 3.11+
 - RabbitMQ worker（消息队列消费者，全异步处理）
-- LangChain（AI Chat Agent Runtime、Tool Calling、Memory、Answer）
+- LangChain + LangGraph（AI Chat Agent Runtime、Tool Calling、上下文门控、最终流式回答）
 - Sentence Transformers / Embedding 模型
 - OCR 大模型接口（阿里云 DashScope `qwen-vl-ocr-latest`）
 - LLM 接口（DeepSeek V4 Pro，场景标签生成）
@@ -157,9 +157,9 @@ financial-management-ai/
 │   │   ├── ocr/                      # OCR 处理（engines/handlers/services）
 │   │   ├── messaging/                # RabbitMQ 消息通信
 │   │   └── worker/                   # Worker 启动入口
-│   ├── tests/                        # Python 测试代码
+│   ├── test/                         # Python Agent/工具测试代码
+│   ├── tests/                        # Python 其他测试代码
 │   ├── requirements.txt              # Python 依赖
-│   └── README.md                     # AI 服务说明
 ├── frontend-vue/                     # Vue 前端项目
 │   ├── src/
 │   │   ├── api/                      # 前端接口请求
@@ -231,13 +231,14 @@ financial-management-ai/
 - 查询行情上下文（股票/指数行情、分时、日K）。
 - 向量检索召回相关知识库片段。
 - 通过 DeepSeek ChatClient 输出结构化回答。
-- 规划 AI Chat Agent 化：前端通过 WebSocket 连接 Java，Java 创建 Agent Session 并通过 RabbitMQ 触发 Python LangChain Agent。
-- Agent 的 LLM、Planner、Memory、Tool Calling 和 Answer 逻辑放在 Python 层执行。
+- AI Chat Agent：前端通过 WebSocket 连接 Java，Java 创建 Agent Session 并通过 RabbitMQ 触发 Python LangGraph Agent。
+- Agent 的 context gate、Planner、Tool Calling、final decision 和 final stream 逻辑放在 Python 层执行。
 - Java 只负责用户鉴权、WebSocket 推送、RabbitMQ 启动消息、内部数据网关、callback 接收和 HMAC 签名校验。
 - Python Agent 查询业务数据时只调用 Java 暴露的受控数据网关，不直接访问数据库，不传 SQL。
-- AI Chat 对话以 `userId + conversationId` 作为短期记忆边界，`conversationId` 由 Java 在 WebSocket 握手时生成或复用，Python 每次 Agent Run 通过 `conversation.history` 固定召回最近 20 条上下文。
-- 工具链路较慢时，Python 只在最终用户可见答案阶段通过 `answer_delta` 流式回传；planner 和工具规划阶段不流式，避免工具调用内容泄露到对话框。
+- AI Chat 对话以 `userId + conversationId` 作为短期记忆边界，`conversationId` 由 Java 在 WebSocket 握手时生成或复用；Python 通过 `context_gate` 判断当前问题是否需要用户画像或短期记忆，只有需要指代消解或延续任务时才通过 `conversation.history` 读取最近上下文。
+- 工具链路较慢时，Python 只在 `final_stream` 最终用户可见答案阶段通过 `answer_delta` 流式回传；planner、tools 和 final_decision 阶段不流式，避免工具调用内容泄露到对话框。
 - Java 对 `answer_delta` 只做 WebSocket 推送，不保存对话、不记录 Token；`final_answer` 才保存 assistant message 并记录 Token 用量。
+- final answer 有程序级保护，如果模型在最终阶段输出 DSML、tool_calls 或 invoke 等工具调用格式，会停止发送该段增量并尝试改写成自然语言正文。
 - WebSocket 关闭后不立即清理短期消息；Java 在 activeCount 归零时发送 30 分钟延迟 cleanup，版本一致时先保存 `ai_user_memory` 对话摘要，再删除 `ai_chat_message`。
 
 ### 投资报告模块
@@ -317,9 +318,13 @@ Java 创建 Agent Session 和临时 sessionSecret
   ↓
 Java 通过 RabbitMQ 发布 agent.run.start 消息
   ↓
-Python Worker 消费消息，启动 LangChain Agent
+Python Worker 消费消息，启动 LangGraph Agent
   ↓
-Python 先通过 conversation.history 召回短期记忆，再调用 LLM 判断是否需要 Tool Calling
+context_gate 规则优先判断是否需要用户画像和短期记忆；规则未确定项由无工具 LLM JSON 兜底
+  ↓
+按需读取用户画像和 conversation.history 短期记忆
+  ↓
+planner 调用 LLM 生成标准 tool_calls
   ↓
 如果模型返回 tool_calls，Python 代码执行对应 Tool
   ↓
@@ -327,9 +332,11 @@ Python Tool 通过 HMAC 签名调用 Java 内部数据网关查询业务数据
   ↓
 Java 校验签名、nonce、过期时间、scope 和用户数据边界后返回受控数据
   ↓
-Python 将工具结果回填给 LLM，继续判断是否需要后续工具
+Python 将工具结果回填给 planner，继续判断是否需要后续工具
   ↓
-工具链路结束后，Python 在最终答案生成阶段通过 answer_delta 流式回传内容
+final_decision 判断证据是否足够；证据不足且预算允许时回到 planner 补工具
+  ↓
+final_stream 生成最终自然语言答案，并通过 answer_delta 流式回传内容
   ↓
 Python 通过 callback 回传 final_answer
   ↓
@@ -338,7 +345,7 @@ Java 保存 assistant message、记录 Token 用量，并通过 WebSocket 推送
 WebSocket 关闭 30 分钟后，版本一致则摘要入 ai_user_memory 并删除短期消息
 ```
 
-AI Chat 当前是有限循环 Tool Calling：模型负责提出工具调用请求和判断是否还需要后续工具，Python 执行工具，Java 数据网关查询业务数据，工具结果再回填给模型生成最终答案。直接回答分支保持快速返回；工具链路后的最终答案才启用流式输出。
+AI Chat 当前由 LangGraph 编排 Tool Calling：`context_gate -> load_profile? -> load_memory? -> planner -> tools -> final_decision -> final_stream`。模型负责提出标准工具调用请求，Python 执行工具，Java 数据网关查询业务数据；`final_decision` 可在证据不足且预算允许时回到 planner 补工具，只有 `final_stream` 能输出用户可见的流式自然语言答案。直接回答分支保持快速返回；工具链路后的最终答案才启用流式输出。
 
 知识库处理流程：
 
@@ -402,7 +409,7 @@ OCR 详细阶段、消息体、产物目录和人工复核规则见 [docs/OCR_PI
 
 - 项目文档、代码注释、提交说明优先使用中文。
 - Java 服务负责业务稳定性、数据一致性和系统对外接口。
-- Python 服务负责 AI 能力；AI Chat Agent 的 LLM、Planner、Memory、Tool Calling 和 Answer 放在 Python LangChain 层，业务数据访问仍通过 Java 受控数据网关完成。
+- Python 服务负责 AI 能力；AI Chat Agent 的 context gate、Planner、Tool Calling、final decision 和 final stream 放在 Python LangChain/LangGraph 层，业务数据访问仍通过 Java 受控数据网关完成。
 - AI Chat 记忆第一版由 Java 负责短期消息持久化和 cleanup 摘要入库；后续需要更高质量长期记忆时，再把摘要生成升级为 Python LangChain/LLM 任务。
 - 前后端接口返回结构保持清晰、可追踪、可扩展。
 - 所有模型输出都需要保留引用依据，避免只有结论没有来源。
