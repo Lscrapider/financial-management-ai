@@ -127,15 +127,21 @@ AgentDataGatewayServiceImpl
 
 Python 是 Agent 和 LLM 能力承载层。Java 只通过 RabbitMQ 启动 Agent，不直接调用 LLM。
 
-建议使用 LangChain 的 Tool Calling Agent 作为第一阶段运行时：
+当前 AI Chat 使用 LangGraph 编排 LangChain tool calling：
 
 ```text
 RabbitMQ AgentRunHandler
   -> AgentExecutor
       -> ChatOpenAI 或 OpenAI 兼容 Chat Model
-      -> MemoryLoader
       -> PromptBuilder
-      -> AgentPlanner
+      -> AgentGraphRunner
+          -> context_gate
+          -> load_profile?
+          -> load_memory?
+          -> planner
+          -> tools
+          -> final_decision
+          -> final_stream
       -> ToolRegistry
       -> ToolCallRunner
       -> AnswerGenerator
@@ -158,24 +164,28 @@ app/agent/
     data_gateway_client.py   # 调 Java 内部数据网关
     signature.py             # 内部 HMAC 签名
     answer_builder.py        # 答案兜底和最终文本清理
-  memory/
-    memory_loader.py         # 短期记忆加载
+  graph/
+    graph_runner.py          # LangGraph 组装和执行入口
+    routing.py               # 条件边路由
+    state.py                 # Graph 状态定义
+    profile_context.py       # 画像和短期记忆上下文注入
+    nodes/                   # context/profile/memory/planner/tools/final 节点
   prompts/
     prompt_builder.py        # system prompt、memory prompt、当前问题 prompt
-  planning/
-    agent_planner.py         # 第一次模型调用，生成标准 tool_calls
   runtime/
     tool_call_runner.py      # 执行工具调用
     answer_generator.py      # 工具结果回填模型并生成答案
   tools/
     tool_registry.py         # LangChain 工具注册
     market_quote_tool.py     # 行情工具
-    conversation_history_tool.py
+    conversation_history_tool.py # 内部短期记忆读取器，不注册为 LangChain tool
 ```
 
 后续新增工具时，优先新增独立 tool 文件，并在 `tool_registry.py` 注册；不要把工具定义、工具执行和答案生成继续塞进 `agent_executor.py`。
 
 LangChain Tool 不直接访问数据库。每个 Tool 只负责把模型生成的结构化参数转成 Java 数据网关请求。
+
+工具参数必须与 Java action 既有契约一致。`scene_signal_context` 对应 Java `scene.signal_data`，必须同时传入标准 `target_code` 和 `target_name`；如果用户只给名称或只给代码，planner 需要先通过 `market_quote` 解析标准代码和名称，再请求场景信号。
 
 示例：
 
@@ -187,25 +197,31 @@ KnowledgeSearchTool
   -> JavaDataGatewayClient.call("knowledge.search", params)
 ```
 
-第一阶段先使用 LangChain Tool Calling Agent；如果后续需要复杂状态机、循环规划、人工确认或长耗时研究任务，再升级为 LangGraph。
+Graph 中只有 `final_stream` 允许向前端推送流式 `answer_delta`；planner、tools 和 final_decision 都不直接产生用户可见文本。
+
+`final_stream` 仍有程序级输出保护：如果流式内容或最终完整回答包含 DSML、tool_calls、invoke 等工具调用格式，Python 会停止继续发送该段 delta，并尝试把完整结果改写为自然语言正文。最终入库和前端展示都只能使用自然语言答案。
 
 ### Tool Calling 执行语义
 
-当前 Agent Executor 是有限循环 Tool Calling 流程。Planner 只负责判断是否需要工具和生成标准 `tool_calls`，不做流式输出；工具执行后的最终用户可见答案由 AnswerGenerator 生成，并在工具链路较慢时通过 `answer_delta` 流式推送。
+当前 Agent Executor 是 LangGraph Tool Calling 流程。Planner 只负责判断是否需要工具和生成标准 `tool_calls`，不做流式输出；`final_decision` 只判断证据是否足够，必要时回到 planner；最终用户可见答案只由 `final_stream` 生成，并通过 `answer_delta` 流式推送。
 
 ```text
-1. Python 将当前问题、短期记忆和工具定义发送给 LLM
-2. LLM 只负责判断是否需要工具，并返回结构化 tool_calls
-3. Python 读取 tool_calls，由代码执行对应 LangChain Tool
-4. LangChain Tool 通过 Java 内部数据网关查询业务数据
-5. Python 将工具结果包装为 ToolMessage，继续交给 Planner 判断是否还需要后续工具
-6. 如果仍有 tool_calls，继续执行下一轮工具
-7. 如果已有工具结果且不再需要工具，AnswerGenerator 基于 scratchpad 生成最终答案
-8. AnswerGenerator 使用模型 stream 输出 `answer_delta`，并保留完整 final message 用于 Token 统计
-9. Python callback Java，Java 通过 WebSocket 推送增量和最终答案
+1. context_gate 先用规则分别判断是否需要用户画像和短期记忆；某一类规则未判断出来时，再用不绑定工具的 LLM JSON 兜底分类
+2. Python 将当前问题、必要上下文和工具定义发送给 LLM planner
+3. LLM planner 只负责判断是否需要工具，并返回结构化 tool_calls
+4. Python 读取 tool_calls，由代码执行对应 LangChain Tool
+5. LangChain Tool 通过 Java 内部数据网关查询业务数据
+6. Python 将工具结果包装为 ToolMessage，继续交给 planner 判断是否还需要后续工具
+7. 如果 planner 认为不需要继续查工具，进入 final_decision 做证据充分性判断
+8. 如果 final_decision 认为证据不足且仍可查工具，写入 planning_nudges 并回到 planner
+9. 如果 final_decision 返回 ready 或 insufficient，进入 final_stream 生成最终自然语言答案
+10. final_stream 使用模型 stream 输出 `answer_delta`，并保留完整 final message 用于 Token 统计
+11. Python callback Java，Java 通过 WebSocket 推送增量和最终答案
 ```
 
-如果模型一开始就不需要工具并直接回答，当前走 `direct_answer` 快速返回，不额外发起一次最终答案流式模型调用。
+默认工具预算由 `ToolCallBudget` 统一控制：`max_steps=6`、`max_tool_calls_total=10`、`max_tool_calls_per_step=4`、`timeout_seconds=50`。缓存命中的重复工具结果不占用每步真实新工具调用数量。
+
+如果模型一开始就不需要工具并直接回答，当前使用 planner 返回内容快速返回，不额外发起一次最终答案流式模型调用。
 
 模型不会直接调用 Java 接口，也不会直接访问数据库。Tool Calling 的本质是：
 
@@ -280,7 +296,7 @@ Java 在 WebSocket 握手阶段完成：
 4. 发 RabbitMQ agent.run.start 给 Python
 ```
 
-Python 每次 Agent Run 固定通过 Java 内部数据网关读取最近短期记忆：
+Python 由 `context_gate` 判断当前问题需要历史指代或延续上一轮任务时，才通过 Java 内部数据网关读取最近短期记忆。`context_gate` 先走明确规则，分别判断用户画像和短期记忆：规则判断需要画像就读取画像，规则判断需要记忆就读取记忆；如果某一类规则未判断出来，例如“看看海康威视，给我买卖建议”能判断需要画像但无法确定是否需要记忆，则只把未确定的上下文需求交给一次不绑定工具的 LLM JSON 兜底分类：
 
 ```text
 action = conversation.history
@@ -289,7 +305,7 @@ params = {
 limit = 20
 ```
 
-Java 使用 Agent Session 中的 `userId + conversationId` 查询 `ai_chat_message`，不允许 Python 自行指定任意用户。Python 将短期记忆、当前问题和工具结果交给 LLM 生成答案。
+Java 使用 Agent Session 中的 `userId + conversationId` 查询 `ai_chat_message`，不允许 Python 自行指定任意用户。短期记忆由 graph 注入 planner/final 上下文，不作为 LLM 可调用 tool 暴露。
 
 Java 收到 Python `final_answer` callback 后：
 

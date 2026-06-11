@@ -7,8 +7,10 @@ import lombok.Getter;
 public enum AiTokenUsagePhaseEnum {
 
     PLANNING("planning", "规划"),
+    CONTEXT_GATE("context_gate", "上下文门控"),
     INITIAL_PLANNING("initial_planning", "初始规划"),
     TOOL_FOLLOWUP_PLANNING("tool_followup_planning", "工具后续规划"),
+    ANSWER_READINESS_CHECK("answer_readiness_check", "回答证据检查"),
     DIRECT_ANSWER("direct_answer", "直接回答"),
     TOOL_RESULT_ANSWER("tool_result_answer", "基于工具结果回答"),
     FINAL_ANSWER("final_answer", "最终整理回答"),

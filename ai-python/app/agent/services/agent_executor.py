@@ -5,12 +5,10 @@ from dataclasses import dataclass
 from collections.abc import Callable
 from typing import Any
 
+from app.agent.graph.graph_runner import AgentGraphRunner
 from app.agent.llm.deepseek_chat import DeepSeekChatModelFactory
-from app.agent.memory.memory_loader import AgentMemoryLoader
-from app.agent.planning.agent_planner import AgentPlanner
 from app.agent.prompts.prompt_builder import AgentPromptBuilder
 from app.agent.runtime.answer_generator import AgentAnswerGenerator
-from app.agent.runtime.agent_loop_runner import AgentLoopRunner
 from app.agent.runtime.token_usage import AgentTokenUsageCollector
 from app.agent.runtime.tool_call_runner import ToolCallRunner
 from app.agent.services.answer_builder import AgentAnswerBuilder
@@ -35,27 +33,23 @@ class BasicAgentExecutor:
         conversation_history_tool: ConversationHistoryTool | None = None,
         model_factory: DeepSeekChatModelFactory | None = None,
         answer_builder: AgentAnswerBuilder | None = None,
-        memory_loader: AgentMemoryLoader | None = None,
         prompt_builder: AgentPromptBuilder | None = None,
         tool_registry: AgentToolRegistry | None = None,
-        planner: AgentPlanner | None = None,
         tool_call_runner: ToolCallRunner | None = None,
         answer_generator: AgentAnswerGenerator | None = None,
         data_gateway_client: AgentDataGatewayClient | None = None,
+        graph_runner: AgentGraphRunner | None = None,
     ) -> None:
         self._model_factory = model_factory or DeepSeekChatModelFactory()
-        self._memory_loader = memory_loader or AgentMemoryLoader(conversation_history_tool)
+        self._conversation_history_tool = conversation_history_tool or ConversationHistoryTool()
         self._prompt_builder = prompt_builder or AgentPromptBuilder()
         self._tool_registry = tool_registry or AgentToolRegistry(
             market_quote_tool=market_quote_tool,
-            memory_context_tool=conversation_history_tool,
         )
-        self._planner = planner or AgentPlanner()
         self._tool_call_runner = tool_call_runner or ToolCallRunner()
         self._answer_generator = answer_generator or AgentAnswerGenerator(answer_builder)
         self._data_gateway_client = data_gateway_client or AgentDataGatewayClient()
-        self._agent_loop_runner = AgentLoopRunner(
-            planner=self._planner,
+        self._agent_graph_runner = graph_runner or AgentGraphRunner(
             tool_call_runner=self._tool_call_runner,
             answer_generator=self._answer_generator,
         )
@@ -125,7 +119,7 @@ class BasicAgentExecutor:
                 ),
                 tool,
             )
-            answer = self._agent_loop_runner.run(
+            graph_result = self._agent_graph_runner.run(
                 model=model,
                 messages=messages,
                 tools_by_name=tools_by_name,
@@ -139,7 +133,14 @@ class BasicAgentExecutor:
                     agent_session_id,
                     session_secret,
                 ),
+                memory_provider=lambda mode: self._load_memory_context(
+                    data_gateway_url,
+                    agent_session_id,
+                    session_secret,
+                    mode,
+                ),
             )
+            answer = graph_result.answer
             if not answer:
                 return None
             return AgentRunResult(answer, token_usage_collector.events())
@@ -170,3 +171,18 @@ class BasicAgentExecutor:
         except Exception as exc:
             logger.warning("agent psych profile query failed session_id=%s error=%s", agent_session_id, exc)
             return None
+
+    def _load_memory_context(
+        self,
+        data_gateway_url: str,
+        agent_session_id: str,
+        session_secret: str,
+        mode: str,
+    ) -> str | None:
+        return self._conversation_history_tool.invoke(
+            data_gateway_url=data_gateway_url,
+            agent_session_id=agent_session_id,
+            session_secret=session_secret,
+            mode=mode,
+            limit=ConversationHistoryTool.MEMORY_WINDOW,
+        )

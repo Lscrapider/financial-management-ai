@@ -6,6 +6,7 @@ Pillow==11.0.0
 opendataloader-pdf
 openai==1.82.0
 langchain>=0.3.25
+langgraph>=0.2.0,<1.0.0
 langchain-openai>=0.3.18
 sentence-transformers>=3.0.0
 pgvector>=0.3.0

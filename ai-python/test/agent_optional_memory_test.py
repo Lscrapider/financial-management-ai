@@ -9,15 +9,6 @@ from app.agent.services.agent_executor import BasicAgentExecutor
 from app.agent.tools.tool_registry import AgentToolContext, AgentToolRegistry
 
 
-class FakeMemoryLoader:
-    def __init__(self) -> None:
-        self.called = False
-
-    def load_short_term_memory(self, **kwargs: Any) -> list[dict[str, Any]]:
-        self.called = True
-        raise AssertionError("memory should be loaded only through memory_context tool")
-
-
 class FakeModelFactory:
     def create(self) -> object:
         return object()
@@ -52,9 +43,9 @@ class FakeToolRegistry:
         return {}
 
 
-class FakeLoopRunner:
-    def run(self, **kwargs: Any) -> str:
-        return "回答"
+class FakeGraphRunner:
+    def run(self, **kwargs: Any) -> Any:
+        return type("GraphResult", (), {"answer": "回答"})()
 
 
 class FakeMemoryContextTool:
@@ -93,15 +84,15 @@ def install_fake_langchain(monkeypatch: Any) -> None:
 
 def test_agent_start_does_not_preload_memory(monkeypatch: Any) -> None:
     install_fake_langchain(monkeypatch)
-    memory_loader = FakeMemoryLoader()
+    memory_context_tool = FakeMemoryContextTool()
     prompt_builder = FakePromptBuilder()
     executor = BasicAgentExecutor(
+        conversation_history_tool=memory_context_tool,
         model_factory=FakeModelFactory(),
-        memory_loader=memory_loader,
         prompt_builder=prompt_builder,
         tool_registry=FakeToolRegistry(),
     )
-    executor._agent_loop_runner = FakeLoopRunner()
+    executor._agent_graph_runner = FakeGraphRunner()
 
     result = executor._tool_calling_answer(
         data_gateway_url="http://gateway",
@@ -112,13 +103,12 @@ def test_agent_start_does_not_preload_memory(monkeypatch: Any) -> None:
 
     assert result is not None
     assert result.answer == "回答"
-    assert memory_loader.called is False
+    assert memory_context_tool.calls == []
     assert prompt_builder.history == []
 
 
-def test_memory_context_tool_reuses_conversation_history_window() -> None:
-    memory_context_tool = FakeMemoryContextTool()
-    registry = AgentToolRegistry(memory_context_tool=memory_context_tool)
+def test_memory_context_is_not_registered_as_planner_tool() -> None:
+    registry = AgentToolRegistry()
 
     tools = registry.build_langchain_tools(
         AgentToolContext(
@@ -129,16 +119,14 @@ def test_memory_context_tool_reuses_conversation_history_window() -> None:
         lambda func: func,
     )
 
-    assert "memory_context" in tools
-    assert tools["memory_context"]() == "memory-result"
-    assert memory_context_tool.calls == [{"mode": "reference", "limit": 20}]
+    assert "memory_context" not in tools
 
 
 def test_prompt_tells_model_memory_is_optional() -> None:
     prompt = AgentPromptBuilder().system_prompt()
 
-    assert "默认不要调用 memory_context" in prompt
-    assert "只有当前问题依赖历史指代或明确延续上一轮任务时，才调用 memory_context" in prompt
+    assert "短期记忆不是可调用工具" in prompt
+    assert "系统会在工具规划前注入短期记忆上下文" in prompt
 
 
 def test_build_messages_does_not_inject_empty_history_context() -> None:

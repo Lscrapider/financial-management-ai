@@ -64,8 +64,10 @@ const SOURCE_OPTIONS = [
 ];
 const PHASE_OPTIONS = [
   { label: '规划', value: 'planning' },
+  { label: '上下文门控', value: 'context_gate' },
   { label: '初始规划', value: 'initial_planning' },
   { label: '工具后续规划', value: 'tool_followup_planning' },
+  { label: '回答证据检查', value: 'answer_readiness_check' },
   { label: '直接回答', value: 'direct_answer' },
   { label: '基于工具结果回答', value: 'tool_result_answer' },
   { label: '最终整理回答', value: 'final_answer' },
