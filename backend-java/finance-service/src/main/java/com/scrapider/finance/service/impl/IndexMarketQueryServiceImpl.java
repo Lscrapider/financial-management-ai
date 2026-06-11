@@ -19,7 +19,7 @@ import com.scrapider.finance.manage.IndexConfigManage;
 import com.scrapider.finance.manage.IndexIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.IndexKlineManage;
 import com.scrapider.finance.manage.IndexQuoteSnapshotManage;
-import com.scrapider.finance.service.provider.HistoricalKlineProvider;
+import com.scrapider.finance.provider.HistoricalKlineProvider;
 import com.scrapider.finance.service.IndexMarketQueryService;
 import com.scrapider.finance.task.IndexMarketSyncTask;
 import java.time.LocalDate;

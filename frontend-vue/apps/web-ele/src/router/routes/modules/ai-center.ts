@@ -54,6 +54,16 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
+        name: 'AiInvestorPsychProfile',
+        path: '/ai-center/investor-psych-profile',
+        component: () =>
+          import('#/views/ai-center/investor-psych-profile/index.vue'),
+        meta: {
+          icon: 'lucide:brain',
+          title: $t('page.aiCenter.investorPsychProfile'),
+        },
+      },
+      {
         name: 'AiReportWorkspace',
         path: '/ai-center/report-workspace',
         component: () => import('#/views/ai-center/report-workspace/index.vue'),

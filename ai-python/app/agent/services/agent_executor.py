@@ -14,6 +14,7 @@ from app.agent.runtime.agent_loop_runner import AgentLoopRunner
 from app.agent.runtime.token_usage import AgentTokenUsageCollector
 from app.agent.runtime.tool_call_runner import ToolCallRunner
 from app.agent.services.answer_builder import AgentAnswerBuilder
+from app.agent.services.data_gateway_client import AgentDataGatewayClient
 from app.agent.tools.conversation_history_tool import ConversationHistoryTool
 from app.agent.tools.market_quote_tool import MarketQuoteTool
 from app.agent.tools.tool_registry import AgentToolContext, AgentToolRegistry
@@ -40,6 +41,7 @@ class BasicAgentExecutor:
         planner: AgentPlanner | None = None,
         tool_call_runner: ToolCallRunner | None = None,
         answer_generator: AgentAnswerGenerator | None = None,
+        data_gateway_client: AgentDataGatewayClient | None = None,
     ) -> None:
         self._model_factory = model_factory or DeepSeekChatModelFactory()
         self._memory_loader = memory_loader or AgentMemoryLoader(conversation_history_tool)
@@ -51,6 +53,7 @@ class BasicAgentExecutor:
         self._planner = planner or AgentPlanner()
         self._tool_call_runner = tool_call_runner or ToolCallRunner()
         self._answer_generator = answer_generator or AgentAnswerGenerator(answer_builder)
+        self._data_gateway_client = data_gateway_client or AgentDataGatewayClient()
         self._agent_loop_runner = AgentLoopRunner(
             planner=self._planner,
             tool_call_runner=self._tool_call_runner,
@@ -131,10 +134,39 @@ class BasicAgentExecutor:
                 agent_session_id=agent_session_id,
                 token_usage_collector=token_usage_collector,
                 answer_delta_callback=answer_delta_callback,
+                psych_profile_provider=lambda: self._load_psych_profile(
+                    data_gateway_url,
+                    agent_session_id,
+                    session_secret,
+                ),
             )
             if not answer:
                 return None
             return AgentRunResult(answer, token_usage_collector.events())
         except Exception as exc:
             logger.warning("langchain tool calling failed: %s", exc)
+            return None
+
+    def _load_psych_profile(
+        self,
+        data_gateway_url: str,
+        agent_session_id: str,
+        session_secret: str,
+    ) -> dict[str, Any] | None:
+        try:
+            result = self._data_gateway_client.query(
+                data_gateway_url=data_gateway_url,
+                agent_session_id=agent_session_id,
+                session_secret=session_secret,
+                action="investor.psych_profile",
+            )
+            rows = result.get("data") if isinstance(result, dict) else None
+            if not isinstance(rows, list) or not rows:
+                return None
+            profile = rows[0]
+            if not isinstance(profile, dict):
+                return None
+            return profile
+        except Exception as exc:
+            logger.warning("agent psych profile query failed session_id=%s error=%s", agent_session_id, exc)
             return None

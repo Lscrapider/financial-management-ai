@@ -18,7 +18,7 @@ import com.scrapider.finance.manage.IndexIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.IndexKlineManage;
 import com.scrapider.finance.manage.IndexQuoteSnapshotManage;
 import com.scrapider.finance.manage.MarketSyncJobManage;
-import com.scrapider.finance.service.provider.HistoricalKlineProvider;
+import com.scrapider.finance.provider.HistoricalKlineProvider;
 import com.scrapider.finance.service.MarketTradingCalendarService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;

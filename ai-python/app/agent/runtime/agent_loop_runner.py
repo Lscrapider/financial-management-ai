@@ -36,6 +36,8 @@ class AgentLoopRunner:
         budget: ToolCallBudget | None = None,
         token_usage_collector: AgentTokenUsageCollector | None = None,
         answer_delta_callback: Callable[[str], None] | None = None,
+        psych_profile: dict[str, Any] | None = None,
+        psych_profile_provider: Callable[[], dict[str, Any] | None] | None = None,
     ) -> str | None:
         active_budget = budget or ToolCallBudget()
         trace = AgentTrace()
@@ -69,6 +71,7 @@ class AgentLoopRunner:
                         agent_session_id=agent_session_id,
                         token_usage_collector=token_usage_collector,
                         answer_delta_callback=answer_delta_callback,
+                        psych_profile=self._final_psych_profile(psych_profile, psych_profile_provider),
                     )
                 if plan.content:
                     self._record_planning_usage(
@@ -129,6 +132,7 @@ class AgentLoopRunner:
                 agent_session_id=agent_session_id,
                 token_usage_collector=token_usage_collector,
                 answer_delta_callback=answer_delta_callback,
+                psych_profile=self._final_psych_profile(psych_profile, psych_profile_provider),
             )
         return self._answer_generator.answer_without_tools(
             content=last_plan_content,
@@ -144,6 +148,17 @@ class AgentLoopRunner:
     ) -> None:
         if token_usage_collector:
             token_usage_collector.add_message(planning_message, phase)
+
+    def _final_psych_profile(
+        self,
+        psych_profile: dict[str, Any] | None,
+        psych_profile_provider: Callable[[], dict[str, Any] | None] | None,
+    ) -> dict[str, Any] | None:
+        if psych_profile is not None:
+            return psych_profile
+        if psych_profile_provider is None:
+            return None
+        return psych_profile_provider()
 
     def _planning_message_with_tool_calls(self, planning_message: Any, tool_calls: list[dict[str, Any]]) -> Any:
         original_tool_calls = getattr(planning_message, "tool_calls", []) or []

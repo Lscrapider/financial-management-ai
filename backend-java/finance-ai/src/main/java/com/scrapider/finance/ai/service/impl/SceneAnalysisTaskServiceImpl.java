@@ -10,6 +10,7 @@ import com.scrapider.finance.ai.domain.param.SceneAnalysisCurrentScenesPayloadPa
 import com.scrapider.finance.ai.domain.param.SceneAnalysisSubmitParam;
 import com.scrapider.finance.ai.domain.param.SceneRetrievalEmbeddingParam;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisSubmitVO;
+import com.scrapider.finance.ai.pipeline.SceneAnalysisTaskPipeline;
 import com.scrapider.finance.ai.publisher.SceneAnalysisMessagePublisher;
 import com.scrapider.finance.ai.security.CurrentUserContext;
 import com.scrapider.finance.ai.service.SceneAnalysisTaskService;

@@ -55,6 +55,7 @@ const NAVIGATION_WORKSPACES: NavigationWorkspace[] = [
     children: [
       { label: '标的分析报告', path: '/ai-center/scene-reports' },
       { label: '报告工作台', path: '/ai-center/report-workspace' },
+      { label: '投资心理画像', path: '/ai-center/investor-psych-profile' },
     ],
     defaultPath: '/ai-center/scene-reports',
     icon: 'lucide:file-text',

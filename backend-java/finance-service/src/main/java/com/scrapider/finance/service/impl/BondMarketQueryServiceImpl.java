@@ -20,7 +20,7 @@ import com.scrapider.finance.manage.BondIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.BondKlineManage;
 import com.scrapider.finance.manage.BondQuoteSnapshotManage;
 import com.scrapider.finance.service.BondMarketQueryService;
-import com.scrapider.finance.service.provider.HistoricalKlineProvider;
+import com.scrapider.finance.provider.HistoricalKlineProvider;
 import com.scrapider.finance.task.BondMarketSyncTask;
 import java.time.LocalDate;
 import java.util.List;

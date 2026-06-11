@@ -3,7 +3,7 @@ package com.scrapider.finance.ai.service.impl;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.scrapider.finance.ai.domain.dto.ConvertibleBondSceneDataDTO;
-import com.scrapider.finance.service.provider.ConvertibleBondSceneDataProvider;
+import com.scrapider.finance.provider.ConvertibleBondSceneDataProvider;
 import com.scrapider.finance.domain.po.BondConfigPO;
 import com.scrapider.finance.domain.po.BondQuoteSnapshotPO;
 import com.scrapider.finance.domain.po.ConvertibleBondBasicPO;

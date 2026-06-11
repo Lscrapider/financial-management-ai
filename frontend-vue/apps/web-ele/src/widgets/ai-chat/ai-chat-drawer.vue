@@ -65,7 +65,7 @@ const enlargedPanelWidth = 720;
 const enlargedPanelHeight = 720;
 const minPanelWidth = 360;
 const minPanelHeight = 420;
-const quickPrompts = ['解释今日异动', '列复盘清单', '查相关知识'];
+const quickPrompts = ['解释今日异动', '按我的画像分析', '列复盘清单', '查相关知识'];
 
 const markdownRenderer = new MarkdownIt({
   breaks: true,
@@ -656,6 +656,7 @@ onBeforeUnmount(() => {
         <span class="context-chip active">当前页</span>
         <span class="context-chip">自选池</span>
         <span class="context-chip">近 20 条会话</span>
+        <span class="context-chip">心理画像</span>
         <span class="context-chip">知识库材料</span>
       </div>
 
