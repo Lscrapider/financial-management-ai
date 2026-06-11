@@ -10,6 +10,16 @@ from app.ocr.engines.embedding_engine import SentenceTransformersEngine
 
 logger = logging.getLogger(__name__)
 
+KNOWLEDGE_TAG_SCENES = (
+    "asset",
+    "price",
+    "volume",
+    "trend",
+    "valuation",
+    "sentiment",
+    "risk_strategy",
+)
+
 
 class LocalEmbeddingProvider:
     def __init__(self) -> None:
@@ -43,7 +53,7 @@ class KnowledgeSearchTool:
         session_secret: str,
         query_text: str,
         scenes: list[str] | None = None,
-        tags: dict[str, list[str]] | None = None,
+        tags: dict[str, Any] | None = None,
         limit: int = 5,
     ) -> str:
         self.last_result = self.query(
@@ -64,18 +74,19 @@ class KnowledgeSearchTool:
         session_secret: str,
         query_text: str,
         scenes: list[str] | None = None,
-        tags: dict[str, list[str]] | None = None,
+        tags: dict[str, Any] | None = None,
         limit: int = 5,
     ) -> dict[str, Any]:
         normalized_query_text = str(query_text or "").strip()
         if not normalized_query_text:
             return {"chunks": []}
         normalized_limit = max(1, min(int(limit or 5), 8))
+        normalized_scenes = _normalize_scenes(scenes)
         params: dict[str, Any] = {
             "queryText": normalized_query_text,
             "queryEmbedding": self._embedding_provider.embed_query(normalized_query_text),
-            "scenes": scenes or [],
-            "tags": tags or {},
+            "scenes": normalized_scenes,
+            "tags": _normalize_tags(tags, normalized_scenes),
             "limit": normalized_limit,
         }
         logger.info(
@@ -107,3 +118,52 @@ class KnowledgeSearchTool:
             "filename": filename,
             "content": content,
         }
+
+
+def _normalize_scenes(scenes: list[str] | None) -> list[str]:
+    return [str(scene).strip() for scene in scenes or [] if str(scene).strip()]
+
+
+def _normalize_tags(tags: dict[str, Any] | None, scenes: list[str]) -> dict[str, list[str]]:
+    if not isinstance(tags, dict):
+        return {}
+    normalized: dict[str, list[str]] = {}
+    loose_tags: list[str] = []
+    for key, value in tags.items():
+        key_text = str(key).strip()
+        if not key_text:
+            continue
+        if isinstance(value, list):
+            values = _string_list(value)
+            if values:
+                normalized[key_text] = values
+            continue
+        if isinstance(value, str):
+            value_text = value.strip()
+            if value_text:
+                normalized[key_text] = [value_text]
+            continue
+        if isinstance(value, bool):
+            if value:
+                loose_tags.append(key_text)
+            continue
+        if value:
+            loose_tags.append(key_text)
+
+    if loose_tags:
+        target_scenes = scenes or list(KNOWLEDGE_TAG_SCENES)
+        for scene in target_scenes:
+            values = normalized.setdefault(scene, [])
+            for tag in loose_tags:
+                if tag not in values:
+                    values.append(tag)
+    return {scene: values for scene, values in normalized.items() if values}
+
+
+def _string_list(values: list[Any]) -> list[str]:
+    result: list[str] = []
+    for value in values:
+        text = str(value).strip()
+        if text and text not in result:
+            result.append(text)
+    return result

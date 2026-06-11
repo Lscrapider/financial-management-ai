@@ -1,5 +1,6 @@
 package com.scrapider.finance.ai.domain.dto;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.time.Instant;
 import java.util.Set;
 
@@ -15,13 +16,15 @@ public record AgentRunStartMessageDTO(
         Set<String> scopes,
         Instant expiresAt,
         String dataGatewayUrl,
-        String callbackUrl) {
+        String callbackUrl,
+        JsonNode executionBudget) {
 
     public static AgentRunStartMessageDTO from(
             AgentSessionDTO session,
             String userMessage,
             String dataGatewayUrl,
-            String callbackUrl) {
+            String callbackUrl,
+            JsonNode executionBudget) {
         return new AgentRunStartMessageDTO(
                 "agent.run.start",
                 session.agentSessionId(),
@@ -34,6 +37,7 @@ public record AgentRunStartMessageDTO(
                 session.scopes(),
                 session.expiresAt(),
                 dataGatewayUrl,
-                callbackUrl);
+                callbackUrl,
+                executionBudget);
     }
 }

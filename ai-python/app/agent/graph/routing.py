@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from app.agent.graph.state import AgentGraphState
 
-MAX_FINAL_BACKTRACKS = 2
-
 
 def route_after_context_gate(state: AgentGraphState) -> str:
     if state.get("profile_required"):
@@ -34,7 +32,7 @@ def route_after_final_decision(state: AgentGraphState) -> str:
     decision = state.get("final_decision")
     if decision is None or decision.status != "need_tool":
         return "final_stream"
-    if int(state.get("final_backtrack_count", 0)) > MAX_FINAL_BACKTRACKS:
+    if int(state.get("final_backtrack_count", 0)) > state["budget"].max_final_backtracks:
         return "final_stream"
     if not state["budget"].step_allowed(int(state.get("step_index", 0))):
         return "final_stream"

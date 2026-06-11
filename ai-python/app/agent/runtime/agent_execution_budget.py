@@ -6,17 +6,63 @@ from dataclasses import dataclass, field
 from typing import Any
 
 UNORDERED_LIST_ARG_NAMES = {"target_codes", "scenes", "sections"}
+DEFAULT_MAX_STEPS = 6
+DEFAULT_MAX_TOOL_CALLS_TOTAL = 10
+DEFAULT_MAX_TOOL_CALLS_PER_STEP = 4
+DEFAULT_TIMEOUT_SECONDS = 50.0
+DEFAULT_MAX_FINAL_BACKTRACKS = 2
 
 
 @dataclass
-class ToolCallBudget:
-    max_steps: int = 6
-    max_tool_calls_total: int = 10
-    max_tool_calls_per_step: int = 4
-    timeout_seconds: float = 50.0
+class AgentExecutionBudget:
+    max_steps: int = DEFAULT_MAX_STEPS
+    max_tool_calls_total: int = DEFAULT_MAX_TOOL_CALLS_TOTAL
+    max_tool_calls_per_step: int = DEFAULT_MAX_TOOL_CALLS_PER_STEP
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
+    max_final_backtracks: int = DEFAULT_MAX_FINAL_BACKTRACKS
     started_at: float = field(default_factory=time.monotonic)
     total_tool_calls: int = 0
     seen_signatures: set[str] = field(default_factory=set)
+
+    @classmethod
+    def from_payload(cls, payload: Any) -> "AgentExecutionBudget":
+        if not isinstance(payload, dict):
+            return cls()
+        return cls(
+            max_steps=_int_budget(payload, "maxSteps", "max_steps", DEFAULT_MAX_STEPS, 1, 12),
+            max_tool_calls_total=_int_budget(
+                payload,
+                "maxToolCallsTotal",
+                "max_tool_calls_total",
+                DEFAULT_MAX_TOOL_CALLS_TOTAL,
+                1,
+                50,
+            ),
+            max_tool_calls_per_step=_int_budget(
+                payload,
+                "maxToolCallsPerStep",
+                "max_tool_calls_per_step",
+                DEFAULT_MAX_TOOL_CALLS_PER_STEP,
+                1,
+                10,
+            ),
+            timeout_seconds=float(_int_budget(
+                payload,
+                "timeoutSeconds",
+                "timeout_seconds",
+                int(DEFAULT_TIMEOUT_SECONDS),
+                10,
+                120,
+            )),
+            max_final_backtracks=_int_budget(
+                payload,
+                "maxFinalBacktracks",
+                "max_final_backtracks",
+                DEFAULT_MAX_FINAL_BACKTRACKS,
+                0,
+                5,
+            ),
+        )
 
     def step_allowed(self, step_index: int) -> bool:
         return step_index < self.max_steps and not self.timed_out()
@@ -65,3 +111,19 @@ class ToolCallBudget:
         if isinstance(value, dict):
             return self._normalized_args(value)
         return value
+
+
+def _int_budget(
+    payload: dict[str, Any],
+    camel_key: str,
+    snake_key: str,
+    default: int,
+    minimum: int,
+    maximum: int,
+) -> int:
+    value = payload.get(camel_key, payload.get(snake_key))
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = default
+    return max(minimum, min(parsed, maximum))

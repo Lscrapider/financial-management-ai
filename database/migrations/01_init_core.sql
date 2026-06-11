@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS app_user (
     email VARCHAR(128),
     phone VARCHAR(32),
     email_notification BOOLEAN NOT NULL DEFAULT TRUE,
+    agent_execution_budget_json JSONB,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uk_app_user_username UNIQUE (username)
@@ -127,6 +128,7 @@ ALTER TABLE app_user ADD COLUMN IF NOT EXISTS introduction TEXT;
 ALTER TABLE app_user ADD COLUMN IF NOT EXISTS email VARCHAR(128);
 ALTER TABLE app_user ADD COLUMN IF NOT EXISTS phone VARCHAR(32);
 ALTER TABLE app_user ADD COLUMN IF NOT EXISTS email_notification BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE app_user ADD COLUMN IF NOT EXISTS agent_execution_budget_json JSONB;
 UPDATE app_user
 SET home_path = '/investment-workbench'
 WHERE role_code = 'user' AND home_path = '/analytics';
@@ -139,6 +141,7 @@ COMMENT ON COLUMN app_user.role_code IS '用户角色编码';
 COMMENT ON COLUMN app_user.avatar IS '用户头像地址';
 COMMENT ON COLUMN app_user.enabled IS '是否启用';
 COMMENT ON COLUMN app_user.home_path IS '登录后默认首页';
+COMMENT ON COLUMN app_user.agent_execution_budget_json IS 'AI Chat Agent 执行预算 JSON；为空时使用系统默认预算';
 
 -- 默认管理员
 INSERT INTO app_user (username, password, real_name, role_code, home_path)

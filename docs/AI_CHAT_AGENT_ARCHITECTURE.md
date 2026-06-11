@@ -280,7 +280,7 @@ Graph Deps 保存运行依赖，例如模型、工具表、答案生成器、工
 11. Python callback Java，Java 通过 WebSocket 推送增量和最终答案
 ```
 
-默认工具预算由 `ToolCallBudget` 统一控制：`max_steps=6`、`max_tool_calls_total=10`、`max_tool_calls_per_step=4`、`timeout_seconds=50`。缓存命中的重复工具结果不占用每步真实新工具调用数量。
+默认执行预算由 `AgentExecutionBudget` 统一控制：`max_steps=6`、`max_tool_calls_total=10`、`max_tool_calls_per_step=4`、`timeout_seconds=50`、`max_final_backtracks=2`。Java 可从 `app_user.agent_execution_budget_json` 读取用户级预算并通过 RMQ 顶层字段 `executionBudget` 传给 Python；字段为空或非法时 Python 使用默认预算并做安全上限夹取。缓存命中的重复工具结果不占用每步真实新工具调用数量。
 
 ### 流式输出与直出路径
 

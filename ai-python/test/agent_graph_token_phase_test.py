@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.agent.graph.graph_runner import AgentGraphRunner
-from app.agent.runtime.tool_call_budget import ToolCallBudget
+from app.agent.runtime.agent_execution_budget import AgentExecutionBudget
 from app.agent.runtime.token_usage import AgentTokenUsageCollector
 
 
@@ -250,6 +250,40 @@ def test_tool_result_answer_streams_final_answer_after_followup_planning() -> No
     ]
 
 
+def test_final_stream_clears_planner_message_content_but_keeps_tool_calls() -> None:
+    collector = AgentTokenUsageCollector()
+    tool_call = {"id": "call-1", "name": "market_quote", "args": {}}
+    runner = AgentGraphRunner(tool_call_runner=FakeToolRunner())
+    model = FakeStreamingModel([
+        message("场景信号齐全，现在用知识库 RAG 召回。", [tool_call]),
+        message("基于工具回答"),
+        message('{"status":"ready","reason":"已有工具结果"}'),
+    ])
+
+    result = runner.run(
+        model=model,
+        messages=[],
+        tools_by_name={},
+        tool_message_type=FakeToolMessage,
+        quote_result_provider=lambda: {},
+        agent_session_id="session-1",
+        token_usage_collector=collector,
+        answer_delta_callback=lambda _delta: None,
+    )
+
+    assert result.answer == "基于工具生成回答。"
+    final_messages = model.stream_messages[0]
+    assert all(
+        "RAG 召回" not in str(getattr(item, "content", ""))
+        for item in final_messages
+    )
+    assert any(
+        getattr(item, "content", None) == ""
+        and getattr(item, "tool_calls", None) == [tool_call]
+        for item in final_messages
+    )
+
+
 def test_final_decision_can_backtrack_to_planner() -> None:
     collector = AgentTokenUsageCollector()
     tool_call = {"id": "call-1", "name": "market_quote", "args": {}}
@@ -271,7 +305,7 @@ def test_final_decision_can_backtrack_to_planner() -> None:
         tool_message_type=FakeToolMessage,
         quote_result_provider=lambda: {},
         agent_session_id="session-1",
-        budget=ToolCallBudget(max_steps=3),
+        budget=AgentExecutionBudget(max_steps=3),
         token_usage_collector=collector,
         answer_delta_callback=deltas.append,
     )
@@ -311,7 +345,7 @@ def test_final_decision_tool_intent_text_backtracks_to_planner() -> None:
         tool_message_type=FakeToolMessage,
         quote_result_provider=lambda: {},
         agent_session_id="session-1",
-        budget=ToolCallBudget(max_steps=3),
+        budget=AgentExecutionBudget(max_steps=3),
         token_usage_collector=collector,
         answer_delta_callback=deltas.append,
     )
@@ -355,7 +389,7 @@ def test_final_stream_gets_guard_when_decision_needs_tool_but_budget_stops() -> 
         tool_message_type=FakeToolMessage,
         quote_result_provider=lambda: {},
         agent_session_id="session-1",
-        budget=ToolCallBudget(max_steps=1),
+        budget=AgentExecutionBudget(max_steps=1),
         token_usage_collector=collector,
         answer_delta_callback=deltas.append,
     )
@@ -380,7 +414,7 @@ def test_final_stream_gets_guard_when_decision_needs_tool_but_budget_stops() -> 
 
 
 def test_tool_signature_normalizes_unordered_scope_args() -> None:
-    budget = ToolCallBudget()
+    budget = AgentExecutionBudget()
 
     first = budget.signature({
         "name": "scene_signal_context",
@@ -400,10 +434,11 @@ def test_tool_signature_normalizes_unordered_scope_args() -> None:
     assert first == second
 
 
-def test_default_tool_budget_limits_are_doubled() -> None:
-    budget = ToolCallBudget()
+def test_default_agent_execution_budget_limits_are_doubled() -> None:
+    budget = AgentExecutionBudget()
 
     assert budget.max_steps == 6
     assert budget.max_tool_calls_total == 10
     assert budget.max_tool_calls_per_step == 4
     assert budget.timeout_seconds == 50.0
+    assert budget.max_final_backtracks == 2

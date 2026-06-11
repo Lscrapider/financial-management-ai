@@ -189,7 +189,7 @@ class AgentToolRegistry:
         def knowledge_search(
             query_text: str,
             scenes: list[str] | None = None,
-            tags: dict[str, list[str]] | None = None,
+            tags: dict[str, Any] | None = None,
             limit: int = 5,
         ) -> str:
             """基于投资知识库检索简洁知识片段，适合在 scene_signal_context 得到场景标签后补充方法、风险和策略依据；返回内容只包含文件名和 chunk 文本。"""

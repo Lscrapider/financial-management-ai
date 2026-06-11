@@ -1,10 +1,13 @@
 package com.scrapider.finance.ai.websocket;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.scrapider.finance.ai.domain.dto.AgentRunStartMessageDTO;
 import com.scrapider.finance.ai.domain.dto.AgentSessionDTO;
 import com.scrapider.finance.ai.domain.param.AiChatWebSocketMessageParam;
 import com.scrapider.finance.ai.domain.vo.AiChatWebSocketMessageVO;
+import com.scrapider.finance.domain.po.AppUserPO;
+import com.scrapider.finance.manage.AppUserManage;
 import com.scrapider.finance.security.LoginUser;
 import com.scrapider.finance.ai.publisher.AgentMessagePublisher;
 import com.scrapider.finance.ai.service.AgentSessionService;
@@ -30,6 +33,7 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
     private final AgentSessionService agentSessionService;
     private final AgentMessagePublisher agentMessagePublisher;
     private final AiChatConversationService aiChatConversationService;
+    private final AppUserManage appUserManage;
     private final String dataGatewayUrl;
     private final String callbackUrl;
 
@@ -39,6 +43,7 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
             AgentSessionService agentSessionService,
             AgentMessagePublisher agentMessagePublisher,
             AiChatConversationService aiChatConversationService,
+            AppUserManage appUserManage,
             @Value("${finance.agent.data-gateway-url:http://localhost:8081/internal/agent/data/query}")
                     String dataGatewayUrl,
             @Value("${finance.agent.callback-url:http://localhost:8081/internal/agent/callback}")
@@ -48,6 +53,7 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
         this.agentSessionService = agentSessionService;
         this.agentMessagePublisher = agentMessagePublisher;
         this.aiChatConversationService = aiChatConversationService;
+        this.appUserManage = appUserManage;
         this.dataGatewayUrl = dataGatewayUrl;
         this.callbackUrl = callbackUrl;
     }
@@ -94,7 +100,8 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
                     agentSession,
                     param.content(),
                     this.dataGatewayUrl,
-                    this.callbackUrl));
+                    this.callbackUrl,
+                    this.agentExecutionBudget(loginUser.getUser().getId())));
         } catch (Exception ex) {
             this.send(session, AiChatWebSocketMessageVO.finalAnswer(
                     boundConversationId,
@@ -116,5 +123,13 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
 
     private void send(WebSocketSession session, AiChatWebSocketMessageVO payload) throws IOException {
         session.sendMessage(new TextMessage(this.objectMapper.writeValueAsString(payload)));
+    }
+
+    private JsonNode agentExecutionBudget(Long userId) {
+        if (userId == null) {
+            return null;
+        }
+        AppUserPO user = this.appUserManage.getById(userId);
+        return user == null ? null : user.getAgentExecutionBudgetJson();
     }
 }

@@ -22,7 +22,7 @@ from app.agent.graph.routing import (
 )
 from app.agent.graph.state import AgentGraphDeps, AgentGraphRunResult, AgentGraphState, initial_state
 from app.agent.runtime.answer_generator import AgentAnswerGenerator
-from app.agent.runtime.tool_call_budget import ToolCallBudget
+from app.agent.runtime.agent_execution_budget import AgentExecutionBudget
 from app.agent.runtime.tool_call_runner import ToolCallRunner
 from app.agent.runtime.token_usage import AgentTokenUsageCollector
 
@@ -46,7 +46,7 @@ class AgentGraphRunner:
         tool_message_type: Any,
         quote_result_provider: Callable[[], dict[str, Any]],
         agent_session_id: str,
-        budget: ToolCallBudget | None = None,
+        budget: AgentExecutionBudget | None = None,
         token_usage_collector: AgentTokenUsageCollector | None = None,
         answer_delta_callback: Callable[[str], None] | None = None,
         psych_profile_provider: Callable[[], dict[str, Any] | None] | None = None,
@@ -70,7 +70,7 @@ class AgentGraphRunner:
             messages=messages,
             agent_session_id=agent_session_id,
             deps=deps,
-            budget=budget or ToolCallBudget(),
+            budget=budget or AgentExecutionBudget(),
         ))
         answer = final_state.get("answer")
         logger.info("agent graph run done session_id=%s answer_len=%s", agent_session_id, len(answer or ""))

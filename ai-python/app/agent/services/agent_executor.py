@@ -8,6 +8,7 @@ from typing import Any
 from app.agent.graph.graph_runner import AgentGraphRunner
 from app.agent.llm.deepseek_chat import DeepSeekChatModelFactory
 from app.agent.prompts.prompt_builder import AgentPromptBuilder
+from app.agent.runtime.agent_execution_budget import AgentExecutionBudget
 from app.agent.runtime.answer_generator import AgentAnswerGenerator
 from app.agent.runtime.token_usage import AgentTokenUsageCollector
 from app.agent.runtime.tool_call_runner import ToolCallRunner
@@ -63,18 +64,25 @@ class BasicAgentExecutor:
         agent_session_id = str(message_body["agentSessionId"])
         session_secret = str(message_body["sessionSecret"])
         data_gateway_url = str(message_body["dataGatewayUrl"])
+        execution_budget = AgentExecutionBudget.from_payload(message_body.get("executionBudget"))
         logger.info(
-            "agent executor start session_id=%s conversation_id=%s message_id=%s user_message_len=%s",
+            "agent executor start session_id=%s conversation_id=%s message_id=%s user_message_len=%s max_steps=%s max_tool_calls_total=%s max_tool_calls_per_step=%s timeout_seconds=%s max_final_backtracks=%s",
             agent_session_id,
             message_body.get("conversationId"),
             message_body.get("messageId"),
             len(user_message),
+            execution_budget.max_steps,
+            execution_budget.max_tool_calls_total,
+            execution_budget.max_tool_calls_per_step,
+            execution_budget.timeout_seconds,
+            execution_budget.max_final_backtracks,
         )
         result = self._tool_calling_answer(
             data_gateway_url=data_gateway_url,
             agent_session_id=agent_session_id,
             session_secret=session_secret,
             user_message=user_message,
+            execution_budget=execution_budget,
             answer_delta_callback=answer_delta_callback,
         )
         if result and result.answer:
@@ -93,6 +101,7 @@ class BasicAgentExecutor:
         agent_session_id: str,
         session_secret: str,
         user_message: str,
+        execution_budget: AgentExecutionBudget | None = None,
         answer_delta_callback: Callable[[str], None] | None = None,
     ) -> AgentRunResult | None:
         try:
@@ -126,6 +135,7 @@ class BasicAgentExecutor:
                 tool_message_type=ToolMessage,
                 quote_result_provider=lambda: self._tool_registry.last_market_quote_result,
                 agent_session_id=agent_session_id,
+                budget=execution_budget,
                 token_usage_collector=token_usage_collector,
                 answer_delta_callback=answer_delta_callback,
                 psych_profile_provider=lambda: self._load_psych_profile(

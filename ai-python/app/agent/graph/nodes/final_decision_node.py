@@ -5,7 +5,6 @@ import logging
 from typing import Any
 
 from app.agent.graph.profile_context import messages_with_memory_context, messages_with_psych_profile
-from app.agent.graph.routing import MAX_FINAL_BACKTRACKS
 from app.agent.graph.state import AgentGraphState, FinalDecision, merge_state, message_with_content
 
 logger = logging.getLogger(__name__)
@@ -154,7 +153,7 @@ def _need_tool_block_reason(state: AgentGraphState) -> str | None:
     stop_reason = state.get("stop_reason")
     if stop_reason in {"tool_budget_exhausted", "tool_all_failed"}:
         return str(stop_reason)
-    if int(state.get("final_backtrack_count", 0)) + 1 > MAX_FINAL_BACKTRACKS:
+    if int(state.get("final_backtrack_count", 0)) + 1 > state["budget"].max_final_backtracks:
         return "final_backtrack_limit"
     if not state["budget"].step_allowed(int(state.get("step_index", 0))):
         return "tool_budget_exhausted"

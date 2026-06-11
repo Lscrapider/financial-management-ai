@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Literal, TypedDict
 
 from app.agent.runtime.answer_generator import AgentAnswerGenerator
-from app.agent.runtime.tool_call_budget import ToolCallBudget
+from app.agent.runtime.agent_execution_budget import AgentExecutionBudget
 from app.agent.runtime.tool_call_runner import ToolCallRunner
 from app.agent.runtime.token_usage import AgentTokenUsageCollector
 
@@ -52,7 +52,7 @@ class AgentGraphState(TypedDict, total=False):
     messages: list[Any]
     scratchpad: list[Any]
     agent_session_id: str
-    budget: ToolCallBudget
+    budget: AgentExecutionBudget
     deps: AgentGraphDeps
     step_index: int
     pending_tool_calls: list[dict[str, Any]]
@@ -77,7 +77,7 @@ def initial_state(
     messages: list[Any],
     agent_session_id: str,
     deps: AgentGraphDeps,
-    budget: ToolCallBudget,
+    budget: AgentExecutionBudget,
 ) -> AgentGraphState:
     return {
         "messages": messages,

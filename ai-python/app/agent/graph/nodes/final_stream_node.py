@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import is_dataclass, replace
+from typing import Any
 
 from app.agent.graph.profile_context import messages_with_memory_context
 from app.agent.graph.state import AgentGraphState, FinalDecision, merge_state, message_with_content
@@ -41,11 +43,33 @@ def final_stream_node(state: AgentGraphState) -> AgentGraphState:
 
 
 def _scratchpad_with_final_guard(state: AgentGraphState) -> list[object]:
-    scratchpad = list(state.get("scratchpad", []))
+    scratchpad = [_sanitize_planner_message(message) for message in list(state.get("scratchpad", []))]
     guard_message = _final_guard_message(state)
     if guard_message is not None:
         scratchpad.append(guard_message)
     return scratchpad
+
+
+def _sanitize_planner_message(message: Any) -> Any:
+    if not _has_tool_calls(message):
+        return message
+    update = {"content": ""}
+    if hasattr(message, "model_copy"):
+        return message.model_copy(update=update)
+    if hasattr(message, "copy"):
+        return message.copy(update=update)
+    if is_dataclass(message):
+        return replace(message, content="")
+    return message
+
+
+def _has_tool_calls(message: Any) -> bool:
+    tool_calls = getattr(message, "tool_calls", None)
+    if tool_calls:
+        return True
+    additional_kwargs = getattr(message, "additional_kwargs", {}) or {}
+    raw_tool_calls = additional_kwargs.get("tool_calls") if isinstance(additional_kwargs, dict) else None
+    return bool(raw_tool_calls)
 
 
 def _final_guard_message(state: AgentGraphState) -> object | None:
