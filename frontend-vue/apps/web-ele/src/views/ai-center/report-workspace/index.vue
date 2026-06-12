@@ -31,6 +31,7 @@ import {
 import { GridItem, GridLayout } from 'grid-layout-plus';
 
 import {
+  getSceneReportDetail,
   listSceneReportHistory,
   searchSceneAnalysisTargets,
 } from '#/api/scene-analysis';
@@ -116,17 +117,32 @@ const targetTypeOptions: Array<{ label: string; value: WorkbenchTargetType }> =
 onMounted(() => {
   const reportId = Number(route.query.reportId);
   if (Number.isFinite(reportId) && reportId > 0) {
-    const firstItem = workbenchItems.value[0];
-    if (!firstItem) {
-      return;
-    }
-    workbenchItems.value[0] = {
-      ...firstItem,
-      componentType: 'report',
-      reportId,
-    };
+    void applyInitialReport(reportId);
   }
 });
+
+async function applyInitialReport(reportId: number) {
+  const firstItem = workbenchItems.value[0];
+  if (!firstItem) {
+    return;
+  }
+  workbenchItems.value[0] = {
+    ...firstItem,
+    componentType: 'report',
+    reportId,
+  };
+  try {
+    const report = await getSceneReportDetail(reportId);
+    workbenchItems.value[0] = {
+      ...workbenchItems.value[0],
+      targetCode: report.targetCode,
+      targetName: report.targetName ?? undefined,
+      targetType: normalizeTargetType(report.targetType),
+    };
+  } catch {
+    // 保留 reportId，让报告正文组件按原路径自行加载并展示错误状态。
+  }
+}
 
 function applyLayout(value: WorkbenchLayout) {
   layout.value = value;
@@ -314,6 +330,17 @@ function findItem(itemId: string) {
 
 function isWorkbenchLayout(value: string): value is WorkbenchLayout {
   return layoutOptions.some((item) => item.value === value);
+}
+
+function normalizeTargetType(value?: string): WorkbenchTargetType {
+  if (
+    value === 'STOCK' ||
+    value === 'INDEX' ||
+    value === 'CONVERTIBLE_BOND'
+  ) {
+    return value;
+  }
+  return 'STOCK';
 }
 </script>
 

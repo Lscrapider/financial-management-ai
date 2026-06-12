@@ -290,6 +290,18 @@ function toNullableNumber(value?: null | number | string) {
 function toNumber(value?: null | number | string) {
   return toNullableNumber(value) ?? 0;
 }
+
+function maskEmail(email?: null | string) {
+  if (!email) {
+    return '-';
+  }
+  const [name = '', domain = ''] = email.split('@');
+  if (!name || !domain) {
+    return email;
+  }
+  const visiblePrefix = name.slice(0, 1);
+  return `${visiblePrefix}***@${domain}`;
+}
 </script>
 
 <template>
@@ -399,7 +411,7 @@ function toNumber(value?: null | number | string) {
           >
             <template #default="{ row }">
               <div class="stack-cell">
-                <span>{{ row.email || '-' }}</span>
+                <span>{{ maskEmail(row.email) }}</span>
                 <ElTag
                   :type="row.emailNotification ? 'success' : 'info'"
                   effect="plain"
