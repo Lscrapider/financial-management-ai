@@ -58,6 +58,7 @@ class CurrentSceneHandler(MessageHandler):
             raise PermanentMessageError(f"scene analysis target.code is required task_no={task_no}")
         if not isinstance(config, dict) or not isinstance(config.get("parameters"), dict):
             raise PermanentMessageError(f"scene analysis config.parameters is required task_no={task_no}")
+        callback_token = self._callback_token(message.body, task_no)
         total_chunks = self._total_chunks(message.body)
         # self._save_test_data(message.body)
         base_metrics = self._base_metrics_calculator.calculate(message.body)
@@ -107,9 +108,15 @@ class CurrentSceneHandler(MessageHandler):
             task_no,
             current_scenes_payload,
         )
-        self._callback_client.mark_success(task_no, current_scenes_payload)
+        self._callback_client.mark_success(task_no, callback_token, current_scenes_payload)
         logger.info("scene analysis callback success task_no=%s", task_no)
         return HandlerResult()
+
+    def _callback_token(self, payload: dict, task_no: str) -> str:
+        callback_token = payload.get("callbackToken")
+        if not isinstance(callback_token, str) or not callback_token.strip():
+            raise PermanentMessageError(f"scene analysis callbackToken is required task_no={task_no}")
+        return callback_token.strip()
 
     def _total_chunks(self, payload: dict) -> int:
         value = payload.get("totalChunks")

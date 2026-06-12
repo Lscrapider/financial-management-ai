@@ -12,6 +12,7 @@ import com.scrapider.finance.ai.domain.param.SceneRetrievalEmbeddingParam;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisSubmitVO;
 import com.scrapider.finance.ai.pipeline.SceneAnalysisTaskPipeline;
 import com.scrapider.finance.ai.publisher.SceneAnalysisMessagePublisher;
+import com.scrapider.finance.ai.security.SceneAnalysisCallbackTokenStore;
 import com.scrapider.finance.ai.security.CurrentUserContext;
 import com.scrapider.finance.ai.service.SceneAnalysisTaskService;
 import com.scrapider.finance.ai.service.SceneTargetDataProvider;
@@ -29,6 +30,7 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
     private final SceneAnalysisMessagePublisher sceneAnalysisMessagePublisher;
     private final SceneAnalysisTaskManage sceneAnalysisTaskManage;
     private final SceneAnalysisTaskPipeline sceneAnalysisTaskPipeline;
+    private final SceneAnalysisCallbackTokenStore callbackTokenStore;
     private final List<SceneTargetDataProvider> targetDataProviders;
 
     public SceneAnalysisTaskServiceImpl(
@@ -36,11 +38,13 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
             SceneAnalysisMessagePublisher sceneAnalysisMessagePublisher,
             SceneAnalysisTaskManage sceneAnalysisTaskManage,
             SceneAnalysisTaskPipeline sceneAnalysisTaskPipeline,
+            SceneAnalysisCallbackTokenStore callbackTokenStore,
             List<SceneTargetDataProvider> targetDataProviders) {
         this.objectMapper = objectMapper;
         this.sceneAnalysisMessagePublisher = sceneAnalysisMessagePublisher;
         this.sceneAnalysisTaskManage = sceneAnalysisTaskManage;
         this.sceneAnalysisTaskPipeline = sceneAnalysisTaskPipeline;
+        this.callbackTokenStore = callbackTokenStore;
         this.targetDataProviders = targetDataProviders;
     }
 
@@ -62,10 +66,12 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
         SceneAnalysisMessageDTO message = this.targetDataProvider(targetType)
                 .buildMessage(taskNo, targetCode, param);
         this.sceneAnalysisTaskManage.saveTask(this.pendingTask(userId, message));
+        String callbackToken = this.callbackTokenStore.issue(taskNo);
         try {
-            this.sceneAnalysisMessagePublisher.publishCurrentSceneAnalysisMessage(message);
+            this.sceneAnalysisMessagePublisher.publishCurrentSceneAnalysisMessage(message, callbackToken);
             this.sceneAnalysisTaskManage.markProcessing(taskNo);
         } catch (Exception ex) {
+            this.callbackTokenStore.revoke(taskNo);
             this.sceneAnalysisTaskManage.markFailed(taskNo, ex.getMessage());
             throw ex;
         }
@@ -73,7 +79,7 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
     }
 
     @Override
-    public void callback(String taskNo, SceneAnalysisCallbackParam param) {
+    public void callback(String taskNo, String callbackToken, SceneAnalysisCallbackParam param) {
         if (StrUtil.isBlank(taskNo)) {
             throw new IllegalArgumentException("taskNo is required");
         }
@@ -90,11 +96,16 @@ public class SceneAnalysisTaskServiceImpl implements SceneAnalysisTaskService {
                 this.sceneAnalysisTaskManage.markCurrentScenesReady(
                         taskNo,
                         this.objectMapper.valueToTree(currentScenesPayload));
-                this.sceneAnalysisTaskPipeline.start(taskNo, currentScenesPayload);
+                boolean continued = this.sceneAnalysisTaskPipeline.start(taskNo, currentScenesPayload, callbackToken);
+                if (!continued) {
+                    this.callbackTokenStore.revoke(taskNo);
+                }
                 return;
             }
             this.sceneAnalysisTaskPipeline.continueWithRetrievalEmbeddings(taskNo, retrievalEmbeddings);
+            this.callbackTokenStore.revoke(taskNo);
         } catch (Exception ex) {
+            this.callbackTokenStore.revoke(taskNo);
             this.sceneAnalysisTaskManage.markFailed(taskNo, ex.getMessage());
             throw ex;
         }

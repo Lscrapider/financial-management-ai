@@ -5,7 +5,7 @@ import type {
   OcrReviewParagraph,
 } from '#/api/ocr-review';
 
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { Page } from '@vben/common-ui';
@@ -22,6 +22,7 @@ import {
 
 import {
   getOcrReview,
+  getOcrReviewPageImage,
   saveOcrReviewDraft,
   submitOcrReview,
 } from '#/api/ocr-review';
@@ -34,6 +35,10 @@ const saving = ref(false);
 const submitting = ref(false);
 const review = ref<OcrReviewDetail>();
 const selectedParagraphNo = ref<number>();
+const selectedPageImageUrl = ref('');
+const selectedPageImageLoading = ref(false);
+
+let selectedPageImageRequestId = 0;
 
 const taskNo = computed(() => String(route.params.taskNo ?? ''));
 
@@ -76,6 +81,18 @@ onMounted(() => {
   void loadReview();
 });
 
+onBeforeUnmount(() => {
+  selectedPageImageRequestId += 1;
+  revokeSelectedPageImageUrl();
+});
+
+watch(
+  () => selectedPage.value?.imageUrl,
+  (imageUrl) => {
+    void loadSelectedPageImage(imageUrl);
+  },
+);
+
 async function loadReview() {
   if (!hasTaskNo.value) {
     return;
@@ -88,6 +105,42 @@ async function loadReview() {
   } finally {
     loading.value = false;
   }
+}
+
+async function loadSelectedPageImage(imageUrl?: string) {
+  const requestId = selectedPageImageRequestId + 1;
+  selectedPageImageRequestId = requestId;
+  revokeSelectedPageImageUrl();
+  if (!imageUrl) {
+    selectedPageImageLoading.value = false;
+    return;
+  }
+  selectedPageImageLoading.value = true;
+  try {
+    const image = await getOcrReviewPageImage(imageUrl);
+    const objectUrl = URL.createObjectURL(image);
+    if (requestId !== selectedPageImageRequestId) {
+      URL.revokeObjectURL(objectUrl);
+      return;
+    }
+    selectedPageImageUrl.value = objectUrl;
+  } catch {
+    if (requestId === selectedPageImageRequestId) {
+      ElMessage.error('页面图片加载失败');
+    }
+  } finally {
+    if (requestId === selectedPageImageRequestId) {
+      selectedPageImageLoading.value = false;
+    }
+  }
+}
+
+function revokeSelectedPageImageUrl() {
+  if (!selectedPageImageUrl.value) {
+    return;
+  }
+  URL.revokeObjectURL(selectedPageImageUrl.value);
+  selectedPageImageUrl.value = '';
 }
 
 async function saveDraft() {
@@ -377,16 +430,20 @@ async function goBack() {
             <div class="image-header">
               <div>
                 <h2>第 {{ selectedPageNo ?? '-' }} 页</h2>
-                <span>{{ selectedPage?.imageRef.objectKey ?? '-' }}</span>
               </div>
             </div>
             <div class="image-stage">
               <img
-                v-if="selectedPage"
+                v-if="selectedPage && selectedPageImageUrl"
                 :alt="`page-${selectedPage.pageNo}`"
-                :src="selectedPage.imageUrl"
+                :src="selectedPageImageUrl"
               />
-              <ElEmpty v-else description="暂无页面图片" />
+              <ElEmpty
+                v-else
+                :description="
+                  selectedPageImageLoading ? '页面图片加载中' : '暂无页面图片'
+                "
+              />
             </div>
           </aside>
         </div>

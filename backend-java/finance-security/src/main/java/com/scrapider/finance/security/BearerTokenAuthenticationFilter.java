@@ -1,6 +1,7 @@
 package com.scrapider.finance.security;
 
 import com.scrapider.finance.domain.po.AppUserPO;
+import com.scrapider.finance.mapper.AppUserMapper;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -20,10 +21,12 @@ public class BearerTokenAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
     private final TokenStore tokenStore;
+    private final AppUserMapper appUserMapper;
 
-    public BearerTokenAuthenticationFilter(JwtUtils jwtUtils, TokenStore tokenStore) {
+    public BearerTokenAuthenticationFilter(JwtUtils jwtUtils, TokenStore tokenStore, AppUserMapper appUserMapper) {
         this.jwtUtils = jwtUtils;
         this.tokenStore = tokenStore;
+        this.appUserMapper = appUserMapper;
     }
 
     @Override
@@ -38,13 +41,11 @@ public class BearerTokenAuthenticationFilter extends OncePerRequestFilter {
                 try {
                     Claims claims = this.jwtUtils.parseAccessToken(token);
                     Long userId = Long.valueOf(claims.getSubject());
-                    String username = claims.get("username", String.class);
-                    String role = claims.get("role", String.class);
-
-                    AppUserPO user = new AppUserPO();
-                    user.setId(userId);
-                    user.setUsername(username);
-                    user.setRoleCode(role);
+                    AppUserPO user = this.appUserMapper.selectById(userId);
+                    if (user == null || !Boolean.TRUE.equals(user.getEnabled())) {
+                        filterChain.doFilter(request, response);
+                        return;
+                    }
 
                     LoginUser loginUser = new LoginUser(user);
                     UsernamePasswordAuthenticationToken auth =

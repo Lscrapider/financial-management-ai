@@ -3,6 +3,7 @@ package com.scrapider.finance.config;
 import com.scrapider.finance.security.BearerTokenAuthenticationFilter;
 import com.scrapider.finance.security.JwtUtils;
 import com.scrapider.finance.security.TokenStore;
+import com.scrapider.finance.mapper.AppUserMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -26,7 +27,11 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtUtils jwtUtils, TokenStore tokenStore) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            JwtUtils jwtUtils,
+            TokenStore tokenStore,
+            AppUserMapper appUserMapper) throws Exception {
         return http.csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(this.corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -42,7 +47,7 @@ public class SecurityConfig {
                                 "/api/auth/logout")
                         .permitAll()
                         .requestMatchers("/api/ws/**").permitAll()
-                        .requestMatchers("/api/ai/ocr/reviews/*/pages/*/image").permitAll()
+                        .requestMatchers("/api/ai/ocr/reviews/*/pages/*/image").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/ai/scene-analysis/tasks/*/callback").permitAll()
                         .requestMatchers(
                                 "/api/system-config/**",
@@ -60,9 +65,9 @@ public class SecurityConfig {
                                 "/api/ai/token-usage/**")
                         .hasRole("admin")
                         .requestMatchers("/api/**").authenticated()
-                        .anyRequest().permitAll())
+                        .anyRequest().authenticated())
                 .addFilterBefore(
-                        new BearerTokenAuthenticationFilter(jwtUtils, tokenStore),
+                        new BearerTokenAuthenticationFilter(jwtUtils, tokenStore, appUserMapper),
                         UsernamePasswordAuthenticationFilter.class)
                 .build();
     }

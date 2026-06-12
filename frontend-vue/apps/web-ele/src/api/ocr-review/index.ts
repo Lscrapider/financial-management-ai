@@ -64,6 +64,12 @@ export function getOcrReview(taskNo: string) {
   });
 }
 
+export function getOcrReviewPageImage(imageUrl: string) {
+  return requestClient.download<Blob>(normalizeOcrReviewImageUrl(imageUrl), {
+    responseReturn: 'body',
+  });
+}
+
 export function saveOcrReviewDraft(
   taskNo: string,
   draftContent: OcrReviewDraftContent,
@@ -88,4 +94,8 @@ export function submitOcrReview(
       responseReturn: 'body',
     },
   );
+}
+
+function normalizeOcrReviewImageUrl(imageUrl: string) {
+  return imageUrl.startsWith('/api/') ? imageUrl.slice('/api'.length) : imageUrl;
 }

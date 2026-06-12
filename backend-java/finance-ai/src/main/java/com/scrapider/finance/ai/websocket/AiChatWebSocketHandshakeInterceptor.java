@@ -2,6 +2,7 @@ package com.scrapider.finance.ai.websocket;
 
 import com.scrapider.finance.domain.po.AppUserPO;
 import com.scrapider.finance.ai.domain.dto.AiChatConversationBindingDTO;
+import com.scrapider.finance.mapper.AppUserMapper;
 import com.scrapider.finance.security.JwtUtils;
 import com.scrapider.finance.security.LoginUser;
 import com.scrapider.finance.security.TokenStore;
@@ -30,14 +31,17 @@ public class AiChatWebSocketHandshakeInterceptor implements HandshakeInterceptor
 
     private final JwtUtils jwtUtils;
     private final TokenStore tokenStore;
+    private final AppUserMapper appUserMapper;
     private final AiChatConversationService aiChatConversationService;
 
     public AiChatWebSocketHandshakeInterceptor(
             JwtUtils jwtUtils,
             TokenStore tokenStore,
+            AppUserMapper appUserMapper,
             AiChatConversationService aiChatConversationService) {
         this.jwtUtils = jwtUtils;
         this.tokenStore = tokenStore;
+        this.appUserMapper = appUserMapper;
         this.aiChatConversationService = aiChatConversationService;
     }
 
@@ -58,7 +62,11 @@ public class AiChatWebSocketHandshakeInterceptor implements HandshakeInterceptor
 
         try {
             Claims claims = this.jwtUtils.parseAccessToken(token);
-            LoginUser loginUser = this.loginUser(claims);
+            LoginUser loginUser = this.loginUser(claims.getSubject());
+            if (loginUser == null) {
+                response.setStatusCode(HttpStatus.UNAUTHORIZED);
+                return false;
+            }
             AiChatConversationBindingDTO binding = this.aiChatConversationService.bind(loginUser.getUser().getId());
             attributes.put(LOGIN_USER_ATTRIBUTE, loginUser);
             attributes.put(USER_ID_ATTRIBUTE, binding.userId());
@@ -80,11 +88,11 @@ public class AiChatWebSocketHandshakeInterceptor implements HandshakeInterceptor
             Exception exception) {
     }
 
-    private LoginUser loginUser(Claims claims) {
-        AppUserPO user = new AppUserPO();
-        user.setId(Long.valueOf(claims.getSubject()));
-        user.setUsername(claims.get("username", String.class));
-        user.setRoleCode(claims.get("role", String.class));
+    private LoginUser loginUser(String subject) {
+        AppUserPO user = this.appUserMapper.selectById(Long.valueOf(subject));
+        if (user == null || !Boolean.TRUE.equals(user.getEnabled())) {
+            return null;
+        }
         return new LoginUser(user);
     }
 }

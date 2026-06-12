@@ -5,28 +5,37 @@ from urllib import error, request
 
 from app.core.config import FinanceApiSettings
 
+CALLBACK_TOKEN_HEADER = "X-Scene-Analysis-Callback-Token"
+
 
 class SceneAnalysisCallbackClient:
     def __init__(self, settings: FinanceApiSettings) -> None:
         self._settings = settings
 
-    def mark_success(self, task_no: str, current_scenes_payload: dict) -> None:
+    def mark_success(self, task_no: str, callback_token: str, current_scenes_payload: dict) -> None:
         self._post_callback(
             task_no,
+            callback_token,
             {
                 "currentScenesPayload": current_scenes_payload,
             },
         )
 
-    def submit_retrieval_embeddings(self, task_no: str, retrieval_embeddings: list[dict]) -> None:
+    def submit_retrieval_embeddings(
+        self,
+        task_no: str,
+        callback_token: str,
+        retrieval_embeddings: list[dict],
+    ) -> None:
         self._post_callback(
             task_no,
+            callback_token,
             {
                 "retrievalEmbeddings": retrieval_embeddings,
             },
         )
 
-    def _post_callback(self, task_no: str, body: dict) -> None:
+    def _post_callback(self, task_no: str, callback_token: str, body: dict) -> None:
         base_url = self._settings.base_url.rstrip("/")
         url = f"{base_url}/api/ai/scene-analysis/tasks/{task_no}/callback"
         data = json.dumps(body, ensure_ascii=False).encode("utf-8")
@@ -34,7 +43,10 @@ class SceneAnalysisCallbackClient:
             url,
             data=data,
             method="POST",
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                CALLBACK_TOKEN_HEADER: callback_token,
+            },
         )
         try:
             with request.urlopen(http_request, timeout=self._settings.timeout_seconds) as response:

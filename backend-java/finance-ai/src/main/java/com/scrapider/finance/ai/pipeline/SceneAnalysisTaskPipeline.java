@@ -83,7 +83,10 @@ public class SceneAnalysisTaskPipeline {
         this.sceneAnalysisMessagePublisher = sceneAnalysisMessagePublisher;
         this.sceneAnalysisReportService = sceneAnalysisReportService;
     }
-    public void start(String taskNo, SceneAnalysisCurrentScenesPayloadParam currentScenesPayload) {
+    public boolean start(
+            String taskNo,
+            SceneAnalysisCurrentScenesPayloadParam currentScenesPayload,
+            String callbackToken) {
         this.sceneAnalysisTaskManage.markRetrievingKnowledge(taskNo);
         // 6.2 根据 7 大类得分计算 Chunk 分配比例。
         List<SceneChunkAllocationDTO> allocations = this.allocateChunks(currentScenesPayload);
@@ -93,15 +96,17 @@ public class SceneAnalysisTaskPipeline {
         if (retrievalTasks.isEmpty()) {
             this.sceneAnalysisTaskManage.markFailed(taskNo, NO_RETRIEVAL_SCENE_ERROR);
             LOGGER.info("scene report retrieval skipped task_no={} reason={}", taskNo, NO_RETRIEVAL_SCENE_ERROR);
-            return;
+            return false;
         }
         this.sceneAnalysisMessagePublisher.publishRetrievalEmbeddingMessage(
-                SceneRetrievalEmbeddingMessageDTO.create(taskNo, retrievalTasks));
+                SceneRetrievalEmbeddingMessageDTO.create(taskNo, retrievalTasks),
+                callbackToken);
         LOGGER.info(
                 "scene report retrieval embedding message published task_no={} allocations={} retrieval_tasks={}",
                 taskNo,
                 allocations,
                 retrievalTasks.size());
+        return true;
     }
     public void continueWithRetrievalEmbeddings(
             String taskNo,

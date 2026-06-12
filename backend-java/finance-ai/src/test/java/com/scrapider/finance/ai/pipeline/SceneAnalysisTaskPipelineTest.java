@@ -24,7 +24,7 @@ class SceneAnalysisTaskPipelineTest {
                 null,
                 null);
 
-        service.start("scene-test", this.lowScorePayload());
+        service.start("scene-test", this.lowScorePayload(), "callback-token");
 
         assertThat(taskManage.retrievingTaskNo).isEqualTo("scene-test");
         assertThat(taskManage.failedTaskNo).isEqualTo("scene-test");

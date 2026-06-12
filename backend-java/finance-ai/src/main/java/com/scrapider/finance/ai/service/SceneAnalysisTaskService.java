@@ -8,5 +8,5 @@ public interface SceneAnalysisTaskService {
 
     SceneAnalysisSubmitVO submit(SceneAnalysisSubmitParam param);
 
-    void callback(String taskNo, SceneAnalysisCallbackParam param);
+    void callback(String taskNo, String callbackToken, SceneAnalysisCallbackParam param);
 }
