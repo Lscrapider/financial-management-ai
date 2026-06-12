@@ -805,7 +805,7 @@ PDF 源文件示例：
   "taskNo": "ocr-xxx",
   "stage": "embedding.index",
   "chunkCount": 1,
-  "embeddingModel": "BAAI/bge-small-zh-v1.5",
+  "embeddingModel": "BAAI/bge-base-zh-v1.5",
   "finishedAt": "2026-05-25T17:02:00"
 }
 ```

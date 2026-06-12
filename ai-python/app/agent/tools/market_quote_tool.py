@@ -24,13 +24,9 @@ class MarketQuoteTool:
         target_name: str | None = None,
         limit: int = 5,
     ) -> str:
-        logger.info(
-            "agent tool market_quote invoke session_id=%s target_type=%s target_code=%s target_name=%s limit=%s",
+        logger.debug(
+            "agent tool market_quote invoke session_id=%s",
             agent_session_id,
-            target_type,
-            target_code,
-            target_name,
-            limit,
         )
         self.last_result = self.query(
             data_gateway_url=data_gateway_url,
@@ -42,7 +38,7 @@ class MarketQuoteTool:
             limit=limit,
         )
         rows = self.last_result.get("data") if isinstance(self.last_result, dict) else None
-        logger.info(
+        logger.debug(
             "agent tool market_quote result session_id=%s success=%s rows=%s",
             agent_session_id,
             self.last_result.get("success") if isinstance(self.last_result, dict) else None,

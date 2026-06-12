@@ -31,12 +31,10 @@ class AgentDataGatewayClient:
         }
         if limit is not None:
             body["limit"] = limit
-        logger.info(
-            "agent data gateway query start session_id=%s url=%s action=%s params=%s limit=%s",
+        logger.debug(
+            "agent data gateway query start session_id=%s action=%s limit=%s",
             agent_session_id,
-            data_gateway_url,
             action,
-            params or {},
             limit,
         )
         return self._post(data_gateway_url, body, agent_session_id, session_secret)
@@ -64,31 +62,27 @@ class AgentDataGatewayClient:
                 result = json.loads(response_body) if response_body else {}
                 data = result.get("data") if isinstance(result, dict) else None
                 logger.info(
-                    "agent data gateway query done session_id=%s url=%s status=%s elapsed_ms=%s success=%s rows=%s body_preview=%s",
+                    "agent data gateway query done session_id=%s status=%s elapsed_ms=%s success=%s rows=%s",
                     agent_session_id,
-                    url,
                     response.status,
                     elapsed_ms,
                     result.get("success") if isinstance(result, dict) else None,
                     len(data) if isinstance(data, list) else None,
-                    response_body[:500],
                 )
                 return result
         except error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
             logger.warning(
-                "agent data gateway query http error session_id=%s url=%s status=%s body=%s",
+                "agent data gateway query http error session_id=%s status=%s body_len=%s",
                 agent_session_id,
-                url,
                 exc.code,
-                detail,
+                len(detail),
             )
             raise RuntimeError(f"agent data query failed status={exc.code} body={detail}") from exc
         except error.URLError as exc:
             logger.warning(
-                "agent data gateway query request error session_id=%s url=%s reason=%s",
+                "agent data gateway query request error session_id=%s reason=%s",
                 agent_session_id,
-                url,
                 exc.reason,
             )
             raise RuntimeError(f"agent data query request failed reason={exc.reason}") from exc

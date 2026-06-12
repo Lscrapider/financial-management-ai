@@ -37,7 +37,7 @@ public class SceneAnalysisTaskPipeline {
     private static final double JACCARD_THRESHOLD = 0.2;
     private static final double LOWERED_JACCARD_THRESHOLD = 0.1;
     private static final int SEMANTIC_CANDIDATE_LIMIT = 200;
-    private static final int EXPECTED_EMBEDDING_DIMENSION = 512;
+    private static final int EXPECTED_EMBEDDING_DIMENSION = 768;
     private static final int MIN_PER_ACTIVE_SCENE = 1;
     private static final int MAX_PER_SCENE = 4;
     private static final double SEMANTIC_SCORE_WEIGHT = 0.45;

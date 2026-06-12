@@ -63,13 +63,9 @@ class SceneSignalContextTool:
             params["targetCode"] = str(target_code).strip()
         if target_name:
             params["targetName"] = str(target_name).strip()
-        logger.info(
-            "agent tool scene_signal_context invoke session_id=%s target_type=%s target_code=%s scenes=%s total_chunks=%s",
+        logger.debug(
+            "agent tool scene_signal_context invoke session_id=%s",
             agent_session_id,
-            params["targetType"],
-            params.get("targetCode"),
-            scenes,
-            requested_total_chunks,
         )
         response = self._data_gateway_client.query(
             data_gateway_url=data_gateway_url,

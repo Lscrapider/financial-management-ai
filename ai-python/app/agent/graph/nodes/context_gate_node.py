@@ -75,18 +75,12 @@ def context_gate_node(state: AgentGraphState) -> AgentGraphState:
     profile_required = rule_profile_required or fallback_profile_required
     memory_mode = None if memory_skip else rule_memory_mode or fallback_memory_mode
     logger.info(
-        "agent graph context gate session_id=%s profile_required=%s memory_mode=%s rule_profile=%s rule_memory=%s query_depth=%s allowed_tools=%s max_steps=%s max_tool_calls_total=%s max_tool_calls_per_step=%s max_final_backtracks=%s",
+        "agent graph context gate session_id=%s profile_required=%s memory_required=%s query_depth=%s tool_count=%s",
         state["agent_session_id"],
         profile_required,
-        memory_mode,
-        rule_profile_required,
-        rule_memory_mode,
+        memory_mode is not None,
         intent_policy.query_depth,
-        intent_policy.allowed_tools,
-        effective_budget.max_steps,
-        effective_budget.max_tool_calls_total,
-        effective_budget.max_tool_calls_per_step,
-        effective_budget.max_final_backtracks,
+        len(intent_policy.allowed_tools),
     )
     return merge_state(
         state,

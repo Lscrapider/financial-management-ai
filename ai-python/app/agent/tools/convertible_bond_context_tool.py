@@ -25,13 +25,9 @@ class ConvertibleBondContextTool:
         limit: int = 8,
     ) -> str:
         normalized_limit = max(1, min(int(limit or 8), 20))
-        logger.info(
-            "agent tool convertible_bond_context invoke session_id=%s target_code=%s target_name=%s sections=%s limit=%s",
+        logger.debug(
+            "agent tool convertible_bond_context invoke session_id=%s",
             agent_session_id,
-            target_code,
-            target_name,
-            sections,
-            normalized_limit,
         )
         params: dict[str, Any] = {
             "targetCode": target_code,

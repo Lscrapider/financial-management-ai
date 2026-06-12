@@ -22,10 +22,9 @@ class WatchPoolContextTool:
         limit: int = 20,
     ) -> str:
         normalized_limit = max(1, min(int(limit or 20), 50))
-        logger.info(
-            "agent tool watch_pool_context invoke session_id=%s limit=%s",
+        logger.debug(
+            "agent tool watch_pool_context invoke session_id=%s",
             agent_session_id,
-            normalized_limit,
         )
         self.last_result = self._data_gateway_client.query(
             data_gateway_url=data_gateway_url,

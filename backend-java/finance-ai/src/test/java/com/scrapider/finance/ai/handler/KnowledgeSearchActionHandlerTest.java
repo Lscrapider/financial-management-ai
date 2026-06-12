@@ -130,7 +130,7 @@ class KnowledgeSearchActionHandlerTest {
     }
 
     private List<Double> embedding() {
-        return IntStream.range(0, 512).mapToObj(index -> 0.1D).toList();
+        return IntStream.range(0, 768).mapToObj(index -> 0.1D).toList();
     }
 
     private static class FakeKnowledgeVectorManage extends KnowledgeVectorManage {

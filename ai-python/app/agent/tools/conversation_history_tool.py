@@ -54,7 +54,7 @@ class ConversationHistoryTool:
             limit=limit,
         )
         rows = result.get("data") if isinstance(result, dict) else []
-        logger.info(
+        logger.debug(
             "agent conversation history loaded session_id=%s rows=%s",
             agent_session_id,
             len(rows) if isinstance(rows, list) else 0,

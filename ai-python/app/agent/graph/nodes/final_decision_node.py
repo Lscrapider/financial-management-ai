@@ -81,10 +81,9 @@ def _decision_prompt(state: AgentGraphState) -> str:
 
 def _log_decision(state: AgentGraphState, decision: FinalDecision) -> None:
     logger.info(
-        "agent graph final decision session_id=%s status=%s reason=%s",
+        "agent graph final decision session_id=%s status=%s",
         state["agent_session_id"],
         decision.status,
-        decision.reason,
     )
 
 

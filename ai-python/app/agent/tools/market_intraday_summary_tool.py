@@ -29,12 +29,9 @@ class MarketIntradaySummaryTool:
         target_code: str | None = None,
         target_name: str | None = None,
     ) -> str:
-        logger.info(
-            "agent tool market_intraday_summary invoke session_id=%s target_type=%s target_code=%s target_name=%s",
+        logger.debug(
+            "agent tool market_intraday_summary invoke session_id=%s",
             agent_session_id,
-            target_type,
-            target_code,
-            target_name,
         )
         gateway_result = self._data_gateway_client.query(
             data_gateway_url=data_gateway_url,

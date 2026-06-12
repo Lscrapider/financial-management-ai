@@ -89,12 +89,9 @@ class KnowledgeSearchTool:
             "tags": _normalize_tags(tags, normalized_scenes),
             "limit": normalized_limit,
         }
-        logger.info(
-            "agent tool knowledge_search invoke session_id=%s scenes=%s limit=%s query_preview=%s",
+        logger.debug(
+            "agent tool knowledge_search invoke session_id=%s",
             agent_session_id,
-            params["scenes"],
-            normalized_limit,
-            normalized_query_text[:120],
         )
         response = self._data_gateway_client.query(
             data_gateway_url=data_gateway_url,

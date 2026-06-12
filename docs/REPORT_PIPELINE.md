@@ -1741,7 +1741,7 @@ maxPerCategory = 4
 semanticCandidateLimit = 200
 jaccardThreshold = 0.2
 loweredJaccardThreshold = 0.1
-embeddingDimension = 512
+embeddingDimension = 768
 finalScore = 0.45 * semantic_score + 0.45 * tag_match_score + 0.10 * cross_scene_score
 ```
 
@@ -2940,7 +2940,7 @@ CREATE TABLE knowledge_vector (
     task_no VARCHAR(64),
     chunk_index INTEGER,
     text TEXT NOT NULL,
-    embedding VECTOR(512),
+    embedding VECTOR(768),
     metadata JSONB,
     enabled BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

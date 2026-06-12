@@ -1,6 +1,4 @@
 from __future__ import annotations
-
-import json
 import logging
 from typing import Any
 
@@ -16,25 +14,23 @@ def planner_node(state: AgentGraphState) -> AgentGraphState:
     messages = _planning_messages(state)
     tools_by_name = _allowed_tools_by_name(state)
     logger.info(
-        "agent graph planning start session_id=%s step=%s model=%s base_url=%s thinking_type=%s query_depth=%s allowed_tools=%s",
+        "agent graph planning start session_id=%s step=%s model=%s thinking_type=%s query_depth=%s tool_count=%s",
         state["agent_session_id"],
         state.get("step_index", 0),
         settings.deepseek.model,
-        settings.deepseek.base_url,
         settings.deepseek.thinking_type,
         state.get("query_depth"),
-        tuple(tools_by_name.keys()),
+        len(tools_by_name),
     )
     planning_message = deps.model.bind_tools(list(tools_by_name.values())).invoke(messages)
     standard_tool_calls = _allowed_tool_calls(getattr(planning_message, "tool_calls", []) or [], tools_by_name)
     content = str(getattr(planning_message, "content", "") or "").strip()
     logger.info(
-        "agent graph planning done session_id=%s step=%s standard_tool_calls=%s content_preview=%s tool_calls_preview=%s",
+        "agent graph planning done session_id=%s step=%s standard_tool_calls=%s content_len=%s",
         state["agent_session_id"],
         state.get("step_index", 0),
         len(standard_tool_calls),
-        _preview(content),
-        _tool_calls_preview(standard_tool_calls),
+        len(content),
     )
     _record_planning_usage(state, planning_message)
     return merge_state(
@@ -109,17 +105,3 @@ def _allowed_tool_calls(tool_calls: list[dict[str, Any]], tools_by_name: dict[st
         for tool_call in tool_calls
         if str(tool_call.get("name") or "") in allowed_names
     ]
-
-
-def _preview(value: Any, limit: int = 200) -> str:
-    return str(value or "").replace("\n", "\\n")[:limit]
-
-
-def _tool_calls_preview(tool_calls: list[dict[str, Any]], limit: int = 500) -> str:
-    preview = []
-    for tool_call in tool_calls:
-        preview.append({
-            "name": tool_call.get("name"),
-            "args": tool_call.get("args") or {},
-        })
-    return _preview(json.dumps(preview, ensure_ascii=False, default=str), limit)

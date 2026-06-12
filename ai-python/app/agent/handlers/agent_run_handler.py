@@ -30,15 +30,11 @@ class AgentRunHandler(MessageHandler):
         self._require(body, "dataGatewayUrl")
 
         agent_session_id = str(body["agentSessionId"])
-        user_id = body.get("userId")
-        username = body.get("username")
         logger.info(
-            "agent run start consumed session_id=%s conversation_id=%s message_id=%s user_id=%s username=%s",
+            "agent run start consumed session_id=%s conversation_id=%s message_id=%s",
             agent_session_id,
             body.get("conversationId"),
             body.get("messageId"),
-            user_id,
-            username,
         )
         run_result = self._agent_executor.run(
             body,

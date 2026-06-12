@@ -25,13 +25,9 @@ class SceneReportContextTool:
         limit: int = 1,
     ) -> str:
         normalized_limit = max(1, min(int(limit or 1), 3))
-        logger.info(
-            "agent tool scene_report_context invoke session_id=%s target_type=%s target_code=%s report_id=%s limit=%s",
+        logger.debug(
+            "agent tool scene_report_context invoke session_id=%s",
             agent_session_id,
-            target_type,
-            target_code,
-            report_id,
-            normalized_limit,
         )
         params: dict[str, Any] = {
             "targetType": target_type,

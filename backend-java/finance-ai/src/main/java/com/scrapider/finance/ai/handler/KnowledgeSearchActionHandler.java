@@ -31,7 +31,7 @@ public class KnowledgeSearchActionHandler implements AgentDataActionHandler {
     private static final int DEFAULT_LIMIT = 5;
     private static final int MAX_LIMIT = 8;
     private static final int SEMANTIC_CANDIDATE_LIMIT = 200;
-    private static final int EXPECTED_EMBEDDING_DIMENSION = 512;
+    private static final int EXPECTED_EMBEDDING_DIMENSION = 768;
     private static final double SEMANTIC_SCORE_WEIGHT = 0.45;
     private static final double TAG_MATCH_SCORE_WEIGHT = 0.45;
     private static final double CROSS_SCENE_SCORE_WEIGHT = 0.10;
@@ -102,7 +102,7 @@ public class KnowledgeSearchActionHandler implements AgentDataActionHandler {
             return this.error("QUERY_EMBEDDING_REQUIRED", "queryEmbedding 不能为空");
         }
         if (queryEmbeddingValues.size() != EXPECTED_EMBEDDING_DIMENSION) {
-            return this.error("QUERY_EMBEDDING_DIMENSION_INVALID", "queryEmbedding 维度必须为 512");
+            return this.error("QUERY_EMBEDDING_DIMENSION_INVALID", "queryEmbedding 维度必须为 768");
         }
         String queryEmbedding = this.serializeQueryEmbedding(queryEmbeddingValues);
         int limit = this.limit(param);

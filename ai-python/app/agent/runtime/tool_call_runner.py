@@ -57,11 +57,10 @@ class ToolCallRunner:
                     tool_messages.append(tool_message_type(content=result, tool_call_id=tool_call_id))
                 continue
             logger.info(
-                "agent langchain standard tool call session_id=%s tool_id=%s tool_name=%s args=%s",
+                "agent langchain standard tool call session_id=%s tool_id=%s tool_name=%s",
                 agent_session_id,
                 tool_call_id,
                 tool_name,
-                tool_args,
             )
             try:
                 tool_result = tool.invoke(tool_args)
