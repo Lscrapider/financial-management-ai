@@ -64,6 +64,7 @@ class BasicAgentExecutor:
         agent_session_id = str(message_body["agentSessionId"])
         session_secret = str(message_body["sessionSecret"])
         data_gateway_url = str(message_body["dataGatewayUrl"])
+        user_id = self._normalized_user_id(message_body.get("userId"))
         execution_budget = AgentExecutionBudget.from_payload(message_body.get("executionBudget"))
         logger.info(
             "agent executor start session_id=%s conversation_id=%s message_id=%s user_message_len=%s max_steps=%s max_tool_calls_total=%s max_tool_calls_per_step=%s timeout_seconds=%s max_final_backtracks=%s",
@@ -82,6 +83,7 @@ class BasicAgentExecutor:
             agent_session_id=agent_session_id,
             session_secret=session_secret,
             user_message=user_message,
+            user_id=user_id,
             execution_budget=execution_budget,
             answer_delta_callback=answer_delta_callback,
         )
@@ -101,6 +103,7 @@ class BasicAgentExecutor:
         agent_session_id: str,
         session_secret: str,
         user_message: str,
+        user_id: str | None = None,
         execution_budget: AgentExecutionBudget | None = None,
         answer_delta_callback: Callable[[str], None] | None = None,
     ) -> AgentRunResult | None:
@@ -112,7 +115,7 @@ class BasicAgentExecutor:
             return None
 
         try:
-            model = self._model_factory.create()
+            model = self._model_factory.create(user_id=user_id)
             token_usage_collector = AgentTokenUsageCollector()
             messages = self._prompt_builder.build_messages(
                 system_message_type=SystemMessage,
@@ -196,3 +199,7 @@ class BasicAgentExecutor:
             mode=mode,
             limit=ConversationHistoryTool.MEMORY_WINDOW,
         )
+
+    def _normalized_user_id(self, user_id: Any) -> str | None:
+        normalized = str(user_id or "").strip()
+        return normalized or None

@@ -10,7 +10,11 @@ from app.agent.tools.tool_registry import AgentToolContext, AgentToolRegistry
 
 
 class FakeModelFactory:
-    def create(self) -> object:
+    def __init__(self) -> None:
+        self.user_id: str | None = None
+
+    def create(self, user_id: str | None = None) -> object:
+        self.user_id = user_id
         return object()
 
 
@@ -86,9 +90,10 @@ def test_agent_start_does_not_preload_memory(monkeypatch: Any) -> None:
     install_fake_langchain(monkeypatch)
     memory_context_tool = FakeMemoryContextTool()
     prompt_builder = FakePromptBuilder()
+    model_factory = FakeModelFactory()
     executor = BasicAgentExecutor(
         conversation_history_tool=memory_context_tool,
-        model_factory=FakeModelFactory(),
+        model_factory=model_factory,
         prompt_builder=prompt_builder,
         tool_registry=FakeToolRegistry(),
     )
@@ -99,10 +104,12 @@ def test_agent_start_does_not_preload_memory(monkeypatch: Any) -> None:
         agent_session_id="session",
         session_secret="secret",
         user_message="从全部股票给我推荐一个",
+        user_id="10001",
     )
 
     assert result is not None
     assert result.answer == "回答"
+    assert model_factory.user_id == "10001"
     assert memory_context_tool.calls == []
     assert prompt_builder.history == []
 
