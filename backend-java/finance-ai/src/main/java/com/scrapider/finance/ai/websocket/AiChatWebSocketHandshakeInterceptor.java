@@ -2,12 +2,9 @@ package com.scrapider.finance.ai.websocket;
 
 import com.scrapider.finance.domain.po.AppUserPO;
 import com.scrapider.finance.ai.domain.dto.AiChatConversationBindingDTO;
-import com.scrapider.finance.mapper.AppUserMapper;
-import com.scrapider.finance.security.JwtUtils;
 import com.scrapider.finance.security.LoginUser;
-import com.scrapider.finance.security.TokenStore;
 import com.scrapider.finance.ai.service.AiChatConversationService;
-import io.jsonwebtoken.Claims;
+import com.scrapider.finance.ai.service.AiChatWebSocketTicketService;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,19 +26,13 @@ public class AiChatWebSocketHandshakeInterceptor implements HandshakeInterceptor
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AiChatWebSocketHandshakeInterceptor.class);
 
-    private final JwtUtils jwtUtils;
-    private final TokenStore tokenStore;
-    private final AppUserMapper appUserMapper;
+    private final AiChatWebSocketTicketService aiChatWebSocketTicketService;
     private final AiChatConversationService aiChatConversationService;
 
     public AiChatWebSocketHandshakeInterceptor(
-            JwtUtils jwtUtils,
-            TokenStore tokenStore,
-            AppUserMapper appUserMapper,
+            AiChatWebSocketTicketService aiChatWebSocketTicketService,
             AiChatConversationService aiChatConversationService) {
-        this.jwtUtils = jwtUtils;
-        this.tokenStore = tokenStore;
-        this.appUserMapper = appUserMapper;
+        this.aiChatWebSocketTicketService = aiChatWebSocketTicketService;
         this.aiChatConversationService = aiChatConversationService;
     }
 
@@ -51,19 +42,19 @@ public class AiChatWebSocketHandshakeInterceptor implements HandshakeInterceptor
             ServerHttpResponse response,
             WebSocketHandler wsHandler,
             Map<String, Object> attributes) {
-        String token = UriComponentsBuilder.fromUri(request.getURI())
+        String ticket = UriComponentsBuilder.fromUri(request.getURI())
                 .build()
                 .getQueryParams()
-                .getFirst("accessToken");
-        if (token == null || token.isBlank() || this.tokenStore.isBlacklisted(token)) {
+                .getFirst("ticket");
+        if (ticket == null || ticket.isBlank()) {
             response.setStatusCode(HttpStatus.UNAUTHORIZED);
             return false;
         }
 
         try {
-            Claims claims = this.jwtUtils.parseAccessToken(token);
-            LoginUser loginUser = this.loginUser(claims.getSubject());
-            if (loginUser == null) {
+            LoginUser loginUser = this.aiChatWebSocketTicketService.consume(ticket)
+                    .orElse(null);
+            if (loginUser == null || !this.enabled(loginUser)) {
                 response.setStatusCode(HttpStatus.UNAUTHORIZED);
                 return false;
             }
@@ -74,7 +65,7 @@ public class AiChatWebSocketHandshakeInterceptor implements HandshakeInterceptor
             attributes.put(CLEANUP_VERSION_ATTRIBUTE, binding.cleanupVersion());
             return true;
         } catch (Exception ex) {
-            LOGGER.debug("Invalid websocket access token, reject handshake.", ex);
+            LOGGER.debug("Invalid websocket ticket, reject handshake.", ex);
             response.setStatusCode(HttpStatus.UNAUTHORIZED);
             return false;
         }
@@ -88,11 +79,8 @@ public class AiChatWebSocketHandshakeInterceptor implements HandshakeInterceptor
             Exception exception) {
     }
 
-    private LoginUser loginUser(String subject) {
-        AppUserPO user = this.appUserMapper.selectById(Long.valueOf(subject));
-        if (user == null || !Boolean.TRUE.equals(user.getEnabled())) {
-            return null;
-        }
-        return new LoginUser(user);
+    private boolean enabled(LoginUser loginUser) {
+        AppUserPO user = loginUser.getUser();
+        return user != null && Boolean.TRUE.equals(user.getEnabled());
     }
 }

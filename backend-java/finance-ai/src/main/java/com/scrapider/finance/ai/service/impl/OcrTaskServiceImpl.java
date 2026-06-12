@@ -23,20 +23,25 @@ import com.scrapider.finance.manage.KnowledgeVectorManage;
 import com.scrapider.finance.manage.OcrReviewManage;
 import com.scrapider.finance.manage.OcrTaskManage;
 import com.scrapider.finance.manage.OcrTaskStageManage;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class OcrTaskServiceImpl implements OcrTaskService {
 
+    private static final String PDF_FILE_TYPE = "pdf";
     private static final Set<String> ALLOWED_FILE_TYPES = Set.of("pdf", "png", "jpg", "jpeg", "webp");
     private static final long MAX_FILE_SIZE = 50L * 1024L * 1024L;
+    private static final int MAX_PDF_PAGE_COUNT = 20;
     private static final int DEFAULT_PAGE_NUM = 1;
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MAX_PAGE_SIZE = 200;
@@ -159,6 +164,19 @@ public class OcrTaskServiceImpl implements OcrTaskService {
         String fileType = this.fileType(this.originalFilename(file));
         if (!ALLOWED_FILE_TYPES.contains(fileType)) {
             throw new IllegalArgumentException("仅支持 PDF、PNG、JPG、JPEG、WEBP 文件");
+        }
+        if (PDF_FILE_TYPE.equals(fileType)) {
+            this.validatePdfPageCount(file);
+        }
+    }
+
+    private void validatePdfPageCount(MultipartFile file) {
+        try (PDDocument document = Loader.loadPDF(file.getBytes())) {
+            if (document.getNumberOfPages() > MAX_PDF_PAGE_COUNT) {
+                throw new IllegalArgumentException("PDF 文件不能超过20页");
+            }
+        } catch (IOException ex) {
+            throw new IllegalArgumentException("PDF 文件解析失败，请确认文件格式正确");
         }
     }
 

@@ -1,6 +1,8 @@
 import { useAppConfig } from '@vben/hooks';
 import { useAccessStore } from '@vben/stores';
 
+import { requestClient } from '#/api/request';
+
 export interface AiChatRequest {
   message: string;
 }
@@ -30,6 +32,11 @@ interface AiChatWebSocketMessage {
   model?: string;
   status?: string;
   type: 'agent_progress' | 'agent_status' | 'answer_delta' | 'final_answer';
+}
+
+interface AiChatWebSocketTicket {
+  expiresInSeconds: number;
+  ticket: string;
 }
 
 interface PendingMessage {
@@ -103,41 +110,51 @@ function connectAiChatSocket() {
     return Promise.reject(new Error('请先登录后再使用 AI Chat。'));
   }
 
-  connectingPromise = new Promise<WebSocket>((resolve, reject) => {
-    let opened = false;
-    const ws = new WebSocket(buildAiChatSocketUrl(accessToken));
-    socket = ws;
+  connectingPromise = issueAiChatWebSocketTicket().then(
+    ({ ticket }) =>
+      new Promise<WebSocket>((resolve, reject) => {
+        let opened = false;
+        const ws = new WebSocket(buildAiChatSocketUrl(ticket));
+        socket = ws;
 
-    ws.addEventListener('open', () => {
-      opened = true;
-      connectingPromise = null;
-      resolve(ws);
-    });
+        ws.addEventListener('open', () => {
+          opened = true;
+          connectingPromise = null;
+          resolve(ws);
+        });
 
-    ws.addEventListener('message', (event) => {
-      handleAiChatSocketMessage(event.data);
-    });
+        ws.addEventListener('message', (event) => {
+          handleAiChatSocketMessage(event.data);
+        });
 
-    ws.addEventListener('error', () => {
-      if (ws.readyState !== WebSocket.OPEN) {
-        reject(new Error('AI Chat 连接失败'));
-      }
-    });
+        ws.addEventListener('error', () => {
+          if (ws.readyState !== WebSocket.OPEN) {
+            reject(new Error('AI Chat 连接失败'));
+          }
+        });
 
-    ws.addEventListener('close', () => {
-      if (socket === ws) {
-        socket = null;
-      }
-      connectingPromise = null;
-      if (!opened) {
-        reject(new Error('AI Chat 连接已关闭'));
-      }
-      pendingMessage?.reject(new Error('AI Chat 连接已断开'));
-      pendingMessage = null;
-    });
+        ws.addEventListener('close', () => {
+          if (socket === ws) {
+            socket = null;
+          }
+          connectingPromise = null;
+          if (!opened) {
+            reject(new Error('AI Chat 连接已关闭'));
+          }
+          pendingMessage?.reject(new Error('AI Chat 连接已断开'));
+          pendingMessage = null;
+        });
+      }),
+  ).catch((error) => {
+    connectingPromise = null;
+    throw error;
   });
 
   return connectingPromise;
+}
+
+function issueAiChatWebSocketTicket() {
+  return requestClient.post<AiChatWebSocketTicket>('/ai/chat/ws-ticket');
 }
 
 function handleAiChatSocketMessage(data: unknown) {
@@ -180,11 +197,11 @@ function handleAiChatSocketMessage(data: unknown) {
   });
 }
 
-function buildAiChatSocketUrl(token: string) {
+function buildAiChatSocketUrl(ticket: string) {
   const endpoint = joinUrl(apiURL, '/ws/ai-chat');
   const url = new URL(endpoint, window.location.origin);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-  url.searchParams.set('accessToken', token);
+  url.searchParams.set('ticket', ticket);
   return url.toString();
 }
 
