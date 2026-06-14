@@ -19,6 +19,7 @@ import com.scrapider.finance.ai.service.SceneAnalysisReportService;
 import com.scrapider.finance.ai.service.AiTokenUsageService;
 import com.scrapider.finance.domain.enums.AiTokenUsagePhaseEnum;
 import com.scrapider.finance.domain.enums.AiTokenUsageSourceEnum;
+import com.scrapider.finance.domain.enums.SceneAnalysisReportTypeEnum;
 import com.scrapider.finance.domain.po.OcrTaskPO;
 import com.scrapider.finance.domain.po.SceneAnalysisReportPO;
 import com.scrapider.finance.domain.po.SceneAnalysisTaskPO;
@@ -275,7 +276,16 @@ public class SceneAnalysisReportServiceImpl implements SceneAnalysisReportServic
         if (task == null) {
             throw new IllegalArgumentException("scene analysis task not found: " + taskNo);
         }
+        this.requireReportTask(task);
         return task;
+    }
+
+    private void requireReportTask(SceneAnalysisTaskPO task) {
+        try {
+            SceneAnalysisReportTypeEnum.of(task.getReportType());
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("scene analysis report task not found: " + task.getTaskNo());
+        }
     }
 
     private JsonNode requiredObject(JsonNode node, String name) {

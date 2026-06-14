@@ -108,7 +108,12 @@ class CurrentSceneHandler(MessageHandler):
             task_no,
             current_scenes_payload,
         )
-        self._callback_client.mark_success(task_no, callback_token, current_scenes_payload)
+        self._callback_client.mark_success(
+            task_no,
+            callback_token,
+            current_scenes_payload,
+            self._callback_path(message.body, task_no),
+        )
         logger.info("scene analysis callback success task_no=%s", task_no)
         return HandlerResult()
 
@@ -117,6 +122,14 @@ class CurrentSceneHandler(MessageHandler):
         if not isinstance(callback_token, str) or not callback_token.strip():
             raise PermanentMessageError(f"scene analysis callbackToken is required task_no={task_no}")
         return callback_token.strip()
+
+    def _callback_path(self, payload: dict, task_no: str) -> str | None:
+        callback_path = payload.get("callbackPath")
+        if callback_path is None:
+            return None
+        if not isinstance(callback_path, str) or not callback_path.strip():
+            raise PermanentMessageError(f"scene analysis callbackPath is invalid task_no={task_no}")
+        return callback_path.strip()
 
     def _total_chunks(self, payload: dict) -> int:
         value = payload.get("totalChunks")

@@ -39,18 +39,35 @@ public class SceneAnalysisMessagePublisher {
     }
 
     public void publishCurrentSceneAnalysisMessage(SceneAnalysisMessageDTO message, String callbackToken) {
+        this.publishCurrentSceneAnalysisMessage(message, callbackToken, null);
+    }
+
+    public void publishCurrentSceneAnalysisMessage(
+            SceneAnalysisMessageDTO message,
+            String callbackToken,
+            String callbackPath) {
         this.rabbitTemplate.convertAndSend(this.exchange, this.currentSceneRoutingKey,
-                this.withCallbackToken(message, callbackToken));
+                this.withCallbackToken(message, callbackToken, callbackPath));
     }
 
     public void publishRetrievalEmbeddingMessage(SceneRetrievalEmbeddingMessageDTO message, String callbackToken) {
-        this.rabbitTemplate.convertAndSend(this.exchange, this.retrievalEmbeddingRoutingKey,
-                this.withCallbackToken(message, callbackToken));
+        this.publishRetrievalEmbeddingMessage(message, callbackToken, null);
     }
 
-    private Map<String, Object> withCallbackToken(Object message, String callbackToken) {
+    public void publishRetrievalEmbeddingMessage(
+            SceneRetrievalEmbeddingMessageDTO message,
+            String callbackToken,
+            String callbackPath) {
+        this.rabbitTemplate.convertAndSend(this.exchange, this.retrievalEmbeddingRoutingKey,
+                this.withCallbackToken(message, callbackToken, callbackPath));
+    }
+
+    private Map<String, Object> withCallbackToken(Object message, String callbackToken, String callbackPath) {
         Map<String, Object> payload = new LinkedHashMap<>(this.objectMapper.convertValue(message, MAP_TYPE));
         payload.put(CALLBACK_TOKEN_FIELD, callbackToken);
+        if (callbackPath != null && !callbackPath.isBlank()) {
+            payload.put("callbackPath", callbackPath);
+        }
         return payload;
     }
 }

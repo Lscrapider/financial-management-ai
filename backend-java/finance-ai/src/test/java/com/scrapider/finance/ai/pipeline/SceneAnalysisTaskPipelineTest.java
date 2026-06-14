@@ -7,6 +7,8 @@ import com.scrapider.finance.ai.domain.param.SceneAnalysisCurrentScenesParam;
 import com.scrapider.finance.ai.domain.param.SceneAnalysisCurrentScenesPayloadParam;
 import com.scrapider.finance.ai.domain.param.SceneAnalysisCurrentScenesTargetParam;
 import com.scrapider.finance.ai.domain.param.SceneAnalysisSceneModuleParam;
+import com.scrapider.finance.ai.service.impl.SceneKnowledgeRetrievalServiceImpl;
+import com.scrapider.finance.manage.KnowledgeVectorManage;
 import com.scrapider.finance.manage.SceneAnalysisTaskManage;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +21,7 @@ class SceneAnalysisTaskPipelineTest {
         FakeTaskManage taskManage = new FakeTaskManage();
         SceneAnalysisTaskPipeline service = new SceneAnalysisTaskPipeline(
                 new ObjectMapper(),
-                null,
+                new SceneKnowledgeRetrievalServiceImpl(new KnowledgeVectorManage()),
                 taskManage,
                 null,
                 null);

@@ -39,7 +39,12 @@ class RetrievalEmbeddingHandler(MessageHandler):
             self._embedding_payload(task, embeddings[index], task_no)
             for index, task in enumerate(retrieval_tasks)
         ]
-        self._callback_client.submit_retrieval_embeddings(task_no, callback_token, retrieval_embeddings)
+        self._callback_client.submit_retrieval_embeddings(
+            task_no,
+            callback_token,
+            retrieval_embeddings,
+            self._callback_path(message.body, task_no),
+        )
         logger.info(
             "scene retrieval embeddings callback success task_no=%s retrieval_task_count=%s",
             task_no,
@@ -52,6 +57,14 @@ class RetrievalEmbeddingHandler(MessageHandler):
         if not isinstance(callback_token, str) or not callback_token.strip():
             raise PermanentMessageError(f"scene retrieval callbackToken is required task_no={task_no}")
         return callback_token.strip()
+
+    def _callback_path(self, payload: dict, task_no: str) -> str | None:
+        callback_path = payload.get("callbackPath")
+        if callback_path is None:
+            return None
+        if not isinstance(callback_path, str) or not callback_path.strip():
+            raise PermanentMessageError(f"scene retrieval callbackPath is invalid task_no={task_no}")
+        return callback_path.strip()
 
     def _query_text(self, task: Any, task_no: str) -> str:
         if not isinstance(task, dict):

@@ -29,6 +29,7 @@
   "knowledge": {
     "title": "Knowledge Base",
     "base": "Knowledge Browser",
+    "materials": "Knowledge Materials",
     "overview": "Knowledge Overview"
   },
   "systemConfig": {

@@ -65,6 +65,7 @@ const NAVIGATION_WORKSPACES: NavigationWorkspace[] = [
   {
     children: [
       { label: '知识库概览', path: '/knowledge/overview' },
+      { label: '知识库材料', path: '/knowledge/materials' },
       { label: '知识库浏览', path: '/knowledge/base' },
       { label: '知识库OCR导入', path: '/ai-center/knowledge-processing' },
       { label: '知识库手动导入', path: '/ai-center/manual-knowledge' },

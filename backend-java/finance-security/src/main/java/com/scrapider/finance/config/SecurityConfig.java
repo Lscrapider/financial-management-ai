@@ -49,6 +49,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/ws/**").permitAll()
                         .requestMatchers("/api/ai/ocr/reviews/*/pages/*/image").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/ai/scene-analysis/tasks/*/callback").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/ai/knowledge-material/tasks/*/callback").permitAll()
                         .requestMatchers(
                                 "/api/system-config/**",
                                 "/api/stocks/sync",
@@ -61,6 +62,7 @@ public class SecurityConfig {
                                 "/api/ai/ocr/tasks/**",
                                 "/api/ai/ocr/reviews/**",
                                 "/api/ai/manual-knowledge/tasks/**",
+                                "/api/ai/knowledge-material/**",
                                 "/api/ai/console/**",
                                 "/api/ai/token-usage/**")
                         .hasRole("admin")

@@ -29,6 +29,7 @@
   "knowledge": {
     "title": "知识库",
     "overview": "知识库概览",
+    "materials": "知识库材料",
     "base": "知识库浏览"
   },
   "systemConfig": {

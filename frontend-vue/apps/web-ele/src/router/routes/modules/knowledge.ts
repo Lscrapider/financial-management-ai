@@ -23,6 +23,15 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
+        name: 'KnowledgeMaterials',
+        path: '/knowledge/materials',
+        component: () => import('#/views/knowledge/materials.vue'),
+        meta: {
+          icon: 'lucide:search-check',
+          title: $t('page.knowledge.materials'),
+        },
+      },
+      {
         name: 'KnowledgeBase',
         path: '/knowledge/base',
         component: () => import('#/views/knowledge/index.vue'),
