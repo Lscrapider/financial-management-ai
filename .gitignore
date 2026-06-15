@@ -114,3 +114,4 @@ docker-compose.override.yml
 /.claude/
 /.*/
 /backend-java/finance-app/src/main/resources/application.yml
+stitch_exports/
