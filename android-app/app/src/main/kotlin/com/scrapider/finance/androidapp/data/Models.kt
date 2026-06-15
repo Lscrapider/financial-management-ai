@@ -2,6 +2,8 @@ package com.scrapider.finance.androidapp.data
 
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -63,6 +65,69 @@ data class WorkbenchSummary(
             reportGeneratingCount > 0 || reportFailedCount > 0 || movements.isNotEmpty() || reports.isNotEmpty()
 }
 
+enum class MarketAssetType(
+    val label: String,
+    val apiPath: String,
+    val codeKey: String,
+    val nameKey: String,
+    val defaultSortField: String,
+) {
+    Stock("股票", ApiConfig.STOCK_QUOTES_PATH, "stockCode", "stockName", "changePercent"),
+    Index("指数", ApiConfig.INDEX_QUOTES_PATH, "indexCode", "indexName", "changePercent"),
+    Bond("可转债", ApiConfig.BOND_QUOTES_PATH, "bondCode", "bondName", "changePercent"),
+}
+
+data class MarketFilter(
+    val label: String,
+    val marketCode: String,
+)
+
+data class MarketQuote(
+    val assetType: MarketAssetType,
+    val code: String,
+    val name: String,
+    val marketCode: String,
+    val latestPrice: Double,
+    val changeAmount: Double,
+    val changePercent: Double,
+    val turnoverAmount: Double,
+    val amplitude: Double,
+    val syncedAt: String,
+    val conversionPremiumRate: Double? = null,
+) {
+    fun matches(keyword: String): Boolean {
+        val normalized = keyword.trim()
+        if (normalized.isBlank()) return true
+        return name.contains(normalized, ignoreCase = true) ||
+            code.contains(normalized, ignoreCase = true) ||
+            marketCode.contains(normalized, ignoreCase = true)
+    }
+}
+
+data class MarketUiState(
+    val assetType: MarketAssetType = MarketAssetType.Stock,
+    val marketFilter: MarketFilter = MarketFilter("全部市场", ""),
+    val keyword: String = "",
+    val sortOrder: String = "desc",
+    val updatedAt: String = "--:--",
+    val quotes: List<MarketQuote> = emptyList(),
+) {
+    val visibleQuotes: List<MarketQuote>
+        get() = quotes.filter { it.matches(keyword) }
+
+    val upCount: Int
+        get() = quotes.count { it.changePercent > 0.0 }
+
+    val downCount: Int
+        get() = quotes.count { it.changePercent < 0.0 }
+
+    val flatCount: Int
+        get() = (quotes.size - upCount - downCount).coerceAtLeast(0)
+
+    val hasAnyData: Boolean
+        get() = quotes.isNotEmpty()
+}
+
 class FinanceRepository(
     private val apiClient: ApiClient,
 ) {
@@ -122,6 +187,38 @@ class FinanceRepository(
         }
         apiClient.get(ApiConfig.REPORT_TARGETS_PATH) { result ->
             pending.consume(result, "报告动态同步失败。") { body -> readReports(body, pending) }
+        }
+    }
+
+    fun loadMarketQuotes(
+        assetType: MarketAssetType,
+        marketCode: String,
+        sortOrder: String,
+        callback: (ApiResult, MarketUiState) -> Unit,
+    ) {
+        apiClient.get(marketQuotePath(assetType, marketCode, sortOrder)) { result ->
+            if (!result.success) {
+                callback(result, MarketUiState(assetType = assetType, marketFilter = marketFilterOf(marketCode), sortOrder = sortOrder))
+                return@get
+            }
+            runCatching {
+                val quotes = quoteArray(result.body).toMarketQuotes(assetType)
+                callback(
+                    result.copy(message = "行情已同步：${assetType.label} ${quotes.size} 条。"),
+                    MarketUiState(
+                        assetType = assetType,
+                        marketFilter = marketFilterOf(marketCode),
+                        sortOrder = normalizeSortOrder(sortOrder),
+                        updatedAt = LocalDateTime.now().format(timeFormat),
+                        quotes = quotes,
+                    ),
+                )
+            }.onFailure {
+                callback(
+                    ApiResult(false, result.statusCode, result.body, "行情解析失败：${it.message ?: it.javaClass.simpleName}"),
+                    MarketUiState(assetType = assetType, marketFilter = marketFilterOf(marketCode), sortOrder = sortOrder),
+                )
+            }
         }
     }
 
@@ -193,6 +290,16 @@ class FinanceRepository(
     private fun dataArray(body: String): JSONArray {
         val root = JSONObject(body.ifBlank { "{}" })
         return root.optJSONArray("data") ?: JSONArray()
+    }
+
+    private fun quoteArray(body: String): JSONArray {
+        val trimmed = body.trim()
+        if (trimmed.startsWith("[")) return JSONArray(trimmed)
+        val root = JSONObject(trimmed.ifBlank { "{}" })
+        return root.optJSONArray("data")
+            ?: root.optJSONArray("records")
+            ?: root.optJSONObject("data")?.optJSONArray("records")
+            ?: JSONArray()
     }
 
     private fun isNearThreshold(alert: JSONObject): Boolean {
@@ -301,6 +408,23 @@ class FinanceRepository(
     }
 }
 
+fun marketFilters(assetType: MarketAssetType): List<MarketFilter> = when (assetType) {
+    MarketAssetType.Stock -> listOf(
+        MarketFilter("全部市场", ""),
+        MarketFilter("沪市", "SH_MAIN"),
+        MarketFilter("深市", "SZ_MAIN"),
+        MarketFilter("科创板", "STAR"),
+        MarketFilter("创业板", "CHINEXT"),
+    )
+
+    MarketAssetType.Index,
+    MarketAssetType.Bond -> listOf(
+        MarketFilter("全部市场", ""),
+        MarketFilter("沪市", "SH_MAIN"),
+        MarketFilter("深市", "SZ_MAIN"),
+    )
+}
+
 private fun primaryAction(watchItemCount: Int, outAlertCount: Int, nearAlertCount: Int): String = when {
     outAlertCount > 0 -> "有 $outAlertCount 条提醒越界，优先检查布控阈值。"
     nearAlertCount > 0 -> "有 $nearAlertCount 条提醒接近阈值，盘后复核价格波动。"
@@ -332,3 +456,52 @@ private fun JSONArray?.toStringList(): List<String> {
     if (this == null) return emptyList()
     return List(length()) { index -> optString(index, "") }.filter { it.isNotBlank() }
 }
+
+private fun JSONArray.toMarketQuotes(assetType: MarketAssetType): List<MarketQuote> =
+    List(length()) { index -> optJSONObject(index) }
+        .filterNotNull()
+        .map { quote ->
+            MarketQuote(
+                assetType = assetType,
+                code = quote.optString(assetType.codeKey, ""),
+                name = quote.optString(assetType.nameKey, "未命名标的"),
+                marketCode = quote.optString("marketCode", ""),
+                latestPrice = quote.optDouble("latestPrice", 0.0),
+                changeAmount = quote.optDouble("changeAmount", 0.0),
+                changePercent = quote.optDouble("changePercent", 0.0),
+                turnoverAmount = quote.optDouble("turnoverAmount", 0.0),
+                amplitude = quote.optDouble("amplitude", 0.0),
+                syncedAt = quote.optString("syncedAt", ""),
+                conversionPremiumRate = quote.optionalDouble("conversionPremiumRate"),
+            )
+        }
+
+private fun JSONObject.optionalDouble(key: String): Double? =
+    if (isNull(key) || !has(key)) null else optDouble(key, 0.0)
+
+private fun marketQuotePath(assetType: MarketAssetType, marketCode: String, sortOrder: String): String {
+    val params = mutableListOf(
+        "limit" to "100",
+        "sortField" to assetType.defaultSortField,
+        "sortOrder" to normalizeSortOrder(sortOrder),
+    )
+    if (marketCode.isNotBlank()) {
+        params += "marketCode" to marketCode
+    }
+    return assetType.apiPath + "?" + params.joinToString("&") { (key, value) ->
+        "${key.encodeQuery()}=${value.encodeQuery()}"
+    }
+}
+
+private fun marketFilterOf(marketCode: String): MarketFilter =
+    MarketAssetType.entries
+        .asSequence()
+        .flatMap { marketFilters(it).asSequence() }
+        .firstOrNull { it.marketCode == marketCode }
+        ?: MarketFilter("全部市场", "")
+
+private fun String.encodeQuery(): String =
+    URLEncoder.encode(this, StandardCharsets.UTF_8.name())
+
+fun normalizeSortOrder(sortOrder: String): String =
+    if (sortOrder.equals("asc", ignoreCase = true)) "asc" else "desc"

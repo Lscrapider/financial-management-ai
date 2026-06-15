@@ -9,15 +9,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.scrapider.finance.androidapp.data.ApiClient
 import com.scrapider.finance.androidapp.data.FinanceRepository
+import com.scrapider.finance.androidapp.data.MarketAssetType
+import com.scrapider.finance.androidapp.data.MarketFilter
+import com.scrapider.finance.androidapp.data.MarketUiState
 import com.scrapider.finance.androidapp.data.SessionState
 import com.scrapider.finance.androidapp.data.WorkbenchSummary
 import com.scrapider.finance.androidapp.ui.FinanceTheme
 import com.scrapider.finance.androidapp.ui.LoginScreen
+import com.scrapider.finance.androidapp.ui.MarketScreen
 import com.scrapider.finance.androidapp.ui.WorkbenchScreen
 
 private enum class AppScreen {
     Login,
     Workbench,
+    Market,
 }
 
 private data class AppUiState(
@@ -32,6 +37,7 @@ private data class AppUiState(
     val errorMessage: String = "",
     val session: SessionState = SessionState(),
     val workbench: WorkbenchSummary = WorkbenchSummary(),
+    val market: MarketUiState = MarketUiState(),
 )
 
 class MainActivity : ComponentActivity() {
@@ -81,6 +87,19 @@ class MainActivity : ComponentActivity() {
                         statusMessage = state.statusMessage,
                         summary = state.workbench,
                         onRefresh = ::refreshWorkbench,
+                        onMarketSelected = ::showMarket,
+                    )
+
+                    AppScreen.Market -> MarketScreen(
+                        loading = state.loading,
+                        statusMessage = state.statusMessage,
+                        market = state.market,
+                        onRefresh = ::refreshMarket,
+                        onAssetTypeChange = ::selectMarketAssetType,
+                        onMarketFilterChange = ::selectMarketFilter,
+                        onSortByChangePercent = ::toggleMarketChangePercentSort,
+                        onKeywordChange = { state = state.copy(market = state.market.copy(keyword = it)) },
+                        onWorkbenchSelected = ::showWorkbench,
                     )
                 }
             }
@@ -88,7 +107,7 @@ class MainActivity : ComponentActivity() {
 
         if (state.session.authenticated) {
             apiClient.setAccessToken(state.session.accessToken)
-            refreshWorkbench()
+            refreshMarket()
         }
     }
 
@@ -118,14 +137,90 @@ class MainActivity : ComponentActivity() {
                 return@login
             }
             state = state.copy(
-                screen = AppScreen.Workbench,
+                screen = AppScreen.Market,
                 loading = false,
                 session = session,
-                statusMessage = "登录成功：${session.displayName}，正在同步投资工作台。",
+                statusMessage = "登录成功：${session.displayName}，正在同步行情中心。",
                 errorMessage = "",
             )
             saveLoginState(session)
+            refreshMarket()
+        }
+    }
+
+    private fun refreshMarket() {
+        if (!state.session.authenticated) {
+            state = state.copy(screen = AppScreen.Login, statusMessage = "请先登录，登录后进入行情中心。")
+            return
+        }
+        val currentMarket = state.market
+        state = state.copy(loading = true, statusMessage = "正在同步${currentMarket.assetType.label}行情。")
+        repository.loadMarketQuotes(currentMarket.assetType, currentMarket.marketFilter.marketCode, currentMarket.sortOrder) { result, market ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@loadMarketQuotes
+            }
+            val nextMarket = if (result.success || market.hasAnyData) {
+                market.copy(keyword = currentMarket.keyword)
+            } else {
+                currentMarket
+            }
+            state = state.copy(
+                loading = false,
+                market = nextMarket,
+                statusMessage = when {
+                    result.success -> "行情中心已同步：${nextMarket.assetType.label} ${nextMarket.quotes.size} 条，上涨 ${nextMarket.upCount}，下跌 ${nextMarket.downCount}。"
+                    market.hasAnyData -> "部分同步完成：${market.assetType.label} ${market.quotes.size} 条。${result.message}"
+                    else -> result.message
+                },
+            )
+            if (!result.success && !market.hasAnyData) {
+                Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun selectMarketAssetType(assetType: MarketAssetType) {
+        if (state.market.assetType == assetType) return
+        state = state.copy(
+            screen = AppScreen.Market,
+            market = MarketUiState(assetType = assetType),
+            statusMessage = "正在切换到${assetType.label}行情。",
+        )
+        refreshMarket()
+    }
+
+    private fun selectMarketFilter(filter: MarketFilter) {
+        if (state.market.marketFilter.marketCode == filter.marketCode) return
+        state = state.copy(
+            screen = AppScreen.Market,
+            market = state.market.copy(marketFilter = filter),
+            statusMessage = "正在筛选${filter.label}行情。",
+        )
+        refreshMarket()
+    }
+
+    private fun toggleMarketChangePercentSort() {
+        val nextOrder = if (state.market.sortOrder == "desc") "asc" else "desc"
+        state = state.copy(
+            screen = AppScreen.Market,
+            market = state.market.copy(sortOrder = nextOrder),
+            statusMessage = "正在按涨跌幅${if (nextOrder == "desc") "从高到低" else "从低到高"}排序。",
+        )
+        refreshMarket()
+    }
+
+    private fun showWorkbench() {
+        state = state.copy(screen = AppScreen.Workbench)
+        if (!state.workbench.hasAnyData) {
             refreshWorkbench()
+        }
+    }
+
+    private fun showMarket() {
+        state = state.copy(screen = AppScreen.Market)
+        if (!state.market.hasAnyData) {
+            refreshMarket()
         }
     }
 
@@ -137,14 +232,7 @@ class MainActivity : ComponentActivity() {
         state = state.copy(loading = true, statusMessage = "正在同步投资工作台：观察池、布控提醒和报告动态。")
         repository.loadWorkbench { result, summary ->
             if (result.statusCode == 401) {
-                clearLoginState()
-                state = state.copy(
-                    screen = AppScreen.Login,
-                    loading = false,
-                    session = SessionState(),
-                    statusMessage = "登录态已失效，请重新登录。",
-                    errorMessage = "登录态已失效",
-                )
+                handleExpiredSession("登录态已失效，请重新登录。")
                 return@loadWorkbench
             }
             state = state.copy(
@@ -182,11 +270,11 @@ class MainActivity : ComponentActivity() {
             roles = preferences.getString(KEY_ROLES, "").orEmpty().split(ROLE_SEPARATOR).filter { it.isNotBlank() },
         )
         return AppUiState(
-            screen = AppScreen.Workbench,
+            screen = AppScreen.Market,
             username = if (rememberAccount) session.username.ifBlank { rememberedUsername } else "",
             rememberAccount = rememberAccount,
             session = session,
-            statusMessage = "正在恢复登录态并同步投资工作台。",
+            statusMessage = "正在恢复登录态并同步行情中心。",
         )
     }
 
@@ -212,5 +300,16 @@ class MainActivity : ComponentActivity() {
             .remove(KEY_REAL_NAME)
             .remove(KEY_ROLES)
             .apply()
+    }
+
+    private fun handleExpiredSession(message: String) {
+        clearLoginState()
+        state = state.copy(
+            screen = AppScreen.Login,
+            loading = false,
+            session = SessionState(),
+            statusMessage = message,
+            errorMessage = "登录态已失效",
+        )
     }
 }

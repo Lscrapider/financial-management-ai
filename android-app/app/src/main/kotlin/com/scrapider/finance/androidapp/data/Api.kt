@@ -20,6 +20,9 @@ object ApiConfig {
     const val WATCH_GROUPS_PATH = "/api/watch-pool/groups"
     const val STOCK_ALERTS_PATH = "/api/stock-alerts"
     const val REPORT_TARGETS_PATH = "/api/ai/scene-analysis/tasks/reports/targets?pageNum=1&pageSize=4"
+    const val STOCK_QUOTES_PATH = "/api/stocks/quotes"
+    const val INDEX_QUOTES_PATH = "/api/indices/quotes"
+    const val BOND_QUOTES_PATH = "/api/bonds/quotes"
     const val CONNECT_TIMEOUT_MS = 3500
     const val READ_TIMEOUT_MS = 5000
 }
@@ -132,4 +135,3 @@ fun apiMessage(body: String, fallback: String): String = runCatching {
         else -> fallback
     }
 }.getOrDefault(fallback)
-
