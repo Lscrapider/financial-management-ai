@@ -8,21 +8,26 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.scrapider.finance.androidapp.data.ApiClient
+import com.scrapider.finance.androidapp.data.AddWatchTargetFormState
 import com.scrapider.finance.androidapp.data.FinanceRepository
 import com.scrapider.finance.androidapp.data.MarketAssetType
 import com.scrapider.finance.androidapp.data.MarketFilter
 import com.scrapider.finance.androidapp.data.MarketUiState
+import com.scrapider.finance.androidapp.data.ObservationRiskUiState
 import com.scrapider.finance.androidapp.data.SessionState
+import com.scrapider.finance.androidapp.data.WatchTargetType
 import com.scrapider.finance.androidapp.data.WorkbenchSummary
 import com.scrapider.finance.androidapp.ui.FinanceTheme
 import com.scrapider.finance.androidapp.ui.LoginScreen
 import com.scrapider.finance.androidapp.ui.MarketScreen
+import com.scrapider.finance.androidapp.ui.ObservationRiskScreen
 import com.scrapider.finance.androidapp.ui.WorkbenchScreen
 
 private enum class AppScreen {
     Login,
     Workbench,
     Market,
+    Observation,
 }
 
 private data class AppUiState(
@@ -38,6 +43,7 @@ private data class AppUiState(
     val session: SessionState = SessionState(),
     val workbench: WorkbenchSummary = WorkbenchSummary(),
     val market: MarketUiState = MarketUiState(),
+    val observation: ObservationRiskUiState = ObservationRiskUiState(),
 )
 
 class MainActivity : ComponentActivity() {
@@ -88,6 +94,7 @@ class MainActivity : ComponentActivity() {
                         summary = state.workbench,
                         onRefresh = ::refreshWorkbench,
                         onMarketSelected = ::showMarket,
+                        onObservationSelected = ::showObservation,
                     )
 
                     AppScreen.Market -> MarketScreen(
@@ -100,6 +107,27 @@ class MainActivity : ComponentActivity() {
                         onSortByChangePercent = ::toggleMarketChangePercentSort,
                         onKeywordChange = { state = state.copy(market = state.market.copy(keyword = it)) },
                         onWorkbenchSelected = ::showWorkbench,
+                        onObservationSelected = ::showObservation,
+                    )
+
+                    AppScreen.Observation -> ObservationRiskScreen(
+                        loading = state.loading,
+                        statusMessage = state.statusMessage,
+                        observation = state.observation,
+                        onRefresh = ::refreshObservation,
+                        onGroupSelected = ::selectObservationGroup,
+                        onTypeFilterSelected = ::selectObservationTypeFilter,
+                        onItemSelected = ::selectObservationItem,
+                        onDismissDetailSheet = ::dismissObservationItem,
+                        onAlertSettingChange = ::saveObservationAlertSetting,
+                        onDeleteItem = ::deleteObservationItem,
+                        onOpenAddSheet = ::openAddWatchTargetSheet,
+                        onDismissAddSheet = ::dismissAddWatchTargetSheet,
+                        onFormChange = ::updateAddWatchTargetForm,
+                        onTargetTypeChange = ::selectAddWatchTargetType,
+                        onSaveTarget = ::saveObservationTarget,
+                        onWorkbenchSelected = ::showWorkbench,
+                        onMarketSelected = ::showMarket,
                     )
                 }
             }
@@ -224,6 +252,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun showObservation() {
+        state = state.copy(screen = AppScreen.Observation)
+        if (state.observation.groups.isEmpty()) {
+            refreshObservation()
+        }
+    }
+
     private fun refreshWorkbench() {
         if (!state.session.authenticated) {
             state = state.copy(screen = AppScreen.Login, statusMessage = "请先登录，登录后进入投资工作台。")
@@ -248,6 +283,254 @@ class MainActivity : ComponentActivity() {
                 Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    private fun refreshObservation() {
+        if (!state.session.authenticated) {
+            state = state.copy(screen = AppScreen.Login, statusMessage = "请先登录，登录后进入观察风控。")
+            return
+        }
+        val current = state.observation
+        state = state.copy(loading = true, statusMessage = "正在同步观察池分组、标的和风险预警。")
+        repository.loadObservationRisk { result, observation ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@loadObservationRisk
+            }
+            val selectedGroupId = current.selectedGroupId
+                .takeIf { id -> observation.groups.any { it.id == id } }
+                ?: observation.selectedGroupId
+            val formGroupId = current.addForm.selectedGroupId
+                .takeIf { id -> observation.groups.any { it.id == id } }
+                ?: selectedGroupId
+            state = state.copy(
+                loading = false,
+                observation = observation.copy(
+                    selectedGroupId = selectedGroupId,
+                    selectedItemId = current.selectedItemId
+                        .takeIf { id -> observation.groups.any { group -> group.items.any { it.id == id } } }
+                        .orEmpty(),
+                    typeFilter = current.typeFilter,
+                    targetOptions = current.targetOptions,
+                    showAddSheet = current.showAddSheet,
+                    addForm = current.addForm.copy(selectedGroupId = formGroupId),
+                ),
+                statusMessage = when {
+                    result.success -> "观察风控已同步：观察池 ${observation.watchItemCount} 个标的，启用预警 ${observation.enabledAlertCount} 项。"
+                    observation.groups.isNotEmpty() || observation.alerts.isNotEmpty() -> "部分同步完成：${result.message}"
+                    else -> result.message
+                },
+            )
+            if (!result.success && observation.groups.isEmpty() && observation.alerts.isEmpty()) {
+                Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun selectObservationGroup(groupId: String) {
+        state = state.copy(
+            screen = AppScreen.Observation,
+            observation = state.observation.copy(selectedGroupId = groupId, selectedItemId = ""),
+        )
+    }
+
+    private fun selectObservationTypeFilter(targetType: WatchTargetType?) {
+        state = state.copy(
+            screen = AppScreen.Observation,
+            observation = state.observation.copy(typeFilter = targetType, selectedItemId = ""),
+        )
+    }
+
+    private fun selectObservationItem(itemId: String) {
+        state = state.copy(
+            screen = AppScreen.Observation,
+            observation = state.observation.copy(selectedItemId = itemId),
+        )
+    }
+
+    private fun dismissObservationItem() {
+        state = state.copy(observation = state.observation.copy(selectedItemId = ""))
+    }
+
+    private fun saveObservationAlertSetting(
+        itemId: String,
+        enabled: Boolean,
+        thresholdPercent: Double,
+    ) {
+        if (state.loading) return
+        val item = state.observation.groups
+            .asSequence()
+            .flatMap { it.items.asSequence() }
+            .firstOrNull { it.id == itemId }
+            ?: return
+        if (!item.targetType.supportsAlert) {
+            state = state.copy(statusMessage = "${item.targetType.label}暂不支持风险预警。")
+            return
+        }
+        val alert = state.observation.alerts.find {
+            it.targetType == item.targetType && it.stockCode == item.targetCode
+        }
+        state = state.copy(loading = true, statusMessage = "正在保存 ${item.targetName} 的风险预警设置。")
+        repository.saveStockAlert(
+            targetType = item.targetType,
+            stockCode = item.targetCode,
+            thresholdPercent = thresholdPercent,
+            enabled = enabled,
+            id = alert?.id.orEmpty(),
+        ) { result ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@saveStockAlert
+            }
+            if (!result.success) {
+                state = state.copy(loading = false, statusMessage = result.message)
+                Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show()
+                return@saveStockAlert
+            }
+            state = state.copy(loading = false, statusMessage = "${item.targetName} 风险预警设置已保存。")
+            refreshObservation()
+        }
+    }
+
+    private fun deleteObservationItem(itemId: String) {
+        if (state.loading) return
+        val item = state.observation.groups
+            .asSequence()
+            .flatMap { it.items.asSequence() }
+            .firstOrNull { it.id == itemId }
+            ?: return
+        val alert = state.observation.alerts.find {
+            it.targetType == item.targetType && it.stockCode == item.targetCode
+        }
+        state = state.copy(loading = true, statusMessage = "正在删除 ${item.targetName} 的观察和预警配置。")
+        repository.deleteWatchTargetWithAlert(item, alert) { result ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@deleteWatchTargetWithAlert
+            }
+            if (!result.success) {
+                state = state.copy(loading = false, statusMessage = result.message)
+                Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show()
+                return@deleteWatchTargetWithAlert
+            }
+            state = state.copy(
+                loading = false,
+                observation = state.observation.copy(selectedItemId = ""),
+                statusMessage = "${item.targetName} 已从观察池移除。",
+            )
+            refreshObservation()
+        }
+    }
+
+    private fun openAddWatchTargetSheet() {
+        if (state.observation.groups.isEmpty()) {
+            refreshObservation()
+            return
+        }
+        val groupId = state.observation.selectedGroup?.id.orEmpty()
+        state = state.copy(
+            observation = state.observation.copy(
+                showAddSheet = true,
+                addForm = AddWatchTargetFormState(selectedGroupId = groupId),
+            ),
+        )
+        loadAddTargetOptions(WatchTargetType.Stock)
+    }
+
+    private fun dismissAddWatchTargetSheet() {
+        state = state.copy(observation = state.observation.copy(showAddSheet = false))
+    }
+
+    private fun updateAddWatchTargetForm(form: AddWatchTargetFormState) {
+        state = state.copy(observation = state.observation.copy(addForm = form))
+    }
+
+    private fun selectAddWatchTargetType(targetType: WatchTargetType) {
+        val form = state.observation.addForm.copy(
+            targetType = targetType,
+            targetKeyword = "",
+            selectedTargetCode = "",
+            selectedTargetName = "",
+            selectedSecid = "",
+            alertEnabled = targetType.supportsAlert,
+        )
+        state = state.copy(
+            observation = state.observation.copy(
+                addForm = form,
+                targetOptions = emptyList(),
+            ),
+        )
+        loadAddTargetOptions(targetType)
+    }
+
+    private fun loadAddTargetOptions(targetType: WatchTargetType) {
+        repository.loadAlertTargetOptions(targetType) { result, options ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@loadAlertTargetOptions
+            }
+            if (state.observation.addForm.targetType != targetType) {
+                return@loadAlertTargetOptions
+            }
+            state = state.copy(
+                observation = state.observation.copy(targetOptions = options),
+                statusMessage = if (result.success) result.message else result.message,
+            )
+        }
+    }
+
+    private fun saveObservationTarget() {
+        if (state.loading) return
+        val form = state.observation.addForm
+        state = state.copy(loading = true, statusMessage = "正在保存观察标的。")
+        repository.saveWatchTarget(form) { result, item ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@saveWatchTarget
+            }
+            if (!result.success) {
+                state = state.copy(loading = false, statusMessage = result.message)
+                Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show()
+                return@saveWatchTarget
+            }
+            val targetCode = item?.targetCode ?: form.selectedTargetCode.ifBlank { form.targetKeyword.trim() }
+            if (!form.effectiveAlertEnabled) {
+                finishObservationSave("观察标的已保存。")
+                return@saveWatchTarget
+            }
+            state = state.copy(statusMessage = "观察标的已保存，正在绑定风险预警。")
+            repository.saveStockAlert(
+                targetType = form.targetType,
+                stockCode = targetCode,
+                thresholdPercent = form.alertThresholdPercent,
+                enabled = true,
+            ) { alertResult ->
+                if (alertResult.statusCode == 401) {
+                    handleExpiredSession("登录态已失效，请重新登录。")
+                    return@saveStockAlert
+                }
+                if (alertResult.success) {
+                    finishObservationSave("观察标的和风险预警已保存。")
+                } else {
+                    state = state.copy(
+                        loading = false,
+                        observation = state.observation.copy(showAddSheet = false),
+                        statusMessage = "观察标的已保存，但风险预警保存失败：${alertResult.message}",
+                    )
+                    Toast.makeText(this, alertResult.message, Toast.LENGTH_SHORT).show()
+                    refreshObservation()
+                }
+            }
+        }
+    }
+
+    private fun finishObservationSave(message: String) {
+        state = state.copy(
+            loading = false,
+            observation = state.observation.copy(showAddSheet = false),
+            statusMessage = message,
+        )
+        refreshObservation()
     }
 
     private fun savedUiState(): AppUiState {

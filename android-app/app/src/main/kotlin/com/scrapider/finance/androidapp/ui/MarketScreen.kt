@@ -63,6 +63,7 @@ fun MarketScreen(
     onSortByChangePercent: () -> Unit,
     onKeywordChange: (String) -> Unit,
     onWorkbenchSelected: () -> Unit,
+    onObservationSelected: () -> Unit,
 ) {
     Scaffold(
         containerColor = WorkspaceBackground,
@@ -73,7 +74,12 @@ fun MarketScreen(
                 onRefresh = onRefresh,
             )
         },
-        bottomBar = { MarketBottomNav(onWorkbenchSelected = onWorkbenchSelected) },
+        bottomBar = {
+            MarketBottomNav(
+                onWorkbenchSelected = onWorkbenchSelected,
+                onObservationSelected = onObservationSelected,
+            )
+        },
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -396,7 +402,10 @@ private fun EmptyMarketRow(text: String) {
 }
 
 @Composable
-private fun MarketBottomNav(onWorkbenchSelected: () -> Unit) {
+private fun MarketBottomNav(
+    onWorkbenchSelected: () -> Unit,
+    onObservationSelected: () -> Unit,
+) {
     NavigationBar(
         containerColor = Color(0xFF1D1F27),
         contentColor = WorkspaceMuted,
@@ -407,8 +416,9 @@ private fun MarketBottomNav(onWorkbenchSelected: () -> Unit) {
             NavigationBarItem(
                 selected = item == "行情",
                 onClick = {
-                    if (item == "工作台") {
-                        onWorkbenchSelected()
+                    when (item) {
+                        "工作台" -> onWorkbenchSelected()
+                        "观察" -> onObservationSelected()
                     }
                 },
                 icon = { Text(navIcon(item), fontSize = 17.sp) },

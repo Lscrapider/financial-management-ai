@@ -18,7 +18,9 @@ object ApiConfig {
     const val LOGIN_PATH = "/api/auth/login"
     const val USER_INFO_PATH = "/api/user/info"
     const val WATCH_GROUPS_PATH = "/api/watch-pool/groups"
+    const val WATCH_ITEMS_PATH = "/api/watch-pool/items"
     const val STOCK_ALERTS_PATH = "/api/stock-alerts"
+    const val STOCK_ALERT_TARGET_OPTIONS_PATH = "/api/stock-alerts/target-options"
     const val REPORT_TARGETS_PATH = "/api/ai/scene-analysis/tasks/reports/targets?pageNum=1&pageSize=4"
     const val STOCK_QUOTES_PATH = "/api/stocks/quotes"
     const val INDEX_QUOTES_PATH = "/api/indices/quotes"
@@ -56,6 +58,13 @@ class ApiClient(
     fun postJson(path: String, payload: JSONObject, callback: (ApiResult) -> Unit) {
         executor.execute {
             val result = execute("POST", path, payload)
+            mainHandler.post { callback(result) }
+        }
+    }
+
+    fun delete(path: String, callback: (ApiResult) -> Unit) {
+        executor.execute {
+            val result = execute("DELETE", path, null)
             mainHandler.post { callback(result) }
         }
     }

@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.KeyboardOptions
 
 @Composable
 fun Panel(
@@ -98,6 +99,9 @@ fun FinanceTextField(
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     isError: Boolean = false,
+    singleLine: Boolean = true,
+    minLines: Int = 1,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     visualTransformation: androidx.compose.ui.text.input.VisualTransformation = androidx.compose.ui.text.input.VisualTransformation.None,
     trailingIcon: @Composable (() -> Unit)? = null,
 ) {
@@ -107,8 +111,10 @@ fun FinanceTextField(
             value = value,
             onValueChange = onValueChange,
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
+            singleLine = singleLine,
+            minLines = minLines,
             isError = isError,
+            keyboardOptions = keyboardOptions,
             visualTransformation = visualTransformation,
             trailingIcon = trailingIcon,
             colors = OutlinedTextFieldDefaults.colors(

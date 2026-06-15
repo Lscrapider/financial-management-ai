@@ -128,6 +128,136 @@ data class MarketUiState(
         get() = quotes.isNotEmpty()
 }
 
+const val DEFAULT_ALERT_THRESHOLD_PERCENT = 5.0
+const val ALERT_THRESHOLD_STEP_PERCENT = 0.5
+const val ALERT_THRESHOLD_MIN_PERCENT = 0.01
+const val ALERT_THRESHOLD_MAX_PERCENT = 100.0
+
+enum class WatchTargetType(
+    val apiValue: String,
+    val label: String,
+    val alertTargetType: String?,
+) {
+    Stock("STOCK", "股票", "STOCK"),
+    Bond("BOND", "可转债", "BOND"),
+    Index("INDEX", "指数", "INDEX"),
+    Fund("FUND", "基金", null),
+    Sector("SECTOR", "板块", null);
+
+    val supportsAlert: Boolean
+        get() = alertTargetType != null
+
+    companion object {
+        fun fromApi(value: String): WatchTargetType =
+            entries.firstOrNull { it.apiValue == value } ?: Stock
+    }
+}
+
+data class WatchItem(
+    val id: String,
+    val groupId: String,
+    val targetType: WatchTargetType,
+    val targetCode: String,
+    val targetName: String,
+    val secid: String = "",
+    val remark: String = "",
+    val buyPrice: Double? = null,
+    val position: Double? = null,
+    val latestPrice: Double? = null,
+    val changePercent: Double? = null,
+    val syncedAt: String = "",
+) {
+    fun matches(typeFilter: WatchTargetType?): Boolean =
+        typeFilter == null || targetType == typeFilter
+}
+
+data class WatchGroup(
+    val id: String,
+    val name: String,
+    val items: List<WatchItem> = emptyList(),
+)
+
+data class StockAlertConfig(
+    val id: String,
+    val targetType: WatchTargetType,
+    val stockCode: String,
+    val stockName: String,
+    val thresholdPercent: Double,
+    val enabled: Boolean,
+    val outOfThreshold: Boolean,
+    val latestPrice: Double? = null,
+    val changePercent: Double? = null,
+    val syncedAt: String = "",
+)
+
+data class AlertTargetOption(
+    val targetType: WatchTargetType,
+    val targetCode: String,
+    val targetName: String,
+    val marketCode: String = "",
+    val exchangeCode: String = "",
+) {
+    fun matches(keyword: String): Boolean {
+        val normalized = keyword.trim()
+        if (normalized.isBlank()) return true
+        return targetName.contains(normalized, ignoreCase = true) ||
+            targetCode.contains(normalized, ignoreCase = true) ||
+            marketCode.contains(normalized, ignoreCase = true)
+    }
+}
+
+data class AddWatchTargetFormState(
+    val targetType: WatchTargetType = WatchTargetType.Stock,
+    val selectedGroupId: String = "",
+    val targetKeyword: String = "",
+    val selectedTargetCode: String = "",
+    val selectedTargetName: String = "",
+    val selectedSecid: String = "",
+    val buyPrice: String = "",
+    val position: String = "",
+    val alertEnabled: Boolean = true,
+    val alertThresholdPercent: Double = DEFAULT_ALERT_THRESHOLD_PERCENT,
+    val remark: String = "",
+) {
+    val canEnableAlert: Boolean
+        get() = targetType.supportsAlert
+
+    val effectiveAlertEnabled: Boolean
+        get() = alertEnabled && canEnableAlert
+}
+
+data class ObservationRiskUiState(
+    val groups: List<WatchGroup> = emptyList(),
+    val selectedGroupId: String = "",
+    val selectedItemId: String = "",
+    val typeFilter: WatchTargetType? = null,
+    val alerts: List<StockAlertConfig> = emptyList(),
+    val targetOptions: List<AlertTargetOption> = emptyList(),
+    val updatedAt: String = "--:--",
+    val showAddSheet: Boolean = false,
+    val addForm: AddWatchTargetFormState = AddWatchTargetFormState(),
+) {
+    val selectedGroup: WatchGroup?
+        get() = groups.firstOrNull { it.id == selectedGroupId } ?: groups.firstOrNull()
+
+    val selectedItem: WatchItem?
+        get() = groups.asSequence()
+            .flatMap { it.items.asSequence() }
+            .firstOrNull { it.id == selectedItemId }
+
+    val visibleItems: List<WatchItem>
+        get() = selectedGroup?.items.orEmpty().filter { it.matches(typeFilter) }
+
+    val watchItemCount: Int
+        get() = groups.sumOf { it.items.size }
+
+    val enabledAlertCount: Int
+        get() = alerts.count { it.enabled }
+
+    val outAlertCount: Int
+        get() = alerts.count { it.outOfThreshold }
+}
+
 class FinanceRepository(
     private val apiClient: ApiClient,
 ) {
@@ -187,6 +317,144 @@ class FinanceRepository(
         }
         apiClient.get(ApiConfig.REPORT_TARGETS_PATH) { result ->
             pending.consume(result, "报告动态同步失败。") { body -> readReports(body, pending) }
+        }
+    }
+
+    fun loadObservationRisk(callback: (ApiResult, ObservationRiskUiState) -> Unit) {
+        val pending = ObservationPending(callback)
+        apiClient.get(ApiConfig.WATCH_GROUPS_PATH) { result ->
+            pending.consumeGroups(result)
+        }
+        apiClient.get(ApiConfig.STOCK_ALERTS_PATH) { result ->
+            pending.consumeAlerts(result)
+        }
+    }
+
+    fun loadAlertTargetOptions(
+        targetType: WatchTargetType,
+        callback: (ApiResult, List<AlertTargetOption>) -> Unit,
+    ) {
+        val alertType = targetType.alertTargetType
+        if (alertType == null) {
+            callback(ApiResult(true, 200, "", "${targetType.label}暂未接入预警候选标的。"), emptyList())
+            return
+        }
+        apiClient.get("${ApiConfig.STOCK_ALERT_TARGET_OPTIONS_PATH}?targetType=${alertType.encodeQuery()}") { result ->
+            if (!result.success || !isApiSuccess(result.body)) {
+                callback(result.copy(success = false, message = apiMessage(result.body, result.message)), emptyList())
+                return@get
+            }
+            runCatching {
+                callback(result.copy(message = "${targetType.label}候选标的已同步。"), readTargetOptions(result.body))
+            }.onFailure {
+                callback(
+                    ApiResult(false, result.statusCode, result.body, "候选标的解析失败：${it.message ?: it.javaClass.simpleName}"),
+                    emptyList(),
+                )
+            }
+        }
+    }
+
+    fun saveWatchTarget(
+        form: AddWatchTargetFormState,
+        callback: (ApiResult, WatchItem?) -> Unit,
+    ) {
+        val targetCode = form.selectedTargetCode.ifBlank { form.targetKeyword.trim() }
+        val targetName = form.selectedTargetName.ifBlank { form.targetKeyword.trim() }
+        if (form.selectedGroupId.isBlank() || targetCode.isBlank() || targetName.isBlank()) {
+            callback(ApiResult(false, 0, "", "请选择分组并搜索标的。"), null)
+            return
+        }
+        val payload = JSONObject()
+            .put("groupId", form.selectedGroupId)
+            .put("targetType", form.targetType.apiValue)
+            .put("targetCode", targetCode)
+            .put("targetName", targetName)
+            .put("secid", form.selectedSecid)
+            .put("remark", form.remark.trim())
+        form.buyPrice.toDoubleOrNull()?.let { payload.put("buyPrice", it) }
+        form.position.toDoubleOrNull()?.let { payload.put("position", it) }
+
+        apiClient.postJson(ApiConfig.WATCH_ITEMS_PATH, payload) { result ->
+            if (!result.success || !isApiSuccess(result.body)) {
+                callback(result.copy(success = false, message = apiMessage(result.body, result.message)), null)
+                return@postJson
+            }
+            runCatching {
+                val item = JSONObject(result.body).optJSONObject("data")?.toWatchItem()
+                callback(result.copy(message = "观察标的已保存。"), item)
+            }.onFailure {
+                callback(
+                    ApiResult(false, result.statusCode, result.body, "观察标的解析失败：${it.message ?: it.javaClass.simpleName}"),
+                    null,
+                )
+            }
+        }
+    }
+
+    fun saveStockAlert(
+        targetType: WatchTargetType,
+        stockCode: String,
+        thresholdPercent: Double = DEFAULT_ALERT_THRESHOLD_PERCENT,
+        enabled: Boolean = true,
+        id: String = "",
+        callback: (ApiResult) -> Unit,
+    ) {
+        val alertType = targetType.alertTargetType
+        if (alertType == null) {
+            callback(ApiResult(false, 0, "", "${targetType.label}暂不支持风险预警。"))
+            return
+        }
+        val payload = JSONObject()
+            .put("targetType", alertType)
+            .put("stockCode", stockCode)
+            .put("thresholdPercent", thresholdPercent)
+            .put("enabled", enabled)
+        if (id.isNotBlank()) {
+            payload.put("id", id)
+        }
+        apiClient.postJson(ApiConfig.STOCK_ALERTS_PATH, payload) { result ->
+            callback(
+                if (result.success && isApiSuccess(result.body)) {
+                    result.copy(message = "风险预警已保存。")
+                } else {
+                    result.copy(success = false, message = apiMessage(result.body, result.message))
+                },
+            )
+        }
+    }
+
+    fun deleteWatchTargetWithAlert(
+        item: WatchItem,
+        alert: StockAlertConfig?,
+        callback: (ApiResult) -> Unit,
+    ) {
+        if (item.id.isBlank()) {
+            callback(ApiResult(false, 0, "", "观察标的缺少 ID，无法删除。"))
+            return
+        }
+        if (alert != null && alert.id.isNotBlank()) {
+            apiClient.delete("${ApiConfig.STOCK_ALERTS_PATH}/${alert.id}") { alertResult ->
+                if (!alertResult.success || !isApiSuccess(alertResult.body)) {
+                    callback(alertResult.copy(success = false, message = apiMessage(alertResult.body, alertResult.message)))
+                    return@delete
+                }
+                deleteWatchItem(item.id, callback)
+            }
+            return
+        }
+        deleteWatchItem(item.id, callback)
+    }
+
+    private fun deleteWatchItem(itemId: String, callback: (ApiResult) -> Unit) {
+        apiClient.delete("${ApiConfig.WATCH_ITEMS_PATH}/$itemId") { result ->
+            callback(
+                if (result.success && isApiSuccess(result.body)) {
+                    result.copy(message = "观察标的已删除。")
+                } else {
+                    result.copy(success = false, message = apiMessage(result.body, result.message))
+                },
+            )
         }
     }
 
@@ -290,6 +558,57 @@ class FinanceRepository(
     private fun dataArray(body: String): JSONArray {
         val root = JSONObject(body.ifBlank { "{}" })
         return root.optJSONArray("data") ?: JSONArray()
+    }
+
+    private fun readObservationGroups(body: String): List<WatchGroup> {
+        val groups = dataArray(body)
+        return List(groups.length()) { index -> groups.optJSONObject(index) }
+            .filterNotNull()
+            .map { group ->
+                val items = group.optJSONArray("items") ?: JSONArray()
+                WatchGroup(
+                    id = group.optString("id", ""),
+                    name = group.cleanString("groupName").ifBlank { group.cleanString("name").ifBlank { "未命名分组" } },
+                    items = List(items.length()) { itemIndex -> items.optJSONObject(itemIndex) }
+                        .filterNotNull()
+                        .map { it.toWatchItem() },
+                )
+            }
+    }
+
+    private fun readStockAlerts(body: String): List<StockAlertConfig> {
+        val alerts = dataArray(body)
+        return List(alerts.length()) { index -> alerts.optJSONObject(index) }
+            .filterNotNull()
+            .map { alert ->
+                StockAlertConfig(
+                    id = alert.optString("id", ""),
+                    targetType = WatchTargetType.fromApi(alert.optString("targetType", "")),
+                    stockCode = alert.optString("stockCode", ""),
+                    stockName = alert.cleanString("stockName").ifBlank { "未命名标的" },
+                    thresholdPercent = alert.optDouble("thresholdPercent", DEFAULT_ALERT_THRESHOLD_PERCENT),
+                    enabled = alert.optBoolean("enabled", false),
+                    outOfThreshold = alert.optBoolean("outOfThreshold", false),
+                    latestPrice = alert.optionalDouble("latestPrice"),
+                    changePercent = alert.optionalDouble("changePercent"),
+                    syncedAt = alert.optString("syncedAt", ""),
+                )
+            }
+    }
+
+    private fun readTargetOptions(body: String): List<AlertTargetOption> {
+        val options = dataArray(body)
+        return List(options.length()) { index -> options.optJSONObject(index) }
+            .filterNotNull()
+            .map { option ->
+                AlertTargetOption(
+                    targetType = WatchTargetType.fromApi(option.optString("targetType", "")),
+                    targetCode = option.optString("targetCode", ""),
+                    targetName = option.cleanString("targetName").ifBlank { "未命名标的" },
+                    marketCode = option.cleanString("marketCode"),
+                    exchangeCode = option.cleanString("exchangeCode"),
+                )
+            }
     }
 
     private fun quoteArray(body: String): JSONArray {
@@ -406,6 +725,48 @@ class FinanceRepository(
             callback(failure ?: ApiResult(true, 200, "", "工作台后端数据已同步。"), summary)
         }
     }
+
+    private inner class ObservationPending(
+        private val callback: (ApiResult, ObservationRiskUiState) -> Unit,
+    ) {
+        private var remaining = 2
+        private var failure: ApiResult? = null
+        private var groups: List<WatchGroup> = emptyList()
+        private var alerts: List<StockAlertConfig> = emptyList()
+
+        fun consumeGroups(result: ApiResult) {
+            consume(result, "观察池分组同步失败。") { body -> groups = readObservationGroups(body) }
+        }
+
+        fun consumeAlerts(result: ApiResult) {
+            consume(result, "风险预警同步失败。") { body -> alerts = readStockAlerts(body) }
+        }
+
+        private fun consume(result: ApiResult, fallback: String, reader: (String) -> Unit) {
+            if (result.success && isApiSuccess(result.body)) {
+                runCatching { reader(result.body) }.onFailure {
+                    failure = ApiResult(false, result.statusCode, result.body, "观察风控解析失败：${it.message ?: it.javaClass.simpleName}")
+                }
+            } else if (failure == null) {
+                failure = result.copy(success = false, message = apiMessage(result.body, result.message.ifBlank { fallback }))
+            }
+            done()
+        }
+
+        private fun done() {
+            remaining--
+            if (remaining > 0) return
+            callback(
+                failure ?: ApiResult(true, 200, "", "观察风控数据已同步。"),
+                ObservationRiskUiState(
+                    groups = groups,
+                    selectedGroupId = groups.firstOrNull()?.id.orEmpty(),
+                    alerts = alerts,
+                    updatedAt = LocalDateTime.now().format(timeFormat),
+                ),
+            )
+        }
+    }
 }
 
 fun marketFilters(assetType: MarketAssetType): List<MarketFilter> = when (assetType) {
@@ -476,8 +837,30 @@ private fun JSONArray.toMarketQuotes(assetType: MarketAssetType): List<MarketQuo
             )
         }
 
+private fun JSONObject.toWatchItem(): WatchItem =
+    WatchItem(
+        id = optString("id", ""),
+        groupId = optString("groupId", ""),
+        targetType = WatchTargetType.fromApi(optString("targetType", "")),
+        targetCode = optString("targetCode", ""),
+        targetName = cleanString("targetName").ifBlank { "未命名标的" },
+        secid = cleanString("secid"),
+        remark = cleanString("remark"),
+        buyPrice = optionalDouble("buyPrice"),
+        position = optionalDouble("position"),
+        latestPrice = optionalDouble("latestPrice"),
+        changePercent = optionalDouble("changePercent"),
+        syncedAt = optString("syncedAt", ""),
+    )
+
 private fun JSONObject.optionalDouble(key: String): Double? =
     if (isNull(key) || !has(key)) null else optDouble(key, 0.0)
+
+private fun JSONObject.cleanString(key: String): String {
+    if (isNull(key) || !has(key)) return ""
+    val value = optString(key, "")
+    return if (value.equals("null", ignoreCase = true)) "" else value
+}
 
 private fun marketQuotePath(assetType: MarketAssetType, marketCode: String, sortOrder: String): String {
     val params = mutableListOf(
