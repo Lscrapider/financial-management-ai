@@ -20,12 +20,7 @@
     "build:analyze": "pnpm vite build --mode analyze",
     "dev": "pnpm vite --mode development",
     "preview": "vite preview",
-    "typecheck": "vue-tsc --noEmit --skipLibCheck",
-    "cap:add": "cap add android",
-    "cap:sync": "cap sync",
-    "cap:open": "cap open android",
-    "cap:build": "pnpm build && cap sync",
-    "cap:dev": "cap run android"
+    "typecheck": "vue-tsc --noEmit --skipLibCheck"
   },
   "imports": {
     "#/*": "./src/*"
@@ -55,9 +50,6 @@
     "vue-router": "catalog:"
   },
   "devDependencies": {
-    "@capacitor/android": "^6.2.0",
-    "@capacitor/cli": "^6.2.0",
-    "@capacitor/core": "^6.2.0",
     "@types/markdown-it": "^14.1.2",
     "unplugin-element-plus": "catalog:",
     "vite-plugin-pwa": "catalog:"
