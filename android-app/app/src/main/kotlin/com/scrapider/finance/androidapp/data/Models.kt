@@ -9,6 +9,21 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
 
+enum class AppFontScale(
+    val storageValue: String,
+    val label: String,
+    val scale: Float,
+) {
+    Compact("compact", "紧凑", 0.92f),
+    Standard("standard", "标准", 1.0f),
+    Large("large", "放大", 1.14f);
+
+    companion object {
+        fun fromStorage(value: String): AppFontScale =
+            entries.firstOrNull { it.storageValue == value } ?: Standard
+    }
+}
+
 data class SessionState(
     val authenticated: Boolean = false,
     val accessToken: String = "",
@@ -705,6 +720,111 @@ class FinanceRepository(
             )
             apiClient.setAccessToken(state.accessToken)
             callback(ApiResult(true, result.statusCode, result.body, "后端用户信息已同步。"), state)
+        }
+    }
+
+    fun changePassword(
+        oldPassword: String,
+        newPassword: String,
+        confirmPassword: String,
+        callback: (ApiResult) -> Unit,
+    ) {
+        val normalizedOldPassword = oldPassword.trim()
+        val normalizedNewPassword = newPassword.trim()
+        val normalizedConfirmPassword = confirmPassword.trim()
+        if (normalizedOldPassword.isBlank() || normalizedNewPassword.isBlank() || normalizedConfirmPassword.isBlank()) {
+            callback(ApiResult(false, 0, "", "请输入旧密码、新密码和确认密码。"))
+            return
+        }
+        if (normalizedNewPassword != normalizedConfirmPassword) {
+            callback(ApiResult(false, 0, "", "两次输入的新密码不一致。"))
+            return
+        }
+        val payload = JSONObject()
+            .put("oldPassword", normalizedOldPassword)
+            .put("newPassword", normalizedNewPassword)
+            .put("confirmPassword", normalizedConfirmPassword)
+        apiClient.putJson(ApiConfig.USER_PASSWORD_PATH, payload) { result ->
+            callback(
+                if (result.success && isApiSuccess(result.body)) {
+                    result.copy(message = "密码修改成功。")
+                } else {
+                    result.copy(success = false, message = apiMessage(result.body, result.message))
+                },
+            )
+        }
+    }
+
+    fun addStockConfig(stockCode: String, stockName: String, callback: (ApiResult) -> Unit) {
+        val normalizedCode = stockCode.trim()
+        val normalizedName = stockName.trim()
+        if (!normalizedCode.matches(Regex("\\d{6}")) || normalizedName.isBlank()) {
+            callback(ApiResult(false, 0, "", "请输入 6 位股票代码和股票名称。"))
+            return
+        }
+        val payload = JSONObject()
+            .put("stockCode", normalizedCode)
+            .put("stockName", normalizedName)
+        apiClient.postJson(ApiConfig.SYSTEM_CONFIG_STOCKS_PATH, payload, ApiConfig.SYSTEM_CONFIG_READ_TIMEOUT_MS) { result ->
+            if (!result.success || !isApiSuccess(result.body)) {
+                callback(result.copy(success = false, message = apiMessage(result.body, result.message)))
+                return@postJson
+            }
+            runCatching {
+                val data = dataObject(result.body)
+                val name = data.cleanString("stockName").ifBlank { normalizedName }
+                val trendMessage = if (data.optBoolean("trendSynced", false)) "分时同步完成" else "分时同步未完成"
+                callback(result.copy(message = "$name 快照同步完成，$trendMessage。"))
+            }.onFailure {
+                callback(result.copy(message = "$normalizedName 已新增，返回结果解析失败：${it.message ?: it.javaClass.simpleName}"))
+            }
+        }
+    }
+
+    fun addBondConfig(bondCode: String, bondName: String, callback: (ApiResult) -> Unit) {
+        val normalizedCode = bondCode.trim()
+        val normalizedName = bondName.trim()
+        if (!normalizedCode.matches(Regex("\\d{6}")) || normalizedName.isBlank()) {
+            callback(ApiResult(false, 0, "", "请输入 6 位可转债代码和可转债名称。"))
+            return
+        }
+        val payload = JSONObject()
+            .put("bondCode", normalizedCode)
+            .put("bondName", normalizedName)
+        apiClient.postJson(ApiConfig.SYSTEM_CONFIG_BONDS_PATH, payload, ApiConfig.SYSTEM_CONFIG_READ_TIMEOUT_MS) { result ->
+            if (!result.success || !isApiSuccess(result.body)) {
+                callback(result.copy(success = false, message = apiMessage(result.body, result.message)))
+                return@postJson
+            }
+            runCatching {
+                val data = dataObject(result.body)
+                val name = data.cleanString("bondName").ifBlank { normalizedName }
+                val stockText = data.cleanString("underlyingStockName").takeIf { it.isNotBlank() }?.let { "，正股 $it 已同步" }.orEmpty()
+                callback(result.copy(message = "$name 同步完成$stockText。"))
+            }.onFailure {
+                callback(result.copy(message = "$normalizedName 已新增，返回结果解析失败：${it.message ?: it.javaClass.simpleName}"))
+            }
+        }
+    }
+
+    fun deleteTargetConfig(targetType: String, targetCode: String, callback: (ApiResult) -> Unit) {
+        val normalizedType = targetType.trim().uppercase(Locale.ROOT)
+        val normalizedCode = targetCode.trim()
+        if (normalizedType !in setOf("STOCK", "BOND", "INDEX") || !normalizedCode.matches(Regex("\\d{6}"))) {
+            callback(ApiResult(false, 0, "", "请选择标的类型并输入 6 位标的代码。"))
+            return
+        }
+        val payload = JSONObject()
+            .put("targetType", normalizedType)
+            .put("targetCode", normalizedCode)
+        apiClient.postJson(ApiConfig.SYSTEM_CONFIG_TARGET_DELETE_PATH, payload, ApiConfig.SYSTEM_CONFIG_READ_TIMEOUT_MS) { result ->
+            callback(
+                if (result.success && isApiSuccess(result.body)) {
+                    result.copy(message = "${targetTypeLabel(normalizedType)} $normalizedCode 已物理删除。")
+                } else {
+                    result.copy(success = false, message = apiMessage(result.body, result.message))
+                },
+            )
         }
     }
 
@@ -2125,6 +2245,13 @@ private fun reportTargetPath(targetType: ReportTargetType): String {
 
 private fun reportTargetTypeOrNull(value: String): ReportTargetType? =
     value.takeIf { it.isNotBlank() }?.let { ReportTargetType.fromApi(it) }
+
+private fun targetTypeLabel(value: String): String = when (value.uppercase(Locale.ROOT)) {
+    "STOCK" -> "股票"
+    "BOND" -> "可转债"
+    "INDEX" -> "指数"
+    else -> value
+}
 
 private fun ReportTargetType.assetTypeValue(): String = when (this) {
     ReportTargetType.Index -> "index"

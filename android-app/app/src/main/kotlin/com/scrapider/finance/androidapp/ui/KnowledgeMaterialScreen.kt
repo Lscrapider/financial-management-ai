@@ -103,6 +103,7 @@ fun KnowledgeMaterialScreen(
     onSelectManualTask: (String) -> Unit,
     onOpenManualTask: (String) -> Unit,
     onDeleteManualTask: (String) -> Unit,
+    onUserCenterSelected: () -> Unit = {},
     onWorkbenchSelected: () -> Unit,
     onMarketSelected: () -> Unit,
     onObservationSelected: () -> Unit,
@@ -116,6 +117,7 @@ fun KnowledgeMaterialScreen(
                 avatarText = avatarText,
                 loading = loading,
                 onRefresh = onRefresh,
+                onUserCenterSelected = onUserCenterSelected,
             )
         },
         bottomBar = {
@@ -230,12 +232,14 @@ private fun KnowledgeTopBar(
     avatarText: String,
     loading: Boolean,
     onRefresh: () -> Unit,
+    onUserCenterSelected: () -> Unit,
 ) {
     ScreenTopBar(
         title = "知识",
         avatarText = avatarText,
         loading = loading,
         onRefresh = onRefresh,
+        onAvatarClick = onUserCenterSelected,
     )
 }
 

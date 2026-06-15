@@ -4,7 +4,10 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.graphics.Color
 
 val WorkspaceBackground = Color(0xFF14161A)
@@ -44,12 +47,16 @@ private val DarkScheme: ColorScheme = darkColorScheme(
 @Composable
 fun FinanceTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    fontScale: Float = 1.0f,
     content: @Composable () -> Unit,
 ) {
-    MaterialTheme(
-        colorScheme = DarkScheme,
-        typography = MaterialTheme.typography,
-        content = content,
-    )
+    val density = LocalDensity.current
+    val scaledDensity = Density(density.density, density.fontScale * fontScale.coerceIn(0.85f, 1.25f))
+    CompositionLocalProvider(LocalDensity provides scaledDensity) {
+        MaterialTheme(
+            colorScheme = DarkScheme,
+            typography = MaterialTheme.typography,
+            content = content,
+        )
+    }
 }
-

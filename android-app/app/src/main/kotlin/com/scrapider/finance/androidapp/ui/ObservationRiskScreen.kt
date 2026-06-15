@@ -75,6 +75,7 @@ fun ObservationRiskScreen(
     loading: Boolean,
     statusMessage: String,
     observation: ObservationRiskUiState,
+    showKnowledge: Boolean = true,
     onRefresh: () -> Unit,
     onGroupSelected: (String) -> Unit,
     onTypeFilterSelected: (WatchTargetType?) -> Unit,
@@ -87,6 +88,7 @@ fun ObservationRiskScreen(
     onFormChange: (AddWatchTargetFormState) -> Unit,
     onTargetTypeChange: (WatchTargetType) -> Unit,
     onSaveTarget: () -> Unit,
+    onUserCenterSelected: () -> Unit = {},
     onWorkbenchSelected: () -> Unit,
     onMarketSelected: () -> Unit,
     onReportSelected: () -> Unit,
@@ -101,6 +103,7 @@ fun ObservationRiskScreen(
                 loading = loading,
                 onRefresh = onRefresh,
                 onAdd = onOpenAddSheet,
+                onUserCenterSelected = onUserCenterSelected,
             )
         },
         bottomBar = {
@@ -109,6 +112,7 @@ fun ObservationRiskScreen(
                 onMarketSelected = onMarketSelected,
                 onReportSelected = onReportSelected,
                 onKnowledgeSelected = onKnowledgeSelected,
+                showKnowledge = showKnowledge,
             )
         },
     ) { paddingValues ->
@@ -210,6 +214,7 @@ private fun ObservationTopBar(
     loading: Boolean,
     onRefresh: () -> Unit,
     onAdd: () -> Unit,
+    onUserCenterSelected: () -> Unit,
 ) {
     ScreenTopBar(
         title = "观察风控",
@@ -218,6 +223,7 @@ private fun ObservationTopBar(
         onRefresh = onRefresh,
         primaryActionText = "+新增",
         onPrimaryAction = onAdd,
+        onAvatarClick = onUserCenterSelected,
     )
 }
 
@@ -953,6 +959,7 @@ private fun AlertSwitchRow(
 
 @Composable
 private fun ObservationBottomNav(
+    showKnowledge: Boolean,
     onWorkbenchSelected: () -> Unit,
     onMarketSelected: () -> Unit,
     onReportSelected: () -> Unit,
@@ -960,6 +967,7 @@ private fun ObservationBottomNav(
 ) {
     WorkspaceBottomNav(
         selectedItem = "观察",
+        showKnowledge = showKnowledge,
         onWorkbenchSelected = onWorkbenchSelected,
         onMarketSelected = onMarketSelected,
         onReportSelected = onReportSelected,

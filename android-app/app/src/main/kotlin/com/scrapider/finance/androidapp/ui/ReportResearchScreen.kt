@@ -69,6 +69,7 @@ fun ReportResearchScreen(
     avatarText: String,
     loading: Boolean,
     report: ReportResearchUiState,
+    showKnowledge: Boolean = true,
     onRefresh: () -> Unit,
     onTargetTypeChange: (ReportTargetType) -> Unit,
     onStatusFilterChange: (ReportStatusFilter) -> Unit,
@@ -84,6 +85,7 @@ fun ReportResearchScreen(
     onCreateTargetSelected: (ReportTargetOption) -> Unit,
     onCreateProfileSelected: (Long) -> Unit,
     onSubmitCreateReport: () -> Unit,
+    onUserCenterSelected: () -> Unit = {},
     onWorkbenchSelected: () -> Unit,
     onMarketSelected: () -> Unit,
     onObservationSelected: () -> Unit,
@@ -98,6 +100,7 @@ fun ReportResearchScreen(
                 loading = loading,
                 onRefresh = onRefresh,
                 onAdd = onOpenCreateSheet,
+                onUserCenterSelected = onUserCenterSelected,
             )
         },
         bottomBar = {
@@ -106,6 +109,7 @@ fun ReportResearchScreen(
                 onMarketSelected = onMarketSelected,
                 onObservationSelected = onObservationSelected,
                 onKnowledgeSelected = onKnowledgeSelected,
+                showKnowledge = showKnowledge,
             )
         },
     ) { paddingValues ->
@@ -189,6 +193,7 @@ private fun ReportTopBar(
     loading: Boolean,
     onRefresh: () -> Unit,
     onAdd: () -> Unit,
+    onUserCenterSelected: () -> Unit,
 ) {
     ScreenTopBar(
         title = "报告研究",
@@ -197,6 +202,7 @@ private fun ReportTopBar(
         onRefresh = onRefresh,
         primaryActionText = "+ 新建",
         onPrimaryAction = onAdd,
+        onAvatarClick = onUserCenterSelected,
     )
 }
 
@@ -877,6 +883,7 @@ private fun SheetHandle() {
 
 @Composable
 private fun ReportBottomNav(
+    showKnowledge: Boolean,
     onWorkbenchSelected: () -> Unit,
     onMarketSelected: () -> Unit,
     onObservationSelected: () -> Unit,
@@ -884,6 +891,7 @@ private fun ReportBottomNav(
 ) {
     WorkspaceBottomNav(
         selectedItem = "研究",
+        showKnowledge = showKnowledge,
         onWorkbenchSelected = onWorkbenchSelected,
         onMarketSelected = onMarketSelected,
         onObservationSelected = onObservationSelected,

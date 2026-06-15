@@ -18,6 +18,7 @@ object ApiConfig {
     const val DEFAULT_BASE_URL = "http://192.168.0.107:8081"
     const val LOGIN_PATH = "/api/auth/login"
     const val USER_INFO_PATH = "/api/user/info"
+    const val USER_PASSWORD_PATH = "/api/user/password"
     const val WATCH_GROUPS_PATH = "/api/watch-pool/groups"
     const val WATCH_ITEMS_PATH = "/api/watch-pool/items"
     const val STOCK_ALERTS_PATH = "/api/stock-alerts"
@@ -38,8 +39,12 @@ object ApiConfig {
     const val STOCK_QUOTES_PATH = "/api/stocks/quotes"
     const val INDEX_QUOTES_PATH = "/api/indices/quotes"
     const val BOND_QUOTES_PATH = "/api/bonds/quotes"
+    const val SYSTEM_CONFIG_STOCKS_PATH = "/api/system-config/stocks"
+    const val SYSTEM_CONFIG_BONDS_PATH = "/api/system-config/bonds"
+    const val SYSTEM_CONFIG_TARGET_DELETE_PATH = "/api/system-config/targets/delete"
     const val CONNECT_TIMEOUT_MS = 3500
     const val READ_TIMEOUT_MS = 5000
+    const val SYSTEM_CONFIG_READ_TIMEOUT_MS = 120_000
 }
 
 data class ApiResult(
@@ -71,6 +76,15 @@ class ApiClient(
 
     fun postJson(path: String, payload: JSONObject, callback: (ApiResult) -> Unit) {
         enqueue("POST", path, payload, callback)
+    }
+
+    fun postJson(path: String, payload: JSONObject, readTimeoutMs: Int, callback: (ApiResult) -> Unit) {
+        val request = request("POST", path, payload)
+        client.newBuilder()
+            .readTimeout(readTimeoutMs.toLong(), TimeUnit.MILLISECONDS)
+            .build()
+            .newCall(request)
+            .enqueue(apiCallback(callback))
     }
 
     fun putJson(path: String, payload: JSONObject, callback: (ApiResult) -> Unit) {

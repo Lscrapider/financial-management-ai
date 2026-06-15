@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.scrapider.finance.androidapp.data.ApiClient
 import com.scrapider.finance.androidapp.data.AddWatchTargetFormState
+import com.scrapider.finance.androidapp.data.AppFontScale
 import com.scrapider.finance.androidapp.data.FinanceRepository
 import com.scrapider.finance.androidapp.data.KnowledgeMaterialFormState
 import com.scrapider.finance.androidapp.data.KnowledgeMaterialTask
@@ -42,6 +43,7 @@ import com.scrapider.finance.androidapp.ui.LoginScreen
 import com.scrapider.finance.androidapp.ui.MarketScreen
 import com.scrapider.finance.androidapp.ui.ObservationRiskScreen
 import com.scrapider.finance.androidapp.ui.ReportResearchScreen
+import com.scrapider.finance.androidapp.ui.UserCenterScreen
 import com.scrapider.finance.androidapp.ui.WorkbenchScreen
 import java.io.ByteArrayOutputStream
 import java.time.LocalDateTime
@@ -54,6 +56,7 @@ private enum class AppScreen {
     Observation,
     Report,
     Knowledge,
+    UserCenter,
 }
 
 private data class AppUiState(
@@ -72,6 +75,7 @@ private data class AppUiState(
     val observation: ObservationRiskUiState = ObservationRiskUiState(),
     val report: ReportResearchUiState = ReportResearchUiState(),
     val knowledge: KnowledgeMaterialUiState = KnowledgeMaterialUiState(),
+    val fontScale: AppFontScale = AppFontScale.Standard,
 )
 
 class MainActivity : ComponentActivity() {
@@ -81,6 +85,7 @@ class MainActivity : ComponentActivity() {
         const val KEY_USERNAME = "username"
         const val KEY_REAL_NAME = "real_name"
         const val KEY_ROLES = "roles"
+        const val KEY_FONT_SCALE = "font_scale"
         const val KEY_REMEMBER_ACCOUNT = "remember_account"
         const val KEY_REMEMBERED_USERNAME = "remembered_username"
         const val ROLE_SEPARATOR = "\u001F"
@@ -109,7 +114,7 @@ class MainActivity : ComponentActivity() {
         state = savedUiState()
 
         setContent {
-            FinanceTheme {
+            FinanceTheme(fontScale = state.fontScale.scale) {
                 BackHandler(enabled = state.screen != AppScreen.Login && screenBackStack.size > 1) {
                     popTopLevelScreen()
                 }
@@ -135,11 +140,13 @@ class MainActivity : ComponentActivity() {
                         loading = state.loading,
                         statusMessage = state.statusMessage,
                         summary = state.workbench,
+                        showKnowledge = state.session.isAdmin,
                         onRefresh = ::refreshWorkbench,
                         onMarketSelected = ::showMarket,
                         onObservationSelected = ::showObservation,
                         onReportSelected = ::showReport,
                         onKnowledgeSelected = ::showKnowledge,
+                        onUserCenterSelected = ::showUserCenter,
                     )
 
                     AppScreen.Market -> MarketScreen(
@@ -147,11 +154,13 @@ class MainActivity : ComponentActivity() {
                         loading = state.loading,
                         statusMessage = state.statusMessage,
                         market = state.market,
+                        showKnowledge = state.session.isAdmin,
                         onRefresh = ::refreshMarket,
                         onAssetTypeChange = ::selectMarketAssetType,
                         onMarketFilterChange = ::selectMarketFilter,
                         onSortByChangePercent = ::toggleMarketChangePercentSort,
                         onKeywordChange = { state = state.copy(market = state.market.copy(keyword = it)) },
+                        onUserCenterSelected = ::showUserCenter,
                         onWorkbenchSelected = ::showWorkbench,
                         onObservationSelected = ::showObservation,
                         onReportSelected = ::showReport,
@@ -163,6 +172,7 @@ class MainActivity : ComponentActivity() {
                         loading = state.loading,
                         statusMessage = state.statusMessage,
                         observation = state.observation,
+                        showKnowledge = state.session.isAdmin,
                         onRefresh = ::refreshObservation,
                         onGroupSelected = ::selectObservationGroup,
                         onTypeFilterSelected = ::selectObservationTypeFilter,
@@ -175,6 +185,7 @@ class MainActivity : ComponentActivity() {
                         onFormChange = ::updateAddWatchTargetForm,
                         onTargetTypeChange = ::selectAddWatchTargetType,
                         onSaveTarget = ::saveObservationTarget,
+                        onUserCenterSelected = ::showUserCenter,
                         onWorkbenchSelected = ::showWorkbench,
                         onMarketSelected = ::showMarket,
                         onReportSelected = ::showReport,
@@ -185,6 +196,7 @@ class MainActivity : ComponentActivity() {
                         avatarText = state.session.displayName,
                         loading = state.loading,
                         report = state.report,
+                        showKnowledge = state.session.isAdmin,
                         onRefresh = ::refreshReportResearch,
                         onTargetTypeChange = ::selectReportTargetType,
                         onStatusFilterChange = ::selectReportStatusFilter,
@@ -200,6 +212,7 @@ class MainActivity : ComponentActivity() {
                         onCreateTargetSelected = ::selectCreateReportTarget,
                         onCreateProfileSelected = ::selectCreateReportProfile,
                         onSubmitCreateReport = ::submitCreateReport,
+                        onUserCenterSelected = ::showUserCenter,
                         onWorkbenchSelected = ::showWorkbench,
                         onMarketSelected = ::showMarket,
                         onObservationSelected = ::showObservation,
@@ -250,10 +263,30 @@ class MainActivity : ComponentActivity() {
                         onSelectManualTask = ::selectManualKnowledgeTask,
                         onOpenManualTask = ::openManualKnowledgeTask,
                         onDeleteManualTask = ::deleteManualKnowledgeTask,
+                        onUserCenterSelected = ::showUserCenter,
                         onWorkbenchSelected = ::showWorkbench,
                         onMarketSelected = ::showMarket,
                         onObservationSelected = ::showObservation,
                         onReportSelected = ::showReport,
+                    )
+
+                    AppScreen.UserCenter -> UserCenterScreen(
+                        session = state.session,
+                        loading = state.loading,
+                        statusMessage = state.statusMessage,
+                        showKnowledge = state.session.isAdmin,
+                        fontScale = state.fontScale,
+                        onFontScaleChange = ::changeFontScale,
+                        onChangePassword = ::changePassword,
+                        onAddStockConfig = ::addStockConfig,
+                        onAddBondConfig = ::addBondConfig,
+                        onDeleteTargetConfig = ::deleteTargetConfig,
+                        onLogout = ::logout,
+                        onWorkbenchSelected = ::showWorkbench,
+                        onMarketSelected = ::showMarket,
+                        onObservationSelected = ::showObservation,
+                        onReportSelected = ::showReport,
+                        onKnowledgeSelected = ::showKnowledge,
                     )
                 }
             }
@@ -395,6 +428,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun showKnowledge() {
+        if (!state.session.isAdmin) {
+            state = state.copy(statusMessage = "普通用户暂无知识库入口权限。")
+            return
+        }
         navigateToTopLevel(AppScreen.Knowledge)
         if (state.knowledge.reportTypes.isEmpty() || state.knowledge.configProfiles.isEmpty()) {
             loadKnowledgeMaterialOptions()
@@ -411,6 +448,100 @@ class MainActivity : ComponentActivity() {
         }
         if (state.knowledge.section == KnowledgeSection.ManualImport && state.knowledge.manual.tasks.isEmpty()) {
             loadManualKnowledgeTasks()
+        }
+    }
+
+    private fun showUserCenter() {
+        if (!state.session.authenticated) {
+            showLogin("请先登录，登录后进入个人中心。")
+            return
+        }
+        navigateToTopLevel(AppScreen.UserCenter)
+    }
+
+    private fun logout() {
+        val currentFontScale = state.fontScale
+        clearLoginState()
+        stopMaterialPolling()
+        screenBackStack = listOf(AppScreen.Workbench)
+        state = AppUiState(
+            username = if (state.rememberAccount) state.username else "",
+            rememberAccount = state.rememberAccount,
+            statusMessage = "已退出登录。",
+            fontScale = currentFontScale,
+        )
+        apiClient.setAccessToken("")
+    }
+
+    private fun changeFontScale(fontScale: AppFontScale) {
+        state = state.copy(
+            fontScale = fontScale,
+            statusMessage = "字号已切换为${fontScale.label}。",
+        )
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
+            .putString(KEY_FONT_SCALE, fontScale.storageValue)
+            .apply()
+    }
+
+    private fun changePassword(oldPassword: String, newPassword: String, confirmPassword: String) {
+        if (state.loading) return
+        state = state.copy(loading = true, statusMessage = "正在修改密码。")
+        repository.changePassword(oldPassword, newPassword, confirmPassword) { result ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录后修改密码。")
+                return@changePassword
+            }
+            state = state.copy(loading = false, statusMessage = result.message)
+            if (!result.success) {
+                Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun addStockConfig(stockCode: String, stockName: String) {
+        if (state.loading) return
+        if (!state.session.isAdmin) {
+            state = state.copy(statusMessage = "普通用户不能新增标的。")
+            return
+        }
+        state = state.copy(loading = true, statusMessage = "正在新增股票 ${stockCode.trim()} 并同步行情。")
+        repository.addStockConfig(stockCode, stockName) { result ->
+            handleSystemConfigResult(result)
+        }
+    }
+
+    private fun addBondConfig(bondCode: String, bondName: String) {
+        if (state.loading) return
+        if (!state.session.isAdmin) {
+            state = state.copy(statusMessage = "普通用户不能新增标的。")
+            return
+        }
+        state = state.copy(loading = true, statusMessage = "正在新增可转债 ${bondCode.trim()} 并同步基础资料。")
+        repository.addBondConfig(bondCode, bondName) { result ->
+            handleSystemConfigResult(result)
+        }
+    }
+
+    private fun deleteTargetConfig(targetType: String, targetCode: String) {
+        if (state.loading) return
+        if (!state.session.isAdmin) {
+            state = state.copy(statusMessage = "普通用户不能删除标的。")
+            return
+        }
+        state = state.copy(loading = true, statusMessage = "正在物理删除标的 ${targetCode.trim()}。")
+        repository.deleteTargetConfig(targetType, targetCode) { result ->
+            handleSystemConfigResult(result)
+        }
+    }
+
+    private fun handleSystemConfigResult(result: com.scrapider.finance.androidapp.data.ApiResult) {
+        if (result.statusCode == 401) {
+            handleExpiredSession("登录态已失效，请重新登录后维护标的配置。")
+            return
+        }
+        state = state.copy(loading = false, statusMessage = result.message)
+        if (!result.success) {
+            Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -1761,10 +1892,12 @@ class MainActivity : ComponentActivity() {
         val token = preferences.getString(KEY_TOKEN, "").orEmpty()
         val rememberedUsername = preferences.getString(KEY_REMEMBERED_USERNAME, "").orEmpty()
         val sessionUsername = preferences.getString(KEY_USERNAME, "").orEmpty()
+        val fontScale = AppFontScale.fromStorage(preferences.getString(KEY_FONT_SCALE, "").orEmpty())
         if (token.isBlank()) {
             return AppUiState(
                 username = if (rememberAccount) rememberedUsername.ifBlank { "research_user_01" } else "",
                 rememberAccount = rememberAccount,
+                fontScale = fontScale,
             )
         }
         val session = SessionState(
@@ -1780,6 +1913,7 @@ class MainActivity : ComponentActivity() {
             rememberAccount = rememberAccount,
             session = session,
             statusMessage = "正在恢复登录态并同步投资工作台。",
+            fontScale = fontScale,
         )
     }
 

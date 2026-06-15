@@ -51,13 +51,14 @@ private val WorkspaceNavItems = listOf("工作台", "行情", "观察", "研究"
 fun ScreenTopBar(
     title: String,
     loading: Boolean,
-    onRefresh: () -> Unit,
+    onRefresh: (() -> Unit)?,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     titleAccessory: @Composable (() -> Unit)? = null,
     primaryActionText: String? = null,
     onPrimaryAction: (() -> Unit)? = null,
     avatarText: String = "研",
+    onAvatarClick: (() -> Unit)? = null,
 ) {
     Row(
         modifier = modifier
@@ -102,8 +103,10 @@ fun ScreenTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            TextButton(onClick = onRefresh, enabled = !loading) {
-                Text(if (loading) "同步中" else "刷新", color = WorkspaceMuted, fontSize = 13.sp)
+            if (onRefresh != null) {
+                TextButton(onClick = onRefresh, enabled = !loading) {
+                    Text(if (loading) "同步中" else "刷新", color = WorkspaceMuted, fontSize = 13.sp)
+                }
             }
             if (primaryActionText != null && onPrimaryAction != null) {
                 Box(
@@ -123,7 +126,7 @@ fun ScreenTopBar(
                     )
                 }
             }
-            TopBarAvatar(avatarText)
+            TopBarAvatar(avatarText, onAvatarClick)
         }
     }
 }
@@ -165,13 +168,14 @@ fun AiPulseBadge() {
 }
 
 @Composable
-private fun TopBarAvatar(text: String) {
+private fun TopBarAvatar(text: String, onAvatarClick: (() -> Unit)?) {
     val avatarLabel = text.trim().take(2).ifBlank { "研" }
     Box(
         modifier = Modifier
             .size(34.dp)
             .border(1.dp, PrimaryFixedDim.copy(alpha = 0.35f), CircleShape)
-            .background(CommandBlueSoft.copy(alpha = 0.72f), CircleShape),
+            .background(CommandBlueSoft.copy(alpha = 0.72f), CircleShape)
+            .then(if (onAvatarClick != null) Modifier.clickable { onAvatarClick() } else Modifier),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -187,6 +191,7 @@ private fun TopBarAvatar(text: String) {
 @Composable
 fun WorkspaceBottomNav(
     selectedItem: String,
+    showKnowledge: Boolean = true,
     onWorkbenchSelected: () -> Unit = {},
     onMarketSelected: () -> Unit = {},
     onObservationSelected: () -> Unit = {},
@@ -199,7 +204,9 @@ fun WorkspaceBottomNav(
         tonalElevation = 0.dp,
         modifier = Modifier.navigationBarsPadding(),
     ) {
-        WorkspaceNavItems.forEach { item ->
+        WorkspaceNavItems
+            .filter { showKnowledge || it != "知识" }
+            .forEach { item ->
             val active = item == selectedItem
             NavigationBarItem(
                 selected = active,

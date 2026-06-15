@@ -47,7 +47,9 @@ fun WorkbenchScreen(
     loading: Boolean,
     statusMessage: String,
     summary: WorkbenchSummary,
+    showKnowledge: Boolean = true,
     onRefresh: () -> Unit,
+    onUserCenterSelected: () -> Unit = {},
     onMarketSelected: () -> Unit = {},
     onObservationSelected: () -> Unit = {},
     onReportSelected: () -> Unit = {},
@@ -56,7 +58,12 @@ fun WorkbenchScreen(
     Scaffold(
         containerColor = WorkspaceBackground,
         topBar = {
-            TopBar(displayName = displayName, loading = loading, onRefresh = onRefresh)
+            TopBar(
+                displayName = displayName,
+                loading = loading,
+                onRefresh = onRefresh,
+                onUserCenterSelected = onUserCenterSelected,
+            )
         },
         bottomBar = {
             BottomNav(
@@ -64,6 +71,7 @@ fun WorkbenchScreen(
                 onObservationSelected = onObservationSelected,
                 onReportSelected = onReportSelected,
                 onKnowledgeSelected = onKnowledgeSelected,
+                showKnowledge = showKnowledge,
             )
         },
         floatingActionButton = {
@@ -104,6 +112,7 @@ private fun TopBar(
     displayName: String,
     loading: Boolean,
     onRefresh: () -> Unit,
+    onUserCenterSelected: () -> Unit,
 ) {
     ScreenTopBar(
         title = "工作台",
@@ -112,6 +121,7 @@ private fun TopBar(
         avatarText = displayName,
         loading = loading,
         onRefresh = onRefresh,
+        onAvatarClick = onUserCenterSelected,
     )
 }
 
@@ -325,6 +335,7 @@ private fun ReportSection(reports: List<WorkbenchReportLine>) {
 
 @Composable
 private fun BottomNav(
+    showKnowledge: Boolean,
     onMarketSelected: () -> Unit,
     onObservationSelected: () -> Unit,
     onReportSelected: () -> Unit,
@@ -332,6 +343,7 @@ private fun BottomNav(
 ) {
     WorkspaceBottomNav(
         selectedItem = "工作台",
+        showKnowledge = showKnowledge,
         onMarketSelected = onMarketSelected,
         onObservationSelected = onObservationSelected,
         onReportSelected = onReportSelected,

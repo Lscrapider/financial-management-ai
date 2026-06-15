@@ -52,11 +52,13 @@ fun MarketScreen(
     loading: Boolean,
     statusMessage: String,
     market: MarketUiState,
+    showKnowledge: Boolean = true,
     onRefresh: () -> Unit,
     onAssetTypeChange: (MarketAssetType) -> Unit,
     onMarketFilterChange: (MarketFilter) -> Unit,
     onSortByChangePercent: () -> Unit,
     onKeywordChange: (String) -> Unit,
+    onUserCenterSelected: () -> Unit = {},
     onWorkbenchSelected: () -> Unit,
     onObservationSelected: () -> Unit,
     onReportSelected: () -> Unit,
@@ -70,6 +72,7 @@ fun MarketScreen(
                 avatarText = avatarText,
                 loading = loading,
                 onRefresh = onRefresh,
+                onUserCenterSelected = onUserCenterSelected,
             )
         },
         bottomBar = {
@@ -78,6 +81,7 @@ fun MarketScreen(
                 onObservationSelected = onObservationSelected,
                 onReportSelected = onReportSelected,
                 onKnowledgeSelected = onKnowledgeSelected,
+                showKnowledge = showKnowledge,
             )
         },
     ) { paddingValues ->
@@ -130,12 +134,14 @@ private fun MarketTopBar(
     avatarText: String,
     loading: Boolean,
     onRefresh: () -> Unit,
+    onUserCenterSelected: () -> Unit,
 ) {
     ScreenTopBar(
         title = "行情中心",
         avatarText = avatarText,
         loading = loading,
         onRefresh = onRefresh,
+        onAvatarClick = onUserCenterSelected,
     )
 }
 
@@ -388,6 +394,7 @@ private fun EmptyMarketRow(text: String) {
 
 @Composable
 private fun MarketBottomNav(
+    showKnowledge: Boolean,
     onWorkbenchSelected: () -> Unit,
     onObservationSelected: () -> Unit,
     onReportSelected: () -> Unit,
@@ -395,6 +402,7 @@ private fun MarketBottomNav(
 ) {
     WorkspaceBottomNav(
         selectedItem = "行情",
+        showKnowledge = showKnowledge,
         onWorkbenchSelected = onWorkbenchSelected,
         onObservationSelected = onObservationSelected,
         onReportSelected = onReportSelected,
