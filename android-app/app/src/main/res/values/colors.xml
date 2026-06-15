@@ -1,0 +1,13 @@
+<resources>
+    <color name="workspace_background">#14161A</color>
+    <color name="workspace_surface">#1C1E23</color>
+    <color name="workspace_surface_elevated">#24272D</color>
+    <color name="workspace_surface_muted">#2E3033</color>
+    <color name="workspace_border">#36363A</color>
+    <color name="workspace_foreground">#F2F2F2</color>
+    <color name="workspace_foreground_muted">#AEB4BD</color>
+    <color name="command_blue">#006BE6</color>
+    <color name="signal_red">#DC4446</color>
+    <color name="signal_green">#57D188</color>
+    <color name="signal_amber">#EFBD48</color>
+</resources>
