@@ -56,6 +56,7 @@ fun WorkbenchScreen(
     onMarketSelected: () -> Unit = {},
     onObservationSelected: () -> Unit = {},
     onReportSelected: () -> Unit = {},
+    onKnowledgeSelected: () -> Unit = {},
 ) {
     Scaffold(
         containerColor = WorkspaceBackground,
@@ -67,6 +68,7 @@ fun WorkbenchScreen(
                 onMarketSelected = onMarketSelected,
                 onObservationSelected = onObservationSelected,
                 onReportSelected = onReportSelected,
+                onKnowledgeSelected = onKnowledgeSelected,
             )
         },
         floatingActionButton = {
@@ -341,9 +343,10 @@ private fun BottomNav(
     onMarketSelected: () -> Unit,
     onObservationSelected: () -> Unit,
     onReportSelected: () -> Unit,
+    onKnowledgeSelected: () -> Unit,
 ) {
     NavigationBar(containerColor = Color(0xFF1D1F27), contentColor = WorkspaceMuted, tonalElevation = 0.dp) {
-        listOf("工作台", "行情", "观察", "研究", "我的").forEach { item ->
+        listOf("工作台", "行情", "观察", "研究", "知识").forEach { item ->
             NavigationBarItem(
                 selected = item == "工作台",
                 onClick = {
@@ -351,6 +354,7 @@ private fun BottomNav(
                         "行情" -> onMarketSelected()
                         "观察" -> onObservationSelected()
                         "研究" -> onReportSelected()
+                        "知识" -> onKnowledgeSelected()
                     }
                 },
                 icon = { Text(navIcon(item), fontSize = 17.sp) },
@@ -402,6 +406,7 @@ private fun navIcon(item: String): String = when (item) {
     "行情" -> "⌁"
     "观察" -> "◉"
     "研究" -> "▤"
+    "知识" -> "▣"
     else -> "●"
 }
 

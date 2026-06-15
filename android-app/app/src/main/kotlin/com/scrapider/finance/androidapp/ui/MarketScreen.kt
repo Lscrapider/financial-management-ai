@@ -65,6 +65,7 @@ fun MarketScreen(
     onWorkbenchSelected: () -> Unit,
     onObservationSelected: () -> Unit,
     onReportSelected: () -> Unit,
+    onKnowledgeSelected: () -> Unit,
 ) {
     Scaffold(
         containerColor = WorkspaceBackground,
@@ -80,6 +81,7 @@ fun MarketScreen(
                 onWorkbenchSelected = onWorkbenchSelected,
                 onObservationSelected = onObservationSelected,
                 onReportSelected = onReportSelected,
+                onKnowledgeSelected = onKnowledgeSelected,
             )
         },
     ) { paddingValues ->
@@ -408,6 +410,7 @@ private fun MarketBottomNav(
     onWorkbenchSelected: () -> Unit,
     onObservationSelected: () -> Unit,
     onReportSelected: () -> Unit,
+    onKnowledgeSelected: () -> Unit,
 ) {
     NavigationBar(
         containerColor = Color(0xFF1D1F27),
@@ -415,7 +418,7 @@ private fun MarketBottomNav(
         tonalElevation = 0.dp,
         modifier = Modifier.navigationBarsPadding(),
     ) {
-        listOf("工作台", "行情", "观察", "研究", "我的").forEach { item ->
+        listOf("工作台", "行情", "观察", "研究", "知识").forEach { item ->
             NavigationBarItem(
                 selected = item == "行情",
                 onClick = {
@@ -423,6 +426,7 @@ private fun MarketBottomNav(
                         "工作台" -> onWorkbenchSelected()
                         "观察" -> onObservationSelected()
                         "研究" -> onReportSelected()
+                        "知识" -> onKnowledgeSelected()
                     }
                 },
                 icon = { Text(navIcon(item), fontSize = 17.sp) },
@@ -444,6 +448,7 @@ private fun navIcon(item: String): String = when (item) {
     "行情" -> "⌁"
     "观察" -> "◉"
     "研究" -> "▤"
+    "知识" -> "▣"
     else -> "●"
 }
 

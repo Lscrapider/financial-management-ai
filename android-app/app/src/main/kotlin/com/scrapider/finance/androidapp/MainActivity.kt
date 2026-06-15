@@ -1,6 +1,8 @@
 package com.scrapider.finance.androidapp
 
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -10,6 +12,9 @@ import androidx.compose.runtime.setValue
 import com.scrapider.finance.androidapp.data.ApiClient
 import com.scrapider.finance.androidapp.data.AddWatchTargetFormState
 import com.scrapider.finance.androidapp.data.FinanceRepository
+import com.scrapider.finance.androidapp.data.KnowledgeMaterialFormState
+import com.scrapider.finance.androidapp.data.KnowledgeMaterialTask
+import com.scrapider.finance.androidapp.data.KnowledgeMaterialUiState
 import com.scrapider.finance.androidapp.data.MarketAssetType
 import com.scrapider.finance.androidapp.data.MarketFilter
 import com.scrapider.finance.androidapp.data.MarketUiState
@@ -25,6 +30,7 @@ import com.scrapider.finance.androidapp.data.SessionState
 import com.scrapider.finance.androidapp.data.WatchTargetType
 import com.scrapider.finance.androidapp.data.WorkbenchSummary
 import com.scrapider.finance.androidapp.ui.FinanceTheme
+import com.scrapider.finance.androidapp.ui.KnowledgeMaterialScreen
 import com.scrapider.finance.androidapp.ui.LoginScreen
 import com.scrapider.finance.androidapp.ui.MarketScreen
 import com.scrapider.finance.androidapp.ui.ObservationRiskScreen
@@ -37,6 +43,7 @@ private enum class AppScreen {
     Market,
     Observation,
     Report,
+    Knowledge,
 }
 
 private data class AppUiState(
@@ -54,6 +61,7 @@ private data class AppUiState(
     val market: MarketUiState = MarketUiState(),
     val observation: ObservationRiskUiState = ObservationRiskUiState(),
     val report: ReportResearchUiState = ReportResearchUiState(),
+    val knowledge: KnowledgeMaterialUiState = KnowledgeMaterialUiState(),
 )
 
 class MainActivity : ComponentActivity() {
@@ -70,7 +78,9 @@ class MainActivity : ComponentActivity() {
 
     private val apiClient = ApiClient()
     private val repository = FinanceRepository(apiClient)
+    private val materialPollHandler = Handler(Looper.getMainLooper())
     private var state by mutableStateOf(AppUiState())
+    private var materialPollRunnable: Runnable? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -106,6 +116,7 @@ class MainActivity : ComponentActivity() {
                         onMarketSelected = ::showMarket,
                         onObservationSelected = ::showObservation,
                         onReportSelected = ::showReport,
+                        onKnowledgeSelected = ::showKnowledge,
                     )
 
                     AppScreen.Market -> MarketScreen(
@@ -120,6 +131,7 @@ class MainActivity : ComponentActivity() {
                         onWorkbenchSelected = ::showWorkbench,
                         onObservationSelected = ::showObservation,
                         onReportSelected = ::showReport,
+                        onKnowledgeSelected = ::showKnowledge,
                     )
 
                     AppScreen.Observation -> ObservationRiskScreen(
@@ -141,6 +153,7 @@ class MainActivity : ComponentActivity() {
                         onWorkbenchSelected = ::showWorkbench,
                         onMarketSelected = ::showMarket,
                         onReportSelected = ::showReport,
+                        onKnowledgeSelected = ::showKnowledge,
                     )
 
                     AppScreen.Report -> ReportResearchScreen(
@@ -164,6 +177,29 @@ class MainActivity : ComponentActivity() {
                         onWorkbenchSelected = ::showWorkbench,
                         onMarketSelected = ::showMarket,
                         onObservationSelected = ::showObservation,
+                        onKnowledgeSelected = ::showKnowledge,
+                    )
+
+                    AppScreen.Knowledge -> KnowledgeMaterialScreen(
+                        loading = state.loading,
+                        statusMessage = state.statusMessage,
+                        knowledge = state.knowledge,
+                        onRefresh = ::refreshKnowledgeMaterialTask,
+                        onTargetTypeChange = ::selectKnowledgeTargetType,
+                        onTargetKeywordChange = ::changeKnowledgeTargetKeyword,
+                        onTargetSelected = ::selectKnowledgeTarget,
+                        onProfileSelected = ::selectKnowledgeProfile,
+                        onFormChange = ::updateKnowledgeForm,
+                        onSubmitTarget = ::submitKnowledgeTarget,
+                        onSubmitNaturalLanguage = ::submitKnowledgeNaturalLanguage,
+                        onSceneFilterChange = ::selectKnowledgeSceneFilter,
+                        onTagFilterChange = ::selectKnowledgeTagFilter,
+                        onSourceKeywordChange = ::changeKnowledgeSourceKeyword,
+                        onResetFilters = ::resetKnowledgeFilters,
+                        onWorkbenchSelected = ::showWorkbench,
+                        onMarketSelected = ::showMarket,
+                        onObservationSelected = ::showObservation,
+                        onReportSelected = ::showReport,
                     )
                 }
             }
@@ -176,6 +212,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        stopMaterialPolling()
         apiClient.shutdown()
         super.onDestroy()
     }
@@ -299,6 +336,20 @@ class MainActivity : ComponentActivity() {
         state = state.copy(screen = AppScreen.Report)
         if (!state.report.hasAnyData) {
             refreshReportResearch()
+        }
+    }
+
+    private fun showKnowledge() {
+        state = state.copy(screen = AppScreen.Knowledge)
+        if (state.knowledge.reportTypes.isEmpty() || state.knowledge.configProfiles.isEmpty()) {
+            loadKnowledgeMaterialOptions()
+        }
+        if (state.knowledge.targetOptions.isEmpty()) {
+            loadKnowledgeTargetOptions(state.knowledge.form.targetType, state.knowledge.form.targetKeyword)
+        }
+        if (state.knowledge.activeTask?.terminal == false) {
+            refreshKnowledgeMaterialTask()
+            ensureMaterialPolling()
         }
     }
 
@@ -546,6 +597,279 @@ class MainActivity : ComponentActivity() {
         preferredProfileId: Long?,
         profiles: List<ReportConfigProfileOption> = state.report.configProfiles,
     ): CreateReportFormState {
+        val availableProfiles = profiles.filter { it.targetType == null || it.targetType == form.targetType }.ifEmpty { profiles }
+        val profile = availableProfiles.firstOrNull { it.id == preferredProfileId }
+            ?: availableProfiles.firstOrNull { it.configProfile == "system_recommended" }
+            ?: availableProfiles.firstOrNull()
+        return if (profile == null) {
+            form
+        } else {
+            form.copy(
+                configProfileId = profile.id,
+                configProfile = profile.configProfile,
+                reportType = profile.reportType,
+                totalChunks = profile.totalChunks,
+                dailyKlineLimit = profile.dailyKlineLimit,
+                weeklyKlineLimit = profile.weeklyKlineLimit,
+                monthlyKlineLimit = profile.monthlyKlineLimit,
+            )
+        }
+    }
+
+    private fun loadKnowledgeMaterialOptions() {
+        repository.loadKnowledgeMaterialOptions { result, reportTypes, profiles ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@loadKnowledgeMaterialOptions
+            }
+            val nextKnowledge = state.knowledge.copy(
+                reportTypes = reportTypes,
+                configProfiles = profiles,
+            )
+            state = state.copy(
+                knowledge = nextKnowledge.copy(
+                    form = applyKnowledgeMaterialProfile(
+                        nextKnowledge.form,
+                        nextKnowledge.form.configProfileId,
+                        profiles,
+                    ),
+                ),
+                statusMessage = activeKnowledgeTaskMessageOr(result.message),
+            )
+        }
+    }
+
+    private fun selectKnowledgeTargetType(targetType: ReportTargetType) {
+        val form = applyKnowledgeMaterialProfile(
+            state.knowledge.form.copy(
+                targetType = targetType,
+                targetKeyword = "",
+                targetCode = "",
+                targetName = "",
+            ),
+            preferredProfileId = null,
+        )
+        state = state.copy(
+            screen = AppScreen.Knowledge,
+            knowledge = state.knowledge.copy(form = form, targetOptions = emptyList()),
+            statusMessage = "正在切换到${targetType.label}材料检索。",
+        )
+        loadKnowledgeTargetOptions(targetType, "")
+    }
+
+    private fun changeKnowledgeTargetKeyword(keyword: String) {
+        val form = state.knowledge.form.copy(
+            targetKeyword = keyword,
+            targetCode = "",
+            targetName = "",
+        )
+        state = state.copy(knowledge = state.knowledge.copy(form = form))
+        loadKnowledgeTargetOptions(form.targetType, keyword)
+    }
+
+    private fun selectKnowledgeTarget(option: ReportTargetOption) {
+        state = state.copy(
+            knowledge = state.knowledge.copy(
+                form = state.knowledge.form.copy(
+                    targetType = option.targetType,
+                    targetKeyword = "${option.targetName} ${option.targetCode}",
+                    targetCode = option.targetCode,
+                    targetName = option.targetName,
+                ),
+            ),
+        )
+    }
+
+    private fun selectKnowledgeProfile(profileId: Long) {
+        val form = applyKnowledgeMaterialProfile(state.knowledge.form, preferredProfileId = profileId)
+        state = state.copy(knowledge = state.knowledge.copy(form = form))
+    }
+
+    private fun updateKnowledgeForm(form: KnowledgeMaterialFormState) {
+        state = state.copy(knowledge = state.knowledge.copy(form = form))
+    }
+
+    private fun loadKnowledgeTargetOptions(targetType: ReportTargetType, keyword: String) {
+        repository.loadKnowledgeMaterialTargetOptions(targetType, keyword) { result, options ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@loadKnowledgeMaterialTargetOptions
+            }
+            if (state.knowledge.form.targetType != targetType) {
+                return@loadKnowledgeMaterialTargetOptions
+            }
+            state = state.copy(
+                knowledge = state.knowledge.copy(targetOptions = options),
+                statusMessage = activeKnowledgeTaskMessageOr(result.message),
+            )
+        }
+    }
+
+    private fun submitKnowledgeTarget() {
+        if (state.loading) return
+        val form = state.knowledge.form
+        state = state.copy(
+            loading = true,
+            screen = AppScreen.Knowledge,
+            knowledge = state.knowledge.copy(
+                activeTask = null,
+                sceneFilter = "",
+                tagFilter = "",
+                sourceKeyword = "",
+                updatedAt = "--:--",
+            ),
+            statusMessage = "正在提交 ${form.targetName.ifBlank { form.targetCode }} 的知识库材料检索任务。",
+        )
+        repository.submitKnowledgeMaterialTarget(form) { result, task ->
+            handleKnowledgeSubmitResult(result, task)
+        }
+    }
+
+    private fun submitKnowledgeNaturalLanguage() {
+        if (state.loading) return
+        val form = state.knowledge.form
+        state = state.copy(
+            loading = true,
+            screen = AppScreen.Knowledge,
+            knowledge = state.knowledge.copy(
+                activeTask = null,
+                sceneFilter = "",
+                tagFilter = "",
+                sourceKeyword = "",
+                updatedAt = "--:--",
+            ),
+            statusMessage = "正在按自然语言提交 ${form.totalChunks} 条知识库材料召回任务。",
+        )
+        repository.submitKnowledgeMaterialNaturalLanguage(form.queryText, form.totalChunks) { result, task ->
+            handleKnowledgeSubmitResult(result, task)
+        }
+    }
+
+    private fun handleKnowledgeSubmitResult(result: com.scrapider.finance.androidapp.data.ApiResult, task: KnowledgeMaterialTask?) {
+        if (result.statusCode == 401) {
+            handleExpiredSession("登录态已失效，请重新登录。")
+            return
+        }
+        if (!result.success || task == null) {
+            state = state.copy(loading = false, statusMessage = result.message)
+            Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show()
+            return
+        }
+        state = state.copy(
+            loading = false,
+            knowledge = state.knowledge.copy(
+                activeTask = task,
+                sceneFilter = "",
+                tagFilter = "",
+                sourceKeyword = "",
+                updatedAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")),
+            ),
+            statusMessage = knowledgeTaskMessage(task),
+        )
+        refreshKnowledgeMaterialTask()
+        ensureMaterialPolling()
+    }
+
+    private fun refreshKnowledgeMaterialTask() {
+        val taskNo = state.knowledge.activeTask?.taskNo.orEmpty()
+        if (taskNo.isBlank()) {
+            loadKnowledgeMaterialOptions()
+            return
+        }
+        repository.loadKnowledgeMaterialTask(taskNo) { result, task ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@loadKnowledgeMaterialTask
+            }
+            if (!result.success || task == null) {
+                state = state.copy(loading = false, statusMessage = result.message)
+                return@loadKnowledgeMaterialTask
+            }
+            state = state.copy(
+                loading = false,
+                knowledge = state.knowledge.copy(
+                    activeTask = task,
+                    updatedAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")),
+                ),
+                statusMessage = knowledgeTaskMessage(task),
+            )
+            if (task.terminal) {
+                stopMaterialPolling()
+            } else {
+                ensureMaterialPolling()
+            }
+        }
+    }
+
+    private fun ensureMaterialPolling() {
+        val task = state.knowledge.activeTask
+        if (task == null || task.terminal || state.screen != AppScreen.Knowledge || materialPollRunnable != null) {
+            return
+        }
+        startMaterialPolling()
+    }
+
+    private fun startMaterialPolling() {
+        stopMaterialPolling()
+        materialPollRunnable = object : Runnable {
+            override fun run() {
+                val task = state.knowledge.activeTask
+                if (task == null || task.terminal || state.screen != AppScreen.Knowledge) {
+                    stopMaterialPolling()
+                    return
+                }
+                refreshKnowledgeMaterialTask()
+                materialPollHandler.postDelayed(this, 1800L)
+            }
+        }
+        materialPollHandler.postDelayed(materialPollRunnable!!, 1800L)
+    }
+
+    private fun stopMaterialPolling() {
+        materialPollRunnable?.let { materialPollHandler.removeCallbacks(it) }
+        materialPollRunnable = null
+    }
+
+    private fun activeKnowledgeTaskMessageOr(fallback: String): String {
+        val task = state.knowledge.activeTask
+        return when {
+            task != null && !task.terminal -> knowledgeTaskMessage(task)
+            state.loading && state.screen == AppScreen.Knowledge -> state.statusMessage
+            else -> fallback
+        }
+    }
+
+    private fun knowledgeTaskMessage(task: KnowledgeMaterialTask): String = when (task.status) {
+        "success" -> "材料召回完成：${task.chunks.size} 条。"
+        "failed" -> task.errorMessage.ifBlank { "材料召回失败。" }
+        "processing_current_scenes" -> "正在计算标的场景，完成后会自动召回知识库材料。"
+        "current_scenes_ready" -> "标的场景已计算，正在准备知识库召回。"
+        "retrieving_knowledge" -> "正在检索知识库材料，请稍候。"
+        "pending" -> "材料任务已提交，等待后端处理。"
+        else -> "材料任务${materialStatusText(task.status)}，请稍候。"
+    }
+
+    private fun selectKnowledgeSceneFilter(scene: String) {
+        state = state.copy(knowledge = state.knowledge.copy(sceneFilter = scene, tagFilter = ""))
+    }
+
+    private fun selectKnowledgeTagFilter(tag: String) {
+        state = state.copy(knowledge = state.knowledge.copy(tagFilter = tag))
+    }
+
+    private fun changeKnowledgeSourceKeyword(keyword: String) {
+        state = state.copy(knowledge = state.knowledge.copy(sourceKeyword = keyword))
+    }
+
+    private fun resetKnowledgeFilters() {
+        state = state.copy(knowledge = state.knowledge.copy(sceneFilter = "", tagFilter = "", sourceKeyword = ""))
+    }
+
+    private fun applyKnowledgeMaterialProfile(
+        form: KnowledgeMaterialFormState,
+        preferredProfileId: Long?,
+        profiles: List<ReportConfigProfileOption> = state.knowledge.configProfiles,
+    ): KnowledgeMaterialFormState {
         val availableProfiles = profiles.filter { it.targetType == null || it.targetType == form.targetType }.ifEmpty { profiles }
         val profile = availableProfiles.firstOrNull { it.id == preferredProfileId }
             ?: availableProfiles.firstOrNull { it.configProfile == "system_recommended" }
@@ -900,5 +1224,15 @@ class MainActivity : ComponentActivity() {
             statusMessage = message,
             errorMessage = "登录态已失效",
         )
+    }
+
+    private fun materialStatusText(status: String): String = when (status) {
+        "pending" -> "等待中"
+        "processing_current_scenes" -> "正在计算场景"
+        "current_scenes_ready" -> "场景已计算"
+        "retrieving_knowledge" -> "正在召回知识库材料"
+        "success" -> "已完成"
+        "failed" -> "失败"
+        else -> status.ifBlank { "处理中" }
     }
 }

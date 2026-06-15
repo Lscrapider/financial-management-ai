@@ -412,6 +412,130 @@ data class ReportResearchUiState(
         get() = targets.isNotEmpty()
 }
 
+const val DEFAULT_KNOWLEDGE_MATERIAL_TOTAL_CHUNKS = DEFAULT_REPORT_TOTAL_CHUNKS
+
+enum class KnowledgeMaterialSearchMode(
+    val apiValue: String,
+    val label: String,
+) {
+    Target("target", "按标的"),
+    NaturalLanguage("natural_language", "自然语言");
+
+    companion object {
+        fun fromApi(value: String): KnowledgeMaterialSearchMode =
+            entries.firstOrNull { it.apiValue == value } ?: Target
+    }
+}
+
+data class KnowledgeMaterialFormState(
+    val targetType: ReportTargetType = ReportTargetType.Stock,
+    val targetKeyword: String = "",
+    val targetCode: String = "",
+    val targetName: String = "",
+    val reportType: String = "quick_analysis",
+    val configProfile: String = "system_recommended",
+    val configProfileId: Long? = null,
+    val totalChunks: Int = DEFAULT_KNOWLEDGE_MATERIAL_TOTAL_CHUNKS,
+    val dailyKlineLimit: Int = DEFAULT_REPORT_DAILY_KLINE_LIMIT,
+    val weeklyKlineLimit: Int = DEFAULT_REPORT_WEEKLY_KLINE_LIMIT,
+    val monthlyKlineLimit: Int = DEFAULT_REPORT_MONTHLY_KLINE_LIMIT,
+    val queryText: String = "",
+) {
+    val canSubmitTarget: Boolean
+        get() = targetCode.isNotBlank()
+
+    val canSubmitNaturalLanguage: Boolean
+        get() = queryText.trim().isNotBlank()
+}
+
+data class KnowledgeMaterialChunk(
+    val chunkId: Long,
+    val taskNo: String,
+    val chunkIndex: Int?,
+    val scene: String,
+    val filename: String,
+    val text: String,
+    val matchedTags: List<String>,
+    val semanticScore: Double?,
+    val tagMatchScore: Double?,
+    val crossSceneScore: Double?,
+    val finalScore: Double?,
+) {
+    fun matches(sceneFilter: String, tagFilter: String, sourceKeyword: String): Boolean {
+        if (sceneFilter.isNotBlank() && scene != sceneFilter) return false
+        if (tagFilter.isNotBlank() && !matchedTags.contains(tagFilter)) return false
+        val normalized = sourceKeyword.trim()
+        if (normalized.isBlank()) return true
+        return filename.contains(normalized, ignoreCase = true)
+    }
+}
+
+data class KnowledgeMaterialTask(
+    val taskNo: String = "",
+    val searchMode: KnowledgeMaterialSearchMode = KnowledgeMaterialSearchMode.Target,
+    val targetType: ReportTargetType? = null,
+    val targetCode: String = "",
+    val targetName: String = "",
+    val queryText: String = "",
+    val rewrittenQuery: String = "",
+    val status: String = "",
+    val errorMessage: String = "",
+    val submittedAt: String = "",
+    val finishedAt: String = "",
+    val chunks: List<KnowledgeMaterialChunk> = emptyList(),
+) {
+    val terminal: Boolean
+        get() = status == "success" || status == "failed"
+
+    val title: String
+        get() = when (searchMode) {
+            KnowledgeMaterialSearchMode.Target ->
+                targetName.ifBlank { targetCode.ifBlank { "标的材料检索" } } +
+                    targetCode.takeIf { it.isNotBlank() }?.let { " $it" }.orEmpty()
+
+            KnowledgeMaterialSearchMode.NaturalLanguage -> queryText.ifBlank { "自然语言召回" }
+        }
+}
+
+data class KnowledgeMaterialUiState(
+    val form: KnowledgeMaterialFormState = KnowledgeMaterialFormState(),
+    val targetOptions: List<ReportTargetOption> = emptyList(),
+    val reportTypes: List<ReportTypeOption> = listOf(
+        ReportTypeOption("quick_analysis", "快速分析"),
+        ReportTypeOption("valuation_report", "估值报告"),
+    ),
+    val configProfiles: List<ReportConfigProfileOption> = emptyList(),
+    val activeTask: KnowledgeMaterialTask? = null,
+    val sceneFilter: String = "",
+    val tagFilter: String = "",
+    val sourceKeyword: String = "",
+    val updatedAt: String = "--:--",
+) {
+    val chunks: List<KnowledgeMaterialChunk>
+        get() = activeTask?.chunks.orEmpty()
+
+    val sceneOptions: List<Pair<String, Int>>
+        get() = chunks.groupingBy { it.scene }.eachCount().toList().sortedBy { it.first }
+
+    val tagOptions: List<Pair<String, Int>>
+        get() = chunks
+            .filter { it.matches(sceneFilter, "", sourceKeyword) }
+            .flatMap { it.matchedTags }
+            .groupingBy { it }
+            .eachCount()
+            .toList()
+            .sortedBy { it.first }
+
+    val visibleChunks: List<KnowledgeMaterialChunk>
+        get() = chunks.filter { it.matches(sceneFilter, tagFilter, sourceKeyword) }
+
+    val groupedVisibleChunks: List<Pair<String, List<KnowledgeMaterialChunk>>>
+        get() = visibleChunks.groupBy { it.scene }.toList()
+
+    val hasAnyData: Boolean
+        get() = activeTask != null || chunks.isNotEmpty()
+}
+
 class FinanceRepository(
     private val apiClient: ApiClient,
 ) {
@@ -707,6 +831,104 @@ class FinanceRepository(
                     result.copy(success = false, message = apiMessage(result.body, result.message))
                 },
             )
+        }
+    }
+
+    fun loadKnowledgeMaterialOptions(callback: (ApiResult, List<ReportTypeOption>, List<ReportConfigProfileOption>) -> Unit) {
+        loadReportCreateOptions(callback)
+    }
+
+    fun loadKnowledgeMaterialTargetOptions(
+        targetType: ReportTargetType,
+        keyword: String,
+        callback: (ApiResult, List<ReportTargetOption>) -> Unit,
+    ) {
+        loadReportTargetOptions(targetType, keyword, callback)
+    }
+
+    fun submitKnowledgeMaterialTarget(
+        form: KnowledgeMaterialFormState,
+        callback: (ApiResult, KnowledgeMaterialTask?) -> Unit,
+    ) {
+        if (!form.canSubmitTarget) {
+            callback(ApiResult(false, 0, "", "请选择标的后再检索材料。"), null)
+            return
+        }
+        val payload = JSONObject()
+            .put("searchMode", KnowledgeMaterialSearchMode.Target.apiValue)
+            .put("configProfile", form.configProfile.ifBlank { "system_recommended" })
+            .put("dailyKlineLimit", form.dailyKlineLimit.coerceAtLeast(MIN_REPORT_DAILY_KLINE_LIMIT))
+            .put("monthlyKlineLimit", form.monthlyKlineLimit)
+            .put("reportType", form.reportType.ifBlank { "quick_analysis" })
+            .put("targetCode", form.targetCode.trim())
+            .put("targetName", form.targetName.trim().ifBlank { form.targetCode.trim() })
+            .put("targetType", form.targetType.apiValue)
+            .put("totalChunks", form.totalChunks.coerceAtLeast(1))
+            .put("weeklyKlineLimit", form.weeklyKlineLimit)
+            .put("userOverrides", JSONObject().put("asset_type", form.targetType.assetTypeValue()))
+
+        submitKnowledgeMaterial(payload, callback)
+    }
+
+    fun submitKnowledgeMaterialNaturalLanguage(
+        queryText: String,
+        totalChunks: Int,
+        callback: (ApiResult, KnowledgeMaterialTask?) -> Unit,
+    ) {
+        val normalizedQuery = queryText.trim()
+        if (normalizedQuery.isBlank()) {
+            callback(ApiResult(false, 0, "", "请输入自然语言检索问题。"), null)
+            return
+        }
+        val payload = JSONObject()
+            .put("searchMode", KnowledgeMaterialSearchMode.NaturalLanguage.apiValue)
+            .put("queryText", normalizedQuery)
+            .put("totalChunks", totalChunks.coerceAtLeast(1))
+
+        submitKnowledgeMaterial(payload, callback)
+    }
+
+    fun loadKnowledgeMaterialTask(
+        taskNo: String,
+        callback: (ApiResult, KnowledgeMaterialTask?) -> Unit,
+    ) {
+        if (taskNo.isBlank()) {
+            callback(ApiResult(false, 0, "", "任务编号为空，无法刷新材料。"), null)
+            return
+        }
+        apiClient.get("${ApiConfig.KNOWLEDGE_MATERIAL_TASKS_PATH}/${taskNo.encodePath()}") { result ->
+            if (!result.success || !result.isBusinessSuccessOrRaw()) {
+                callback(result.copy(success = false, message = apiMessage(result.body, result.message)), null)
+                return@get
+            }
+            runCatching {
+                callback(result.copy(message = "材料任务已刷新。"), readKnowledgeMaterialTask(result.body))
+            }.onFailure {
+                callback(
+                    ApiResult(false, result.statusCode, result.body, "材料任务解析失败：${it.message ?: it.javaClass.simpleName}"),
+                    null,
+                )
+            }
+        }
+    }
+
+    private fun submitKnowledgeMaterial(
+        payload: JSONObject,
+        callback: (ApiResult, KnowledgeMaterialTask?) -> Unit,
+    ) {
+        apiClient.postJson(ApiConfig.KNOWLEDGE_MATERIAL_TASKS_PATH, payload) { result ->
+            if (!result.success || !result.isBusinessSuccessOrRaw()) {
+                callback(result.copy(success = false, message = apiMessage(result.body, result.message)), null)
+                return@postJson
+            }
+            runCatching {
+                callback(result.copy(message = "材料检索任务已提交。"), readKnowledgeMaterialTask(result.body))
+            }.onFailure {
+                callback(
+                    ApiResult(false, result.statusCode, result.body, "材料提交结果解析失败：${it.message ?: it.javaClass.simpleName}"),
+                    null,
+                )
+            }
         }
     }
 
@@ -1007,6 +1229,44 @@ class FinanceRepository(
             }
     }
 
+    private fun readKnowledgeMaterialTask(body: String): KnowledgeMaterialTask {
+        val task = dataObject(body)
+        return KnowledgeMaterialTask(
+            taskNo = task.cleanString("taskNo"),
+            searchMode = KnowledgeMaterialSearchMode.fromApi(task.cleanString("searchMode")),
+            targetType = reportTargetTypeOrNull(task.cleanString("targetType")),
+            targetCode = task.cleanString("targetCode"),
+            targetName = task.cleanString("targetName"),
+            queryText = task.cleanString("queryText"),
+            rewrittenQuery = task.cleanString("rewrittenQuery"),
+            status = task.cleanString("status"),
+            errorMessage = task.cleanString("errorMessage"),
+            submittedAt = task.cleanString("submittedAt"),
+            finishedAt = task.cleanString("finishedAt"),
+            chunks = readKnowledgeMaterialChunks(task),
+        )
+    }
+
+    private fun readKnowledgeMaterialChunks(task: JSONObject): List<KnowledgeMaterialChunk> {
+        val directChunks = task.optJSONArray("chunks")
+        if (directChunks != null && directChunks.length() > 0) {
+            return List(directChunks.length()) { index -> directChunks.optJSONObject(index) }
+                .filterNotNull()
+                .map { it.toKnowledgeMaterialChunk() }
+        }
+        val context = task.optJSONObject("knowledgeContext") ?: return emptyList()
+        val result = mutableListOf<KnowledgeMaterialChunk>()
+        val scenes = context.keys()
+        while (scenes.hasNext()) {
+            val scene = scenes.next()
+            val chunks = context.optJSONArray(scene) ?: continue
+            for (index in 0 until chunks.length()) {
+                chunks.optJSONObject(index)?.let { result += it.toKnowledgeMaterialChunk(scene) }
+            }
+        }
+        return result
+    }
+
     private fun quoteArray(body: String): JSONArray {
         val trimmed = body.trim()
         if (trimmed.startsWith("[")) return JSONArray(trimmed)
@@ -1292,6 +1552,21 @@ private fun JSONObject.toWatchItem(): WatchItem =
         syncedAt = optString("syncedAt", ""),
     )
 
+private fun JSONObject.toKnowledgeMaterialChunk(sceneFallback: String = "knowledge"): KnowledgeMaterialChunk =
+    KnowledgeMaterialChunk(
+        chunkId = optLong("chunkId", 0L),
+        taskNo = cleanString("taskNo"),
+        chunkIndex = optionalInt("chunkIndex"),
+        scene = cleanString("scene").ifBlank { sceneFallback.ifBlank { "knowledge" } },
+        filename = cleanString("filename").ifBlank { "知识库材料" },
+        text = cleanString("text"),
+        matchedTags = optJSONArray("matchedTags").toStringList(),
+        semanticScore = optionalDouble("semanticScore"),
+        tagMatchScore = optionalDouble("tagMatchScore"),
+        crossSceneScore = optionalDouble("crossSceneScore"),
+        finalScore = optionalDouble("finalScore"),
+    )
+
 private fun JSONObject.optionalDouble(key: String): Double? =
     if (isNull(key) || !has(key)) null else optDouble(key, 0.0)
 
@@ -1312,8 +1587,15 @@ private fun dataObject(body: String): JSONObject {
     return root.optJSONObject("data") ?: root
 }
 
-private fun ApiResult.isBusinessSuccessOrRaw(): Boolean =
-    body.isBlank() || isApiSuccess(body) || body.trim().startsWith("[") || body.trim().startsWith("{") && !body.contains("\"code\"")
+private fun ApiResult.isBusinessSuccessOrRaw(): Boolean {
+    val trimmed = body.trim()
+    if (trimmed.isBlank() || trimmed.startsWith("[")) return true
+    if (!trimmed.startsWith("{")) return false
+    return runCatching {
+        val root = JSONObject(trimmed)
+        !root.has("code") || root.optInt("code", -1) == 0
+    }.getOrDefault(false)
+}
 
 private fun marketQuotePath(assetType: MarketAssetType, marketCode: String, sortOrder: String): String {
     val params = mutableListOf(
