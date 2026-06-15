@@ -14,13 +14,13 @@ enum class AppFontScale(
     val label: String,
     val scale: Float,
 ) {
-    Compact("compact", "紧凑", 0.92f),
-    Standard("standard", "标准", 1.0f),
-    Large("large", "放大", 1.14f);
+    Compact("compact", "紧凑", 1.0f),
+    Standard("standard", "标准", 1.14f),
+    Large("large", "放大", 1.30f);
 
     companion object {
         fun fromStorage(value: String): AppFontScale =
-            entries.firstOrNull { it.storageValue == value } ?: Standard
+            entries.firstOrNull { it.storageValue == value } ?: Compact
     }
 }
 

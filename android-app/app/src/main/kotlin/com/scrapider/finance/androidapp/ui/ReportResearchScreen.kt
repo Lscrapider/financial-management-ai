@@ -1,6 +1,7 @@
 package com.scrapider.finance.androidapp.ui
 
 import android.text.method.LinkMovementMethod
+import android.util.TypedValue
 import android.widget.TextView
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -43,6 +44,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.viewinterop.AndroidView
@@ -469,6 +471,7 @@ private fun ReportDetailSheet(
 @Composable
 private fun MarkdownReportText(markdown: String) {
     val context = LocalContext.current
+    val density = LocalDensity.current
     val markwon = remember(context) {
         Markwon.builder(context)
             .usePlugin(TablePlugin.create(context))
@@ -478,13 +481,16 @@ private fun MarkdownReportText(markdown: String) {
     }
     val textColor = WorkspaceOnSurface.toArgb()
     val linkColor = PrimaryFixedDim.toArgb()
+    val platformFontScale = context.resources.configuration.fontScale.takeIf { it > 0f } ?: 1f
+    val appFontScale = density.fontScale / platformFontScale
+    val reportTextSizeSp = 13f * appFontScale
     AndroidView(
         modifier = Modifier.fillMaxWidth(),
         factory = { viewContext ->
             TextView(viewContext).apply {
                 setTextColor(textColor)
                 setLinkTextColor(linkColor)
-                textSize = 13f
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, reportTextSizeSp)
                 setLineSpacing(0f, 1.2f)
                 includeFontPadding = false
                 linksClickable = true
@@ -495,6 +501,7 @@ private fun MarkdownReportText(markdown: String) {
         update = { textView ->
             textView.setTextColor(textColor)
             textView.setLinkTextColor(linkColor)
+            textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, reportTextSizeSp)
             markwon.setMarkdown(textView, markdown)
         },
     )

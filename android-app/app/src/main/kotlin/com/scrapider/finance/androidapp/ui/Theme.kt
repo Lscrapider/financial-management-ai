@@ -51,7 +51,7 @@ fun FinanceTheme(
     content: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
-    val scaledDensity = Density(density.density, density.fontScale * fontScale.coerceIn(0.85f, 1.25f))
+    val scaledDensity = Density(density.density, density.fontScale * fontScale.coerceIn(1.0f, 1.30f))
     CompositionLocalProvider(LocalDensity provides scaledDensity) {
         MaterialTheme(
             colorScheme = DarkScheme,

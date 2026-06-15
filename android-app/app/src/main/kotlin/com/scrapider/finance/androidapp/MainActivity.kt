@@ -75,7 +75,7 @@ private data class AppUiState(
     val observation: ObservationRiskUiState = ObservationRiskUiState(),
     val report: ReportResearchUiState = ReportResearchUiState(),
     val knowledge: KnowledgeMaterialUiState = KnowledgeMaterialUiState(),
-    val fontScale: AppFontScale = AppFontScale.Standard,
+    val fontScale: AppFontScale = AppFontScale.Compact,
 )
 
 class MainActivity : ComponentActivity() {
