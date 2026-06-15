@@ -258,6 +258,160 @@ data class ObservationRiskUiState(
         get() = alerts.count { it.outOfThreshold }
 }
 
+const val DEFAULT_REPORT_PAGE_SIZE = 20
+const val DEFAULT_REPORT_TOTAL_CHUNKS = 10
+const val DEFAULT_REPORT_DAILY_KLINE_LIMIT = 90
+const val DEFAULT_REPORT_WEEKLY_KLINE_LIMIT = 52
+const val DEFAULT_REPORT_MONTHLY_KLINE_LIMIT = 60
+const val MIN_REPORT_DAILY_KLINE_LIMIT = 60
+
+enum class ReportTargetType(
+    val apiValue: String,
+    val label: String,
+) {
+    Stock("STOCK", "股票"),
+    Index("INDEX", "指数"),
+    ConvertibleBond("CONVERTIBLE_BOND", "可转债");
+
+    companion object {
+        fun fromApi(value: String): ReportTargetType =
+            entries.firstOrNull { it.apiValue == value } ?: Stock
+    }
+}
+
+enum class ReportStatusFilter(
+    val apiValue: String?,
+    val label: String,
+) {
+    All(null, "全部"),
+    Generating("generating", "生成中"),
+    Success("success", "成功"),
+    Failed("failed", "失败");
+
+    fun matches(status: String): Boolean = when (this) {
+        All -> true
+        Generating -> status.isGeneratingStatus()
+        Success -> status == "success"
+        Failed -> status == "failed"
+    }
+}
+
+data class ReportTargetSummary(
+    val targetType: ReportTargetType,
+    val targetCode: String,
+    val targetName: String,
+    val latestTaskNo: String,
+    val latestReportId: Long?,
+    val latestStatus: String,
+    val latestVersionNo: Int?,
+    val latestReportType: String,
+    val latestGenerationType: String,
+    val latestModel: String,
+    val latestReportPreview: String,
+    val latestCreatedAt: String,
+    val latestGeneratedAt: String,
+    val reportCount: Int,
+) {
+    fun matches(keyword: String, statusFilter: ReportStatusFilter): Boolean {
+        val normalized = keyword.trim()
+        val keywordMatched = normalized.isBlank() ||
+            targetName.contains(normalized, ignoreCase = true) ||
+            targetCode.contains(normalized, ignoreCase = true)
+        return keywordMatched && statusFilter.matches(latestStatus)
+    }
+}
+
+data class ReportDetail(
+    val reportId: Long,
+    val taskNo: String,
+    val targetType: ReportTargetType,
+    val targetCode: String,
+    val targetName: String,
+    val reportType: String,
+    val generationType: String,
+    val versionNo: Int,
+    val status: String,
+    val model: String,
+    val createdAt: String,
+    val generatedAt: String,
+    val errorMessage: String,
+    val reportText: String,
+)
+
+data class ReportTypeOption(
+    val code: String,
+    val label: String,
+)
+
+data class ReportConfigProfileOption(
+    val id: Long,
+    val name: String,
+    val configProfile: String,
+    val configGroup: String,
+    val reportType: String,
+    val targetType: ReportTargetType?,
+    val totalChunks: Int,
+    val dailyKlineLimit: Int,
+    val weeklyKlineLimit: Int,
+    val monthlyKlineLimit: Int,
+    val systemDefault: Boolean,
+)
+
+data class ReportTargetOption(
+    val targetType: ReportTargetType,
+    val targetCode: String,
+    val targetName: String,
+    val marketCode: String = "",
+) {
+    fun matches(keyword: String): Boolean {
+        val normalized = keyword.trim()
+        if (normalized.isBlank()) return true
+        return targetName.contains(normalized, ignoreCase = true) ||
+            targetCode.contains(normalized, ignoreCase = true) ||
+            marketCode.contains(normalized, ignoreCase = true)
+    }
+}
+
+data class CreateReportFormState(
+    val targetType: ReportTargetType = ReportTargetType.Stock,
+    val targetKeyword: String = "",
+    val targetCode: String = "",
+    val targetName: String = "",
+    val reportType: String = "quick_analysis",
+    val configProfile: String = "system_recommended",
+    val configProfileId: Long? = null,
+    val totalChunks: Int = DEFAULT_REPORT_TOTAL_CHUNKS,
+    val dailyKlineLimit: Int = DEFAULT_REPORT_DAILY_KLINE_LIMIT,
+    val weeklyKlineLimit: Int = DEFAULT_REPORT_WEEKLY_KLINE_LIMIT,
+    val monthlyKlineLimit: Int = DEFAULT_REPORT_MONTHLY_KLINE_LIMIT,
+) {
+    val canSubmit: Boolean
+        get() = targetCode.isNotBlank()
+}
+
+data class ReportResearchUiState(
+    val targets: List<ReportTargetSummary> = emptyList(),
+    val targetType: ReportTargetType = ReportTargetType.Stock,
+    val statusFilter: ReportStatusFilter = ReportStatusFilter.All,
+    val keyword: String = "",
+    val updatedAt: String = "--:--",
+    val selectedDetail: ReportDetail? = null,
+    val showCreateSheet: Boolean = false,
+    val createForm: CreateReportFormState = CreateReportFormState(),
+    val targetOptions: List<ReportTargetOption> = emptyList(),
+    val reportTypes: List<ReportTypeOption> = listOf(
+        ReportTypeOption("quick_analysis", "快速分析"),
+        ReportTypeOption("valuation_report", "估值报告"),
+    ),
+    val configProfiles: List<ReportConfigProfileOption> = emptyList(),
+) {
+    val visibleTargets: List<ReportTargetSummary>
+        get() = targets.filter { it.matches(keyword, statusFilter) }
+
+    val hasAnyData: Boolean
+        get() = targets.isNotEmpty()
+}
+
 class FinanceRepository(
     private val apiClient: ApiClient,
 ) {
@@ -458,6 +612,141 @@ class FinanceRepository(
         }
     }
 
+    fun loadReportResearch(
+        targetType: ReportTargetType,
+        callback: (ApiResult, ReportResearchUiState) -> Unit,
+    ) {
+        apiClient.get(reportTargetPath(targetType)) { result ->
+            if (!result.success) {
+                callback(result, ReportResearchUiState(targetType = targetType))
+                return@get
+            }
+            runCatching {
+                val targets = readReportTargets(result.body)
+                callback(
+                    result.copy(message = "报告研究已同步：${targets.size} 个报告标的。"),
+                    ReportResearchUiState(
+                        targets = targets,
+                        targetType = targetType,
+                        updatedAt = LocalDateTime.now().format(timeFormat),
+                    ),
+                )
+            }.onFailure {
+                callback(
+                    ApiResult(false, result.statusCode, result.body, "报告列表解析失败：${it.message ?: it.javaClass.simpleName}"),
+                    ReportResearchUiState(targetType = targetType),
+                )
+            }
+        }
+    }
+
+    fun loadReportCreateOptions(callback: (ApiResult, List<ReportTypeOption>, List<ReportConfigProfileOption>) -> Unit) {
+        val pending = ReportCreateOptionsPending(callback)
+        apiClient.get(ApiConfig.SCENE_ANALYSIS_REPORT_TYPES_PATH) { result ->
+            pending.consumeTypes(result)
+        }
+        apiClient.get(ApiConfig.SCENE_ANALYSIS_CONFIG_PROFILES_PATH) { result ->
+            pending.consumeProfiles(result)
+        }
+    }
+
+    fun loadReportTargetOptions(
+        targetType: ReportTargetType,
+        keyword: String,
+        callback: (ApiResult, List<ReportTargetOption>) -> Unit,
+    ) {
+        val params = listOf(
+            "targetType" to targetType.apiValue,
+            "keyword" to keyword.trim(),
+            "limit" to "20",
+        ).filterNot { (key, value) -> key == "keyword" && value.isBlank() }
+        val path = ApiConfig.SCENE_ANALYSIS_TARGET_SEARCH_PATH + "?" + params.joinToString("&") { (key, value) ->
+            "${key.encodeQuery()}=${value.encodeQuery()}"
+        }
+        apiClient.get(path) { result ->
+            if (!result.success || !result.isBusinessSuccessOrRaw()) {
+                callback(result.copy(success = false, message = apiMessage(result.body, result.message)), emptyList())
+                return@get
+            }
+            runCatching {
+                callback(result.copy(message = "${targetType.label}候选标的已同步。"), readReportTargetOptions(result.body))
+            }.onFailure {
+                callback(
+                    ApiResult(false, result.statusCode, result.body, "报告候选标的解析失败：${it.message ?: it.javaClass.simpleName}"),
+                    emptyList(),
+                )
+            }
+        }
+    }
+
+    fun submitReportTask(
+        form: CreateReportFormState,
+        callback: (ApiResult) -> Unit,
+    ) {
+        if (!form.canSubmit) {
+            callback(ApiResult(false, 0, "", "请选择标的后再创建报告。"))
+            return
+        }
+        val payload = JSONObject()
+            .put("configProfile", form.configProfile.ifBlank { "system_recommended" })
+            .put("dailyKlineLimit", form.dailyKlineLimit.coerceAtLeast(MIN_REPORT_DAILY_KLINE_LIMIT))
+            .put("monthlyKlineLimit", form.monthlyKlineLimit)
+            .put("reportType", form.reportType.ifBlank { "quick_analysis" })
+            .put("targetCode", form.targetCode.trim())
+            .put("targetName", form.targetName.trim().ifBlank { form.targetCode.trim() })
+            .put("targetType", form.targetType.apiValue)
+            .put("totalChunks", form.totalChunks.coerceAtLeast(1))
+            .put("weeklyKlineLimit", form.weeklyKlineLimit)
+            .put("userOverrides", JSONObject().put("asset_type", form.targetType.assetTypeValue()))
+
+        apiClient.postJson(ApiConfig.SCENE_ANALYSIS_TASKS_PATH, payload) { result ->
+            callback(
+                if (result.success && result.isBusinessSuccessOrRaw()) {
+                    result.copy(message = "报告生成任务已提交。")
+                } else {
+                    result.copy(success = false, message = apiMessage(result.body, result.message))
+                },
+            )
+        }
+    }
+
+    fun loadReportDetail(reportId: Long, callback: (ApiResult, ReportDetail?) -> Unit) {
+        if (reportId <= 0L) {
+            callback(ApiResult(false, 0, "", "报告缺少 ID，无法查看详情。"), null)
+            return
+        }
+        apiClient.get("${ApiConfig.SCENE_REPORTS_PATH}/$reportId") { result ->
+            if (!result.success || !result.isBusinessSuccessOrRaw()) {
+                callback(result.copy(success = false, message = apiMessage(result.body, result.message)), null)
+                return@get
+            }
+            runCatching {
+                callback(result.copy(message = "报告详情已加载。"), readReportDetail(result.body))
+            }.onFailure {
+                callback(
+                    ApiResult(false, result.statusCode, result.body, "报告详情解析失败：${it.message ?: it.javaClass.simpleName}"),
+                    null,
+                )
+            }
+        }
+    }
+
+    fun regenerateReport(taskNo: String, callback: (ApiResult) -> Unit) {
+        if (taskNo.isBlank()) {
+            callback(ApiResult(false, 0, "", "任务编号为空，无法重新生成。"))
+            return
+        }
+        apiClient.postJson("${ApiConfig.SCENE_ANALYSIS_TASKS_PATH}/${taskNo.encodePath()}/report/regenerate", JSONObject()) { result ->
+            callback(
+                if (result.success && result.isBusinessSuccessOrRaw()) {
+                    result.copy(message = "已提交重新生成任务。")
+                } else {
+                    result.copy(success = false, message = apiMessage(result.body, result.message))
+                },
+            )
+        }
+    }
+
     fun loadMarketQuotes(
         assetType: MarketAssetType,
         marketCode: String,
@@ -556,6 +845,8 @@ class FinanceRepository(
     }
 
     private fun dataArray(body: String): JSONArray {
+        val trimmed = body.trim()
+        if (trimmed.startsWith("[")) return JSONArray(trimmed)
         val root = JSONObject(body.ifBlank { "{}" })
         return root.optJSONArray("data") ?: JSONArray()
     }
@@ -607,6 +898,111 @@ class FinanceRepository(
                     targetName = option.cleanString("targetName").ifBlank { "未命名标的" },
                     marketCode = option.cleanString("marketCode"),
                     exchangeCode = option.cleanString("exchangeCode"),
+                )
+            }
+    }
+
+    private fun readReportTargets(body: String): List<ReportTargetSummary> {
+        val root = JSONObject(body.ifBlank { "{}" })
+        val data = root.optJSONObject("data")
+        val records = data?.optJSONArray("records")
+            ?: root.optJSONArray("records")
+            ?: root.optJSONArray("data")
+            ?: JSONArray()
+        return List(records.length()) { index -> records.optJSONObject(index) }
+            .filterNotNull()
+            .map { item ->
+                ReportTargetSummary(
+                    targetType = ReportTargetType.fromApi(item.cleanString("targetType")),
+                    targetCode = item.cleanString("targetCode"),
+                    targetName = item.cleanString("targetName").ifBlank { item.cleanString("targetCode").ifBlank { "未命名标的" } },
+                    latestTaskNo = item.cleanString("latestTaskNo"),
+                    latestReportId = item.optionalLong("latestReportId"),
+                    latestStatus = item.cleanString("latestStatus"),
+                    latestVersionNo = item.optionalInt("latestVersionNo"),
+                    latestReportType = item.cleanString("latestReportType"),
+                    latestGenerationType = item.cleanString("latestGenerationType"),
+                    latestModel = item.cleanString("latestModel"),
+                    latestReportPreview = item.cleanString("latestReportPreview"),
+                    latestCreatedAt = item.cleanString("latestCreatedAt"),
+                    latestGeneratedAt = item.cleanString("latestGeneratedAt"),
+                    reportCount = item.optInt("reportCount", 0),
+                )
+            }
+    }
+
+    private fun readReportDetail(body: String): ReportDetail {
+        val detail = dataObject(body)
+        return ReportDetail(
+            reportId = detail.optLong("reportId", 0L),
+            taskNo = detail.cleanString("taskNo"),
+            targetType = ReportTargetType.fromApi(detail.cleanString("targetType")),
+            targetCode = detail.cleanString("targetCode"),
+            targetName = detail.cleanString("targetName").ifBlank { detail.cleanString("targetCode").ifBlank { "未命名标的" } },
+            reportType = detail.cleanString("reportType"),
+            generationType = detail.cleanString("generationType"),
+            versionNo = detail.optInt("versionNo", 0),
+            status = detail.cleanString("status"),
+            model = detail.cleanString("model"),
+            createdAt = detail.cleanString("createdAt"),
+            generatedAt = detail.cleanString("generatedAt"),
+            errorMessage = detail.cleanString("errorMessage"),
+            reportText = detail.cleanString("reportText"),
+        )
+    }
+
+    private fun readReportTypes(body: String): List<ReportTypeOption> {
+        val types = dataArray(body)
+        val parsed = List(types.length()) { index -> types.optJSONObject(index) }
+            .filterNotNull()
+            .map { type ->
+                ReportTypeOption(
+                    code = type.cleanString("code").ifBlank { "quick_analysis" },
+                    label = type.cleanString("label").ifBlank { type.cleanString("code").ifBlank { "快速分析" } },
+                )
+            }
+        return parsed.ifEmpty {
+            listOf(
+                ReportTypeOption("quick_analysis", "快速分析"),
+                ReportTypeOption("valuation_report", "估值报告"),
+            )
+        }
+    }
+
+    private fun readReportConfigProfiles(body: String): List<ReportConfigProfileOption> {
+        val profiles = dataArray(body)
+        return List(profiles.length()) { index -> profiles.optJSONObject(index) }
+            .filterNotNull()
+            .map { profile ->
+                val config = profile.optJSONObject("configJson") ?: JSONObject()
+                ReportConfigProfileOption(
+                    id = profile.optLong("id", 0L),
+                    name = profile.cleanString("name").ifBlank { profile.cleanString("configProfile").ifBlank { "系统推荐" } },
+                    configProfile = profile.cleanString("configProfile").ifBlank { "system_recommended" },
+                    configGroup = profile.cleanString("configGroup").ifBlank { "默认" },
+                    reportType = config.cleanString("reportType").ifBlank { profile.cleanString("reportType").ifBlank { "quick_analysis" } },
+                    targetType = reportTargetTypeOrNull(
+                        config.cleanString("targetType").ifBlank { profile.cleanString("targetType") },
+                    ),
+                    totalChunks = config.optionalInt("totalChunks") ?: DEFAULT_REPORT_TOTAL_CHUNKS,
+                    dailyKlineLimit = config.optionalInt("dailyKlineLimit") ?: DEFAULT_REPORT_DAILY_KLINE_LIMIT,
+                    weeklyKlineLimit = config.optionalInt("weeklyKlineLimit") ?: DEFAULT_REPORT_WEEKLY_KLINE_LIMIT,
+                    monthlyKlineLimit = config.optionalInt("monthlyKlineLimit") ?: DEFAULT_REPORT_MONTHLY_KLINE_LIMIT,
+                    systemDefault = profile.optBoolean("systemDefault", false),
+                )
+            }
+    }
+
+    private fun readReportTargetOptions(body: String): List<ReportTargetOption> {
+        val options = dataArray(body)
+        return List(options.length()) { index -> options.optJSONObject(index) }
+            .filterNotNull()
+            .map { option ->
+                ReportTargetOption(
+                    targetType = ReportTargetType.fromApi(option.cleanString("targetType")),
+                    targetCode = option.cleanString("targetCode"),
+                    targetName = option.cleanString("targetName").ifBlank { option.cleanString("targetCode").ifBlank { "未命名标的" } },
+                    marketCode = option.cleanString("marketCode"),
                 )
             }
     }
@@ -767,6 +1163,49 @@ class FinanceRepository(
             )
         }
     }
+
+    private inner class ReportCreateOptionsPending(
+        private val callback: (ApiResult, List<ReportTypeOption>, List<ReportConfigProfileOption>) -> Unit,
+    ) {
+        private var remaining = 2
+        private var failure: ApiResult? = null
+        private var reportTypes: List<ReportTypeOption> = emptyList()
+        private var configProfiles: List<ReportConfigProfileOption> = emptyList()
+
+        fun consumeTypes(result: ApiResult) {
+            consume(result, "报告类型同步失败。") { body -> reportTypes = readReportTypes(body) }
+        }
+
+        fun consumeProfiles(result: ApiResult) {
+            consume(result, "报告配置同步失败。") { body -> configProfiles = readReportConfigProfiles(body) }
+        }
+
+        private fun consume(result: ApiResult, fallback: String, reader: (String) -> Unit) {
+            if (result.success && result.isBusinessSuccessOrRaw()) {
+                runCatching { reader(result.body) }.onFailure {
+                    failure = ApiResult(false, result.statusCode, result.body, "新建报告配置解析失败：${it.message ?: it.javaClass.simpleName}")
+                }
+            } else if (failure == null) {
+                failure = result.copy(success = false, message = apiMessage(result.body, result.message.ifBlank { fallback }))
+            }
+            done()
+        }
+
+        private fun done() {
+            remaining--
+            if (remaining > 0) return
+            callback(
+                failure ?: ApiResult(true, 200, "", "新建报告配置已同步。"),
+                reportTypes.ifEmpty {
+                    listOf(
+                        ReportTypeOption("quick_analysis", "快速分析"),
+                        ReportTypeOption("valuation_report", "估值报告"),
+                    )
+                },
+                configProfiles,
+            )
+        }
+    }
 }
 
 fun marketFilters(assetType: MarketAssetType): List<MarketFilter> = when (assetType) {
@@ -856,11 +1295,25 @@ private fun JSONObject.toWatchItem(): WatchItem =
 private fun JSONObject.optionalDouble(key: String): Double? =
     if (isNull(key) || !has(key)) null else optDouble(key, 0.0)
 
+private fun JSONObject.optionalInt(key: String): Int? =
+    if (isNull(key) || !has(key)) null else optInt(key, 0)
+
+private fun JSONObject.optionalLong(key: String): Long? =
+    if (isNull(key) || !has(key)) null else optLong(key, 0L)
+
 private fun JSONObject.cleanString(key: String): String {
     if (isNull(key) || !has(key)) return ""
     val value = optString(key, "")
     return if (value.equals("null", ignoreCase = true)) "" else value
 }
+
+private fun dataObject(body: String): JSONObject {
+    val root = JSONObject(body.ifBlank { "{}" })
+    return root.optJSONObject("data") ?: root
+}
+
+private fun ApiResult.isBusinessSuccessOrRaw(): Boolean =
+    body.isBlank() || isApiSuccess(body) || body.trim().startsWith("[") || body.trim().startsWith("{") && !body.contains("\"code\"")
 
 private fun marketQuotePath(assetType: MarketAssetType, marketCode: String, sortOrder: String): String {
     val params = mutableListOf(
@@ -885,6 +1338,29 @@ private fun marketFilterOf(marketCode: String): MarketFilter =
 
 private fun String.encodeQuery(): String =
     URLEncoder.encode(this, StandardCharsets.UTF_8.name())
+
+private fun String.encodePath(): String =
+    URLEncoder.encode(this, StandardCharsets.UTF_8.name())
+
+private fun reportTargetPath(targetType: ReportTargetType): String {
+    val params = listOf(
+        "pageNum" to "1",
+        "pageSize" to DEFAULT_REPORT_PAGE_SIZE.toString(),
+        "targetType" to targetType.apiValue,
+    )
+    return ApiConfig.SCENE_REPORT_TARGETS_PATH + "?" + params.joinToString("&") { (key, value) ->
+        "${key.encodeQuery()}=${value.encodeQuery()}"
+    }
+}
+
+private fun reportTargetTypeOrNull(value: String): ReportTargetType? =
+    value.takeIf { it.isNotBlank() }?.let { ReportTargetType.fromApi(it) }
+
+private fun ReportTargetType.assetTypeValue(): String = when (this) {
+    ReportTargetType.Index -> "index"
+    ReportTargetType.ConvertibleBond -> "convertible_bond"
+    ReportTargetType.Stock -> "stock"
+}
 
 fun normalizeSortOrder(sortOrder: String): String =
     if (sortOrder.equals("asc", ignoreCase = true)) "asc" else "desc"

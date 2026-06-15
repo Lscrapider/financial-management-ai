@@ -14,6 +14,13 @@ import com.scrapider.finance.androidapp.data.MarketAssetType
 import com.scrapider.finance.androidapp.data.MarketFilter
 import com.scrapider.finance.androidapp.data.MarketUiState
 import com.scrapider.finance.androidapp.data.ObservationRiskUiState
+import com.scrapider.finance.androidapp.data.CreateReportFormState
+import com.scrapider.finance.androidapp.data.ReportConfigProfileOption
+import com.scrapider.finance.androidapp.data.ReportResearchUiState
+import com.scrapider.finance.androidapp.data.ReportStatusFilter
+import com.scrapider.finance.androidapp.data.ReportTargetOption
+import com.scrapider.finance.androidapp.data.ReportTargetSummary
+import com.scrapider.finance.androidapp.data.ReportTargetType
 import com.scrapider.finance.androidapp.data.SessionState
 import com.scrapider.finance.androidapp.data.WatchTargetType
 import com.scrapider.finance.androidapp.data.WorkbenchSummary
@@ -21,6 +28,7 @@ import com.scrapider.finance.androidapp.ui.FinanceTheme
 import com.scrapider.finance.androidapp.ui.LoginScreen
 import com.scrapider.finance.androidapp.ui.MarketScreen
 import com.scrapider.finance.androidapp.ui.ObservationRiskScreen
+import com.scrapider.finance.androidapp.ui.ReportResearchScreen
 import com.scrapider.finance.androidapp.ui.WorkbenchScreen
 
 private enum class AppScreen {
@@ -28,6 +36,7 @@ private enum class AppScreen {
     Workbench,
     Market,
     Observation,
+    Report,
 }
 
 private data class AppUiState(
@@ -44,6 +53,7 @@ private data class AppUiState(
     val workbench: WorkbenchSummary = WorkbenchSummary(),
     val market: MarketUiState = MarketUiState(),
     val observation: ObservationRiskUiState = ObservationRiskUiState(),
+    val report: ReportResearchUiState = ReportResearchUiState(),
 )
 
 class MainActivity : ComponentActivity() {
@@ -95,6 +105,7 @@ class MainActivity : ComponentActivity() {
                         onRefresh = ::refreshWorkbench,
                         onMarketSelected = ::showMarket,
                         onObservationSelected = ::showObservation,
+                        onReportSelected = ::showReport,
                     )
 
                     AppScreen.Market -> MarketScreen(
@@ -108,6 +119,7 @@ class MainActivity : ComponentActivity() {
                         onKeywordChange = { state = state.copy(market = state.market.copy(keyword = it)) },
                         onWorkbenchSelected = ::showWorkbench,
                         onObservationSelected = ::showObservation,
+                        onReportSelected = ::showReport,
                     )
 
                     AppScreen.Observation -> ObservationRiskScreen(
@@ -128,6 +140,30 @@ class MainActivity : ComponentActivity() {
                         onSaveTarget = ::saveObservationTarget,
                         onWorkbenchSelected = ::showWorkbench,
                         onMarketSelected = ::showMarket,
+                        onReportSelected = ::showReport,
+                    )
+
+                    AppScreen.Report -> ReportResearchScreen(
+                        loading = state.loading,
+                        report = state.report,
+                        onRefresh = ::refreshReportResearch,
+                        onTargetTypeChange = ::selectReportTargetType,
+                        onStatusFilterChange = ::selectReportStatusFilter,
+                        onKeywordChange = { state = state.copy(report = state.report.copy(keyword = it)) },
+                        onReportSelected = ::openReportDetail,
+                        onRegenerate = ::regenerateReport,
+                        onDismissDetailSheet = ::dismissReportDetail,
+                        onOpenCreateSheet = ::openCreateReportSheet,
+                        onDismissCreateSheet = ::dismissCreateReportSheet,
+                        onCreateFormChange = ::updateCreateReportForm,
+                        onCreateTargetTypeChange = ::selectCreateReportTargetType,
+                        onCreateTargetKeywordChange = ::changeCreateReportTargetKeyword,
+                        onCreateTargetSelected = ::selectCreateReportTarget,
+                        onCreateProfileSelected = ::selectCreateReportProfile,
+                        onSubmitCreateReport = ::submitCreateReport,
+                        onWorkbenchSelected = ::showWorkbench,
+                        onMarketSelected = ::showMarket,
+                        onObservationSelected = ::showObservation,
                     )
                 }
             }
@@ -256,6 +292,276 @@ class MainActivity : ComponentActivity() {
         state = state.copy(screen = AppScreen.Observation)
         if (state.observation.groups.isEmpty()) {
             refreshObservation()
+        }
+    }
+
+    private fun showReport() {
+        state = state.copy(screen = AppScreen.Report)
+        if (!state.report.hasAnyData) {
+            refreshReportResearch()
+        }
+    }
+
+    private fun refreshReportResearch() {
+        if (!state.session.authenticated) {
+            state = state.copy(screen = AppScreen.Login, statusMessage = "请先登录，登录后进入报告研究。")
+            return
+        }
+        val current = state.report
+        state = state.copy(loading = true, statusMessage = "正在同步${current.targetType.label}报告列表。")
+        repository.loadReportResearch(current.targetType) { result, report ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@loadReportResearch
+            }
+            val nextReport = if (result.success || report.hasAnyData) {
+                report.copy(
+                    statusFilter = current.statusFilter,
+                    keyword = current.keyword,
+                    selectedDetail = current.selectedDetail,
+                    showCreateSheet = current.showCreateSheet,
+                    createForm = current.createForm,
+                    targetOptions = current.targetOptions,
+                    reportTypes = current.reportTypes,
+                    configProfiles = current.configProfiles,
+                )
+            } else {
+                current
+            }
+            state = state.copy(
+                loading = false,
+                report = nextReport,
+                statusMessage = when {
+                    result.success -> "报告研究已同步：${nextReport.targets.size} 个标的。"
+                    report.hasAnyData -> "部分同步完成：${result.message}"
+                    else -> result.message
+                },
+            )
+            if (!result.success && !report.hasAnyData) {
+                Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun selectReportTargetType(targetType: ReportTargetType) {
+        if (state.report.targetType == targetType) return
+        state = state.copy(
+            screen = AppScreen.Report,
+            report = state.report.copy(
+                targetType = targetType,
+                keyword = "",
+                targetOptions = emptyList(),
+                createForm = state.report.createForm.copy(targetType = targetType),
+            ),
+            statusMessage = "正在切换到${targetType.label}报告列表。",
+        )
+        refreshReportResearch()
+    }
+
+    private fun selectReportStatusFilter(filter: ReportStatusFilter) {
+        state = state.copy(screen = AppScreen.Report, report = state.report.copy(statusFilter = filter))
+    }
+
+    private fun openReportDetail(report: ReportTargetSummary) {
+        val reportId = report.latestReportId
+        if (reportId == null || reportId <= 0L) {
+            state = state.copy(statusMessage = "该标的暂无可查看报告详情。")
+            return
+        }
+        if (state.loading) return
+        state = state.copy(loading = true, statusMessage = "正在加载 ${report.targetName} 报告详情。")
+        repository.loadReportDetail(reportId) { result, detail ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@loadReportDetail
+            }
+            if (!result.success || detail == null) {
+                state = state.copy(loading = false, statusMessage = result.message)
+                Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show()
+                return@loadReportDetail
+            }
+            state = state.copy(
+                loading = false,
+                report = state.report.copy(selectedDetail = detail),
+                statusMessage = "${detail.targetName} 报告详情已加载。",
+            )
+        }
+    }
+
+    private fun dismissReportDetail() {
+        state = state.copy(report = state.report.copy(selectedDetail = null))
+    }
+
+    private fun regenerateReport(taskNo: String) {
+        if (state.loading) return
+        state = state.copy(loading = true, statusMessage = "正在提交重新生成任务。")
+        repository.regenerateReport(taskNo) { result ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@regenerateReport
+            }
+            if (!result.success) {
+                state = state.copy(loading = false, statusMessage = result.message)
+                Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show()
+                return@regenerateReport
+            }
+            state = state.copy(
+                loading = false,
+                report = state.report.copy(selectedDetail = null),
+                statusMessage = "重新生成任务已提交，正在刷新报告列表。",
+            )
+            refreshReportResearch()
+        }
+    }
+
+    private fun openCreateReportSheet() {
+        val currentType = state.report.targetType
+        val form = applyCreateReportProfile(
+            state.report.createForm.copy(
+                targetType = currentType,
+                targetKeyword = "",
+                targetCode = "",
+                targetName = "",
+            ),
+            preferredProfileId = state.report.createForm.configProfileId,
+        )
+        state = state.copy(report = state.report.copy(showCreateSheet = true, createForm = form, targetOptions = emptyList()))
+        loadReportCreateOptions()
+        loadCreateReportTargetOptions(currentType, "")
+    }
+
+    private fun dismissCreateReportSheet() {
+        state = state.copy(report = state.report.copy(showCreateSheet = false))
+    }
+
+    private fun updateCreateReportForm(form: CreateReportFormState) {
+        state = state.copy(report = state.report.copy(createForm = form))
+    }
+
+    private fun selectCreateReportTargetType(targetType: ReportTargetType) {
+        val form = applyCreateReportProfile(
+            state.report.createForm.copy(
+                targetType = targetType,
+                targetKeyword = "",
+                targetCode = "",
+                targetName = "",
+            ),
+            preferredProfileId = null,
+        )
+        state = state.copy(
+            report = state.report.copy(
+                createForm = form,
+                targetOptions = emptyList(),
+            ),
+        )
+        loadCreateReportTargetOptions(targetType, "")
+    }
+
+    private fun changeCreateReportTargetKeyword(keyword: String) {
+        val form = state.report.createForm.copy(
+            targetKeyword = keyword,
+            targetCode = "",
+            targetName = "",
+        )
+        state = state.copy(report = state.report.copy(createForm = form))
+        loadCreateReportTargetOptions(form.targetType, keyword)
+    }
+
+    private fun selectCreateReportTarget(option: ReportTargetOption) {
+        state = state.copy(
+            report = state.report.copy(
+                createForm = state.report.createForm.copy(
+                    targetType = option.targetType,
+                    targetKeyword = "${option.targetName} ${option.targetCode}",
+                    targetCode = option.targetCode,
+                    targetName = option.targetName,
+                ),
+            ),
+        )
+    }
+
+    private fun selectCreateReportProfile(profileId: Long) {
+        val form = applyCreateReportProfile(state.report.createForm, preferredProfileId = profileId)
+        state = state.copy(report = state.report.copy(createForm = form))
+    }
+
+    private fun submitCreateReport() {
+        if (state.loading) return
+        val form = state.report.createForm
+        state = state.copy(loading = true, statusMessage = "正在创建 ${form.targetName.ifBlank { form.targetCode }} 报告任务。")
+        repository.submitReportTask(form) { result ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@submitReportTask
+            }
+            if (!result.success) {
+                state = state.copy(loading = false, statusMessage = result.message)
+                Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show()
+                return@submitReportTask
+            }
+            state = state.copy(
+                loading = false,
+                report = state.report.copy(showCreateSheet = false),
+                statusMessage = "报告任务已创建，正在刷新列表。",
+            )
+            refreshReportResearch()
+        }
+    }
+
+    private fun loadReportCreateOptions() {
+        repository.loadReportCreateOptions { result, reportTypes, profiles ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@loadReportCreateOptions
+            }
+            val nextReport = state.report.copy(
+                reportTypes = reportTypes,
+                configProfiles = profiles,
+            )
+            state = state.copy(
+                report = nextReport.copy(createForm = applyCreateReportProfile(nextReport.createForm, nextReport.createForm.configProfileId, profiles)),
+                statusMessage = result.message,
+            )
+        }
+    }
+
+    private fun loadCreateReportTargetOptions(targetType: ReportTargetType, keyword: String) {
+        repository.loadReportTargetOptions(targetType, keyword) { result, options ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@loadReportTargetOptions
+            }
+            if (state.report.createForm.targetType != targetType) {
+                return@loadReportTargetOptions
+            }
+            state = state.copy(
+                report = state.report.copy(targetOptions = options),
+                statusMessage = result.message,
+            )
+        }
+    }
+
+    private fun applyCreateReportProfile(
+        form: CreateReportFormState,
+        preferredProfileId: Long?,
+        profiles: List<ReportConfigProfileOption> = state.report.configProfiles,
+    ): CreateReportFormState {
+        val availableProfiles = profiles.filter { it.targetType == null || it.targetType == form.targetType }.ifEmpty { profiles }
+        val profile = availableProfiles.firstOrNull { it.id == preferredProfileId }
+            ?: availableProfiles.firstOrNull { it.configProfile == "system_recommended" }
+            ?: availableProfiles.firstOrNull()
+        return if (profile == null) {
+            form
+        } else {
+            form.copy(
+                configProfileId = profile.id,
+                configProfile = profile.configProfile,
+                reportType = profile.reportType,
+                totalChunks = profile.totalChunks,
+                dailyKlineLimit = profile.dailyKlineLimit,
+                weeklyKlineLimit = profile.weeklyKlineLimit,
+                monthlyKlineLimit = profile.monthlyKlineLimit,
+            )
         }
     }
 

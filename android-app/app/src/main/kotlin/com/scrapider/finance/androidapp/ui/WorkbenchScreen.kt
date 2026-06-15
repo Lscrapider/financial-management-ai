@@ -55,13 +55,20 @@ fun WorkbenchScreen(
     onRefresh: () -> Unit,
     onMarketSelected: () -> Unit = {},
     onObservationSelected: () -> Unit = {},
+    onReportSelected: () -> Unit = {},
 ) {
     Scaffold(
         containerColor = WorkspaceBackground,
         topBar = {
             TopBar(displayName = displayName, loading = loading, onRefresh = onRefresh)
         },
-        bottomBar = { BottomNav(onMarketSelected = onMarketSelected, onObservationSelected = onObservationSelected) },
+        bottomBar = {
+            BottomNav(
+                onMarketSelected = onMarketSelected,
+                onObservationSelected = onObservationSelected,
+                onReportSelected = onReportSelected,
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {},
@@ -333,6 +340,7 @@ private fun ReportSection(reports: List<WorkbenchReportLine>) {
 private fun BottomNav(
     onMarketSelected: () -> Unit,
     onObservationSelected: () -> Unit,
+    onReportSelected: () -> Unit,
 ) {
     NavigationBar(containerColor = Color(0xFF1D1F27), contentColor = WorkspaceMuted, tonalElevation = 0.dp) {
         listOf("工作台", "行情", "观察", "研究", "我的").forEach { item ->
@@ -342,6 +350,7 @@ private fun BottomNav(
                     when (item) {
                         "行情" -> onMarketSelected()
                         "观察" -> onObservationSelected()
+                        "研究" -> onReportSelected()
                     }
                 },
                 icon = { Text(navIcon(item), fontSize = 17.sp) },

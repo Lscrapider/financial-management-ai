@@ -1,0 +1,382 @@
+<!DOCTYPE html><html class="dark" lang="zh-CN" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
+<title>报告研究</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "success": "#57d188",
+                        "on-error-container": "#ffdad6",
+                        "on-secondary-fixed-variant": "#00522c",
+                        "surface-elevated": "#24272d",
+                        "on-error": "#690005",
+                        "primary-fixed": "#d8e2ff",
+                        "secondary-fixed": "#81faad",
+                        "secondary-container": "#1fa561",
+                        "on-secondary-container": "#003118",
+                        "surface-bright": "#363941",
+                        "primary-fixed-dim": "#aec6ff",
+                        "on-tertiary-fixed-variant": "#7d2d00",
+                        "primary": "#aec6ff",
+                        "surface-container-low": "#191b23",
+                        "border": "#36363a",
+                        "on-surface-variant": "#c2c6d6",
+                        "on-tertiary-container": "#fff3ef",
+                        "on-primary": "#002e6a",
+                        "destructive": "#dc4446",
+                        "inverse-on-surface": "#2d3038",
+                        "on-primary-fixed": "#001a42",
+                        "on-background": "#e1e2ec",
+                        "surface-container-high": "#272a32",
+                        "on-surface": "#e1e2ec",
+                        "on-primary-fixed-variant": "#004396",
+                        "surface-muted": "#2e3033",
+                        "primary-soft": "#123a63",
+                        "inverse-primary": "#005ac3",
+                        "primary-container": "#006be6",
+                        "surface-variant": "#32353d",
+                        "surface-dim": "#10131a",
+                        "inverse-surface": "#e1e2ec",
+                        "warning": "#efbd48",
+                        "tertiary-container": "#c14a00",
+                        "foreground-muted": "#aeb4bd",
+                        "on-primary-container": "#f4f5ff",
+                        "error-container": "#93000a",
+                        "on-secondary": "#00391d",
+                        "tertiary-fixed": "#ffdbcd",
+                        "foreground": "#f2f2f2",
+                        "tertiary-fixed-dim": "#ffb596",
+                        "on-tertiary": "#581e00",
+                        "surface": "#1c1e23",
+                        "tertiary": "#ffb596",
+                        "surface-container": "#1d1f27",
+                        "chart-grid": "#2a2d33",
+                        "surface-container-highest": "#32353d",
+                        "outline": "#8c90a0",
+                        "outline-variant": "#424754",
+                        "on-secondary-fixed": "#00210e",
+                        "secondary-fixed-dim": "#64dd93",
+                        "secondary": "#64dd93",
+                        "background": "#14161a",
+                        "surface-container-lowest": "#0b0e15",
+                        "surface-tint": "#aec6ff",
+                        "on-tertiary-fixed": "#360f00",
+                        "error": "#ffb4ab"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "sm": "8px",
+                        "gutter": "8px",
+                        "md": "16px",
+                        "xs": "4px",
+                        "page-padding": "16px",
+                        "lg": "24px",
+                        "xl": "32px"
+                    },
+                    "fontFamily": {
+                        "title": ["Inter", "PingFang SC", "system-ui", "sans-serif"],
+                        "data-tabular": ["Inter"],
+                        "body": ["Inter", "PingFang SC", "system-ui", "sans-serif"],
+                        "display-title": ["Inter"],
+                        "label": ["Inter", "PingFang SC", "system-ui", "sans-serif"],
+                        "headline": ["Inter", "PingFang SC", "system-ui", "sans-serif"],
+                        "body-md": ["Inter"],
+                        "label-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "title": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "data-tabular": ["14px", { "lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "body": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "display-title": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "label": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "headline": ["18px", { "lineHeight": "24px", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        /* Custom Scrollbar for horizontal lists */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        /* Subtle glowing effect for progress */
+        .progress-glow {
+            box-shadow: 0 0 8px rgba(0, 107, 230, 0.4);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background font-body antialiased w-full max-w-[390px] mx-auto min-h-screen relative overflow-x-hidden pb-20">
+<!-- TopAppBar -->
+<header class="w-full top-0 sticky z-40 bg-background/95 backdrop-blur-sm border-b border-border flex items-center justify-between px-page-padding h-14 w-full transition-colors duration-200">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary font-headline" data-weight="fill" style="font-variation-settings: 'FILL' 1;">analytics</span>
+<h1 class="font-headline text-headline text-on-surface">报告研究</h1>
+</div>
+<div class="flex items-center gap-3">
+<button class="text-on-surface-variant hover:bg-surface-variant p-1 rounded-full transition-colors duration-200">
+<span class="material-symbols-outlined">refresh</span>
+</button>
+<button class="bg-primary-container text-on-primary-container px-3 py-1.5 rounded-lg font-label text-label flex items-center gap-1 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[16px]">add</span>
+                新建
+            </button>
+</div>
+</header>
+<main class="px-page-padding py-md space-y-md">
+<!-- Description -->
+
+<!-- Metric Bar -->
+
+<!-- Filter Area -->
+<div class="space-y-sm">
+<!-- 标的类型 -->
+<div class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant whitespace-nowrap min-w-[60px]">标的类型</span>
+<button class="bg-primary-soft/20 text-primary border border-primary/30 px-3 py-1 rounded-full font-label text-label whitespace-nowrap">股票</button>
+<button class="bg-surface text-on-surface border border-border px-3 py-1 rounded-full font-label text-label whitespace-nowrap">指数</button>
+<button class="bg-surface text-on-surface border border-border px-3 py-1 rounded-full font-label text-label whitespace-nowrap">可转债</button>
+</div>
+<!-- 报告状态 -->
+<div class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant whitespace-nowrap min-w-[60px]">报告状态</span>
+<button class="bg-primary-soft/20 text-primary border border-primary/30 px-3 py-1 rounded-full font-label text-label whitespace-nowrap">全部</button>
+<button class="bg-surface text-on-surface border border-border px-3 py-1 rounded-full font-label text-label whitespace-nowrap">生成中</button>
+<button class="bg-surface text-on-surface border border-border px-3 py-1 rounded-full font-label text-label whitespace-nowrap">成功</button>
+<button class="bg-surface text-on-surface border border-border px-3 py-1 rounded-full font-label text-label whitespace-nowrap">失败</button>
+</div>
+<!-- 配置分组 -->
+<div class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant whitespace-nowrap min-w-[60px]">标的检索</span>
+
+
+<div class="bg-surface border border-border px-3 py-1 rounded-full font-label text-label flex items-center gap-1 text-on-surface cursor-pointer">
+  <span class="">全部标的</span>
+  <span class="material-symbols-outlined text-[18px]">expand_more</span>
+</div>
+</div>
+</div>
+<!-- Report List -->
+<div class="space-y-sm">
+<!-- Card 1: 宁德时代 -->
+<div class="bg-surface border border-border rounded-xl p-md flex flex-col gap-sm">
+<div class="flex justify-between items-start">
+<div>
+<div class="flex items-center gap-2 mb-1">
+<h3 class="font-title text-title text-on-surface text-[16px] leading-[20px]">宁德时代</h3>
+<span class="font-data-tabular text-data-tabular text-on-surface-variant text-[12px]">300750</span>
+</div>
+<div class="font-label text-label text-on-surface-variant">最新版本: V3 • 累计生成 5 次</div>
+</div>
+<span class="bg-success/10 text-success border border-success/20 px-2 py-0.5 rounded font-label-sm text-label-sm">成功</span>
+</div>
+<div class="font-body-md text-body-md text-on-surface-variant line-clamp-2">
+                    重点关注近期动力电池装机量数据变化，以及海外产能扩张的落地情况。当前估值处于历史相对低位。
+                </div>
+<div class="flex justify-between items-center mt-1 pt-sm border-t border-border">
+<span class="font-data-tabular text-data-tabular text-on-surface-variant text-[12px]">2023-10-24 14:30</span>
+<button class="text-primary font-label text-label flex items-center gap-1">查看详情<span class="material-symbols-outlined text-[14px]">chevron_right</span></button>
+</div>
+</div>
+<!-- Card 2: 贵州茅台 -->
+<div class="bg-surface border border-border rounded-xl p-md flex flex-col gap-sm relative overflow-hidden">
+<!-- Generating Progress Indicator Background -->
+<div class="absolute bottom-0 left-0 h-1 bg-primary/20 w-full">
+<div class="h-full bg-primary w-[45%] progress-glow"></div>
+</div>
+<div class="flex justify-between items-start">
+<div>
+<div class="flex items-center gap-2 mb-1">
+<h3 class="font-title text-title text-on-surface text-[16px] leading-[20px]">贵州茅台</h3>
+<span class="font-data-tabular text-data-tabular text-on-surface-variant text-[12px]">600519</span>
+</div>
+<div class="font-label text-label text-on-surface-variant">最新版本: V2 • 累计生成 2 次</div>
+</div>
+<span class="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded font-label-sm text-label-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px] animate-spin">sync</span>生成中
+                    </span>
+</div>
+<div class="font-body-md text-body-md text-on-surface-variant italic">
+                    智能研究助手正在搜集最新批价数据及渠道库存情况...
+                </div>
+<div class="flex justify-between items-center mt-1 pt-sm border-t border-border">
+<span class="font-data-tabular text-data-tabular text-on-surface-variant text-[12px]">2023-10-25 09:15</span>
+<button class="text-primary font-label text-label flex items-center gap-1 opacity-50 cursor-not-allowed">查看详情<span class="material-symbols-outlined text-[14px]">chevron_right</span></button>
+</div>
+</div>
+<!-- Card 3: 招商银行 -->
+<div class="bg-surface border border-border rounded-xl p-md flex flex-col gap-sm">
+<div class="flex justify-between items-start">
+<div>
+<div class="flex items-center gap-2 mb-1">
+<h3 class="font-title text-title text-on-surface text-[16px] leading-[20px]">招商银行</h3>
+<span class="font-data-tabular text-data-tabular text-on-surface-variant text-[12px]">600036</span>
+</div>
+<div class="font-label text-label text-on-surface-variant">最新版本: V4 • 累计生成 8 次</div>
+</div>
+<span class="bg-error/10 text-error border border-error/20 px-2 py-0.5 rounded font-label-sm text-label-sm">失败</span>
+</div>
+<div class="font-body-md text-body-md text-error line-clamp-2 bg-error/5 p-2 rounded border border-error/10">
+                    数据源访问超时，未能获取完整的息差预测模型数据。请稍后重试。
+                </div>
+<div class="flex justify-between items-center mt-1 pt-sm border-t border-border">
+<span class="font-data-tabular text-data-tabular text-on-surface-variant text-[12px]">2023-10-23 16:45</span>
+<button class="text-primary font-label text-label flex items-center gap-1">重新生成<span class="material-symbols-outlined text-[14px]">refresh</span></button>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center h-16 px-gutter bg-surface border-t border-border z-50">
+<button class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1 active:scale-95 transition-transform duration-150">
+<span class="material-symbols-outlined mb-1 text-[24px]">dashboard</span>
+<span class="font-label-sm text-label-sm">工作台</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1 active:scale-95 transition-transform duration-150">
+<span class="material-symbols-outlined mb-1 text-[24px]">trending_up</span>
+<span class="font-label-sm text-label-sm">行情</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1 active:scale-95 transition-transform duration-150">
+<span class="material-symbols-outlined mb-1 text-[24px]">visibility</span>
+<span class="font-label-sm text-label-sm">观察</span>
+</button>
+<button class="flex flex-col items-center justify-center text-primary bg-primary-soft/20 rounded-xl px-3 py-1 active:scale-95 transition-transform duration-150">
+<span class="material-symbols-outlined mb-1 text-[24px]" style="font-variation-settings: 'FILL' 1;">menu_book</span>
+<span class="font-label-sm text-label-sm font-bold">研究</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1 active:scale-95 transition-transform duration-150">
+<span class="material-symbols-outlined mb-1 text-[24px]">person</span>
+<span class="font-label-sm text-label-sm">我的</span>
+</button>
+</nav>
+<!-- Bottom Sheet overlay mock (hidden by default, shown via CSS for demonstration or left out if not required in immediate view. We will include a section that looks like the bottom sheet content as per instructions, placed below main content to simulate a scrollable page where the bottom sheet is opened) -->
+<!-- Scrim -->
+<div class="fixed inset-0 bg-black/60 z-[60] backdrop-blur-sm" style="display: none;"></div>
+<!-- Bottom Sheet Content (Mocking an open state for the prompt requirements) -->
+<!-- Note: Wrapping in a div to simulate the overlay, but keeping it visible inline for the prompt output if needed, or structured as a modal -->
+<div class="fixed bottom-0 left-0 w-full bg-surface border-t border-border rounded-t-2xl z-[70] flex flex-col max-h-[751px] shadow-[0_-8px_30px_rgba(0,0,0,0.5)] transform translate-y-0 transition-transform duration-300">
+<!-- Handle -->
+<div class="w-full flex justify-center pt-3 pb-2">
+<div class="w-12 h-1.5 bg-border rounded-full"></div>
+</div>
+<div class="px-page-padding pb-4 flex justify-between items-center border-b border-border">
+<h2 class="font-headline text-headline text-on-surface">新建报告任务</h2>
+<button class="text-on-surface-variant hover:text-on-surface p-1">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<div class="overflow-y-auto px-page-padding py-md space-y-lg no-scrollbar pb-24">
+<!-- Configuration -->
+<section class="space-y-3">
+<h3 class="font-label text-label text-on-surface-variant uppercase tracking-wider">基础配置</h3>
+<div class="grid grid-cols-2 gap-sm">
+<div class="space-y-1.5">
+<label class="font-label-sm text-label-sm text-on-surface-variant">配置分组</label>
+<div class="relative">
+<select class="w-full bg-surface-muted border border-border text-on-surface font-body text-body rounded-lg px-3 py-2 appearance-none focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+<option>默认研究</option>
+<option>估值复核</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-2.5 text-on-surface-variant pointer-events-none text-[18px]">expand_more</span>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="font-label-sm text-label-sm text-on-surface-variant">配置模板</label>
+<div class="relative">
+<select class="w-full bg-surface-muted border border-border text-on-surface font-body text-body rounded-lg px-3 py-2 appearance-none focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+<option>深度报告 V2</option>
+<option>简版追踪</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-2.5 text-on-surface-variant pointer-events-none text-[18px]">expand_more</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Target details -->
+<section class="space-y-3">
+<h3 class="font-label text-label text-on-surface-variant uppercase tracking-wider">标的信息</h3>
+<div class="space-y-sm">
+<div class="flex items-center gap-2 overflow-x-auto no-scrollbar">
+<button class="bg-primary-soft/20 text-primary border border-primary/30 px-4 py-1.5 rounded-lg font-label text-label whitespace-nowrap">股票</button>
+<button class="bg-surface text-on-surface border border-border px-4 py-1.5 rounded-lg font-label text-label whitespace-nowrap">指数</button>
+<button class="bg-surface text-on-surface border border-border px-4 py-1.5 rounded-lg font-label text-label whitespace-nowrap">可转债</button>
+</div>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[18px]">search</span>
+<input class="w-full bg-surface-muted border border-border text-on-surface font-body text-body rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder-on-surface-variant/50" placeholder="搜索标的代码或名称" type="text">
+</div>
+<div class="space-y-1.5">
+<label class="font-label-sm text-label-sm text-on-surface-variant">报告类型</label>
+<div class="relative">
+<select class="w-full bg-surface-muted border border-border text-on-surface font-body text-body rounded-lg px-3 py-2 appearance-none focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+<option selected="">首次覆盖</option>
+<option>跟踪点评</option>
+<option>专题研究</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-2.5 text-on-surface-variant pointer-events-none text-[18px]">expand_more</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Evidence Settings -->
+<section class="space-y-3">
+<h3 class="font-label text-label text-on-surface-variant uppercase tracking-wider">证据集设置</h3>
+<div class="grid grid-cols-2 gap-sm">
+<div class="flex justify-between items-center bg-surface-muted border border-border rounded-lg px-3 py-2">
+<span class="font-body text-body text-on-surface">召回条数</span>
+<span class="font-data-tabular text-data-tabular text-primary">10</span>
+</div>
+<div class="flex justify-between items-center bg-surface-muted border border-border rounded-lg px-3 py-2">
+<span class="font-body text-body text-on-surface">日线数量</span>
+<span class="font-data-tabular text-data-tabular text-primary">250</span>
+</div>
+<div class="flex justify-between items-center bg-surface-muted border border-border rounded-lg px-3 py-2">
+<span class="font-body text-body text-on-surface">周线数量</span>
+<span class="font-data-tabular text-data-tabular text-primary">104</span>
+</div>
+<div class="flex justify-between items-center bg-surface-muted border border-border rounded-lg px-3 py-2">
+<span class="font-body text-body text-on-surface">月线数量</span>
+<span class="font-data-tabular text-data-tabular text-primary">60</span>
+</div>
+</div>
+</section>
+<!-- Parameters -->
+
+</div>
+<!-- Sticky Bottom Actions -->
+<div class="absolute bottom-0 w-full p-page-padding bg-surface border-t border-border flex gap-3 z-20">
+<button class="flex-1 bg-surface-muted text-on-surface border border-border py-3 rounded-xl font-headline text-[16px] active:bg-surface-variant transition-colors">
+                保存为配置
+            </button>
+<button class="flex-1 bg-primary-container text-on-primary-container py-3 rounded-xl font-headline text-[16px] shadow-lg shadow-primary-container/20 active:scale-[0.98] transition-transform">
+                创建报告任务
+            </button>
+</div>
+</div>
+
+
+</body></html>

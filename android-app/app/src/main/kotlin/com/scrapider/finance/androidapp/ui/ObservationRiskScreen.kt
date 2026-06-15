@@ -92,6 +92,7 @@ fun ObservationRiskScreen(
     onSaveTarget: () -> Unit,
     onWorkbenchSelected: () -> Unit,
     onMarketSelected: () -> Unit,
+    onReportSelected: () -> Unit,
 ) {
     Scaffold(
         containerColor = WorkspaceBackground,
@@ -107,6 +108,7 @@ fun ObservationRiskScreen(
             ObservationBottomNav(
                 onWorkbenchSelected = onWorkbenchSelected,
                 onMarketSelected = onMarketSelected,
+                onReportSelected = onReportSelected,
             )
         },
     ) { paddingValues ->
@@ -976,6 +978,7 @@ private fun AlertSwitchRow(
 private fun ObservationBottomNav(
     onWorkbenchSelected: () -> Unit,
     onMarketSelected: () -> Unit,
+    onReportSelected: () -> Unit,
 ) {
     NavigationBar(
         containerColor = Color(0xFF1D1F27),
@@ -990,6 +993,7 @@ private fun ObservationBottomNav(
                     when (item) {
                         "工作台" -> onWorkbenchSelected()
                         "行情" -> onMarketSelected()
+                        "研究" -> onReportSelected()
                     }
                 },
                 icon = { Text(observationNavIcon(item), fontSize = 17.sp) },

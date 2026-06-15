@@ -64,6 +64,7 @@ fun MarketScreen(
     onKeywordChange: (String) -> Unit,
     onWorkbenchSelected: () -> Unit,
     onObservationSelected: () -> Unit,
+    onReportSelected: () -> Unit,
 ) {
     Scaffold(
         containerColor = WorkspaceBackground,
@@ -78,6 +79,7 @@ fun MarketScreen(
             MarketBottomNav(
                 onWorkbenchSelected = onWorkbenchSelected,
                 onObservationSelected = onObservationSelected,
+                onReportSelected = onReportSelected,
             )
         },
     ) { paddingValues ->
@@ -405,6 +407,7 @@ private fun EmptyMarketRow(text: String) {
 private fun MarketBottomNav(
     onWorkbenchSelected: () -> Unit,
     onObservationSelected: () -> Unit,
+    onReportSelected: () -> Unit,
 ) {
     NavigationBar(
         containerColor = Color(0xFF1D1F27),
@@ -419,6 +422,7 @@ private fun MarketBottomNav(
                     when (item) {
                         "工作台" -> onWorkbenchSelected()
                         "观察" -> onObservationSelected()
+                        "研究" -> onReportSelected()
                     }
                 },
                 icon = { Text(navIcon(item), fontSize = 17.sp) },
