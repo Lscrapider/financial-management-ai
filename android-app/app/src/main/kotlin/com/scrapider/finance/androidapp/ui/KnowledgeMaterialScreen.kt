@@ -51,7 +51,12 @@ import com.scrapider.finance.androidapp.data.KnowledgeMaterialChunk
 import com.scrapider.finance.androidapp.data.KnowledgeMaterialFormState
 import com.scrapider.finance.androidapp.data.KnowledgeMaterialTask
 import com.scrapider.finance.androidapp.data.KnowledgeMaterialUiState
+import com.scrapider.finance.androidapp.data.KnowledgeSection
+import com.scrapider.finance.androidapp.data.ManualKnowledgeUiState
 import com.scrapider.finance.androidapp.data.MIN_REPORT_DAILY_KLINE_LIMIT
+import com.scrapider.finance.androidapp.data.OcrReviewDetail
+import com.scrapider.finance.androidapp.data.OcrTask
+import com.scrapider.finance.androidapp.data.OcrUploadFile
 import com.scrapider.finance.androidapp.data.ReportConfigProfileOption
 import com.scrapider.finance.androidapp.data.ReportTargetOption
 import com.scrapider.finance.androidapp.data.ReportTargetType
@@ -64,6 +69,7 @@ fun KnowledgeMaterialScreen(
     statusMessage: String,
     knowledge: KnowledgeMaterialUiState,
     onRefresh: () -> Unit,
+    onSectionChange: (KnowledgeSection) -> Unit,
     onTargetTypeChange: (ReportTargetType) -> Unit,
     onTargetKeywordChange: (String) -> Unit,
     onTargetSelected: (ReportTargetOption) -> Unit,
@@ -75,6 +81,32 @@ fun KnowledgeMaterialScreen(
     onTagFilterChange: (String) -> Unit,
     onSourceKeywordChange: (String) -> Unit,
     onResetFilters: () -> Unit,
+    onPickOcrPdf: () -> Unit,
+    onTakeOcrPhoto: () -> Unit,
+    onPickOcrGallery: () -> Unit,
+    onRemoveOcrFile: (Int) -> Unit,
+    onClearOcrFiles: () -> Unit,
+    onSubmitOcrFiles: () -> Unit,
+    onSelectOcrTask: (String) -> Unit,
+    onOpenOcrReview: (String) -> Unit,
+    onDismissOcrReview: () -> Unit,
+    onOcrReviewParagraphChange: (Int, String) -> Unit,
+    onMoveOcrReviewParagraph: (Int, Int) -> Unit,
+    onMergeOcrReviewParagraph: (Int) -> Unit,
+    onCopyOcrReviewParagraph: (Int) -> Unit,
+    onDeleteOcrReviewParagraph: (Int) -> Unit,
+    onSaveOcrReviewDraft: () -> Unit,
+    onSubmitOcrReview: () -> Unit,
+    onManualTitleChange: (String) -> Unit,
+    onManualChunkChange: (Int, String) -> Unit,
+    onAddManualChunk: () -> Unit,
+    onRemoveManualChunk: (Int) -> Unit,
+    onNewManualDraft: () -> Unit,
+    onSaveManualDraft: () -> Unit,
+    onSubmitManualDraft: () -> Unit,
+    onSelectManualTask: (String) -> Unit,
+    onOpenManualTask: (String) -> Unit,
+    onDeleteManualTask: (String) -> Unit,
     onWorkbenchSelected: () -> Unit,
     onMarketSelected: () -> Unit,
     onObservationSelected: () -> Unit,
@@ -107,31 +139,86 @@ fun KnowledgeMaterialScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            KnowledgeSegmentedTabs()
-            RecallConfigCard(
-                loading = loading,
-                knowledge = knowledge,
-                onTargetTypeChange = onTargetTypeChange,
-                onTargetKeywordChange = onTargetKeywordChange,
-                onTargetSelected = onTargetSelected,
-                onProfileSelected = onProfileSelected,
-                onFormChange = onFormChange,
-                onSubmit = onSubmitTarget,
-            )
-            NaturalLanguageCard(
-                loading = loading,
-                form = knowledge.form,
-                onFormChange = onFormChange,
-                onSubmit = onSubmitNaturalLanguage,
-            )
-            ResultSection(
-                loading = loading,
-                knowledge = knowledge,
-                onSceneFilterChange = onSceneFilterChange,
-                onTagFilterChange = onTagFilterChange,
-                onSourceKeywordChange = onSourceKeywordChange,
-                onResetFilters = onResetFilters,
-            )
+            KnowledgeSegmentedTabs(selected = knowledge.section, onSelected = onSectionChange)
+            when (knowledge.section) {
+                KnowledgeSection.Materials -> {
+                    RecallConfigCard(
+                        loading = loading,
+                        knowledge = knowledge,
+                        onTargetTypeChange = onTargetTypeChange,
+                        onTargetKeywordChange = onTargetKeywordChange,
+                        onTargetSelected = onTargetSelected,
+                        onProfileSelected = onProfileSelected,
+                        onFormChange = onFormChange,
+                        onSubmit = onSubmitTarget,
+                    )
+                    NaturalLanguageCard(
+                        loading = loading,
+                        form = knowledge.form,
+                        onFormChange = onFormChange,
+                        onSubmit = onSubmitNaturalLanguage,
+                    )
+                    ResultSection(
+                        loading = loading,
+                        knowledge = knowledge,
+                        onSceneFilterChange = onSceneFilterChange,
+                        onTagFilterChange = onTagFilterChange,
+                        onSourceKeywordChange = onSourceKeywordChange,
+                        onResetFilters = onResetFilters,
+                    )
+                }
+
+                KnowledgeSection.OcrImport -> {
+                    if (knowledge.ocr.selectedReview == null) {
+                        OcrImportSection(
+                            loading = loading,
+                            selectedFiles = knowledge.ocr.selectedFiles,
+                            tasks = knowledge.ocr.tasks,
+                            selectedTask = knowledge.ocr.selectedTask,
+                            runningCount = knowledge.ocr.runningCount,
+                            finishedCount = knowledge.ocr.finishedCount,
+                            reviewCount = knowledge.ocr.reviewCount,
+                            failedCount = knowledge.ocr.failedCount,
+                            onPickPdf = onPickOcrPdf,
+                            onTakePhoto = onTakeOcrPhoto,
+                            onPickGallery = onPickOcrGallery,
+                            onRemoveFile = onRemoveOcrFile,
+                            onClearFiles = onClearOcrFiles,
+                            onSubmitFiles = onSubmitOcrFiles,
+                            onSelectTask = onSelectOcrTask,
+                            onOpenReview = onOpenOcrReview,
+                        )
+                    } else {
+                        OcrReviewSection(
+                            loading = loading,
+                            review = knowledge.ocr.selectedReview,
+                            onBack = onDismissOcrReview,
+                            onParagraphChange = onOcrReviewParagraphChange,
+                            onMoveParagraph = onMoveOcrReviewParagraph,
+                            onMergeParagraph = onMergeOcrReviewParagraph,
+                            onCopyParagraph = onCopyOcrReviewParagraph,
+                            onDeleteParagraph = onDeleteOcrReviewParagraph,
+                            onSaveDraft = onSaveOcrReviewDraft,
+                            onSubmitReview = onSubmitOcrReview,
+                        )
+                    }
+                }
+
+                KnowledgeSection.ManualImport -> ManualImportSection(
+                    loading = loading,
+                    manual = knowledge.manual,
+                    onTitleChange = onManualTitleChange,
+                    onChunkChange = onManualChunkChange,
+                    onAddChunk = onAddManualChunk,
+                    onRemoveChunk = onRemoveManualChunk,
+                    onNewDraft = onNewManualDraft,
+                    onSaveDraft = onSaveManualDraft,
+                    onSubmitDraft = onSubmitManualDraft,
+                    onSelectTask = onSelectManualTask,
+                    onOpenTask = onOpenManualTask,
+                    onDeleteTask = onDeleteManualTask,
+                )
+            }
             if (statusMessage.isNotBlank()) {
                 Text(statusMessage, color = WorkspaceMuted, fontSize = 12.sp, lineHeight = 18.sp)
             }
@@ -168,7 +255,10 @@ private fun KnowledgeTopBar(
 }
 
 @Composable
-private fun KnowledgeSegmentedTabs() {
+private fun KnowledgeSegmentedTabs(
+    selected: KnowledgeSection,
+    onSelected: (KnowledgeSection) -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -176,8 +266,8 @@ private fun KnowledgeSegmentedTabs() {
             .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        listOf("材料", "OCR导入", "手动导入").forEach { item ->
-            val active = item == "材料"
+        KnowledgeSection.entries.forEach { item ->
+            val active = item == selected
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -187,11 +277,12 @@ private fun KnowledgeSegmentedTabs() {
                         width = if (active) 1.dp else 0.dp,
                         color = if (active) WorkspaceBorder else Color.Transparent,
                         shape = RoundedCornerShape(6.dp),
-                    ),
+                    )
+                    .clickable { onSelected(item) },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = item,
+                    text = item.label,
                     color = if (active) PrimaryFixedDim else WorkspaceMuted,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
@@ -277,6 +368,521 @@ private fun NaturalLanguageCard(
             enabled = !loading && form.canSubmitNaturalLanguage,
             onClick = onSubmit,
         )
+    }
+}
+
+@Composable
+private fun OcrImportSection(
+    loading: Boolean,
+    selectedFiles: List<OcrUploadFile>,
+    tasks: List<OcrTask>,
+    selectedTask: OcrTask?,
+    runningCount: Int,
+    finishedCount: Int,
+    reviewCount: Int,
+    failedCount: Int,
+    onPickPdf: () -> Unit,
+    onTakePhoto: () -> Unit,
+    onPickGallery: () -> Unit,
+    onRemoveFile: (Int) -> Unit,
+    onClearFiles: () -> Unit,
+    onSubmitFiles: () -> Unit,
+    onSelectTask: (String) -> Unit,
+    onOpenReview: (String) -> Unit,
+) {
+    Panel {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("提交OCR任务", color = WorkspaceForeground, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text("上传 PDF、拍照或从图库导入图片，进入 OCR、清洗、切分和入库队列。", color = WorkspaceMuted, fontSize = 12.sp, lineHeight = 18.sp)
+            }
+            StatusChip("${selectedFiles.size} 个待提交", PrimaryFixedDim)
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            UploadOption("▣", "上传PDF", "研报/文档", Modifier.weight(1f), onPickPdf)
+            UploadOption("◉", "拍照", "调用相机", Modifier.weight(1f), onTakePhoto)
+            UploadOption("▧", "图库", "截图/照片", Modifier.weight(1f), onPickGallery)
+        }
+        if (selectedFiles.isEmpty()) {
+            EmptyResultText("尚未选择文件。支持 PDF、PNG、JPG、JPEG、WEBP，单个文件大小由后端限制。")
+        } else {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("已选择文件", color = WorkspaceForeground, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                TextButton(onClick = onClearFiles) {
+                    Text("清空", color = WorkspaceMuted, fontSize = 12.sp)
+                }
+            }
+            selectedFiles.forEachIndexed { index, file ->
+                SelectedOcrFileRow(file = file, onRemove = { onRemoveFile(index) })
+            }
+        }
+        PrimaryActionButton(
+            text = if (loading) "提交中" else "提交OCR任务",
+            enabled = !loading && selectedFiles.isNotEmpty(),
+            onClick = onSubmitFiles,
+        )
+    }
+
+    Panel {
+        Text("处理概览", color = WorkspaceForeground, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            MetricCell("处理中", runningCount.toString(), SignalAmber, Modifier.weight(1f))
+            MetricCell("已完成", finishedCount.toString(), SignalGreen, Modifier.weight(1f))
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            MetricCell("待复核", reviewCount.toString(), PrimaryFixedDim, Modifier.weight(1f))
+            MetricCell("失败", failedCount.toString(), SignalRed, Modifier.weight(1f))
+        }
+    }
+
+    Panel {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("处理队列", color = WorkspaceForeground, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(selectedTask?.updatedAt?.replace('T', ' ')?.take(16) ?: "暂无队列任务", color = WorkspaceMuted, fontSize = 12.sp)
+            }
+            selectedTask?.let { StatusChip(ocrStatusLabel(it.status), ocrStatusColor(it.status)) }
+        }
+        if (tasks.isEmpty()) {
+            EmptyResultText("暂无 OCR 导入任务。")
+        } else {
+            tasks.forEach { task ->
+                OcrTaskRow(
+                    task = task,
+                    selected = task.taskNo == selectedTask?.taskNo,
+                    onClick = { onSelectTask(task.taskNo) },
+                    onOpenReview = { onOpenReview(task.taskNo) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun UploadOption(
+    icon: String,
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = modifier
+            .height(96.dp)
+            .border(1.dp, WorkspaceBorder, RoundedCornerShape(8.dp))
+            .background(WorkspaceSurfaceElevated, RoundedCornerShape(8.dp))
+            .clickable { onClick() }
+            .padding(10.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(icon, color = PrimaryFixedDim, fontSize = 20.sp)
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, color = WorkspaceForeground, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            Text(subtitle, color = WorkspaceMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun SelectedOcrFileRow(file: OcrUploadFile, onRemove: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, WorkspaceBorder, RoundedCornerShape(8.dp))
+            .background(Color(0xFF191B23), RoundedCornerShape(8.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(if (file.contentType.contains("pdf")) "PDF" else "IMG", color = PrimaryFixedDim, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(file.name, color = WorkspaceForeground, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(formatBytes(file.sizeBytes), color = WorkspaceMuted, fontSize = 11.sp)
+        }
+        TextButton(onClick = onRemove) {
+            Text("移除", color = SignalRed, fontSize = 12.sp)
+        }
+    }
+}
+
+@Composable
+private fun OcrTaskRow(
+    task: OcrTask,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onOpenReview: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, if (selected) PrimaryFixedDim.copy(alpha = 0.45f) else WorkspaceBorder, RoundedCornerShape(8.dp))
+            .background(if (selected) CommandBlueSoft.copy(alpha = 0.42f) else Color(0xFF191B23), RoundedCornerShape(8.dp))
+            .clickable { onClick() }
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(task.originalFilename, color = WorkspaceForeground, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(task.taskNo.ifBlank { "暂无任务编号" }, color = WorkspaceMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            StatusChip(ocrStatusLabel(task.status), ocrStatusColor(task.status))
+        }
+        TinyBar(progress = task.progress / 100f)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("${ocrStageLabel(task.currentStage)} · ${task.pageCount}页 · ${task.segmentCount}段", color = WorkspaceMuted, fontSize = 12.sp)
+            if (task.needsReview) {
+                TextButton(onClick = onOpenReview) {
+                    Text("进入复核", color = PrimaryFixedDim, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        if (task.status == "failed" && task.errorMessage.isNotBlank()) {
+            Text(task.errorMessage, color = SignalRed, fontSize = 12.sp, lineHeight = 18.sp)
+        }
+    }
+}
+
+@Composable
+private fun OcrReviewSection(
+    loading: Boolean,
+    review: OcrReviewDetail,
+    onBack: () -> Unit,
+    onParagraphChange: (Int, String) -> Unit,
+    onMoveParagraph: (Int, Int) -> Unit,
+    onMergeParagraph: (Int) -> Unit,
+    onCopyParagraph: (Int) -> Unit,
+    onDeleteParagraph: (Int) -> Unit,
+    onSaveDraft: () -> Unit,
+    onSubmitReview: () -> Unit,
+) {
+    Panel {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("OCR人工复核", color = WorkspaceForeground, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(review.taskNo, color = WorkspaceMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            TextButton(onClick = onBack) {
+                Text("返回队列", color = WorkspaceMuted, fontSize = 12.sp)
+            }
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            MetricCell("段落", review.draftContent.paragraphs.size.toString(), PrimaryFixedDim, Modifier.weight(1f))
+            MetricCell("警告", review.warningCount.toString(), SignalAmber, Modifier.weight(1f))
+            MetricCell("置信度", "${(review.overallConfidence * 100).toInt()}%", confidenceColor(review.overallConfidence), Modifier.weight(1f))
+        }
+        Text("逐段校正识别文本，确认后提交入库处理。", color = WorkspaceMuted, fontSize = 12.sp, lineHeight = 18.sp)
+    }
+    review.draftContent.paragraphs.forEachIndexed { index, paragraph ->
+        Panel {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("#${paragraph.paragraphNo.toString().padStart(2, '0')}", color = WorkspaceForeground, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    StatusChip("第 ${paragraph.sourcePages.firstOrNull() ?: "-"} 页", PrimaryFixedDim)
+                    Text("编辑中", color = WorkspaceMuted, fontSize = 12.sp, maxLines = 1)
+                    Text("${paragraph.text.length}字", color = WorkspaceMuted, fontSize = 12.sp, maxLines = 1)
+                }
+                StatusChip("${(paragraph.avgConfidence * 100).toInt()}%", confidenceColor(paragraph.avgConfidence))
+            }
+            if (paragraph.sourcePages.isNotEmpty()) {
+                Text("来源页：${paragraph.sourcePages.joinToString("、")}", color = WorkspaceMuted, fontSize = 12.sp)
+            }
+            FinanceTextField(
+                label = "复核文本",
+                value = paragraph.text,
+                onValueChange = { onParagraphChange(paragraph.paragraphNo, it) },
+                singleLine = false,
+                minLines = 4,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+            )
+            if (paragraph.warnings.isNotEmpty()) {
+                Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    paragraph.warnings.forEach { warning ->
+                        StatusChip(warning.type, SignalAmber)
+                    }
+                }
+            }
+            OcrParagraphToolbar(
+                canMoveUp = index > 0,
+                canMoveDown = index < review.draftContent.paragraphs.lastIndex,
+                canMerge = index < review.draftContent.paragraphs.lastIndex,
+                canDelete = review.draftContent.paragraphs.size > 1,
+                onMoveUp = { onMoveParagraph(paragraph.paragraphNo, -1) },
+                onMoveDown = { onMoveParagraph(paragraph.paragraphNo, 1) },
+                onMerge = { onMergeParagraph(paragraph.paragraphNo) },
+                onCopy = { onCopyParagraph(paragraph.paragraphNo) },
+                onDelete = { onDeleteParagraph(paragraph.paragraphNo) },
+            )
+        }
+    }
+    Panel {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PrimaryActionButton(
+                text = if (loading) "保存中" else "保存草稿",
+                modifier = Modifier.weight(1f),
+                enabled = !loading,
+                onClick = onSaveDraft,
+            )
+            PrimaryActionButton(
+                text = if (loading) "提交中" else "确认提交",
+                modifier = Modifier.weight(1f),
+                enabled = !loading,
+                onClick = onSubmitReview,
+            )
+        }
+    }
+}
+
+@Composable
+private fun OcrParagraphToolbar(
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    canMerge: Boolean,
+    canDelete: Boolean,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    onMerge: () -> Unit,
+    onCopy: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, WorkspaceBorder, RoundedCornerShape(8.dp))
+            .background(Color(0xFF182C44), RoundedCornerShape(8.dp))
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ToolbarActionButton("↑", "上移", canMoveUp, PrimaryFixedDim, onMoveUp)
+        ToolbarActionButton("↓", "下移", canMoveDown, PrimaryFixedDim, onMoveDown)
+        ToolbarActionButton("合", "合并下一段", canMerge, PrimaryFixedDim, onMerge)
+        ToolbarActionButton("⧉", "复制", true, PrimaryFixedDim, onCopy)
+        ToolbarActionButton("删", "删除", canDelete, SignalRed, onDelete)
+    }
+}
+
+@Composable
+private fun ToolbarActionButton(
+    symbol: String,
+    label: String,
+    enabled: Boolean,
+    color: Color,
+    onClick: () -> Unit,
+) {
+    TextButton(onClick = onClick, enabled = enabled) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                symbol,
+                color = if (enabled) color else WorkspaceMuted.copy(alpha = 0.38f),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+            )
+            Text(
+                label,
+                color = if (enabled) WorkspaceMuted else WorkspaceMuted.copy(alpha = 0.38f),
+                fontSize = 10.sp,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ManualImportSection(
+    loading: Boolean,
+    manual: ManualKnowledgeUiState,
+    onTitleChange: (String) -> Unit,
+    onChunkChange: (Int, String) -> Unit,
+    onAddChunk: () -> Unit,
+    onRemoveChunk: (Int) -> Unit,
+    onNewDraft: () -> Unit,
+    onSaveDraft: () -> Unit,
+    onSubmitDraft: () -> Unit,
+    onSelectTask: (String) -> Unit,
+    onOpenTask: (String) -> Unit,
+    onDeleteTask: (String) -> Unit,
+) {
+    Panel {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("手动知识导入", color = WorkspaceForeground, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text("按 chunk 录入文本，保存为草稿后可继续编辑，提交后进入场景打标和向量入库。", color = WorkspaceMuted, fontSize = 12.sp, lineHeight = 18.sp)
+            }
+            StatusChip(if (manual.readonly) "查看模式" else "${manual.validChunkCount} 条有效", if (manual.readonly) WorkspaceMuted else PrimaryFixedDim)
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PrimaryActionButton(
+                text = "新增草稿",
+                modifier = Modifier.weight(1f),
+                enabled = !loading,
+                onClick = onNewDraft,
+            )
+            PrimaryActionButton(
+                text = if (loading) "保存中" else "保存草稿",
+                modifier = Modifier.weight(1f),
+                enabled = !loading && manual.canSubmit,
+                onClick = onSaveDraft,
+            )
+        }
+        FinanceTextField(
+            label = "标题",
+            value = manual.title,
+            onValueChange = { if (manual.canEdit) onTitleChange(it) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+        )
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("Chunk 列表", color = WorkspaceForeground, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text("有效 ${manual.validChunkCount} / ${manual.chunks.size}", color = WorkspaceMuted, fontSize = 12.sp)
+        }
+        manual.chunks.forEachIndexed { index, chunk ->
+            ManualChunkEditor(
+                index = index,
+                text = chunk,
+                readonly = manual.readonly,
+                canRemove = manual.canEdit && manual.chunks.size > 1,
+                onChange = { onChunkChange(index, it) },
+                onRemove = { onRemoveChunk(index) },
+            )
+        }
+        if (manual.canEdit) {
+            TextButton(onClick = onAddChunk, enabled = !loading) {
+                Text("添加 Chunk", color = PrimaryFixedDim, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        PrimaryActionButton(
+            text = if (loading) "提交中" else "提交入库",
+            enabled = !loading && manual.canSubmit,
+            onClick = onSubmitDraft,
+        )
+    }
+
+    Panel {
+        Text("手动导入概览", color = WorkspaceForeground, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            MetricCell("草稿", manual.draftCount.toString(), SignalAmber, Modifier.weight(1f))
+            MetricCell("处理中", manual.runningCount.toString(), PrimaryFixedDim, Modifier.weight(1f))
+            MetricCell("已完成", manual.finishedCount.toString(), SignalGreen, Modifier.weight(1f))
+        }
+    }
+
+    Panel {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("手动导入队列", color = WorkspaceForeground, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(manual.updatedAt.takeIf { it != "--:--" }?.let { "最近同步 $it" } ?: "暂无队列同步", color = WorkspaceMuted, fontSize = 12.sp)
+            }
+            manual.selectedTask?.let { StatusChip(ocrStatusLabel(it.status), ocrStatusColor(it.status)) }
+        }
+        if (manual.tasks.isEmpty()) {
+            EmptyResultText("暂无手动导入任务。")
+        } else {
+            manual.tasks.forEach { task ->
+                ManualTaskRow(
+                    task = task,
+                    selected = task.taskNo == manual.selectedTaskNo,
+                    loading = loading,
+                    onClick = { onSelectTask(task.taskNo) },
+                    onOpen = { onOpenTask(task.taskNo) },
+                    onDelete = { onDeleteTask(task.taskNo) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ManualChunkEditor(
+    index: Int,
+    text: String,
+    readonly: Boolean,
+    canRemove: Boolean,
+    onChange: (String) -> Unit,
+    onRemove: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, WorkspaceBorder, RoundedCornerShape(8.dp))
+            .background(Color(0xFF191B23), RoundedCornerShape(8.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("Chunk ${index + 1}", color = WorkspaceForeground, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            if (!readonly) {
+                TextButton(onClick = onRemove, enabled = canRemove) {
+                    Text("删除", color = if (canRemove) SignalRed else WorkspaceMuted.copy(alpha = 0.42f), fontSize = 12.sp)
+                }
+            }
+        }
+        OutlinedTextField(
+            value = text,
+            onValueChange = onChange,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !readonly,
+            singleLine = false,
+            minLines = 5,
+            placeholder = { Text("输入这一段 chunk 的文本", color = WorkspaceMuted, fontSize = 13.sp) },
+            textStyle = TextStyle(color = WorkspaceForeground, fontSize = 13.sp, lineHeight = 20.sp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = WorkspaceForeground,
+                unfocusedTextColor = WorkspaceForeground,
+                disabledTextColor = WorkspaceOnSurface,
+                focusedContainerColor = WorkspaceSurfaceElevated,
+                unfocusedContainerColor = WorkspaceSurfaceElevated,
+                disabledContainerColor = WorkspaceSurfaceElevated,
+                focusedBorderColor = PrimaryFixedDim,
+                unfocusedBorderColor = WorkspaceBorder,
+                disabledBorderColor = WorkspaceBorder,
+                cursorColor = PrimaryFixedDim,
+            ),
+            shape = RoundedCornerShape(8.dp),
+        )
+    }
+}
+
+@Composable
+private fun ManualTaskRow(
+    task: OcrTask,
+    selected: Boolean,
+    loading: Boolean,
+    onClick: () -> Unit,
+    onOpen: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, if (selected) PrimaryFixedDim.copy(alpha = 0.45f) else WorkspaceBorder, RoundedCornerShape(8.dp))
+            .background(if (selected) CommandBlueSoft.copy(alpha = 0.42f) else Color(0xFF191B23), RoundedCornerShape(8.dp))
+            .clickable { onClick() }
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(task.originalFilename, color = WorkspaceForeground, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(task.taskNo.ifBlank { "暂无任务编号" }, color = WorkspaceMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            StatusChip(ocrStatusLabel(task.status), ocrStatusColor(task.status))
+        }
+        TinyBar(progress = task.progress / 100f)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("${ocrStageLabel(task.currentStage)} · ${task.segmentCount} 个Chunk", color = WorkspaceMuted, fontSize = 12.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onOpen, enabled = !loading) {
+                    Text(if (task.needsReview) "编辑" else "查看", color = PrimaryFixedDim, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+                TextButton(onClick = onDelete, enabled = !loading) {
+                    Text("删除", color = SignalRed, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        if (task.status == "failed" && task.errorMessage.isNotBlank()) {
+            Text(task.errorMessage, color = SignalRed, fontSize = 12.sp, lineHeight = 18.sp)
+        }
     }
 }
 
@@ -754,6 +1360,48 @@ private fun materialWaitingText(task: KnowledgeMaterialTask, loading: Boolean): 
     "retrieving_knowledge" -> "正在检索知识库材料。"
     "pending" -> "任务已提交，等待后端处理。"
     else -> if (loading) "正在检索材料。" else "等待检索结果。"
+}
+
+private fun ocrStatusLabel(status: String): String = when (status) {
+    "ready" -> "等待中"
+    "running" -> "处理中"
+    "manual_review_required" -> "待复核"
+    "finished" -> "完成"
+    "failed" -> "失败"
+    else -> status.ifBlank { "暂无" }
+}
+
+private fun ocrStatusColor(status: String): Color = when (status) {
+    "finished" -> SignalGreen
+    "failed" -> SignalRed
+    "manual_review_required" -> SignalAmber
+    "running", "ready" -> PrimaryFixedDim
+    else -> WorkspaceMuted
+}
+
+private fun ocrStageLabel(stage: String): String = when (stage) {
+    "document.normalize" -> "格式校验"
+    "ocr.recognize" -> "OCR识别"
+    "text.clean" -> "文本清洗"
+    "quality.validate" -> "质量校验"
+    "chunk.tag", "chunk.tag.rule", "chunk.tag.llm", "chunk.tag.correct" -> "场景打标"
+    "embedding.index" -> "向量入库"
+    else -> stage.ifBlank { "待处理" }
+}
+
+private fun confidenceColor(value: Double): Color = when {
+    value < 0.7 -> SignalRed
+    value < 0.85 -> SignalAmber
+    else -> SignalGreen
+}
+
+private fun formatBytes(sizeBytes: Long): String {
+    val mb = sizeBytes / 1024.0 / 1024.0
+    return if (mb >= 1.0) {
+        "${DecimalFormat("0.0").format(mb)}MB"
+    } else {
+        "${(sizeBytes / 1024).coerceAtLeast(1)}KB"
+    }
 }
 
 private fun sceneLabel(scene: String): String = when (scene) {

@@ -1,0 +1,257 @@
+<!DOCTYPE html><html class="dark" lang="zh-CN" style="width: 390px; height: 1422px; overflow: hidden; position: relative;"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>知识 OCR 导入</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary": "#64dd93",
+                        "foreground-muted": "#aeb4bd",
+                        "on-primary-container": "#f4f5ff",
+                        "on-tertiary-container": "#fff3ef",
+                        "on-background": "#e1e2ec",
+                        "on-error": "#690005",
+                        "on-primary-fixed": "#001a42",
+                        "primary-fixed": "#d8e2ff",
+                        "surface-container": "#1d1f27",
+                        "surface-bright": "#363941",
+                        "on-secondary-fixed": "#00210e",
+                        "secondary-container": "#1fa561",
+                        "on-tertiary-fixed-variant": "#7d2d00",
+                        "chart-grid": "#2a2d33",
+                        "on-surface": "#e1e2ec",
+                        "surface-container-lowest": "#0b0e15",
+                        "surface-container-highest": "#32353d",
+                        "on-tertiary-fixed": "#360f00",
+                        "destructive": "#dc4446",
+                        "success": "#57d188",
+                        "on-primary-fixed-variant": "#004396",
+                        "on-surface-variant": "#c2c6d6",
+                        "on-primary": "#002e6a",
+                        "on-tertiary": "#581e00",
+                        "inverse-surface": "#e1e2ec",
+                        "border": "#36363a",
+                        "on-secondary": "#00391d",
+                        "outline": "#8c90a0",
+                        "surface-dim": "#10131a",
+                        "surface-tint": "#aec6ff",
+                        "surface-container-high": "#272a32",
+                        "foreground": "#f2f2f2",
+                        "primary-container": "#006be6",
+                        "tertiary": "#ffb596",
+                        "on-error-container": "#ffdad6",
+                        "background": "#14161a",
+                        "primary": "#aec6ff",
+                        "tertiary-container": "#c14a00",
+                        "outline-variant": "#424754",
+                        "error-container": "#93000a",
+                        "secondary-fixed": "#81faad",
+                        "error": "#ffb4ab",
+                        "tertiary-fixed-dim": "#ffb596",
+                        "surface": "#1c1e23",
+                        "surface-container-low": "#191b23",
+                        "secondary-fixed-dim": "#64dd93",
+                        "primary-fixed-dim": "#aec6ff",
+                        "on-secondary-container": "#003118",
+                        "inverse-primary": "#005ac3",
+                        "surface-elevated": "#24272d",
+                        "on-secondary-fixed-variant": "#00522c",
+                        "surface-muted": "#2e3033",
+                        "inverse-on-surface": "#2d3038",
+                        "warning": "#efbd48",
+                        "surface-variant": "#32353d",
+                        "tertiary-fixed": "#ffdbcd",
+                        "primary-soft": "#123a63"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "page-padding": "16px",
+                        "xl": "32px",
+                        "lg": "24px",
+                        "xs": "4px",
+                        "md": "16px",
+                        "gutter": "8px",
+                        "sm": "8px"
+                    },
+                    "fontFamily": {
+                        "label-sm": ["Inter"],
+                        "label": ["\"Inter, PingFang SC, system-ui, sans-serif\""],
+                        "title": ["\"Inter, PingFang SC, system-ui, sans-serif\""],
+                        "headline": ["\"Inter, PingFang SC, system-ui, sans-serif\""],
+                        "data-tabular": ["Inter"],
+                        "body": ["\"Inter, PingFang SC, system-ui, sans-serif\""],
+                        "display-title": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "label": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "title": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline": ["18px", { "lineHeight": "24px", "fontWeight": "700" }],
+                        "data-tabular": ["14px", { "lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "body": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "display-title": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', 'PingFang SC', sans-serif; }
+        /* Webkit scrollbar for clean internal scrolling */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #36363a; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #424754; }
+        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        .hide-scroll::-webkit-scrollbar { display: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface antialiased flex flex-col min-h-screen w-full md:w-[390px] md:mx-auto md:border-x border-border">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full md:w-[390px] z-50 bg-background dark:bg-background border-b border-border flex flex-col justify-center px-page-padding h-14 transition-colors duration-200">
+<div class="flex items-center justify-between w-full">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="book" style="font-variation-settings: 'FILL' 1;">book</span>
+<div class="flex flex-col">
+<h1 class="font-headline text-headline font-bold text-primary leading-tight">知识</h1>
+<span class="font-label-sm text-label-sm text-on-surface-variant leading-tight">OCR 任务提交与复核</span>
+</div>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-1 rounded hover:bg-surface-container-high">
+<span class="material-symbols-outlined" data-icon="refresh">refresh</span>
+</button>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="flex-1 overflow-y-auto mt-14 mb-16 px-page-padding py-4 space-y-4">
+<!-- Segmented Control -->
+<div class="flex p-1 bg-surface-container-high rounded-lg border border-border">
+<button class="flex-1 py-1.5 font-label text-label text-on-surface-variant text-center rounded hover:bg-surface-variant transition-colors">材料</button>
+<button class="flex-1 py-1.5 font-label text-label text-on-primary-container bg-surface-bright shadow-sm rounded border border-border text-center transition-colors">OCR导入</button>
+<button class="flex-1 py-1.5 font-label text-label text-on-surface-variant text-center rounded hover:bg-surface-variant transition-colors">手动导入</button>
+</div>
+<!-- Submit OCR Task Card -->
+<section class="bg-surface border border-border rounded-lg p-3 space-y-4">
+<div class="flex justify-between items-center mb-2">
+<h2 class="font-data-tabular text-data-tabular font-bold text-on-surface">提交 OCR 任务</h2>
+</div>
+<div class="grid grid-cols-2 gap-2">
+<button class="flex flex-col items-center justify-center py-4 bg-surface-elevated border border-border rounded hover:bg-surface-variant transition-colors gap-1">
+<span class="material-symbols-outlined text-primary" data-icon="picture_as_pdf">picture_as_pdf</span>
+<span class="font-label text-label text-on-surface">上传 PDF</span>
+</button>
+<button class="flex flex-col items-center justify-center py-4 bg-surface-elevated border border-border rounded hover:bg-surface-variant transition-colors gap-1">
+<span class="material-symbols-outlined text-primary" data-icon="add_a_photo">add_a_photo</span>
+<span class="font-label text-label text-on-surface">选择照片</span>
+</button>
+</div>
+<div class="flex gap-2 pt-2 border-t border-border mt-4">
+<button class="flex-1 bg-primary text-on-primary-fixed rounded py-2 font-label text-label font-bold hover:bg-primary-fixed-dim transition-colors">提交识别任务</button>
+</div>
+</section>
+<!-- Processing Queue Card -->
+<section class="bg-surface border border-border rounded-lg p-3 space-y-3">
+<h2 class="font-data-tabular text-data-tabular font-bold text-on-surface">处理队列</h2><div class="flex justify-between items-center py-1.5 px-2 bg-surface-container-lowest rounded border border-border/50 text-[11px] font-label-sm text-on-surface-variant"><div class="flex gap-3"><span class="">全部 18</span><span class="text-warning">需复核 3</span><span class="text-success">已完成 11</span><span class="text-error">失败 1</span></div></div>
+<div class="space-y-2"><div class="flex flex-col gap-2 p-2 bg-surface-container-low border border-border rounded hover:bg-surface-container transition-colors"><div class="flex justify-between items-start"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-on-surface-variant text-sm" data-icon="schedule">schedule</span><span class="font-body-md text-body-md text-on-surface truncate w-40">会议纪要_1024.docx</span></div><span class="px-1.5 py-0.5 bg-surface-bright text-on-surface-variant text-[10px] font-label-sm rounded border border-border">等待中</span></div><div class="flex justify-between items-center"><span class="font-label-sm text-label-sm text-on-surface-variant">DOCX · 10:50提交</span><span class="text-label-sm text-on-surface-variant opacity-50">排队中...</span></div></div>
+<!-- Item 1: Processing -->
+<div class="flex flex-col gap-2 p-2 bg-surface-container-low border border-border rounded hover:bg-surface-container transition-colors">
+<div class="flex justify-between items-start">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="description">description</span>
+<span class="font-body-md text-body-md text-on-surface truncate w-40">23Q3财报_宁德时代.pdf</span>
+</div>
+<span class="px-1.5 py-0.5 bg-surface-bright text-primary text-[10px] font-label-sm rounded border border-primary-soft">处理中</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">PDF · 32页 · 10:42提交</span>
+<div class="w-24 bg-surface-elevated h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full rounded-full w-[45%]"></div>
+</div>
+</div>
+</div>
+<!-- Item 2: Needs Review -->
+<div class="flex flex-col gap-2 p-2 bg-surface-container-low border border-border rounded hover:bg-surface-container transition-colors">
+<div class="flex justify-between items-start">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-warning text-sm" data-icon="photo_library">photo_library</span>
+<span class="font-body-md text-body-md text-on-surface truncate w-40">调研现场白板.jpg</span>
+</div>
+<span class="px-1.5 py-0.5 bg-surface-bright text-warning text-[10px] font-label-sm rounded border border-warning/30">待复核</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">照片 · 1张 · 10:35提交</span>
+<button class="px-3 py-1 bg-primary text-on-primary-fixed rounded text-label-sm font-bold hover:bg-primary-fixed-dim transition-colors">进入复核</button>
+</div>
+</div>
+<!-- Item 3: Completed -->
+<div class="flex flex-col gap-2 p-2 bg-surface-container-low border border-border rounded hover:bg-surface-container transition-colors opacity-80">
+<div class="flex justify-between items-start">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-success text-sm" data-icon="description">description</span>
+<span class="font-body-md text-body-md text-on-surface truncate w-40">宏观经济数据周报.pdf</span>
+</div>
+<span class="px-1.5 py-0.5 bg-surface-bright text-success text-[10px] font-label-sm rounded border border-success/30">已完成</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">PDF · 5页 · 昨天 16:20</span>
+<div class="flex gap-1">
+<button class="px-2 py-1 bg-surface-container-lowest border border-border rounded text-label-sm text-on-surface-variant hover:text-on-surface">查看</button>
+
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-2 p-2 bg-surface-container-low border border-border rounded hover:bg-surface-container transition-colors"><div class="flex justify-between items-start"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-error text-sm" data-icon="error">error</span><span class="font-body-md text-body-md text-on-surface truncate w-40">行业深度报告_2023.pdf</span></div><span class="px-1.5 py-0.5 bg-error-container/30 text-error text-[10px] font-label-sm rounded border border-error/20">失败</span></div><div class="flex justify-between items-center"><span class="font-label-sm text-label-sm text-on-surface-variant">PDF · 12页 · 09:15提交</span><button class="px-3 py-1 bg-surface-bright border border-border rounded text-label-sm text-on-surface hover:bg-surface-variant">重试任务</button></div></div></div>
+</section>
+<!-- Review Workspace Card -->
+<!-- Safe padding for bottom nav -->
+<div class="h-4"></div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full md:w-[390px] z-50 bg-surface-container dark:bg-surface-container border-t border-border flex justify-around items-center h-16 px-2 pb-safe">
+<button class="flex flex-col items-center justify-center text-foreground-muted hover:bg-surface-bright scale-95 transition-transform duration-150 p-2 rounded-lg w-14">
+<span class="material-symbols-outlined mb-1" data-icon="dashboard">dashboard</span>
+<span class="font-label-sm text-label-sm">工作台</span>
+</button>
+<button class="flex flex-col items-center justify-center text-foreground-muted hover:bg-surface-bright scale-95 transition-transform duration-150 p-2 rounded-lg w-14">
+<span class="material-symbols-outlined mb-1" data-icon="trending_up">trending_up</span>
+<span class="font-label-sm text-label-sm">行情</span>
+</button>
+<button class="flex flex-col items-center justify-center text-foreground-muted hover:bg-surface-bright scale-95 transition-transform duration-150 p-2 rounded-lg w-14">
+<span class="material-symbols-outlined mb-1" data-icon="visibility">visibility</span>
+<span class="font-label-sm text-label-sm">观察</span>
+</button>
+<button class="flex flex-col items-center justify-center text-foreground-muted hover:bg-surface-bright scale-95 transition-transform duration-150 p-2 rounded-lg w-14">
+<span class="material-symbols-outlined mb-1" data-icon="menu_book">menu_book</span>
+<span class="font-label-sm text-label-sm">研究</span>
+</button>
+<button class="flex flex-col items-center justify-center text-secondary-fixed-dim font-bold hover:bg-surface-bright scale-95 transition-transform duration-150 p-2 rounded-lg w-14">
+<span class="material-symbols-outlined mb-1" data-icon="book" style="font-variation-settings: 'FILL' 1;">book</span>
+<span class="font-label-sm text-label-sm">知识</span>
+</button>
+<button class="flex flex-col items-center justify-center text-foreground-muted hover:bg-surface-bright scale-95 transition-transform duration-150 p-2 rounded-lg w-14">
+<span class="material-symbols-outlined mb-1" data-icon="person">person</span>
+<span class="font-label-sm text-label-sm">我的</span>
+</button>
+</nav>
+<div aria-hidden="true" data-snapdom-sandbox="true" id="snapdom-sandbox" style="position: absolute; left: -9999px; top: -9999px; width: 0px; height: 0px; overflow: hidden;"></div>
+
+</body></html>

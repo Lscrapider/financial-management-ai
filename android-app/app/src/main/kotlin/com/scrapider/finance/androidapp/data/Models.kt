@@ -497,7 +497,128 @@ data class KnowledgeMaterialTask(
         }
 }
 
+enum class KnowledgeSection(
+    val label: String,
+) {
+    Materials("材料"),
+    OcrImport("OCR导入"),
+    ManualImport("手动导入"),
+}
+
+data class OcrUploadFile(
+    val name: String,
+    val contentType: String,
+    val sizeBytes: Long,
+    val bytes: ByteArray,
+)
+
+data class OcrTask(
+    val taskNo: String = "",
+    val originalFilename: String = "",
+    val fileType: String = "",
+    val status: String = "",
+    val currentStage: String = "",
+    val progress: Int = 0,
+    val pageCount: Int = 0,
+    val segmentCount: Int = 0,
+    val submittedAt: String = "",
+    val updatedAt: String = "",
+    val errorMessage: String = "",
+) {
+    val needsReview: Boolean
+        get() = status == "manual_review_required"
+
+    val terminal: Boolean
+        get() = status == "finished" || status == "failed"
+}
+
+data class OcrReviewWarning(
+    val type: String,
+    val confidence: Double? = null,
+)
+
+data class OcrReviewParagraph(
+    val paragraphNo: Int,
+    val text: String,
+    val sourcePages: List<Int>,
+    val avgConfidence: Double,
+    val warnings: List<OcrReviewWarning> = emptyList(),
+)
+
+data class OcrReviewDraftContent(
+    val taskNo: String,
+    val paragraphCount: Int,
+    val paragraphs: List<OcrReviewParagraph>,
+)
+
+data class OcrReviewDetail(
+    val taskNo: String,
+    val status: String,
+    val overallConfidence: Double,
+    val paragraphCount: Int,
+    val warningCount: Int,
+    val draftContent: OcrReviewDraftContent,
+)
+
+data class OcrImportUiState(
+    val selectedFiles: List<OcrUploadFile> = emptyList(),
+    val tasks: List<OcrTask> = emptyList(),
+    val selectedTaskNo: String = "",
+    val selectedReview: OcrReviewDetail? = null,
+    val updatedAt: String = "--:--",
+) {
+    val selectedTask: OcrTask?
+        get() = tasks.firstOrNull { it.taskNo == selectedTaskNo } ?: tasks.firstOrNull()
+
+    val runningCount: Int
+        get() = tasks.count { it.status == "running" || it.status == "ready" }
+
+    val finishedCount: Int
+        get() = tasks.count { it.status == "finished" }
+
+    val reviewCount: Int
+        get() = tasks.count { it.needsReview }
+
+    val failedCount: Int
+        get() = tasks.count { it.status == "failed" }
+}
+
+data class ManualKnowledgeUiState(
+    val taskNo: String = "",
+    val title: String = "",
+    val chunks: List<String> = listOf(""),
+    val tasks: List<OcrTask> = emptyList(),
+    val selectedTaskNo: String = "",
+    val readonly: Boolean = false,
+    val updatedAt: String = "--:--",
+) {
+    val selectedTask: OcrTask?
+        get() = tasks.firstOrNull { it.taskNo == selectedTaskNo } ?: tasks.firstOrNull()
+
+    val validChunks: List<String>
+        get() = chunks.map { it.trim() }.filter { it.isNotBlank() }
+
+    val validChunkCount: Int
+        get() = validChunks.size
+
+    val canEdit: Boolean
+        get() = !readonly
+
+    val canSubmit: Boolean
+        get() = canEdit && validChunkCount > 0
+
+    val draftCount: Int
+        get() = tasks.count { it.needsReview }
+
+    val runningCount: Int
+        get() = tasks.count { it.status == "running" || it.status == "ready" }
+
+    val finishedCount: Int
+        get() = tasks.count { it.status == "finished" }
+}
+
 data class KnowledgeMaterialUiState(
+    val section: KnowledgeSection = KnowledgeSection.Materials,
     val form: KnowledgeMaterialFormState = KnowledgeMaterialFormState(),
     val targetOptions: List<ReportTargetOption> = emptyList(),
     val reportTypes: List<ReportTypeOption> = listOf(
@@ -509,6 +630,8 @@ data class KnowledgeMaterialUiState(
     val sceneFilter: String = "",
     val tagFilter: String = "",
     val sourceKeyword: String = "",
+    val ocr: OcrImportUiState = OcrImportUiState(),
+    val manual: ManualKnowledgeUiState = ManualKnowledgeUiState(),
     val updatedAt: String = "--:--",
 ) {
     val chunks: List<KnowledgeMaterialChunk>
@@ -912,6 +1035,224 @@ class FinanceRepository(
         }
     }
 
+    fun loadOcrTasks(callback: (ApiResult, List<OcrTask>) -> Unit) {
+        val payload = JSONObject()
+            .put("pageNum", 1)
+            .put("pageSize", 20)
+        apiClient.postJson(ApiConfig.OCR_TASKS_PAGE_PATH, payload) { result ->
+            if (!result.success || !result.isBusinessSuccessOrRaw()) {
+                callback(result.copy(success = false, message = apiMessage(result.body, result.message)), emptyList())
+                return@postJson
+            }
+            runCatching {
+                callback(result.copy(message = "OCR队列已同步。"), readOcrTasks(result.body))
+            }.onFailure {
+                callback(
+                    ApiResult(false, result.statusCode, result.body, "OCR队列解析失败：${it.message ?: it.javaClass.simpleName}"),
+                    emptyList(),
+                )
+            }
+        }
+    }
+
+    fun submitOcrFiles(
+        files: List<OcrUploadFile>,
+        callback: (ApiResult, List<OcrTask>) -> Unit,
+    ) {
+        if (files.isEmpty()) {
+            callback(ApiResult(false, 0, "", "请选择 PDF 或照片后再提交。"), emptyList())
+            return
+        }
+        apiClient.postMultipartFiles(ApiConfig.OCR_TASKS_PATH, files) { result ->
+            if (!result.success || !result.isBusinessSuccessOrRaw()) {
+                callback(result.copy(success = false, message = apiMessage(result.body, result.message)), emptyList())
+                return@postMultipartFiles
+            }
+            runCatching {
+                callback(result.copy(message = "OCR任务已提交。"), readOcrTaskArray(result.body))
+            }.onFailure {
+                callback(
+                    ApiResult(false, result.statusCode, result.body, "OCR提交结果解析失败：${it.message ?: it.javaClass.simpleName}"),
+                    emptyList(),
+                )
+            }
+        }
+    }
+
+    fun loadOcrReview(taskNo: String, callback: (ApiResult, OcrReviewDetail?) -> Unit) {
+        if (taskNo.isBlank()) {
+            callback(ApiResult(false, 0, "", "任务编号为空，无法进入复核。"), null)
+            return
+        }
+        apiClient.get("${ApiConfig.OCR_REVIEWS_PATH}/${taskNo.encodePath()}") { result ->
+            if (!result.success || !result.isBusinessSuccessOrRaw()) {
+                callback(result.copy(success = false, message = apiMessage(result.body, result.message)), null)
+                return@get
+            }
+            runCatching {
+                callback(result.copy(message = "OCR复核内容已加载。"), readOcrReview(result.body))
+            }.onFailure {
+                callback(
+                    ApiResult(false, result.statusCode, result.body, "OCR复核内容解析失败：${it.message ?: it.javaClass.simpleName}"),
+                    null,
+                )
+            }
+        }
+    }
+
+    fun saveOcrReviewDraft(taskNo: String, draft: OcrReviewDraftContent, callback: (ApiResult) -> Unit) {
+        val payload = JSONObject().put("draftContent", draft.toJson())
+        apiClient.putJson("${ApiConfig.OCR_REVIEWS_PATH}/${taskNo.encodePath()}/draft", payload) { result ->
+            callback(
+                if (result.success && result.isBusinessSuccessOrRaw()) {
+                    result.copy(message = "OCR复核草稿已保存。")
+                } else {
+                    result.copy(success = false, message = apiMessage(result.body, result.message))
+                },
+            )
+        }
+    }
+
+    fun submitOcrReview(taskNo: String, draft: OcrReviewDraftContent, callback: (ApiResult) -> Unit) {
+        val payload = JSONObject().put("draftContent", draft.toJson())
+        apiClient.postJson("${ApiConfig.OCR_REVIEWS_PATH}/${taskNo.encodePath()}/submit", payload) { result ->
+            callback(
+                if (result.success && result.isBusinessSuccessOrRaw()) {
+                    result.copy(message = "OCR复核结果已提交。")
+                } else {
+                    result.copy(success = false, message = apiMessage(result.body, result.message))
+                },
+            )
+        }
+    }
+
+    fun loadManualKnowledgeTasks(callback: (ApiResult, List<OcrTask>) -> Unit) {
+        val payload = JSONObject()
+            .put("pageNum", 1)
+            .put("pageSize", 20)
+        apiClient.postJson(ApiConfig.MANUAL_KNOWLEDGE_TASKS_PAGE_PATH, payload) { result ->
+            if (!result.success || !result.isBusinessSuccessOrRaw()) {
+                callback(result.copy(success = false, message = apiMessage(result.body, result.message)), emptyList())
+                return@postJson
+            }
+            runCatching {
+                callback(result.copy(message = "手动导入队列已同步。"), readOcrTasks(result.body))
+            }.onFailure {
+                callback(
+                    ApiResult(false, result.statusCode, result.body, "手动导入队列解析失败：${it.message ?: it.javaClass.simpleName}"),
+                    emptyList(),
+                )
+            }
+        }
+    }
+
+    fun loadManualKnowledgeDetail(taskNo: String, callback: (ApiResult, OcrReviewDetail?) -> Unit) {
+        if (taskNo.isBlank()) {
+            callback(ApiResult(false, 0, "", "任务编号为空，无法查看手动导入内容。"), null)
+            return
+        }
+        apiClient.get("${ApiConfig.MANUAL_KNOWLEDGE_TASKS_PATH}/${taskNo.encodePath()}") { result ->
+            if (!result.success || !result.isBusinessSuccessOrRaw()) {
+                callback(result.copy(success = false, message = apiMessage(result.body, result.message)), null)
+                return@get
+            }
+            runCatching {
+                callback(result.copy(message = "手动导入内容已加载。"), readOcrReview(result.body))
+            }.onFailure {
+                callback(
+                    ApiResult(false, result.statusCode, result.body, "手动导入内容解析失败：${it.message ?: it.javaClass.simpleName}"),
+                    null,
+                )
+            }
+        }
+    }
+
+    fun saveManualKnowledgeDraft(
+        taskNo: String,
+        title: String,
+        chunks: List<String>,
+        callback: (ApiResult, OcrTask?) -> Unit,
+    ) {
+        val payload = manualKnowledgePayload(title, chunks)
+        if (payload == null) {
+            callback(ApiResult(false, 0, "", "至少需要一个非空文本分段。"), null)
+            return
+        }
+        if (taskNo.isBlank()) {
+            apiClient.postJson(ApiConfig.MANUAL_KNOWLEDGE_TASKS_PATH, payload) { result ->
+                if (!result.success || !result.isBusinessSuccessOrRaw()) {
+                    callback(result.copy(success = false, message = apiMessage(result.body, result.message)), null)
+                    return@postJson
+                }
+                runCatching {
+                    callback(result.copy(message = "手动导入草稿已保存。"), readOcrTask(result.body))
+                }.onFailure {
+                    callback(
+                        ApiResult(false, result.statusCode, result.body, "手动导入草稿解析失败：${it.message ?: it.javaClass.simpleName}"),
+                        null,
+                    )
+                }
+            }
+            return
+        }
+        apiClient.putJson("${ApiConfig.MANUAL_KNOWLEDGE_TASKS_PATH}/${taskNo.encodePath()}/draft", payload) { result ->
+            callback(
+                if (result.success && result.isBusinessSuccessOrRaw()) {
+                    result.copy(message = "手动导入草稿已保存。")
+                } else {
+                    result.copy(success = false, message = apiMessage(result.body, result.message))
+                },
+                null,
+            )
+        }
+    }
+
+    fun submitManualKnowledgeDraft(
+        taskNo: String,
+        title: String,
+        chunks: List<String>,
+        callback: (ApiResult) -> Unit,
+    ) {
+        val payload = manualKnowledgePayload(title, chunks)
+        if (payload == null) {
+            callback(ApiResult(false, 0, "", "至少需要一个非空文本分段。"))
+            return
+        }
+        if (taskNo.isBlank()) {
+            apiClient.postJson(ApiConfig.MANUAL_KNOWLEDGE_TASKS_PATH, payload) { result ->
+                if (!result.success || !result.isBusinessSuccessOrRaw()) {
+                    callback(result.copy(success = false, message = apiMessage(result.body, result.message)))
+                    return@postJson
+                }
+                runCatching {
+                    val createdTaskNo = readOcrTask(result.body).taskNo
+                    submitManualKnowledgeTask(createdTaskNo, payload, callback)
+                }.onFailure {
+                    callback(ApiResult(false, result.statusCode, result.body, "手动导入草稿解析失败：${it.message ?: it.javaClass.simpleName}"))
+                }
+            }
+            return
+        }
+        submitManualKnowledgeTask(taskNo, payload, callback)
+    }
+
+    fun deleteManualKnowledgeTask(taskNo: String, callback: (ApiResult) -> Unit) {
+        if (taskNo.isBlank()) {
+            callback(ApiResult(false, 0, "", "任务编号为空，无法删除手动导入任务。"))
+            return
+        }
+        val payload = JSONObject().put("taskNo", taskNo.trim())
+        apiClient.postJson("${ApiConfig.MANUAL_KNOWLEDGE_TASKS_PATH}/delete", payload) { result ->
+            callback(
+                if (result.success && result.isBusinessSuccessOrRaw()) {
+                    result.copy(message = "手动导入任务已删除。")
+                } else {
+                    result.copy(success = false, message = apiMessage(result.body, result.message))
+                },
+            )
+        }
+    }
+
     private fun submitKnowledgeMaterial(
         payload: JSONObject,
         callback: (ApiResult, KnowledgeMaterialTask?) -> Unit,
@@ -929,6 +1270,22 @@ class FinanceRepository(
                     null,
                 )
             }
+        }
+    }
+
+    private fun submitManualKnowledgeTask(taskNo: String, payload: JSONObject, callback: (ApiResult) -> Unit) {
+        if (taskNo.isBlank()) {
+            callback(ApiResult(false, 0, "", "手动导入任务创建后未返回任务编号。"))
+            return
+        }
+        apiClient.postJson("${ApiConfig.MANUAL_KNOWLEDGE_TASKS_PATH}/${taskNo.encodePath()}/submit", payload) { result ->
+            callback(
+                if (result.success && result.isBusinessSuccessOrRaw()) {
+                    result.copy(message = "手动知识已提交，开始打标入库。")
+                } else {
+                    result.copy(success = false, message = apiMessage(result.body, result.message))
+                },
+            )
         }
     }
 
@@ -1244,6 +1601,73 @@ class FinanceRepository(
             submittedAt = task.cleanString("submittedAt"),
             finishedAt = task.cleanString("finishedAt"),
             chunks = readKnowledgeMaterialChunks(task),
+        )
+    }
+
+    private fun readOcrTasks(body: String): List<OcrTask> {
+        val root = JSONObject(body.ifBlank { "{}" })
+        val page = root.optJSONObject("data") ?: root
+        val records = page.optJSONArray("records")
+            ?: root.optJSONArray("records")
+            ?: root.optJSONArray("data")
+            ?: JSONArray()
+        return List(records.length()) { index -> records.optJSONObject(index) }
+            .filterNotNull()
+            .map { it.toOcrTask() }
+    }
+
+    private fun readOcrTaskArray(body: String): List<OcrTask> {
+        val array = dataArray(body)
+        return List(array.length()) { index -> array.optJSONObject(index) }
+            .filterNotNull()
+            .map { it.toOcrTask() }
+    }
+
+    private fun readOcrTask(body: String): OcrTask =
+        dataObject(body).toOcrTask()
+
+    private fun readOcrReview(body: String): OcrReviewDetail {
+        val detail = dataObject(body)
+        val draft = detail.optJSONObject("draftContent") ?: JSONObject()
+        val draftContent = readOcrReviewDraft(
+            draft = draft,
+            fallbackTaskNo = detail.cleanString("taskNo"),
+        )
+        return OcrReviewDetail(
+            taskNo = detail.cleanString("taskNo").ifBlank { draftContent.taskNo },
+            status = detail.cleanString("status"),
+            overallConfidence = detail.optDouble("overallConfidence", 0.0),
+            paragraphCount = detail.optionalInt("paragraphCount") ?: draftContent.paragraphCount,
+            warningCount = detail.optionalInt("warningCount") ?: draftContent.paragraphs.sumOf { it.warnings.size },
+            draftContent = draftContent,
+        )
+    }
+
+    private fun readOcrReviewDraft(draft: JSONObject, fallbackTaskNo: String): OcrReviewDraftContent {
+        val paragraphs = draft.optJSONArray("paragraphs") ?: JSONArray()
+        val parsedParagraphs = List(paragraphs.length()) { index -> paragraphs.optJSONObject(index) }
+            .filterNotNull()
+            .map { paragraph ->
+                val warnings = paragraph.optJSONArray("warnings") ?: JSONArray()
+                OcrReviewParagraph(
+                    paragraphNo = paragraph.optInt("paragraphNo", 0),
+                    text = paragraph.cleanString("text"),
+                    sourcePages = paragraph.optJSONArray("sourcePages").toIntList(),
+                    avgConfidence = paragraph.optDouble("avgConfidence", 0.0),
+                    warnings = List(warnings.length()) { index -> warnings.optJSONObject(index) }
+                        .filterNotNull()
+                        .map { warning ->
+                            OcrReviewWarning(
+                                type = warning.cleanString("type"),
+                                confidence = warning.optionalDouble("confidence"),
+                            )
+                        },
+                )
+            }
+        return OcrReviewDraftContent(
+            taskNo = draft.cleanString("taskNo").ifBlank { fallbackTaskNo },
+            paragraphCount = draft.optionalInt("paragraphCount") ?: parsedParagraphs.size,
+            paragraphs = parsedParagraphs,
         )
     }
 
@@ -1566,6 +1990,70 @@ private fun JSONObject.toKnowledgeMaterialChunk(sceneFallback: String = "knowled
         crossSceneScore = optionalDouble("crossSceneScore"),
         finalScore = optionalDouble("finalScore"),
     )
+
+private fun JSONObject.toOcrTask(): OcrTask =
+    OcrTask(
+        taskNo = cleanString("taskNo"),
+        originalFilename = cleanString("originalFilename").ifBlank { "未命名材料" },
+        fileType = cleanString("fileType"),
+        status = cleanString("status"),
+        currentStage = cleanString("currentStage"),
+        progress = optInt("progress", 0),
+        pageCount = optInt("pageCount", 0),
+        segmentCount = optInt("segmentCount", 0),
+        submittedAt = cleanString("submittedAt"),
+        updatedAt = cleanString("updatedAt"),
+        errorMessage = cleanString("errorMessage"),
+    )
+
+private fun JSONArray?.toIntList(): List<Int> {
+    if (this == null) return emptyList()
+    return List(length()) { index -> optInt(index, 0) }.filter { it > 0 }
+}
+
+private fun OcrReviewDraftContent.toJson(): JSONObject =
+    JSONObject()
+        .put("taskNo", taskNo)
+        .put("paragraphCount", paragraphs.size)
+        .put(
+            "paragraphs",
+            JSONArray().also { array ->
+                paragraphs.forEachIndexed { index, paragraph ->
+                    array.put(
+                        JSONObject()
+                            .put("paragraphNo", index + 1)
+                            .put("text", paragraph.text)
+                            .put("sourcePages", JSONArray(paragraph.sourcePages))
+                            .put("avgConfidence", paragraph.avgConfidence)
+                            .put(
+                                "warnings",
+                                JSONArray().also { warnings ->
+                                    paragraph.warnings.forEach { warning ->
+                                        warnings.put(
+                                            JSONObject()
+                                                .put("type", warning.type)
+                                                .apply {
+                                                    warning.confidence?.let { put("confidence", it) }
+                                                },
+                                        )
+                                    }
+                                },
+                            ),
+                    )
+                }
+            },
+        )
+
+private fun manualKnowledgePayload(title: String, chunks: List<String>): JSONObject? {
+    val normalizedChunks = chunks.map { it.trim() }.filter { it.isNotBlank() }
+    if (normalizedChunks.isEmpty()) return null
+    val payload = JSONObject().put("chunks", JSONArray(normalizedChunks))
+    val normalizedTitle = title.trim()
+    if (normalizedTitle.isNotBlank()) {
+        payload.put("title", normalizedTitle)
+    }
+    return payload
+}
 
 private fun JSONObject.optionalDouble(key: String): Double? =
     if (isNull(key) || !has(key)) null else optDouble(key, 0.0)

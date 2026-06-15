@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>OCR 人工复核详情页</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "error": "#ffb4ab",
+                        "background": "#14161a",
+                        "primary-container": "#006be6",
+                        "on-primary-container": "#f4f5ff",
+                        "surface-tint": "#aec6ff",
+                        "on-secondary": "#00391d",
+                        "inverse-primary": "#005ac3",
+                        "inverse-on-surface": "#2d3038",
+                        "on-secondary-fixed-variant": "#00522c",
+                        "outline-variant": "#424754",
+                        "tertiary": "#ffb596",
+                        "secondary": "#64dd93",
+                        "on-surface": "#e1e2ec",
+                        "surface-elevated": "#24272d",
+                        "surface-bright": "#363941",
+                        "outline": "#8c90a0",
+                        "on-primary-fixed-variant": "#004396",
+                        "warning": "#efbd48",
+                        "surface-container-lowest": "#0b0e15",
+                        "destructive": "#dc4446",
+                        "on-error-container": "#ffdad6",
+                        "on-surface-variant": "#c2c6d6",
+                        "surface-container-highest": "#32353d",
+                        "surface-container-high": "#272a32",
+                        "primary-fixed-dim": "#aec6ff",
+                        "on-primary": "#002e6a",
+                        "on-background": "#e1e2ec",
+                        "primary": "#aec6ff",
+                        "on-secondary-container": "#003118",
+                        "secondary-container": "#1fa561",
+                        "surface-dim": "#10131a",
+                        "success": "#57d188",
+                        "surface-variant": "#32353d",
+                        "border": "#36363a",
+                        "primary-fixed": "#d8e2ff",
+                        "surface-container": "#1d1f27",
+                        "surface-muted": "#2e3033",
+                        "surface": "#1c1e23",
+                        "tertiary-fixed-dim": "#ffb596",
+                        "on-error": "#690005",
+                        "chart-grid": "#2a2d33",
+                        "primary-soft": "#123a63",
+                        "inverse-surface": "#e1e2ec",
+                        "on-tertiary-container": "#fff3ef",
+                        "on-tertiary-fixed-variant": "#7d2d00",
+                        "on-tertiary": "#581e00",
+                        "tertiary-container": "#c14a00",
+                        "tertiary-fixed": "#ffdbcd",
+                        "error-container": "#93000a",
+                        "foreground-muted": "#aeb4bd",
+                        "secondary-fixed": "#81faad",
+                        "on-primary-fixed": "#001a42",
+                        "foreground": "#f2f2f2",
+                        "on-secondary-fixed": "#00210e",
+                        "secondary-fixed-dim": "#64dd93",
+                        "on-tertiary-fixed": "#360f00",
+                        "surface-container-low": "#191b23"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "md": "16px",
+                        "gutter": "8px",
+                        "page-padding": "16px",
+                        "xs": "4px",
+                        "xl": "32px",
+                        "sm": "8px",
+                        "lg": "24px"
+                    },
+                    "fontFamily": {
+                        "title": ["\"Inter, PingFang SC, system-ui, sans-serif\""],
+                        "body-md": ["Inter"],
+                        "label": ["\"Inter, PingFang SC, system-ui, sans-serif\""],
+                        "display-title": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "data-tabular": ["Inter"],
+                        "headline": ["\"Inter, PingFang SC, system-ui, sans-serif\""],
+                        "body": ["\"Inter, PingFang SC, system-ui, sans-serif\""]
+                    },
+                    "fontSize": {
+                        "title": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "display-title": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "data-tabular": ["14px", { "lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "headline": ["18px", { "lineHeight": "24px", "fontWeight": "700" }],
+                        "body": ["14px", { "lineHeight": "20px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', 'PingFang SC', system-ui, sans-serif; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body w-[390px] mx-auto min-h-screen relative pb-20">
+<!-- AppBar -->
+<header class="bg-background w-full top-0 sticky border-b border-outline-variant z-50">
+<div class="flex flex-col px-page-padding py-sm w-full">
+<div class="flex items-center">
+<button class="p-2 -ml-2 text-primary hover:bg-surface-bright transition-colors rounded-full mr-2 active:opacity-80 transition-opacity flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<div class="flex flex-col">
+<h1 class="font-headline text-headline font-bold text-primary">OCR 人工复核</h1>
+<span class="font-label text-label text-on-surface-variant">宁德时代调研纪要.pdf</span>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content -->
+<main class="px-page-padding py-md flex flex-col gap-sm">
+<!-- Task Summary Card -->
+<section class="bg-surface border border-border rounded-lg p-md shadow-sm">
+<div class="grid grid-cols-2 gap-y-sm gap-x-md font-body-md text-body-md">
+<div class="flex flex-col gap-xs">
+<span class="font-label text-label text-on-surface-variant">任务编号</span>
+<span class="font-data-tabular text-data-tabular text-on-surface">ocr-20240615-0038</span>
+</div>
+<div class="flex flex-col gap-xs">
+<span class="font-label text-label text-on-surface-variant">综合置信度</span>
+<span class="font-data-tabular text-data-tabular text-warning">82%</span>
+</div>
+<div class="flex flex-col gap-xs">
+<span class="font-label text-label text-on-surface-variant">段落/异常数</span>
+<span class="font-data-tabular text-data-tabular text-on-surface">12 / <span class="text-error">3</span></span>
+</div>
+<div class="flex flex-col gap-xs">
+<span class="font-label text-label text-on-surface-variant">当前状态</span>
+<span class="font-data-tabular text-data-tabular text-secondary">草稿已保存</span>
+</div>
+</div>
+<div class="mt-sm pt-sm border-t border-border flex justify-between items-center">
+<span class="font-label text-label text-on-surface-variant">低置信段落</span>
+<span class="bg-error-container text-on-error-container font-label-sm text-label-sm px-2 py-0.5 rounded">2 处需复核</span>
+</div>
+</section>
+<!-- Status/Action Bar -->
+<div class="flex items-center justify-between py-sm bg-surface-container rounded-lg px-md mt-xs border border-border">
+<span class="font-label text-label text-on-surface-variant">已选 #03 · 第 5 页 · 142 字</span>
+<div class="flex gap-xs">
+<button class="bg-surface-muted text-on-surface font-label text-label px-3 py-1.5 rounded hover:bg-surface-elevated transition-colors border border-border">保存草稿</button>
+<button class="bg-primary-container text-on-primary-container font-label text-label px-3 py-1.5 rounded hover:opacity-90 transition-opacity">确认提交</button>
+</div>
+</div>
+<!-- Paragraph List -->
+<div class="flex flex-col gap-gutter mt-xs pb-xl">
+<!-- Card 1: Completed/High Confidence -->
+<article class="bg-surface border border-border rounded-lg flex flex-col overflow-hidden">
+<div class="bg-surface-elevated px-md py-sm flex justify-between items-center border-b border-border">
+<div class="flex items-center gap-sm">
+<span class="font-label text-label text-on-surface font-bold">#01</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant bg-surface-muted px-1.5 py-0.5 rounded">第 5 页</span>
+<span class="font-label-sm text-label-sm text-success flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">check_circle</span> 95%
+                        </span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">89 字</span>
+</div>
+<div class="p-md">
+<textarea class="w-full bg-background border border-outline-variant rounded p-sm font-body-md text-body-md text-on-surface focus:outline-none focus:border-primary resize-none h-20" spellcheck="false">关于上游原材料价格波动对公司利润率的影响，目前碳酸锂价格基本企稳在合理区间。</textarea>
+</div>
+<div class="px-md py-sm border-t border-border bg-surface flex gap-xs justify-end">
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1 flex items-center justify-center rounded hover:bg-surface-muted" title="上移">
+<span class="material-symbols-outlined text-[18px]">arrow_upward</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1 flex items-center justify-center rounded hover:bg-surface-muted" title="下移">
+<span class="material-symbols-outlined text-[18px]">arrow_downward</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1 flex items-center justify-center rounded hover:bg-surface-muted" title="合并">
+<span class="material-symbols-outlined text-[18px]">merge_type</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1 flex items-center justify-center rounded hover:bg-surface-muted" title="复制本段">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+<button class="text-error hover:bg-error-container transition-colors p-1 flex items-center justify-center rounded ml-2" title="删除">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</article>
+<!-- Card 2: Warning/Low Confidence -->
+<article class="bg-surface border border-warning rounded-lg flex flex-col overflow-hidden shadow-[0_0_0_1px_rgba(239,189,72,0.3)]">
+<div class="bg-surface-elevated px-md py-sm flex justify-between items-center border-b border-border">
+<div class="flex items-center gap-sm">
+<span class="font-label text-label text-on-surface font-bold">#02</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant bg-surface-muted px-1.5 py-0.5 rounded">第 5 页</span>
+<span class="font-label-sm text-label-sm text-warning flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">warning</span> 68%
+                        </span>
+<span class="bg-error-container text-on-error-container font-label-sm text-label-sm px-1.5 py-0.5 rounded ml-1">低置信度</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">112 字</span>
+</div>
+<div class="p-md relative">
+<textarea class="w-full bg-background border border-warning rounded p-sm font-body-md text-body-md text-on-surface focus:outline-none focus:ring-1 focus:ring-warning resize-none h-24" spellcheck="false">预计第四季度毛利率环比持平略有改善，神行电池和麒麟电池的良率提升进度快于预期。海外市场方面，欧洲建厂计划正在稳步推进中，匈牙利工厂一期预计明年年底投产。</textarea>
+</div>
+<div class="px-md py-sm border-t border-border bg-surface flex gap-xs justify-end">
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1 flex items-center justify-center rounded hover:bg-surface-muted" title="上移">
+<span class="material-symbols-outlined text-[18px]">arrow_upward</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1 flex items-center justify-center rounded hover:bg-surface-muted" title="下移">
+<span class="material-symbols-outlined text-[18px]">arrow_downward</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1 flex items-center justify-center rounded hover:bg-surface-muted" title="合并">
+<span class="material-symbols-outlined text-[18px]">merge_type</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1 flex items-center justify-center rounded hover:bg-surface-muted" title="复制本段">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+<button class="text-error hover:bg-error-container transition-colors p-1 flex items-center justify-center rounded ml-2" title="删除">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</article>
+<!-- Card 3: Active State -->
+<article class="bg-surface border-2 border-primary rounded-lg flex flex-col overflow-hidden relative">
+<div class="absolute top-0 left-0 w-1 h-full bg-primary"></div>
+<div class="bg-primary-soft px-md py-sm flex justify-between items-center border-b border-primary/30">
+<div class="flex items-center gap-sm ml-2">
+<span class="font-label text-label text-primary font-bold">#03</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant bg-background px-1.5 py-0.5 rounded border border-outline-variant">第 5 页</span>
+<span class="font-label-sm text-label-sm text-primary flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">edit_note</span> 编辑中
+                        </span>
+</div>
+<span class="font-label-sm text-label-sm text-primary">142 字</span>
+</div>
+<div class="p-md ml-2">
+<textarea class="w-full bg-background border border-primary rounded p-sm font-body-md text-body-md text-on-surface focus:outline-none focus:ring-1 focus:ring-primary resize-none h-32" spellcheck="false">我们观察到商用车电动化趋势加速，重卡换电模式在特定场景下的经济性已经显现。公司针对该市场推出了定制化的重卡电池包，目前已与多家头部整车厂达成战略合作，预计明年商用车板块的营收贡献将显著增加，成为新的增长引擎之一。</textarea>
+</div>
+<div class="px-md py-sm border-t border-primary/30 bg-primary-soft/50 flex gap-xs justify-end ml-2">
+<button class="text-primary hover:bg-primary-container/20 transition-colors p-1 flex items-center justify-center rounded" title="上移">
+<span class="material-symbols-outlined text-[18px]">arrow_upward</span>
+</button>
+<button class="text-primary hover:bg-primary-container/20 transition-colors p-1 flex items-center justify-center rounded" title="下移">
+<span class="material-symbols-outlined text-[18px]">arrow_downward</span>
+</button>
+<button class="text-primary hover:bg-primary-container/20 transition-colors p-1 flex items-center justify-center rounded" title="合并">
+<span class="material-symbols-outlined text-[18px]">merge_type</span>
+</button>
+<button class="text-primary hover:bg-primary-container/20 transition-colors p-1 flex items-center justify-center rounded" title="复制本段">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+<button class="text-error hover:bg-error-container transition-colors p-1 flex items-center justify-center rounded ml-2" title="删除">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</article>
+<!-- Card 4: Normal State -->
+<article class="bg-surface border border-border rounded-lg flex flex-col overflow-hidden opacity-80">
+<div class="bg-surface-elevated px-md py-sm flex justify-between items-center border-b border-border">
+<div class="flex items-center gap-sm">
+<span class="font-label text-label text-on-surface font-bold">#04</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant bg-surface-muted px-1.5 py-0.5 rounded">第 6 页</span>
+<span class="font-label-sm text-label-sm text-success flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">check_circle</span> 92%
+                        </span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">76 字</span>
+</div>
+<div class="p-md">
+<textarea class="w-full bg-background border border-outline-variant rounded p-sm font-body-md text-body-md text-on-surface focus:outline-none focus:border-primary resize-none h-20" spellcheck="false">储能业务方面，海外大储订单饱满，户储去库周期接近尾声。公司新一代液冷储能系统具备更高的能量密度和更好的温控表现。</textarea>
+</div>
+<div class="px-md py-sm border-t border-border bg-surface flex gap-xs justify-end">
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1 flex items-center justify-center rounded hover:bg-surface-muted" title="上移">
+<span class="material-symbols-outlined text-[18px]">arrow_upward</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1 flex items-center justify-center rounded hover:bg-surface-muted" title="下移">
+<span class="material-symbols-outlined text-[18px]">arrow_downward</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1 flex items-center justify-center rounded hover:bg-surface-muted" title="合并">
+<span class="material-symbols-outlined text-[18px]">merge_type</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1 flex items-center justify-center rounded hover:bg-surface-muted" title="复制本段">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+<button class="text-error hover:bg-error-container transition-colors p-1 flex items-center justify-center rounded ml-2" title="删除">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</article>
+</div>
+</main>
+<!-- Fixed Bottom Bar -->
+<div class="fixed bottom-0 w-full z-50 bg-surface-container border-t border-outline-variant px-md h-16 flex items-center justify-between shadow-[0_-4px_12px_rgba(0,0,0,0.5)]">
+<button class="flex items-center gap-1 text-on-surface-variant hover:text-on-surface transition-colors font-label text-label">
+<span class="material-symbols-outlined text-[20px]">list</span>
+            返回队列
+        </button>
+<div class="flex items-center gap-sm">
+<button class="bg-surface-muted text-on-surface font-label text-label px-4 py-2 rounded-lg hover:bg-surface-elevated transition-colors border border-border">
+                保存草稿
+            </button>
+<button class="bg-primary-container text-on-primary-container font-label text-label px-4 py-2 rounded-lg hover:opacity-90 transition-opacity font-bold shadow-sm">
+                确认提交
+            </button>
+</div>
+</div>
+</body></html>

@@ -1,9 +1,13 @@
 package com.scrapider.finance.androidapp
 
+import android.graphics.Bitmap
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.OpenableColumns
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
@@ -15,8 +19,10 @@ import com.scrapider.finance.androidapp.data.FinanceRepository
 import com.scrapider.finance.androidapp.data.KnowledgeMaterialFormState
 import com.scrapider.finance.androidapp.data.KnowledgeMaterialTask
 import com.scrapider.finance.androidapp.data.KnowledgeMaterialUiState
+import com.scrapider.finance.androidapp.data.KnowledgeSection
 import com.scrapider.finance.androidapp.data.MarketAssetType
 import com.scrapider.finance.androidapp.data.MarketFilter
+import com.scrapider.finance.androidapp.data.OcrUploadFile
 import com.scrapider.finance.androidapp.data.MarketUiState
 import com.scrapider.finance.androidapp.data.ObservationRiskUiState
 import com.scrapider.finance.androidapp.data.CreateReportFormState
@@ -36,6 +42,9 @@ import com.scrapider.finance.androidapp.ui.MarketScreen
 import com.scrapider.finance.androidapp.ui.ObservationRiskScreen
 import com.scrapider.finance.androidapp.ui.ReportResearchScreen
 import com.scrapider.finance.androidapp.ui.WorkbenchScreen
+import java.io.ByteArrayOutputStream
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 private enum class AppScreen {
     Login,
@@ -76,6 +85,15 @@ class MainActivity : ComponentActivity() {
         const val ROLE_SEPARATOR = "\u001F"
     }
 
+    private val pdfPicker = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+        importOcrUris(uris, "PDF")
+    }
+    private val galleryPicker = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+        importOcrUris(uris, "图库")
+    }
+    private val cameraPicker = registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
+        importOcrCameraBitmap(bitmap)
+    }
     private val apiClient = ApiClient()
     private val repository = FinanceRepository(apiClient)
     private val materialPollHandler = Handler(Looper.getMainLooper())
@@ -184,7 +202,8 @@ class MainActivity : ComponentActivity() {
                         loading = state.loading,
                         statusMessage = state.statusMessage,
                         knowledge = state.knowledge,
-                        onRefresh = ::refreshKnowledgeMaterialTask,
+                        onRefresh = ::refreshKnowledge,
+                        onSectionChange = ::selectKnowledgeSection,
                         onTargetTypeChange = ::selectKnowledgeTargetType,
                         onTargetKeywordChange = ::changeKnowledgeTargetKeyword,
                         onTargetSelected = ::selectKnowledgeTarget,
@@ -196,6 +215,32 @@ class MainActivity : ComponentActivity() {
                         onTagFilterChange = ::selectKnowledgeTagFilter,
                         onSourceKeywordChange = ::changeKnowledgeSourceKeyword,
                         onResetFilters = ::resetKnowledgeFilters,
+                        onPickOcrPdf = { pdfPicker.launch("application/pdf") },
+                        onTakeOcrPhoto = { cameraPicker.launch(null) },
+                        onPickOcrGallery = { galleryPicker.launch("image/*") },
+                        onRemoveOcrFile = ::removeOcrUploadFile,
+                        onClearOcrFiles = ::clearOcrUploadFiles,
+                        onSubmitOcrFiles = ::submitOcrFiles,
+                        onSelectOcrTask = ::selectOcrTask,
+                        onOpenOcrReview = ::openOcrReview,
+                        onDismissOcrReview = ::dismissOcrReview,
+                        onOcrReviewParagraphChange = ::updateOcrReviewParagraph,
+                        onMoveOcrReviewParagraph = ::moveOcrReviewParagraph,
+                        onMergeOcrReviewParagraph = ::mergeOcrReviewParagraph,
+                        onCopyOcrReviewParagraph = ::copyOcrReviewParagraph,
+                        onDeleteOcrReviewParagraph = ::deleteOcrReviewParagraph,
+                        onSaveOcrReviewDraft = ::saveOcrReviewDraft,
+                        onSubmitOcrReview = ::submitOcrReview,
+                        onManualTitleChange = ::changeManualKnowledgeTitle,
+                        onManualChunkChange = ::changeManualKnowledgeChunk,
+                        onAddManualChunk = ::addManualKnowledgeChunk,
+                        onRemoveManualChunk = ::removeManualKnowledgeChunk,
+                        onNewManualDraft = ::newManualKnowledgeDraft,
+                        onSaveManualDraft = ::saveManualKnowledgeDraft,
+                        onSubmitManualDraft = ::submitManualKnowledgeDraft,
+                        onSelectManualTask = ::selectManualKnowledgeTask,
+                        onOpenManualTask = ::openManualKnowledgeTask,
+                        onDeleteManualTask = ::deleteManualKnowledgeTask,
                         onWorkbenchSelected = ::showWorkbench,
                         onMarketSelected = ::showMarket,
                         onObservationSelected = ::showObservation,
@@ -350,6 +395,38 @@ class MainActivity : ComponentActivity() {
         if (state.knowledge.activeTask?.terminal == false) {
             refreshKnowledgeMaterialTask()
             ensureMaterialPolling()
+        }
+        if (state.knowledge.section == KnowledgeSection.OcrImport && state.knowledge.ocr.tasks.isEmpty()) {
+            loadOcrTasks()
+        }
+        if (state.knowledge.section == KnowledgeSection.ManualImport && state.knowledge.manual.tasks.isEmpty()) {
+            loadManualKnowledgeTasks()
+        }
+    }
+
+    private fun refreshKnowledge() {
+        when (state.knowledge.section) {
+            KnowledgeSection.Materials -> refreshKnowledgeMaterialTask()
+            KnowledgeSection.OcrImport -> loadOcrTasks()
+            KnowledgeSection.ManualImport -> loadManualKnowledgeTasks()
+        }
+    }
+
+    private fun selectKnowledgeSection(section: KnowledgeSection) {
+        state = state.copy(
+            screen = AppScreen.Knowledge,
+            knowledge = state.knowledge.copy(section = section),
+            statusMessage = when (section) {
+                KnowledgeSection.Materials -> "已切换到知识库材料。"
+                KnowledgeSection.OcrImport -> "已切换到知识库OCR导入。"
+                KnowledgeSection.ManualImport -> "已切换到知识库手动导入。"
+            },
+        )
+        if (section == KnowledgeSection.OcrImport && state.knowledge.ocr.tasks.isEmpty()) {
+            loadOcrTasks()
+        }
+        if (section == KnowledgeSection.ManualImport && state.knowledge.manual.tasks.isEmpty()) {
+            loadManualKnowledgeTasks()
         }
     }
 
@@ -863,6 +940,511 @@ class MainActivity : ComponentActivity() {
 
     private fun resetKnowledgeFilters() {
         state = state.copy(knowledge = state.knowledge.copy(sceneFilter = "", tagFilter = "", sourceKeyword = ""))
+    }
+
+    private fun importOcrUris(uris: List<Uri>, sourceLabel: String) {
+        if (uris.isEmpty()) return
+        val files = uris.mapNotNull { uri -> readOcrUploadFile(uri) }
+        if (files.isEmpty()) {
+            state = state.copy(statusMessage = "${sourceLabel}文件读取失败，请重新选择。")
+            Toast.makeText(this, "${sourceLabel}文件读取失败", Toast.LENGTH_SHORT).show()
+            return
+        }
+        appendOcrUploadFiles(files, "已选择 ${files.size} 个${sourceLabel}文件。")
+    }
+
+    private fun importOcrCameraBitmap(bitmap: Bitmap?) {
+        if (bitmap == null) {
+            state = state.copy(statusMessage = "未获取到相机照片。")
+            return
+        }
+        val output = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 92, output)
+        val filename = "camera_${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))}.jpg"
+        appendOcrUploadFiles(
+            listOf(
+                OcrUploadFile(
+                    name = filename,
+                    contentType = "image/jpeg",
+                    sizeBytes = output.size().toLong(),
+                    bytes = output.toByteArray(),
+                ),
+            ),
+            "已添加相机照片。",
+        )
+    }
+
+    private fun readOcrUploadFile(uri: Uri): OcrUploadFile? = runCatching {
+        val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
+        val name = queryDisplayName(uri).ifBlank {
+            "ocr_${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))}"
+        }
+        OcrUploadFile(
+            name = name,
+            contentType = contentResolver.getType(uri).orEmpty().ifBlank { guessContentType(name) },
+            sizeBytes = bytes.size.toLong(),
+            bytes = bytes,
+        )
+    }.getOrNull()
+
+    private fun queryDisplayName(uri: Uri): String {
+        val cursor = contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+        return cursor?.use {
+            if (it.moveToFirst()) it.getString(0).orEmpty() else ""
+        }.orEmpty()
+    }
+
+    private fun guessContentType(filename: String): String = when {
+        filename.endsWith(".pdf", ignoreCase = true) -> "application/pdf"
+        filename.endsWith(".png", ignoreCase = true) -> "image/png"
+        filename.endsWith(".webp", ignoreCase = true) -> "image/webp"
+        else -> "image/jpeg"
+    }
+
+    private fun appendOcrUploadFiles(files: List<OcrUploadFile>, message: String) {
+        val existing = state.knowledge.ocr.selectedFiles.associateBy { "${it.name}-${it.sizeBytes}" }.toMutableMap()
+        files.forEach { file -> existing["${file.name}-${file.sizeBytes}"] = file }
+        state = state.copy(
+            screen = AppScreen.Knowledge,
+            knowledge = state.knowledge.copy(
+                section = KnowledgeSection.OcrImport,
+                ocr = state.knowledge.ocr.copy(selectedFiles = existing.values.toList()),
+            ),
+            statusMessage = message,
+        )
+    }
+
+    private fun removeOcrUploadFile(index: Int) {
+        state = state.copy(
+            knowledge = state.knowledge.copy(
+                ocr = state.knowledge.ocr.copy(
+                    selectedFiles = state.knowledge.ocr.selectedFiles.filterIndexed { itemIndex, _ -> itemIndex != index },
+                ),
+            ),
+        )
+    }
+
+    private fun clearOcrUploadFiles() {
+        state = state.copy(knowledge = state.knowledge.copy(ocr = state.knowledge.ocr.copy(selectedFiles = emptyList())))
+    }
+
+    private fun submitOcrFiles() {
+        if (state.loading) return
+        val files = state.knowledge.ocr.selectedFiles
+        state = state.copy(loading = true, statusMessage = "正在提交 ${files.size} 个 OCR 导入任务。")
+        repository.submitOcrFiles(files) { result, tasks ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@submitOcrFiles
+            }
+            if (!result.success) {
+                state = state.copy(loading = false, statusMessage = result.message)
+                Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show()
+                return@submitOcrFiles
+            }
+            state = state.copy(
+                loading = false,
+                knowledge = state.knowledge.copy(
+                    section = KnowledgeSection.OcrImport,
+                    ocr = state.knowledge.ocr.copy(
+                        selectedFiles = emptyList(),
+                        tasks = tasks.ifEmpty { state.knowledge.ocr.tasks },
+                        selectedTaskNo = tasks.firstOrNull()?.taskNo ?: state.knowledge.ocr.selectedTaskNo,
+                        updatedAt = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm")),
+                    ),
+                ),
+                statusMessage = "OCR任务已提交，正在刷新队列。",
+            )
+            loadOcrTasks()
+        }
+    }
+
+    private fun loadOcrTasks() {
+        if (!state.session.authenticated) {
+            state = state.copy(screen = AppScreen.Login, statusMessage = "请先登录，登录后进入 OCR 导入。")
+            return
+        }
+        state = state.copy(loading = true, statusMessage = "正在同步 OCR 导入队列。")
+        repository.loadOcrTasks { result, tasks ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@loadOcrTasks
+            }
+            if (!result.success && tasks.isEmpty()) {
+                state = state.copy(loading = false, statusMessage = result.message)
+                return@loadOcrTasks
+            }
+            state = state.copy(
+                loading = false,
+                knowledge = state.knowledge.copy(
+                    section = KnowledgeSection.OcrImport,
+                    ocr = state.knowledge.ocr.copy(
+                        tasks = tasks,
+                        selectedTaskNo = state.knowledge.ocr.selectedTaskNo.takeIf { taskNo -> tasks.any { it.taskNo == taskNo } }
+                            ?: tasks.firstOrNull()?.taskNo.orEmpty(),
+                        updatedAt = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm")),
+                    ),
+                ),
+                statusMessage = "OCR队列已同步：${tasks.size} 个任务。",
+            )
+        }
+    }
+
+    private fun selectOcrTask(taskNo: String) {
+        state = state.copy(knowledge = state.knowledge.copy(ocr = state.knowledge.ocr.copy(selectedTaskNo = taskNo)))
+    }
+
+    private fun openOcrReview(taskNo: String) {
+        if (taskNo.isBlank() || state.loading) return
+        state = state.copy(loading = true, statusMessage = "正在进入 OCR 人工复核。")
+        repository.loadOcrReview(taskNo) { result, review ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@loadOcrReview
+            }
+            if (!result.success || review == null) {
+                state = state.copy(loading = false, statusMessage = result.message)
+                Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show()
+                return@loadOcrReview
+            }
+            state = state.copy(
+                loading = false,
+                knowledge = state.knowledge.copy(
+                    section = KnowledgeSection.OcrImport,
+                    ocr = state.knowledge.ocr.copy(selectedReview = review),
+                ),
+                statusMessage = "已进入 ${review.taskNo} 的人工复核。",
+            )
+        }
+    }
+
+    private fun dismissOcrReview() {
+        state = state.copy(knowledge = state.knowledge.copy(ocr = state.knowledge.ocr.copy(selectedReview = null)))
+    }
+
+    private fun updateOcrReviewParagraph(paragraphNo: Int, text: String) {
+        val review = state.knowledge.ocr.selectedReview ?: return
+        val draft = review.draftContent
+        val nextParagraphs = draft.paragraphs.map { paragraph ->
+            if (paragraph.paragraphNo == paragraphNo) paragraph.copy(text = text) else paragraph
+        }
+        updateSelectedOcrReviewParagraphs(nextParagraphs)
+    }
+
+    private fun moveOcrReviewParagraph(paragraphNo: Int, offset: Int) {
+        val review = state.knowledge.ocr.selectedReview ?: return
+        val paragraphs = review.draftContent.paragraphs.toMutableList()
+        val currentIndex = paragraphs.indexOfFirst { it.paragraphNo == paragraphNo }
+        val targetIndex = currentIndex + offset
+        if (currentIndex !in paragraphs.indices || targetIndex !in paragraphs.indices) return
+        val item = paragraphs.removeAt(currentIndex)
+        paragraphs.add(targetIndex, item)
+        updateSelectedOcrReviewParagraphs(paragraphs)
+    }
+
+    private fun mergeOcrReviewParagraph(paragraphNo: Int) {
+        val review = state.knowledge.ocr.selectedReview ?: return
+        val paragraphs = review.draftContent.paragraphs.toMutableList()
+        val currentIndex = paragraphs.indexOfFirst { it.paragraphNo == paragraphNo }
+        if (currentIndex !in paragraphs.indices || currentIndex >= paragraphs.lastIndex) return
+        val current = paragraphs[currentIndex]
+        val next = paragraphs[currentIndex + 1]
+        paragraphs[currentIndex] = current.copy(
+            text = listOf(current.text, next.text).joinToString("\n").trim(),
+            sourcePages = (current.sourcePages + next.sourcePages).distinct().sorted(),
+            avgConfidence = ((current.avgConfidence + next.avgConfidence) / 2.0),
+            warnings = current.warnings + next.warnings,
+        )
+        paragraphs.removeAt(currentIndex + 1)
+        updateSelectedOcrReviewParagraphs(paragraphs)
+    }
+
+    private fun copyOcrReviewParagraph(paragraphNo: Int) {
+        val review = state.knowledge.ocr.selectedReview ?: return
+        val paragraphs = review.draftContent.paragraphs.toMutableList()
+        val currentIndex = paragraphs.indexOfFirst { it.paragraphNo == paragraphNo }
+        if (currentIndex !in paragraphs.indices) return
+        paragraphs.add(currentIndex + 1, paragraphs[currentIndex])
+        updateSelectedOcrReviewParagraphs(paragraphs)
+    }
+
+    private fun deleteOcrReviewParagraph(paragraphNo: Int) {
+        val review = state.knowledge.ocr.selectedReview ?: return
+        val paragraphs = review.draftContent.paragraphs.toMutableList()
+        if (paragraphs.size <= 1) return
+        val removed = paragraphs.removeAll { it.paragraphNo == paragraphNo }
+        if (removed) {
+            updateSelectedOcrReviewParagraphs(paragraphs)
+        }
+    }
+
+    private fun updateSelectedOcrReviewParagraphs(paragraphs: List<com.scrapider.finance.androidapp.data.OcrReviewParagraph>) {
+        val review = state.knowledge.ocr.selectedReview ?: return
+        val draft = review.draftContent
+        val nextParagraphs = paragraphs.mapIndexed { index, paragraph ->
+            paragraph.copy(paragraphNo = index + 1)
+        }
+        state = state.copy(
+            knowledge = state.knowledge.copy(
+                ocr = state.knowledge.ocr.copy(
+                    selectedReview = review.copy(
+                        paragraphCount = nextParagraphs.size,
+                        warningCount = nextParagraphs.sumOf { it.warnings.size },
+                        draftContent = draft.copy(
+                            paragraphs = nextParagraphs,
+                            paragraphCount = nextParagraphs.size,
+                        ),
+                    ),
+                ),
+            ),
+        )
+    }
+
+    private fun saveOcrReviewDraft() {
+        val review = state.knowledge.ocr.selectedReview ?: return
+        if (state.loading) return
+        state = state.copy(loading = true, statusMessage = "正在保存 OCR 复核草稿。")
+        repository.saveOcrReviewDraft(review.taskNo, review.draftContent) { result ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@saveOcrReviewDraft
+            }
+            state = state.copy(loading = false, statusMessage = result.message)
+            if (!result.success) {
+                Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun submitOcrReview() {
+        val review = state.knowledge.ocr.selectedReview ?: return
+        if (state.loading) return
+        state = state.copy(loading = true, statusMessage = "正在提交 OCR 复核结果。")
+        repository.submitOcrReview(review.taskNo, review.draftContent) { result ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@submitOcrReview
+            }
+            if (!result.success) {
+                state = state.copy(loading = false, statusMessage = result.message)
+                Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show()
+                return@submitOcrReview
+            }
+            state = state.copy(
+                loading = false,
+                knowledge = state.knowledge.copy(ocr = state.knowledge.ocr.copy(selectedReview = null)),
+                statusMessage = "OCR复核结果已提交，正在刷新队列。",
+            )
+            loadOcrTasks()
+        }
+    }
+
+    private fun changeManualKnowledgeTitle(title: String) {
+        state = state.copy(knowledge = state.knowledge.copy(manual = state.knowledge.manual.copy(title = title)))
+    }
+
+    private fun changeManualKnowledgeChunk(index: Int, text: String) {
+        val chunks = state.knowledge.manual.chunks.toMutableList()
+        if (index !in chunks.indices) return
+        chunks[index] = text
+        state = state.copy(knowledge = state.knowledge.copy(manual = state.knowledge.manual.copy(chunks = chunks)))
+    }
+
+    private fun addManualKnowledgeChunk() {
+        val manual = state.knowledge.manual
+        if (manual.readonly) return
+        state = state.copy(knowledge = state.knowledge.copy(manual = manual.copy(chunks = manual.chunks + "")))
+    }
+
+    private fun removeManualKnowledgeChunk(index: Int) {
+        val manual = state.knowledge.manual
+        if (manual.readonly) return
+        val chunks = manual.chunks.filterIndexed { itemIndex, _ -> itemIndex != index }.ifEmpty { listOf("") }
+        state = state.copy(knowledge = state.knowledge.copy(manual = manual.copy(chunks = chunks)))
+    }
+
+    private fun newManualKnowledgeDraft() {
+        state = state.copy(
+            screen = AppScreen.Knowledge,
+            knowledge = state.knowledge.copy(
+                section = KnowledgeSection.ManualImport,
+                manual = state.knowledge.manual.copy(
+                    taskNo = "",
+                    title = "",
+                    chunks = listOf(""),
+                    selectedTaskNo = "",
+                    readonly = false,
+                ),
+            ),
+            statusMessage = "已新建手动知识草稿。",
+        )
+    }
+
+    private fun saveManualKnowledgeDraft() {
+        if (state.loading) return
+        val manual = state.knowledge.manual
+        if (!manual.canSubmit) {
+            state = state.copy(statusMessage = if (manual.readonly) "该任务不可编辑。" else "至少需要一个非空文本分段。")
+            return
+        }
+        state = state.copy(loading = true, statusMessage = "正在保存手动知识草稿。")
+        repository.saveManualKnowledgeDraft(manual.taskNo, manual.title, manual.chunks) { result, task ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@saveManualKnowledgeDraft
+            }
+            if (!result.success) {
+                state = state.copy(loading = false, statusMessage = result.message)
+                Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show()
+                return@saveManualKnowledgeDraft
+            }
+            val nextTaskNo = task?.taskNo?.ifBlank { manual.taskNo } ?: manual.taskNo
+            state = state.copy(
+                loading = false,
+                knowledge = state.knowledge.copy(
+                    section = KnowledgeSection.ManualImport,
+                    manual = state.knowledge.manual.copy(
+                        taskNo = nextTaskNo,
+                        selectedTaskNo = nextTaskNo.ifBlank { state.knowledge.manual.selectedTaskNo },
+                        readonly = false,
+                    ),
+                ),
+                statusMessage = "手动知识草稿已保存，正在刷新队列。",
+            )
+            loadManualKnowledgeTasks()
+        }
+    }
+
+    private fun submitManualKnowledgeDraft() {
+        if (state.loading) return
+        val manual = state.knowledge.manual
+        if (!manual.canSubmit) {
+            state = state.copy(statusMessage = if (manual.readonly) "该任务不可编辑。" else "至少需要一个非空文本分段。")
+            return
+        }
+        state = state.copy(loading = true, statusMessage = "正在提交手动知识，进入打标入库流程。")
+        repository.submitManualKnowledgeDraft(manual.taskNo, manual.title, manual.chunks) { result ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@submitManualKnowledgeDraft
+            }
+            if (!result.success) {
+                state = state.copy(loading = false, statusMessage = result.message)
+                Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show()
+                return@submitManualKnowledgeDraft
+            }
+            state = state.copy(
+                loading = false,
+                knowledge = state.knowledge.copy(
+                    section = KnowledgeSection.ManualImport,
+                    manual = state.knowledge.manual.copy(
+                        taskNo = "",
+                        title = "",
+                        chunks = listOf(""),
+                        selectedTaskNo = "",
+                        readonly = false,
+                    ),
+                ),
+                statusMessage = "手动知识已提交，正在刷新队列。",
+            )
+            loadManualKnowledgeTasks()
+        }
+    }
+
+    private fun loadManualKnowledgeTasks() {
+        if (!state.session.authenticated) {
+            state = state.copy(screen = AppScreen.Login, statusMessage = "请先登录，登录后进入手动导入。")
+            return
+        }
+        state = state.copy(loading = true, statusMessage = "正在同步手动导入队列。")
+        repository.loadManualKnowledgeTasks { result, tasks ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@loadManualKnowledgeTasks
+            }
+            if (!result.success && tasks.isEmpty()) {
+                state = state.copy(loading = false, statusMessage = result.message)
+                return@loadManualKnowledgeTasks
+            }
+            val selectedTaskNo = state.knowledge.manual.selectedTaskNo
+                .takeIf { taskNo -> tasks.any { it.taskNo == taskNo } }
+                ?: tasks.firstOrNull()?.taskNo.orEmpty()
+            state = state.copy(
+                loading = false,
+                knowledge = state.knowledge.copy(
+                    section = KnowledgeSection.ManualImport,
+                    manual = state.knowledge.manual.copy(
+                        tasks = tasks,
+                        selectedTaskNo = selectedTaskNo,
+                        updatedAt = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm")),
+                    ),
+                ),
+                statusMessage = "手动导入队列已同步：${tasks.size} 个任务。",
+            )
+        }
+    }
+
+    private fun selectManualKnowledgeTask(taskNo: String) {
+        state = state.copy(knowledge = state.knowledge.copy(manual = state.knowledge.manual.copy(selectedTaskNo = taskNo)))
+    }
+
+    private fun openManualKnowledgeTask(taskNo: String) {
+        if (taskNo.isBlank() || state.loading) return
+        val task = state.knowledge.manual.tasks.firstOrNull { it.taskNo == taskNo }
+        state = state.copy(loading = true, statusMessage = "正在加载手动知识内容。")
+        repository.loadManualKnowledgeDetail(taskNo) { result, detail ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@loadManualKnowledgeDetail
+            }
+            if (!result.success || detail == null) {
+                state = state.copy(loading = false, statusMessage = result.message)
+                Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show()
+                return@loadManualKnowledgeDetail
+            }
+            state = state.copy(
+                loading = false,
+                knowledge = state.knowledge.copy(
+                    section = KnowledgeSection.ManualImport,
+                    manual = state.knowledge.manual.copy(
+                        taskNo = taskNo,
+                        title = task?.originalFilename.orEmpty(),
+                        chunks = detail.draftContent.paragraphs.map { it.text }.ifEmpty { listOf("") },
+                        selectedTaskNo = taskNo,
+                        readonly = task?.needsReview == false,
+                    ),
+                ),
+                statusMessage = if (task?.needsReview == false) "已打开手动知识查看模式。" else "已打开手动知识编辑模式。",
+            )
+        }
+    }
+
+    private fun deleteManualKnowledgeTask(taskNo: String) {
+        if (taskNo.isBlank() || state.loading) return
+        state = state.copy(loading = true, statusMessage = "正在删除手动导入任务。")
+        repository.deleteManualKnowledgeTask(taskNo) { result ->
+            if (result.statusCode == 401) {
+                handleExpiredSession("登录态已失效，请重新登录。")
+                return@deleteManualKnowledgeTask
+            }
+            if (!result.success) {
+                state = state.copy(loading = false, statusMessage = result.message)
+                Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show()
+                return@deleteManualKnowledgeTask
+            }
+            val currentManual = state.knowledge.manual
+            val nextManual = if (currentManual.taskNo == taskNo) {
+                currentManual.copy(taskNo = "", title = "", chunks = listOf(""), selectedTaskNo = "", readonly = false)
+            } else {
+                currentManual.copy(selectedTaskNo = "")
+            }
+            state = state.copy(
+                loading = false,
+                knowledge = state.knowledge.copy(section = KnowledgeSection.ManualImport, manual = nextManual),
+                statusMessage = "手动导入任务已删除，正在刷新队列。",
+            )
+            loadManualKnowledgeTasks()
+        }
     }
 
     private fun applyKnowledgeMaterialProfile(

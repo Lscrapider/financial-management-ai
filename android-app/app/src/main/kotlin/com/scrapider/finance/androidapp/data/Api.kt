@@ -5,6 +5,7 @@ import android.os.Looper
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -29,6 +30,11 @@ object ApiConfig {
     const val SCENE_ANALYSIS_REPORT_TYPES_PATH = "/api/ai/scene-analysis/config-profiles/report-types"
     const val SCENE_ANALYSIS_CONFIG_PROFILES_PATH = "/api/ai/scene-analysis/config-profiles"
     const val KNOWLEDGE_MATERIAL_TASKS_PATH = "/api/ai/knowledge-material/tasks"
+    const val OCR_TASKS_PATH = "/api/ai/ocr/tasks"
+    const val OCR_TASKS_PAGE_PATH = "/api/ai/ocr/tasks/page"
+    const val OCR_REVIEWS_PATH = "/api/ai/ocr/reviews"
+    const val MANUAL_KNOWLEDGE_TASKS_PATH = "/api/ai/manual-knowledge/tasks"
+    const val MANUAL_KNOWLEDGE_TASKS_PAGE_PATH = "/api/ai/manual-knowledge/tasks/page"
     const val STOCK_QUOTES_PATH = "/api/stocks/quotes"
     const val INDEX_QUOTES_PATH = "/api/indices/quotes"
     const val BOND_QUOTES_PATH = "/api/bonds/quotes"
@@ -67,6 +73,22 @@ class ApiClient(
         enqueue("POST", path, payload, callback)
     }
 
+    fun putJson(path: String, payload: JSONObject, callback: (ApiResult) -> Unit) {
+        enqueue("PUT", path, payload, callback)
+    }
+
+    fun postMultipartFiles(path: String, files: List<OcrUploadFile>, callback: (ApiResult) -> Unit) {
+        val builder = MultipartBody.Builder().setType(MultipartBody.FORM)
+        files.forEach { file ->
+            val mediaType = file.contentType.ifBlank { "application/octet-stream" }.toMediaType()
+            builder.addFormDataPart("file", file.name, file.bytes.toRequestBody(mediaType))
+        }
+        val request = requestBuilder(path)
+            .post(builder.build())
+            .build()
+        client.newCall(request).enqueue(apiCallback(callback))
+    }
+
     fun delete(path: String, callback: (ApiResult) -> Unit) {
         enqueue("DELETE", path, null, callback)
     }
@@ -79,7 +101,11 @@ class ApiClient(
 
     private fun enqueue(method: String, path: String, payload: JSONObject?, callback: (ApiResult) -> Unit) {
         val request = request(method, path, payload)
-        client.newCall(request).enqueue(object : Callback {
+        client.newCall(request).enqueue(apiCallback(callback))
+    }
+
+    private fun apiCallback(callback: (ApiResult) -> Unit): Callback =
+        object : Callback {
             override fun onFailure(call: Call, exception: IOException) {
                 deliver(
                     ApiResult(
@@ -106,18 +132,13 @@ class ApiClient(
                     )
                 }
             }
-        })
-    }
+        }
 
     private fun request(method: String, path: String, payload: JSONObject?): Request {
-        val builder = Request.Builder()
-            .url(normalizedBaseUrl + normalizePath(path))
-            .header("Accept", "application/json")
-        if (accessToken.isNotBlank()) {
-            builder.header("Authorization", "Bearer $accessToken")
-        }
+        val builder = requestBuilder(path)
         return when (method) {
             "POST" -> builder.post(payload.toJsonRequestBody()).build()
+            "PUT" -> builder.put(payload.toJsonRequestBody()).build()
             "DELETE" -> {
                 if (payload == null) {
                     builder.delete().build()
@@ -127,6 +148,16 @@ class ApiClient(
             }
             else -> builder.get().build()
         }
+    }
+
+    private fun requestBuilder(path: String): Request.Builder {
+        val builder = Request.Builder()
+            .url(normalizedBaseUrl + normalizePath(path))
+            .header("Accept", "application/json")
+        if (accessToken.isNotBlank()) {
+            builder.header("Authorization", "Bearer $accessToken")
+        }
+        return builder
     }
 
     private fun JSONObject?.toJsonRequestBody() =
