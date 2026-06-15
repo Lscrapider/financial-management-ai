@@ -14,24 +14,18 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -54,6 +48,7 @@ import java.text.DecimalFormat
 
 @Composable
 fun MarketScreen(
+    avatarText: String,
     loading: Boolean,
     statusMessage: String,
     market: MarketUiState,
@@ -72,6 +67,7 @@ fun MarketScreen(
         topBar = {
             MarketTopBar(
                 updatedAt = market.updatedAt,
+                avatarText = avatarText,
                 loading = loading,
                 onRefresh = onRefresh,
             )
@@ -131,31 +127,16 @@ fun MarketScreen(
 @Composable
 private fun MarketTopBar(
     updatedAt: String,
+    avatarText: String,
     loading: Boolean,
     onRefresh: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .background(WorkspaceSurface)
-            .border(BorderStroke(1.dp, WorkspaceBorder.copy(alpha = 0.65f)))
-            .statusBarsPadding()
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("☰", color = PrimaryFixedDim, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-            Text("行情中心", color = WorkspaceForeground, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("${updatedAt} 更新", color = WorkspaceMuted, fontSize = 12.sp)
-            TextButton(onClick = onRefresh, enabled = !loading) {
-                Text(if (loading) "同步中" else "↻", color = WorkspaceMuted, fontSize = 14.sp)
-            }
-        }
-    }
+    ScreenTopBar(
+        title = "行情中心",
+        avatarText = avatarText,
+        loading = loading,
+        onRefresh = onRefresh,
+    )
 }
 
 @Composable
@@ -412,44 +393,13 @@ private fun MarketBottomNav(
     onReportSelected: () -> Unit,
     onKnowledgeSelected: () -> Unit,
 ) {
-    NavigationBar(
-        containerColor = Color(0xFF1D1F27),
-        contentColor = WorkspaceMuted,
-        tonalElevation = 0.dp,
-        modifier = Modifier.navigationBarsPadding(),
-    ) {
-        listOf("工作台", "行情", "观察", "研究", "知识").forEach { item ->
-            NavigationBarItem(
-                selected = item == "行情",
-                onClick = {
-                    when (item) {
-                        "工作台" -> onWorkbenchSelected()
-                        "观察" -> onObservationSelected()
-                        "研究" -> onReportSelected()
-                        "知识" -> onKnowledgeSelected()
-                    }
-                },
-                icon = { Text(navIcon(item), fontSize = 17.sp) },
-                label = { Text(item, fontSize = 12.sp) },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = PrimaryFixedDim,
-                    selectedTextColor = PrimaryFixedDim,
-                    indicatorColor = CommandBlueSoft,
-                    unselectedIconColor = WorkspaceMuted,
-                    unselectedTextColor = WorkspaceMuted,
-                ),
-            )
-        }
-    }
-}
-
-private fun navIcon(item: String): String = when (item) {
-    "工作台" -> "▦"
-    "行情" -> "⌁"
-    "观察" -> "◉"
-    "研究" -> "▤"
-    "知识" -> "▣"
-    else -> "●"
+    WorkspaceBottomNav(
+        selectedItem = "行情",
+        onWorkbenchSelected = onWorkbenchSelected,
+        onObservationSelected = onObservationSelected,
+        onReportSelected = onReportSelected,
+        onKnowledgeSelected = onKnowledgeSelected,
+    )
 }
 
 private fun formatMarketPrice(value: Double): String =

@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -25,12 +24,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -110,24 +105,14 @@ private fun TopBar(
     loading: Boolean,
     onRefresh: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(88.dp)
-            .background(WorkspaceBackground)
-            .border(BorderStroke(1.dp, WorkspaceBorder.copy(alpha = 0.65f)))
-            .statusBarsPadding()
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(greeting(displayName), color = PrimaryFixedDim, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        }
-        TextButton(onClick = onRefresh, enabled = !loading) {
-            Text(if (loading) "同步中" else "刷新", color = WorkspaceMuted, fontSize = 13.sp)
-        }
-    }
+    ScreenTopBar(
+        title = "工作台",
+        subtitle = greeting(displayName),
+        titleAccessory = { AiPulseBadge() },
+        avatarText = displayName,
+        loading = loading,
+        onRefresh = onRefresh,
+    )
 }
 
 @Composable
@@ -345,30 +330,13 @@ private fun BottomNav(
     onReportSelected: () -> Unit,
     onKnowledgeSelected: () -> Unit,
 ) {
-    NavigationBar(containerColor = Color(0xFF1D1F27), contentColor = WorkspaceMuted, tonalElevation = 0.dp) {
-        listOf("工作台", "行情", "观察", "研究", "知识").forEach { item ->
-            NavigationBarItem(
-                selected = item == "工作台",
-                onClick = {
-                    when (item) {
-                        "行情" -> onMarketSelected()
-                        "观察" -> onObservationSelected()
-                        "研究" -> onReportSelected()
-                        "知识" -> onKnowledgeSelected()
-                    }
-                },
-                icon = { Text(navIcon(item), fontSize = 17.sp) },
-                label = { Text(item, fontSize = 12.sp) },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = PrimaryFixedDim,
-                    selectedTextColor = PrimaryFixedDim,
-                    indicatorColor = CommandBlueSoft,
-                    unselectedIconColor = WorkspaceMuted,
-                    unselectedTextColor = WorkspaceMuted,
-                ),
-            )
-        }
-    }
+    WorkspaceBottomNav(
+        selectedItem = "工作台",
+        onMarketSelected = onMarketSelected,
+        onObservationSelected = onObservationSelected,
+        onReportSelected = onReportSelected,
+        onKnowledgeSelected = onKnowledgeSelected,
+    )
 }
 
 @Composable
@@ -399,15 +367,6 @@ private fun RiskCell(label: String, value: String, color: Color, modifier: Modif
         Text(label, color = color, fontSize = 12.sp)
         Text(value, color = color, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
     }
-}
-
-private fun navIcon(item: String): String = when (item) {
-    "工作台" -> "▦"
-    "行情" -> "⌁"
-    "观察" -> "◉"
-    "研究" -> "▤"
-    "知识" -> "▣"
-    else -> "●"
 }
 
 private fun flatCount(summary: WorkbenchSummary): Int =

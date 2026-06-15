@@ -13,9 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -24,9 +22,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -65,6 +60,7 @@ import java.text.DecimalFormat
 
 @Composable
 fun KnowledgeMaterialScreen(
+    avatarText: String,
     loading: Boolean,
     statusMessage: String,
     knowledge: KnowledgeMaterialUiState,
@@ -117,6 +113,7 @@ fun KnowledgeMaterialScreen(
         topBar = {
             KnowledgeTopBar(
                 updatedAt = knowledge.updatedAt,
+                avatarText = avatarText,
                 loading = loading,
                 onRefresh = onRefresh,
             )
@@ -230,28 +227,16 @@ fun KnowledgeMaterialScreen(
 @Composable
 private fun KnowledgeTopBar(
     updatedAt: String,
+    avatarText: String,
     loading: Boolean,
     onRefresh: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(88.dp)
-            .background(WorkspaceBackground)
-            .border(BorderStroke(1.dp, WorkspaceBorder.copy(alpha = 0.65f)))
-            .statusBarsPadding()
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("知识", color = WorkspaceForeground, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            Text("材料召回与证据检索 · $updatedAt", color = WorkspaceMuted, fontSize = 11.sp)
-        }
-        TextButton(onClick = onRefresh, enabled = !loading) {
-            Text(if (loading) "同步中" else "↻", color = WorkspaceMuted, fontSize = 14.sp)
-        }
-    }
+    ScreenTopBar(
+        title = "知识",
+        avatarText = avatarText,
+        loading = loading,
+        onRefresh = onRefresh,
+    )
 }
 
 @Composable
@@ -1299,30 +1284,13 @@ private fun KnowledgeBottomNav(
     onObservationSelected: () -> Unit,
     onReportSelected: () -> Unit,
 ) {
-    NavigationBar(containerColor = Color(0xFF1D1F27), contentColor = WorkspaceMuted, tonalElevation = 0.dp, modifier = Modifier.navigationBarsPadding()) {
-        listOf("工作台", "行情", "观察", "研究", "知识").forEach { item ->
-            NavigationBarItem(
-                selected = item == "知识",
-                onClick = {
-                    when (item) {
-                        "工作台" -> onWorkbenchSelected()
-                        "行情" -> onMarketSelected()
-                        "观察" -> onObservationSelected()
-                        "研究" -> onReportSelected()
-                    }
-                },
-                icon = { Text(knowledgeNavIcon(item), fontSize = 17.sp) },
-                label = { Text(item, fontSize = 12.sp) },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = PrimaryFixedDim,
-                    selectedTextColor = PrimaryFixedDim,
-                    indicatorColor = CommandBlueSoft,
-                    unselectedIconColor = WorkspaceMuted,
-                    unselectedTextColor = WorkspaceMuted,
-                ),
-            )
-        }
-    }
+    WorkspaceBottomNav(
+        selectedItem = "知识",
+        onWorkbenchSelected = onWorkbenchSelected,
+        onMarketSelected = onMarketSelected,
+        onObservationSelected = onObservationSelected,
+        onReportSelected = onReportSelected,
+    )
 }
 
 @Composable
@@ -1509,13 +1477,4 @@ private fun tagLabel(tag: String): String = when (tag) {
 private fun scoreText(score: Double?): String {
     if (score == null) return "--"
     return "${DecimalFormat("0.0").format(score * 100)}%"
-}
-
-private fun knowledgeNavIcon(item: String): String = when (item) {
-    "工作台" -> "▦"
-    "行情" -> "⌁"
-    "观察" -> "◉"
-    "研究" -> "▤"
-    "知识" -> "▣"
-    else -> "●"
 }

@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,9 +31,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -75,6 +71,7 @@ import kotlin.math.roundToInt
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ObservationRiskScreen(
+    avatarText: String,
     loading: Boolean,
     statusMessage: String,
     observation: ObservationRiskUiState,
@@ -100,6 +97,7 @@ fun ObservationRiskScreen(
         topBar = {
             ObservationTopBar(
                 updatedAt = observation.updatedAt,
+                avatarText = avatarText,
                 loading = loading,
                 onRefresh = onRefresh,
                 onAdd = onOpenAddSheet,
@@ -208,42 +206,19 @@ fun ObservationRiskScreen(
 @Composable
 private fun ObservationTopBar(
     updatedAt: String,
+    avatarText: String,
     loading: Boolean,
     onRefresh: () -> Unit,
     onAdd: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(88.dp)
-            .background(WorkspaceBackground)
-            .border(BorderStroke(1.dp, WorkspaceBorder.copy(alpha = 0.65f)))
-            .statusBarsPadding()
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("观察风控", color = WorkspaceForeground, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            Text("$updatedAt 更新", color = WorkspaceMuted, fontSize = 11.sp)
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = onRefresh, enabled = !loading) {
-                Text(if (loading) "同步中" else "刷新", color = WorkspaceMuted, fontSize = 13.sp)
-            }
-            Box(
-                modifier = Modifier
-                    .height(36.dp)
-                    .border(1.dp, CommandBlue, RoundedCornerShape(8.dp))
-                    .background(CommandBlue, RoundedCornerShape(8.dp))
-                    .clickable(enabled = !loading) { onAdd() }
-                    .padding(horizontal = 12.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("+", color = Color(0xFFF4F5FF), fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
+    ScreenTopBar(
+        title = "观察风控",
+        avatarText = avatarText,
+        loading = loading,
+        onRefresh = onRefresh,
+        primaryActionText = "+新增",
+        onPrimaryAction = onAdd,
+    )
 }
 
 @Composable
@@ -983,48 +958,17 @@ private fun ObservationBottomNav(
     onReportSelected: () -> Unit,
     onKnowledgeSelected: () -> Unit,
 ) {
-    NavigationBar(
-        containerColor = Color(0xFF1D1F27),
-        contentColor = WorkspaceMuted,
-        tonalElevation = 0.dp,
-        modifier = Modifier.navigationBarsPadding(),
-    ) {
-        listOf("工作台", "行情", "观察", "研究", "知识").forEach { item ->
-            NavigationBarItem(
-                selected = item == "观察",
-                onClick = {
-                    when (item) {
-                        "工作台" -> onWorkbenchSelected()
-                        "行情" -> onMarketSelected()
-                        "研究" -> onReportSelected()
-                        "知识" -> onKnowledgeSelected()
-                    }
-                },
-                icon = { Text(observationNavIcon(item), fontSize = 17.sp) },
-                label = { Text(item, fontSize = 12.sp) },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = PrimaryFixedDim,
-                    selectedTextColor = PrimaryFixedDim,
-                    indicatorColor = CommandBlueSoft,
-                    unselectedIconColor = WorkspaceMuted,
-                    unselectedTextColor = WorkspaceMuted,
-                ),
-            )
-        }
-    }
+    WorkspaceBottomNav(
+        selectedItem = "观察",
+        onWorkbenchSelected = onWorkbenchSelected,
+        onMarketSelected = onMarketSelected,
+        onReportSelected = onReportSelected,
+        onKnowledgeSelected = onKnowledgeSelected,
+    )
 }
 
 private fun List<StockAlertConfig>.findAlert(item: WatchItem): StockAlertConfig? =
     firstOrNull { it.targetType == item.targetType && it.stockCode == item.targetCode }
-
-private fun observationNavIcon(item: String): String = when (item) {
-    "工作台" -> "▦"
-    "行情" -> "⌁"
-    "观察" -> "◉"
-    "研究" -> "▤"
-    "知识" -> "▣"
-    else -> "●"
-}
 
 private fun marketColor(value: Double?): Color = when {
     value == null -> WorkspaceOnSurface

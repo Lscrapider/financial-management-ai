@@ -9,6 +9,7 @@ import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -98,6 +99,7 @@ class MainActivity : ComponentActivity() {
     private val repository = FinanceRepository(apiClient)
     private val materialPollHandler = Handler(Looper.getMainLooper())
     private var state by mutableStateOf(AppUiState())
+    private var screenBackStack by mutableStateOf(listOf(AppScreen.Workbench))
     private var materialPollRunnable: Runnable? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -108,6 +110,9 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             FinanceTheme {
+                BackHandler(enabled = state.screen != AppScreen.Login && screenBackStack.size > 1) {
+                    popTopLevelScreen()
+                }
                 when (state.screen) {
                     AppScreen.Login -> LoginScreen(
                         username = state.username,
@@ -138,6 +143,7 @@ class MainActivity : ComponentActivity() {
                     )
 
                     AppScreen.Market -> MarketScreen(
+                        avatarText = state.session.displayName,
                         loading = state.loading,
                         statusMessage = state.statusMessage,
                         market = state.market,
@@ -153,6 +159,7 @@ class MainActivity : ComponentActivity() {
                     )
 
                     AppScreen.Observation -> ObservationRiskScreen(
+                        avatarText = state.session.displayName,
                         loading = state.loading,
                         statusMessage = state.statusMessage,
                         observation = state.observation,
@@ -175,6 +182,7 @@ class MainActivity : ComponentActivity() {
                     )
 
                     AppScreen.Report -> ReportResearchScreen(
+                        avatarText = state.session.displayName,
                         loading = state.loading,
                         report = state.report,
                         onRefresh = ::refreshReportResearch,
@@ -199,6 +207,7 @@ class MainActivity : ComponentActivity() {
                     )
 
                     AppScreen.Knowledge -> KnowledgeMaterialScreen(
+                        avatarText = state.session.displayName,
                         loading = state.loading,
                         statusMessage = state.statusMessage,
                         knowledge = state.knowledge,
@@ -252,7 +261,7 @@ class MainActivity : ComponentActivity() {
 
         if (state.session.authenticated) {
             apiClient.setAccessToken(state.session.accessToken)
-            refreshMarket()
+            refreshWorkbench()
         }
     }
 
@@ -283,20 +292,21 @@ class MainActivity : ComponentActivity() {
                 return@login
             }
             state = state.copy(
-                screen = AppScreen.Market,
+                screen = AppScreen.Workbench,
                 loading = false,
                 session = session,
-                statusMessage = "登录成功：${session.displayName}，正在同步行情中心。",
+                statusMessage = "登录成功：${session.displayName}，正在同步投资工作台。",
                 errorMessage = "",
             )
+            screenBackStack = listOf(AppScreen.Workbench)
             saveLoginState(session)
-            refreshMarket()
+            refreshWorkbench()
         }
     }
 
     private fun refreshMarket() {
         if (!state.session.authenticated) {
-            state = state.copy(screen = AppScreen.Login, statusMessage = "请先登录，登录后进入行情中心。")
+            showLogin("请先登录，登录后进入行情中心。")
             return
         }
         val currentMarket = state.market
@@ -357,35 +367,35 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun showWorkbench() {
-        state = state.copy(screen = AppScreen.Workbench)
+        navigateToTopLevel(AppScreen.Workbench)
         if (!state.workbench.hasAnyData) {
             refreshWorkbench()
         }
     }
 
     private fun showMarket() {
-        state = state.copy(screen = AppScreen.Market)
+        navigateToTopLevel(AppScreen.Market)
         if (!state.market.hasAnyData) {
             refreshMarket()
         }
     }
 
     private fun showObservation() {
-        state = state.copy(screen = AppScreen.Observation)
+        navigateToTopLevel(AppScreen.Observation)
         if (state.observation.groups.isEmpty()) {
             refreshObservation()
         }
     }
 
     private fun showReport() {
-        state = state.copy(screen = AppScreen.Report)
+        navigateToTopLevel(AppScreen.Report)
         if (!state.report.hasAnyData) {
             refreshReportResearch()
         }
     }
 
     private fun showKnowledge() {
-        state = state.copy(screen = AppScreen.Knowledge)
+        navigateToTopLevel(AppScreen.Knowledge)
         if (state.knowledge.reportTypes.isEmpty() || state.knowledge.configProfiles.isEmpty()) {
             loadKnowledgeMaterialOptions()
         }
@@ -432,7 +442,7 @@ class MainActivity : ComponentActivity() {
 
     private fun refreshReportResearch() {
         if (!state.session.authenticated) {
-            state = state.copy(screen = AppScreen.Login, statusMessage = "请先登录，登录后进入报告研究。")
+            showLogin("请先登录，登录后进入报告研究。")
             return
         }
         val current = state.report
@@ -1061,7 +1071,7 @@ class MainActivity : ComponentActivity() {
 
     private fun loadOcrTasks() {
         if (!state.session.authenticated) {
-            state = state.copy(screen = AppScreen.Login, statusMessage = "请先登录，登录后进入 OCR 导入。")
+            showLogin("请先登录，登录后进入 OCR 导入。")
             return
         }
         state = state.copy(loading = true, statusMessage = "正在同步 OCR 导入队列。")
@@ -1353,7 +1363,7 @@ class MainActivity : ComponentActivity() {
 
     private fun loadManualKnowledgeTasks() {
         if (!state.session.authenticated) {
-            state = state.copy(screen = AppScreen.Login, statusMessage = "请先登录，登录后进入手动导入。")
+            showLogin("请先登录，登录后进入手动导入。")
             return
         }
         state = state.copy(loading = true, statusMessage = "正在同步手动导入队列。")
@@ -1473,7 +1483,7 @@ class MainActivity : ComponentActivity() {
 
     private fun refreshWorkbench() {
         if (!state.session.authenticated) {
-            state = state.copy(screen = AppScreen.Login, statusMessage = "请先登录，登录后进入投资工作台。")
+            showLogin("请先登录，登录后进入投资工作台。")
             return
         }
         state = state.copy(loading = true, statusMessage = "正在同步投资工作台：观察池、布控提醒和报告动态。")
@@ -1499,7 +1509,7 @@ class MainActivity : ComponentActivity() {
 
     private fun refreshObservation() {
         if (!state.session.authenticated) {
-            state = state.copy(screen = AppScreen.Login, statusMessage = "请先登录，登录后进入观察风控。")
+            showLogin("请先登录，登录后进入观察风控。")
             return
         }
         val current = state.observation
@@ -1765,11 +1775,11 @@ class MainActivity : ComponentActivity() {
             roles = preferences.getString(KEY_ROLES, "").orEmpty().split(ROLE_SEPARATOR).filter { it.isNotBlank() },
         )
         return AppUiState(
-            screen = AppScreen.Market,
+            screen = AppScreen.Workbench,
             username = if (rememberAccount) session.username.ifBlank { rememberedUsername } else "",
             rememberAccount = rememberAccount,
             session = session,
-            statusMessage = "正在恢复登录态并同步行情中心。",
+            statusMessage = "正在恢复登录态并同步投资工作台。",
         )
     }
 
@@ -1799,6 +1809,7 @@ class MainActivity : ComponentActivity() {
 
     private fun handleExpiredSession(message: String) {
         clearLoginState()
+        screenBackStack = listOf(AppScreen.Workbench)
         state = state.copy(
             screen = AppScreen.Login,
             loading = false,
@@ -1806,6 +1817,11 @@ class MainActivity : ComponentActivity() {
             statusMessage = message,
             errorMessage = "登录态已失效",
         )
+    }
+
+    private fun showLogin(message: String) {
+        screenBackStack = listOf(AppScreen.Workbench)
+        state = state.copy(screen = AppScreen.Login, statusMessage = message)
     }
 
     private fun materialStatusText(status: String): String = when (status) {
@@ -1816,5 +1832,23 @@ class MainActivity : ComponentActivity() {
         "success" -> "已完成"
         "failed" -> "失败"
         else -> status.ifBlank { "处理中" }
+    }
+
+    private fun navigateToTopLevel(screen: AppScreen) {
+        if (state.screen == screen) return
+        if (screen == AppScreen.Workbench) {
+            screenBackStack = listOf(AppScreen.Workbench)
+        } else {
+            val currentStack = screenBackStack.ifEmpty { listOf(AppScreen.Workbench) }
+            screenBackStack = currentStack + screen
+        }
+        state = state.copy(screen = screen)
+    }
+
+    private fun popTopLevelScreen() {
+        if (screenBackStack.size <= 1) return
+        val nextStack = screenBackStack.dropLast(1)
+        screenBackStack = nextStack
+        state = state.copy(screen = nextStack.last())
     }
 }

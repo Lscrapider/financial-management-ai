@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -27,9 +26,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -70,6 +66,7 @@ import io.noties.markwon.html.HtmlPlugin
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportResearchScreen(
+    avatarText: String,
     loading: Boolean,
     report: ReportResearchUiState,
     onRefresh: () -> Unit,
@@ -97,6 +94,7 @@ fun ReportResearchScreen(
         topBar = {
             ReportTopBar(
                 updatedAt = report.updatedAt,
+                avatarText = avatarText,
                 loading = loading,
                 onRefresh = onRefresh,
                 onAdd = onOpenCreateSheet,
@@ -187,44 +185,19 @@ fun ReportResearchScreen(
 @Composable
 private fun ReportTopBar(
     updatedAt: String,
+    avatarText: String,
     loading: Boolean,
     onRefresh: () -> Unit,
     onAdd: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .background(WorkspaceSurface)
-            .border(BorderStroke(1.dp, WorkspaceBorder.copy(alpha = 0.65f)))
-            .statusBarsPadding()
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("▤", color = PrimaryFixedDim, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text("报告研究", color = WorkspaceForeground, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Text("$updatedAt 更新", color = WorkspaceMuted, fontSize = 11.sp)
-            }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = onRefresh, enabled = !loading) {
-                Text(if (loading) "同步中" else "↻", color = WorkspaceMuted, fontSize = 14.sp)
-            }
-            Box(
-                modifier = Modifier
-                    .height(34.dp)
-                    .background(CommandBlue, RoundedCornerShape(8.dp))
-                    .clickable(enabled = !loading) { onAdd() }
-                    .padding(horizontal = 12.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("+ 新建", color = Color(0xFFF4F5FF), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            }
-        }
-    }
+    ScreenTopBar(
+        title = "报告研究",
+        avatarText = avatarText,
+        loading = loading,
+        onRefresh = onRefresh,
+        primaryActionText = "+ 新建",
+        onPrimaryAction = onAdd,
+    )
 }
 
 @Composable
@@ -909,39 +882,13 @@ private fun ReportBottomNav(
     onObservationSelected: () -> Unit,
     onKnowledgeSelected: () -> Unit,
 ) {
-    NavigationBar(containerColor = Color(0xFF1D1F27), contentColor = WorkspaceMuted, tonalElevation = 0.dp) {
-        listOf("工作台", "行情", "观察", "研究", "知识").forEach { item ->
-            NavigationBarItem(
-                selected = item == "研究",
-                onClick = {
-                    when (item) {
-                        "工作台" -> onWorkbenchSelected()
-                        "行情" -> onMarketSelected()
-                        "观察" -> onObservationSelected()
-                        "知识" -> onKnowledgeSelected()
-                    }
-                },
-                icon = { Text(reportNavIcon(item), fontSize = 17.sp) },
-                label = { Text(item, fontSize = 12.sp) },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = PrimaryFixedDim,
-                    selectedTextColor = PrimaryFixedDim,
-                    indicatorColor = CommandBlueSoft,
-                    unselectedIconColor = WorkspaceMuted,
-                    unselectedTextColor = WorkspaceMuted,
-                ),
-            )
-        }
-    }
-}
-
-private fun reportNavIcon(item: String): String = when (item) {
-    "工作台" -> "▦"
-    "行情" -> "⌁"
-    "观察" -> "◉"
-    "研究" -> "▤"
-    "知识" -> "▣"
-    else -> "●"
+    WorkspaceBottomNav(
+        selectedItem = "研究",
+        onWorkbenchSelected = onWorkbenchSelected,
+        onMarketSelected = onMarketSelected,
+        onObservationSelected = onObservationSelected,
+        onKnowledgeSelected = onKnowledgeSelected,
+    )
 }
 
 private fun List<ReportConfigProfileOption>.filterProfileOptions(targetType: ReportTargetType): List<ReportConfigProfileOption> {
