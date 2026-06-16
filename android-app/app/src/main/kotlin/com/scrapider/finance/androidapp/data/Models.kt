@@ -1,5 +1,9 @@
 package com.scrapider.finance.androidapp.data
 
+import okhttp3.Response
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
+import okio.ByteString
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
@@ -674,6 +678,80 @@ data class KnowledgeMaterialUiState(
         get() = activeTask != null || chunks.isNotEmpty()
 }
 
+enum class AiChatRole {
+    User,
+    Assistant,
+}
+
+data class AiChatMessage(
+    val id: Long,
+    val role: AiChatRole,
+    val content: String,
+    val createdAt: String,
+    val model: String = "",
+)
+
+data class AiChatProgressStep(
+    val id: Long,
+    val content: String,
+    val status: String = "",
+    val createdAt: String,
+)
+
+data class AiChatUiState(
+    val visible: Boolean = false,
+    val input: String = "",
+    val loading: Boolean = false,
+    val progressText: String = "",
+    val progressSteps: List<AiChatProgressStep> = emptyList(),
+    val messages: List<AiChatMessage> = emptyList(),
+) {
+    val hasStreamingAnswer: Boolean
+        get() = loading && messages.lastOrNull()?.role == AiChatRole.Assistant && messages.lastOrNull()?.content?.isNotBlank() == true
+}
+
+data class AiChatSocketEvent(
+    val type: String,
+    val conversationId: String = "",
+    val messageId: String = "",
+    val content: String = "",
+    val status: String = "",
+    val model: String = "",
+    val answeredAt: String = "",
+) {
+    companion object {
+        fun fromPayload(payload: String): AiChatSocketEvent {
+            val json = JSONObject(payload.ifBlank { "{}" })
+            return AiChatSocketEvent(
+                type = json.optString("type", ""),
+                conversationId = json.optString("conversationId", ""),
+                messageId = json.optString("messageId", ""),
+                content = json.optString("content", ""),
+                status = json.optString("status", ""),
+                model = json.optString("model", ""),
+                answeredAt = json.optString("answeredAt", ""),
+            )
+        }
+    }
+}
+
+class AiChatSocket(
+    private val webSocket: WebSocket,
+) {
+    fun sendUserMessage(messageId: String, content: String): Boolean =
+        webSocket.send(
+            JSONObject()
+                .put("type", "user_message")
+                .put("messageId", messageId)
+                .put("content", content)
+                .toString(),
+        )
+
+    fun close() {
+        webSocket.close(1000, "client closed")
+    }
+}
+
 class FinanceRepository(
     private val apiClient: ApiClient,
 ) {
@@ -720,6 +798,69 @@ class FinanceRepository(
             )
             apiClient.setAccessToken(state.accessToken)
             callback(ApiResult(true, result.statusCode, result.body, "后端用户信息已同步。"), state)
+        }
+    }
+
+    fun openAiChatSocket(
+        callback: (ApiResult, AiChatSocket?) -> Unit,
+        onEvent: (AiChatSocketEvent) -> Unit,
+    ) {
+        apiClient.postJson(ApiConfig.AI_CHAT_WS_TICKET_PATH, JSONObject()) { result ->
+            if (!result.success || !isApiSuccess(result.body)) {
+                callback(result.copy(success = false, message = apiMessage(result.body, result.message)), null)
+                return@postJson
+            }
+            val ticket = dataObject(result.body).optString("ticket", "")
+            if (ticket.isBlank()) {
+                callback(ApiResult(false, result.statusCode, result.body, "AI Chat 未返回 WebSocket ticket。"), null)
+                return@postJson
+            }
+            var opened = false
+            val listener = object : WebSocketListener() {
+                override fun onOpen(webSocket: WebSocket, response: Response) {
+                    opened = true
+                    apiClient.dispatchOnMain {
+                        callback(ApiResult(true, response.code, "", "AI Chat 已连接。"), AiChatSocket(webSocket))
+                    }
+                }
+
+                override fun onMessage(webSocket: WebSocket, text: String) {
+                    apiClient.dispatchOnMain {
+                        runCatching {
+                            onEvent(AiChatSocketEvent.fromPayload(text))
+                        }.onFailure {
+                            onEvent(AiChatSocketEvent(type = "client_error", content = "AI Chat 消息解析失败。"))
+                        }
+                    }
+                }
+
+                override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+                    onMessage(webSocket, bytes.utf8())
+                }
+
+                override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                    webSocket.close(code, reason)
+                }
+
+                override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                    apiClient.dispatchOnMain {
+                        onEvent(AiChatSocketEvent(type = "closed", content = reason.ifBlank { "AI Chat 连接已关闭。" }))
+                    }
+                }
+
+                override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                    apiClient.dispatchOnMain {
+                        val statusText = response?.code?.let { "（HTTP $it）" }.orEmpty()
+                        val message = "AI Chat 连接失败$statusText：${t.message ?: t.javaClass.simpleName}"
+                        if (opened) {
+                            onEvent(AiChatSocketEvent(type = "error", content = message))
+                        } else {
+                            callback(ApiResult(false, -1, "", message), null)
+                        }
+                    }
+                }
+            }
+            apiClient.newWebSocket(ApiConfig.AI_CHAT_WS_PATH, ticket, listener)
         }
     }
 

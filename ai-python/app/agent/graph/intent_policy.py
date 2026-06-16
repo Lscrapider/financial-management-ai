@@ -62,6 +62,13 @@ DEEP_RESEARCH_KEYWORDS = (
     "技术面基本面",
 )
 
+# KNOWLEDGE_RESEARCH_KEYWORDS = (
+#     "结合知识库",
+#     "知识库分析",
+#     "结合rag",
+#     "rag分析",
+# )
+
 FOCUSED_TOOL_KEYWORDS = (
     (("趋势", "走势", "k线", "日线", "周线", "月线", "均线", "破位", "支撑", "压力", "回撤"), ("market_kline_trend",)),
     (("分时", "盘中", "今天", "日内", "冲高回落", "跳水", "拉升", "成交", "换手", "量比", "最新", "当前价格", "涨跌幅"), ("market_quote", "market_intraday_summary")),
@@ -119,8 +126,14 @@ class QueryIntentPolicy:
 
 
 def classify_query_intent(user_text: str) -> QueryIntentPolicy:
+    # 暂时关闭意图分层和选择性工具规则，统一交给 planner 使用完整工具集。
+    return _default_policy()
+
     text = str(user_text or "").strip()
     normalized_text = text.lower()
+    # if _knowledge_research_requested(normalized_text):
+    #     return _default_policy()
+
     focused_tools = _focused_tools(normalized_text)
     if focused_tools:
         return QueryIntentPolicy(
@@ -151,7 +164,15 @@ def _default_policy() -> QueryIntentPolicy:
 
 
 def _full_flow_requested(text: str) -> bool:
-    return _contains_any(text, TRADE_ADVICE_KEYWORDS) or _contains_any(text, DEEP_RESEARCH_KEYWORDS)
+    return (
+        _contains_any(text, TRADE_ADVICE_KEYWORDS)
+        or _contains_any(text, DEEP_RESEARCH_KEYWORDS)
+        # or _knowledge_research_requested(text)
+    )
+
+
+# def _knowledge_research_requested(text: str) -> bool:
+#     return _contains_any(text, KNOWLEDGE_RESEARCH_KEYWORDS)
 
 
 def _focused_tools(text: str) -> tuple[str, ...]:

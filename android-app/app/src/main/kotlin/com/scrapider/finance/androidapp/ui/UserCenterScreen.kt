@@ -262,7 +262,7 @@ private fun DisplaySettingPanel(
                 maxLines = 1,
             )
             Text(
-                text = "正文和标签会同步按比例变化",
+                text = "正文和标签会一起按比例变化",
                 color = WorkspaceMuted,
                 fontSize = 12.sp,
                 modifier = Modifier.weight(1.4f),
@@ -348,7 +348,7 @@ private fun TargetConfigPanel(
             onValueChange = { stockName = it },
         )
         PrimaryActionButton(
-            text = if (loading) "同步中" else "新增股票并同步",
+            text = if (loading) "处理中" else "新增股票",
             enabled = !loading && stockCode.matches(Regex("\\d{6}")) && stockName.isNotBlank(),
             onClick = { onAddStockConfig(stockCode, stockName) },
         )
@@ -365,7 +365,7 @@ private fun TargetConfigPanel(
             onValueChange = { bondName = it },
         )
         PrimaryActionButton(
-            text = if (loading) "同步中" else "新增可转债并同步",
+            text = if (loading) "处理中" else "新增可转债",
             enabled = !loading && bondCode.matches(Regex("\\d{6}")) && bondName.isNotBlank(),
             onClick = { onAddBondConfig(bondCode, bondName) },
         )

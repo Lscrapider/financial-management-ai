@@ -10,8 +10,12 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
 import org.json.JSONObject
 import java.io.IOException
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
 object ApiConfig {
@@ -19,6 +23,8 @@ object ApiConfig {
     const val LOGIN_PATH = "/api/auth/login"
     const val USER_INFO_PATH = "/api/user/info"
     const val USER_PASSWORD_PATH = "/api/user/password"
+    const val AI_CHAT_WS_TICKET_PATH = "/api/ai/chat/ws-ticket"
+    const val AI_CHAT_WS_PATH = "/api/ws/ai-chat"
     const val WATCH_GROUPS_PATH = "/api/watch-pool/groups"
     const val WATCH_ITEMS_PATH = "/api/watch-pool/items"
     const val STOCK_ALERTS_PATH = "/api/stock-alerts"
@@ -64,6 +70,9 @@ class ApiClient(
         .connectTimeout(ApiConfig.CONNECT_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
         .readTimeout(ApiConfig.READ_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
         .build()
+    private val webSocketClient = client.newBuilder()
+        .readTimeout(0, TimeUnit.MILLISECONDS)
+        .build()
     private var accessToken: String = ""
 
     fun setAccessToken(token: String) {
@@ -107,10 +116,24 @@ class ApiClient(
         enqueue("DELETE", path, null, callback)
     }
 
+    fun newWebSocket(path: String, ticket: String, listener: WebSocketListener): WebSocket {
+        val request = Request.Builder()
+            .url(webSocketUrl(path, ticket))
+            .build()
+        return webSocketClient.newWebSocket(request, listener)
+    }
+
+    fun dispatchOnMain(action: () -> Unit) {
+        mainHandler.post(action)
+    }
+
     fun shutdown() {
         client.dispatcher.cancelAll()
         client.dispatcher.executorService.shutdown()
         client.connectionPool.evictAll()
+        webSocketClient.dispatcher.cancelAll()
+        webSocketClient.dispatcher.executorService.shutdown()
+        webSocketClient.connectionPool.evictAll()
     }
 
     private fun enqueue(method: String, path: String, payload: JSONObject?, callback: (ApiResult) -> Unit) {
@@ -179,6 +202,15 @@ class ApiClient(
 
     private fun normalizePath(path: String): String = if (path.startsWith("/")) path else "/$path"
 
+    private fun webSocketUrl(path: String, ticket: String): String {
+        val httpUrl = normalizedBaseUrl + normalizePath(path)
+        val protocol = if (httpUrl.startsWith("https://", ignoreCase = true)) "wss://" else "ws://"
+        val withoutProtocol = httpUrl
+            .removePrefix("https://")
+            .removePrefix("http://")
+        return "$protocol$withoutProtocol?ticket=${ticket.encodeQuery()}"
+    }
+
     private fun deliver(result: ApiResult, callback: (ApiResult) -> Unit) {
         mainHandler.post { callback(result) }
     }
@@ -204,3 +236,6 @@ fun apiMessage(body: String, fallback: String): String = runCatching {
         else -> fallback
     }
 }.getOrDefault(fallback)
+
+private fun String.encodeQuery(): String =
+    URLEncoder.encode(this, StandardCharsets.UTF_8.name())

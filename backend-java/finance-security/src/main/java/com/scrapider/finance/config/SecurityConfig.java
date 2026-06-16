@@ -67,7 +67,7 @@ public class SecurityConfig {
                                 "/api/ai/token-usage/**")
                         .hasRole("admin")
                         .requestMatchers("/api/**").authenticated()
-                        .anyRequest().authenticated())
+                        .anyRequest().permitAll())
                 .addFilterBefore(
                         new BearerTokenAuthenticationFilter(jwtUtils, tokenStore, appUserMapper),
                         UsernamePasswordAuthenticationFilter.class)

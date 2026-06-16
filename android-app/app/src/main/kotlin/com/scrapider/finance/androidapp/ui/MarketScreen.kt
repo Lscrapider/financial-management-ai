@@ -29,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -45,6 +46,11 @@ import com.scrapider.finance.androidapp.data.MarketQuote
 import com.scrapider.finance.androidapp.data.MarketUiState
 import com.scrapider.finance.androidapp.data.marketFilters
 import java.text.DecimalFormat
+
+private enum class MarketFilterSheet {
+    AssetType,
+    Market,
+}
 
 @Composable
 fun MarketScreen(
@@ -64,6 +70,7 @@ fun MarketScreen(
     onReportSelected: () -> Unit,
     onKnowledgeSelected: () -> Unit,
 ) {
+    var activeFilterSheet by remember { mutableStateOf<MarketFilterSheet?>(null) }
     Scaffold(
         containerColor = WorkspaceBackground,
         topBar = {
@@ -94,18 +101,23 @@ fun MarketScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            AssetSegmentedTabs(
-                selected = market.assetType,
-                onSelected = onAssetTypeChange,
-            )
             MarketSearchBar(
                 keyword = market.keyword,
                 onKeywordChange = onKeywordChange,
             )
-            MarketFilterChips(
-                assetType = market.assetType,
-                selected = market.marketFilter,
-                onSelected = onMarketFilterChange,
+            CompactFilterBar(
+                items = listOf(
+                    CompactFilterItem(
+                        label = "品类",
+                        value = market.assetType.label,
+                        onClick = { activeFilterSheet = MarketFilterSheet.AssetType },
+                    ),
+                    CompactFilterItem(
+                        label = "市场",
+                        value = market.marketFilter.label,
+                        onClick = { activeFilterSheet = MarketFilterSheet.Market },
+                    ),
+                ),
             )
             MarketListCard(
                 loading = loading,
@@ -125,6 +137,34 @@ fun MarketScreen(
             }
             Spacer(Modifier.height(72.dp))
         }
+    }
+
+    when (activeFilterSheet) {
+        MarketFilterSheet.AssetType -> FilterOptionSheet(
+            title = "选择行情品类",
+            options = MarketAssetType.entries.map { type ->
+                FilterOptionItem(type.name, type.label)
+            },
+            selectedKey = market.assetType.name,
+            onSelected = { key ->
+                MarketAssetType.entries.firstOrNull { it.name == key }?.let(onAssetTypeChange)
+            },
+            onDismiss = { activeFilterSheet = null },
+        )
+
+        MarketFilterSheet.Market -> FilterOptionSheet(
+            title = "选择市场",
+            options = marketFilters(market.assetType).map { filter ->
+                FilterOptionItem(filter.marketCode, filter.label)
+            },
+            selectedKey = market.marketFilter.marketCode,
+            onSelected = { key ->
+                marketFilters(market.assetType).firstOrNull { it.marketCode == key }?.let(onMarketFilterChange)
+            },
+            onDismiss = { activeFilterSheet = null },
+        )
+
+        null -> Unit
     }
 }
 
@@ -263,7 +303,7 @@ private fun MarketListCard(
     ) {
         MarketTableHeader(sortOrder = sortOrder, onSortByChangePercent = onSortByChangePercent)
         when {
-            loading -> EmptyMarketRow("正在同步行情数据。")
+            loading -> EmptyMarketRow("正在加载行情数据。")
             quotes.isEmpty() -> EmptyMarketRow(if (totalCount > 0) "当前搜索没有匹配标的。" else "后端暂无行情快照，刷新后会展示最新行情。")
             else -> displayed.forEach { quote -> MarketQuoteRow(quote) }
         }

@@ -58,6 +58,11 @@ import com.scrapider.finance.androidapp.data.ReportTargetType
 import com.scrapider.finance.androidapp.data.ReportTypeOption
 import java.text.DecimalFormat
 
+private enum class KnowledgeResultFilterSheet {
+    Scene,
+    Tag,
+}
+
 @Composable
 fun KnowledgeMaterialScreen(
     avatarText: String,
@@ -217,9 +222,6 @@ fun KnowledgeMaterialScreen(
                     onOpenTask = onOpenManualTask,
                     onDeleteTask = onDeleteManualTask,
                 )
-            }
-            if (statusMessage.isNotBlank()) {
-                Text(statusMessage, color = WorkspaceMuted, fontSize = 12.sp, lineHeight = 18.sp)
             }
             Spacer(Modifier.height(72.dp))
         }
@@ -760,7 +762,7 @@ private fun ManualImportSection(
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("手动导入队列", color = WorkspaceForeground, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Text(manual.updatedAt.takeIf { it != "--:--" }?.let { "最近同步 $it" } ?: "暂无队列同步", color = WorkspaceMuted, fontSize = 12.sp)
+                Text("${manual.tasks.size} 个任务", color = WorkspaceMuted, fontSize = 12.sp)
             }
             manual.selectedTask?.let { StatusChip(ocrStatusLabel(it.status), ocrStatusColor(it.status)) }
         }
@@ -934,23 +936,32 @@ private fun ResultFilters(
     onSourceKeywordChange: (String) -> Unit,
     onResetFilters: () -> Unit,
 ) {
+    var activeFilterSheet by remember { mutableStateOf<KnowledgeResultFilterSheet?>(null) }
+    val selectedSceneValue = if (knowledge.sceneFilter.isBlank()) {
+        "全部"
+    } else {
+        sceneLabel(knowledge.sceneFilter)
+    }
+    val selectedTagValue = if (knowledge.tagFilter.isBlank()) {
+        "全部"
+    } else {
+        tagLabel(knowledge.tagFilter)
+    }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        FilterRow(label = "场景") {
-            FilterChip("全部", knowledge.sceneFilter.isBlank()) { onSceneFilterChange("") }
-            knowledge.sceneOptions.forEach { (scene, count) ->
-                FilterChip("${sceneLabel(scene)} $count", knowledge.sceneFilter == scene) {
-                    onSceneFilterChange(scene)
-                }
-            }
-        }
-        FilterRow(label = "标签") {
-            FilterChip("全部", knowledge.tagFilter.isBlank()) { onTagFilterChange("") }
-            knowledge.tagOptions.forEach { (tag, count) ->
-                FilterChip("${tagLabel(tag)} $count", knowledge.tagFilter == tag) {
-                    onTagFilterChange(tag)
-                }
-            }
-        }
+        CompactFilterBar(
+            items = listOf(
+                CompactFilterItem(
+                    label = "场景",
+                    value = selectedSceneValue,
+                    onClick = { activeFilterSheet = KnowledgeResultFilterSheet.Scene },
+                ),
+                CompactFilterItem(
+                    label = "标签",
+                    value = selectedTagValue,
+                    onClick = { activeFilterSheet = KnowledgeResultFilterSheet.Tag },
+                ),
+            ),
+        )
         OutlinedTextField(
             value = knowledge.sourceKeyword,
             onValueChange = onSourceKeywordChange,
@@ -975,6 +986,32 @@ private fun ResultFilters(
             ),
             shape = RoundedCornerShape(8.dp),
         )
+    }
+
+    when (activeFilterSheet) {
+        KnowledgeResultFilterSheet.Scene -> FilterOptionSheet(
+            title = "选择场景",
+            options = listOf(FilterOptionItem("ALL", "全部", "${knowledge.chunks.size} 条材料")) +
+                knowledge.sceneOptions.map { (scene, count) ->
+                    FilterOptionItem(scene, sceneLabel(scene), "$count 条材料")
+                },
+            selectedKey = knowledge.sceneFilter.ifBlank { "ALL" },
+            onSelected = { key -> onSceneFilterChange(if (key == "ALL") "" else key) },
+            onDismiss = { activeFilterSheet = null },
+        )
+
+        KnowledgeResultFilterSheet.Tag -> FilterOptionSheet(
+            title = "选择标签",
+            options = listOf(FilterOptionItem("ALL", "全部", "${knowledge.chunks.size} 条材料")) +
+                knowledge.tagOptions.map { (tag, count) ->
+                    FilterOptionItem(tag, tagLabel(tag), "$count 条材料")
+                },
+            selectedKey = knowledge.tagFilter.ifBlank { "ALL" },
+            onSelected = { key -> onTagFilterChange(if (key == "ALL") "" else key) },
+            onDismiss = { activeFilterSheet = null },
+        )
+
+        null -> Unit
     }
 }
 
@@ -1011,14 +1048,14 @@ private fun ChunkCard(chunk: KnowledgeMaterialChunk) {
                 StatusChip(scoreText(chunk.finalScore ?: chunk.semanticScore), PrimaryFixedDim)
             }
             if (chunk.matchedTags.isNotEmpty()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    chunk.matchedTags.forEach { tag ->
-                        StatusChip(tagLabel(tag), WorkspaceMuted)
-                    }
-                }
+                Text(
+                    text = "标签：${chunk.matchedTags.take(4).joinToString(" / ") { tagLabel(it) }}${if (chunk.matchedTags.size > 4) " 等" else ""}",
+                    color = WorkspaceMuted,
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
             Text(
                 text = chunk.text.ifBlank { "该材料分块暂无正文。" },
@@ -1251,34 +1288,6 @@ private fun StepButton(text: String, enabled: Boolean, onClick: () -> Unit) {
     ) {
         Text(text, color = if (enabled) WorkspaceMuted else WorkspaceBorder, fontSize = 16.sp, fontWeight = FontWeight.Bold)
     }
-}
-
-@Composable
-private fun FilterRow(label: String, content: @Composable () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Text(label, color = WorkspaceMuted, fontSize = 12.sp)
-        content()
-    }
-}
-
-@Composable
-private fun FilterChip(text: String, active: Boolean, onClick: () -> Unit) {
-    Text(
-        text = text,
-        modifier = Modifier
-            .background(if (active) CommandBlueSoft else Color(0xFF1D1F27), RoundedCornerShape(12.dp))
-            .border(1.dp, if (active) PrimaryFixedDim.copy(alpha = 0.35f) else WorkspaceBorder, RoundedCornerShape(12.dp))
-            .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 5.dp),
-        color = if (active) PrimaryFixedDim else WorkspaceMuted,
-        fontSize = 12.sp,
-        fontWeight = FontWeight.Medium,
-        maxLines = 1,
-    )
 }
 
 @Composable

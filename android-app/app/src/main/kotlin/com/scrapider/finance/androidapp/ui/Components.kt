@@ -27,7 +27,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -35,9 +37,13 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -46,6 +52,18 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.KeyboardOptions
 
 private val WorkspaceNavItems = listOf("工作台", "行情", "观察", "研究", "知识")
+
+data class CompactFilterItem(
+    val label: String,
+    val value: String,
+    val onClick: () -> Unit,
+)
+
+data class FilterOptionItem(
+    val key: String,
+    val label: String,
+    val description: String = "",
+)
 
 @Composable
 fun ScreenTopBar(
@@ -63,9 +81,20 @@ fun ScreenTopBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(88.dp)
-            .background(WorkspaceBackground)
-            .border(BorderStroke(1.dp, WorkspaceBorder.copy(alpha = 0.65f)))
+            .height(92.dp)
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color(0xFF1B1E27), Color(0xFF171A20), WorkspaceBackground),
+                ),
+            )
+            .drawBehind {
+                drawLine(
+                    color = WorkspaceBorder.copy(alpha = 0.72f),
+                    start = Offset(0f, size.height),
+                    end = Offset(size.width, size.height),
+                    strokeWidth = 1.dp.toPx(),
+                )
+            }
             .statusBarsPadding()
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -105,14 +134,18 @@ fun ScreenTopBar(
         ) {
             if (onRefresh != null) {
                 TextButton(onClick = onRefresh, enabled = !loading) {
-                    Text(if (loading) "同步中" else "刷新", color = WorkspaceMuted, fontSize = 13.sp)
+                    Text(if (loading) "刷新中" else "刷新", color = WorkspaceMuted, fontSize = 13.sp)
                 }
             }
             if (primaryActionText != null && onPrimaryAction != null) {
                 Box(
                     modifier = Modifier
                         .height(36.dp)
-                        .background(CommandBlue, RoundedCornerShape(8.dp))
+                        .background(
+                            Brush.horizontalGradient(listOf(CommandBlue, Color(0xFF1C7DFF))),
+                            RoundedCornerShape(8.dp),
+                        )
+                        .border(1.dp, PrimaryFixedDim.copy(alpha = 0.24f), RoundedCornerShape(8.dp))
                         .clickable(enabled = !loading) { onPrimaryAction() }
                         .padding(horizontal = 12.dp),
                     contentAlignment = Alignment.Center,
@@ -132,7 +165,143 @@ fun ScreenTopBar(
 }
 
 @Composable
-fun AiPulseBadge() {
+fun CompactFilterBar(
+    items: List<CompactFilterItem>,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .border(1.dp, WorkspaceBorder.copy(alpha = 0.84f), RoundedCornerShape(8.dp))
+            .background(
+                Brush.verticalGradient(listOf(Color(0xFF1D212A), Color(0xFF171A20))),
+                RoundedCornerShape(8.dp),
+            )
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        items.forEach { item ->
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(42.dp)
+                    .background(WorkspaceSurfaceElevated.copy(alpha = 0.54f), RoundedCornerShape(6.dp))
+                    .border(1.dp, WorkspaceBorder.copy(alpha = 0.58f), RoundedCornerShape(6.dp))
+                    .clickable { item.onClick() }
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+            ) {
+                Column(
+                    modifier = Modifier.align(Alignment.CenterStart),
+                    verticalArrangement = Arrangement.spacedBy(1.dp),
+                ) {
+                    Text(
+                        text = item.label,
+                        color = WorkspaceMuted,
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = item.value,
+                        color = WorkspaceForeground,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Text(
+                    text = "⌄",
+                    color = PrimaryFixedDim,
+                    fontSize = 14.sp,
+                    modifier = Modifier.align(Alignment.CenterEnd),
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FilterOptionSheet(
+    title: String,
+    options: List<FilterOptionItem>,
+    selectedKey: String,
+    onSelected: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = WorkspaceSurface,
+        contentColor = WorkspaceForeground,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(title, color = WorkspaceForeground, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            options.forEach { option ->
+                val selected = option.key == selectedKey
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(if (option.description.isBlank()) 44.dp else 54.dp)
+                        .background(
+                            if (selected) CommandBlueSoft.copy(alpha = 0.58f) else WorkspaceSurfaceElevated,
+                            RoundedCornerShape(8.dp),
+                        )
+                        .border(
+                            1.dp,
+                            if (selected) PrimaryFixedDim.copy(alpha = 0.36f) else WorkspaceBorder,
+                            RoundedCornerShape(8.dp),
+                        )
+                        .clickable {
+                            onSelected(option.key)
+                            onDismiss()
+                        }
+                        .padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text(
+                            text = option.label,
+                            color = if (selected) PrimaryFixedDim else WorkspaceForeground,
+                            fontSize = 14.sp,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (option.description.isNotBlank()) {
+                            Text(
+                                text = option.description,
+                                color = WorkspaceMuted,
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    if (selected) {
+                        Text("✓", color = PrimaryFixedDim, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+fun AiPulseBadge(onClick: (() -> Unit)? = null) {
     val transition = rememberInfiniteTransition(label = "aiBadge")
     val pulse = transition.animateFloat(
         initialValue = 0.32f,
@@ -147,7 +316,8 @@ fun AiPulseBadge() {
         modifier = Modifier
             .size(width = 34.dp, height = 26.dp)
             .border(1.dp, PrimaryFixedDim.copy(alpha = 0.38f + pulse.value * 0.24f), RoundedCornerShape(8.dp))
-            .background(CommandBlueSoft.copy(alpha = 0.55f + pulse.value * 0.18f), RoundedCornerShape(8.dp)),
+            .background(CommandBlueSoft.copy(alpha = 0.55f + pulse.value * 0.18f), RoundedCornerShape(8.dp))
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -173,8 +343,11 @@ private fun TopBarAvatar(text: String, onAvatarClick: (() -> Unit)?) {
     Box(
         modifier = Modifier
             .size(34.dp)
-            .border(1.dp, PrimaryFixedDim.copy(alpha = 0.35f), CircleShape)
-            .background(CommandBlueSoft.copy(alpha = 0.72f), CircleShape)
+            .background(
+                Brush.radialGradient(listOf(CommandBlueSoft.copy(alpha = 0.96f), Color(0xFF171F2E))),
+                CircleShape,
+            )
+            .border(1.dp, PrimaryFixedDim.copy(alpha = 0.42f), CircleShape)
             .then(if (onAvatarClick != null) Modifier.clickable { onAvatarClick() } else Modifier),
         contentAlignment = Alignment.Center,
     ) {
@@ -199,10 +372,19 @@ fun WorkspaceBottomNav(
     onKnowledgeSelected: () -> Unit = {},
 ) {
     NavigationBar(
-        containerColor = Color(0xFF1D1F27),
+        containerColor = Color(0xFF181B21),
         contentColor = WorkspaceMuted,
         tonalElevation = 0.dp,
-        modifier = Modifier.navigationBarsPadding(),
+        modifier = Modifier
+            .drawBehind {
+                drawLine(
+                    color = WorkspaceBorder.copy(alpha = 0.72f),
+                    start = Offset(0f, 0f),
+                    end = Offset(size.width, 0f),
+                    strokeWidth = 1.dp.toPx(),
+                )
+            }
+            .navigationBarsPadding(),
     ) {
         WorkspaceNavItems
             .filter { showKnowledge || it != "知识" }
@@ -242,7 +424,7 @@ fun WorkspaceBottomNav(
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = PrimaryFixedDim,
                     selectedTextColor = PrimaryFixedDim,
-                    indicatorColor = CommandBlueSoft,
+                    indicatorColor = CommandBlueSoft.copy(alpha = 0.82f),
                     unselectedIconColor = WorkspaceMuted,
                     unselectedTextColor = WorkspaceMuted,
                 ),
@@ -259,8 +441,8 @@ fun Panel(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
-        border = BorderStroke(1.dp, WorkspaceBorder),
-        colors = CardDefaults.cardColors(containerColor = WorkspaceSurface),
+        border = BorderStroke(1.dp, WorkspaceBorder.copy(alpha = 0.86f)),
+        colors = CardDefaults.cardColors(containerColor = WorkspaceSurfaceElevated.copy(alpha = 0.58f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         content = {
             Column(
@@ -290,9 +472,9 @@ fun StatusChip(
     Text(
         text = text,
         modifier = modifier
-            .border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
-            .background(color.copy(alpha = 0.12f), RoundedCornerShape(4.dp))
-            .padding(horizontal = 8.dp, vertical = 3.dp),
+            .background(color.copy(alpha = 0.13f), RoundedCornerShape(5.dp))
+            .border(1.dp, color.copy(alpha = 0.32f), RoundedCornerShape(5.dp))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         color = color,
         fontSize = 12.sp,
         fontWeight = FontWeight.Medium,
@@ -310,9 +492,12 @@ fun MetricCell(
 ) {
     Column(
         modifier = modifier
-            .border(1.dp, WorkspaceBorder, RoundedCornerShape(6.dp))
-            .background(Color(0xFF1D1F27), RoundedCornerShape(6.dp))
-            .padding(horizontal = 8.dp, vertical = 10.dp),
+            .background(
+                Brush.verticalGradient(listOf(Color(0xFF242833), Color(0xFF1A1D24))),
+                RoundedCornerShape(8.dp),
+            )
+            .border(1.dp, WorkspaceBorder.copy(alpha = 0.82f), RoundedCornerShape(8.dp))
+            .padding(horizontal = 8.dp, vertical = 11.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(label, color = WorkspaceMuted, fontSize = 12.sp, maxLines = 1)
@@ -410,7 +595,7 @@ fun TinyBar(
         progress = { progress.coerceIn(0f, 1f) },
         modifier = modifier.fillMaxWidth().height(4.dp),
         color = PrimaryFixedDim,
-        trackColor = Color(0xFF272A32),
+        trackColor = WorkspaceSurfaceMuted.copy(alpha = 0.72f),
     )
 }
 
@@ -432,8 +617,11 @@ fun IconBadge(
     Box(
         modifier = Modifier
             .size(48.dp)
-            .border(1.dp, WorkspaceBorder, RoundedCornerShape(6.dp))
-            .background(WorkspaceSurfaceElevated, RoundedCornerShape(6.dp)),
+            .background(
+                Brush.verticalGradient(listOf(WorkspaceSurfaceElevated, Color(0xFF1A1D24))),
+                RoundedCornerShape(8.dp),
+            )
+            .border(1.dp, WorkspaceBorder.copy(alpha = 0.84f), RoundedCornerShape(8.dp)),
         contentAlignment = Alignment.Center,
     ) {
         Text(text, color = color, fontSize = 24.sp, fontWeight = FontWeight.Bold)

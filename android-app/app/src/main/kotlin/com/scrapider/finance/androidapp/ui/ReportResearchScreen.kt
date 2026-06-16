@@ -65,6 +65,11 @@ import io.noties.markwon.ext.strikethrough.StrikethroughPlugin
 import io.noties.markwon.ext.tables.TablePlugin
 import io.noties.markwon.html.HtmlPlugin
 
+private enum class ReportFilterSheet {
+    TargetType,
+    Status,
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportResearchScreen(
@@ -93,6 +98,7 @@ fun ReportResearchScreen(
     onObservationSelected: () -> Unit,
     onKnowledgeSelected: () -> Unit,
 ) {
+    var activeFilterSheet by remember { mutableStateOf<ReportFilterSheet?>(null) }
     Scaffold(
         containerColor = WorkspaceBackground,
         topBar = {
@@ -124,13 +130,19 @@ fun ReportResearchScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            ReportTargetTypeFilters(
-                selected = report.targetType,
-                onSelected = onTargetTypeChange,
-            )
-            ReportStatusFilters(
-                selected = report.statusFilter,
-                onSelected = onStatusFilterChange,
+            CompactFilterBar(
+                items = listOf(
+                    CompactFilterItem(
+                        label = "标的类型",
+                        value = report.targetType.label,
+                        onClick = { activeFilterSheet = ReportFilterSheet.TargetType },
+                    ),
+                    CompactFilterItem(
+                        label = "报告状态",
+                        value = report.statusFilter.label,
+                        onClick = { activeFilterSheet = ReportFilterSheet.Status },
+                    ),
+                ),
             )
             ReportSearchBar(
                 keyword = report.keyword,
@@ -144,6 +156,34 @@ fun ReportResearchScreen(
             )
             Spacer(Modifier.height(72.dp))
         }
+    }
+
+    when (activeFilterSheet) {
+        ReportFilterSheet.TargetType -> FilterOptionSheet(
+            title = "选择标的类型",
+            options = ReportTargetType.entries.map { type ->
+                FilterOptionItem(type.name, type.label)
+            },
+            selectedKey = report.targetType.name,
+            onSelected = { key ->
+                ReportTargetType.entries.firstOrNull { it.name == key }?.let(onTargetTypeChange)
+            },
+            onDismiss = { activeFilterSheet = null },
+        )
+
+        ReportFilterSheet.Status -> FilterOptionSheet(
+            title = "选择报告状态",
+            options = ReportStatusFilter.entries.map { status ->
+                FilterOptionItem(status.name, status.label)
+            },
+            selectedKey = report.statusFilter.name,
+            onSelected = { key ->
+                ReportStatusFilter.entries.firstOrNull { it.name == key }?.let(onStatusFilterChange)
+            },
+            onDismiss = { activeFilterSheet = null },
+        )
+
+        null -> Unit
     }
 
     report.selectedDetail?.let { detail ->
@@ -312,7 +352,7 @@ private fun ReportList(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
         when {
-            loading && reports.isEmpty() -> EmptyReportCard("正在同步报告列表。")
+            loading && reports.isEmpty() -> EmptyReportCard("正在加载报告列表。")
             reports.isEmpty() -> EmptyReportCard("暂无匹配报告。点击新建可提交新的研究报告任务。")
             else -> reports.forEach { item ->
                 ReportCard(
@@ -389,17 +429,25 @@ private fun ReportCard(
                 )
             }
             DividerLine()
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.fillMaxWidth().height(24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(reportTime(report), color = WorkspaceMuted, fontSize = 12.sp)
                 when {
-                    report.latestStatus == "failed" -> TextButton(onClick = onRegenerate, enabled = !loading && report.latestTaskNo.isNotBlank()) {
-                        Text("重新生成 ↻", color = PrimaryFixedDim, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    }
+                    report.latestStatus == "failed" -> CompactReportAction(
+                        text = "重新生成 ↻",
+                        enabled = !loading && report.latestTaskNo.isNotBlank(),
+                        onClick = onRegenerate,
+                    )
 
                     report.latestStatus.isGeneratingReportStatus() -> Text("生成中", color = WorkspaceMuted, fontSize = 12.sp)
-                    else -> TextButton(onClick = onReportSelected, enabled = report.latestReportId != null) {
-                        Text("查看详情 ›", color = PrimaryFixedDim, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    }
+                    else -> CompactReportAction(
+                        text = "查看详情 ›",
+                        enabled = report.latestReportId != null,
+                        onClick = onReportSelected,
+                    )
                 }
             }
             if (report.latestStatus.isGeneratingReportStatus()) {
@@ -407,6 +455,26 @@ private fun ReportCard(
             }
         }
     }
+}
+
+@Composable
+private fun CompactReportAction(
+    text: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Text(
+        text = text,
+        modifier = Modifier
+            .clickable(enabled = enabled) { onClick() }
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+        color = if (enabled) PrimaryFixedDim else WorkspaceMuted.copy(alpha = 0.56f),
+        fontSize = 12.sp,
+        lineHeight = 14.sp,
+        fontWeight = FontWeight.SemiBold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 @Composable

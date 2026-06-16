@@ -94,6 +94,7 @@ fun ObservationRiskScreen(
     onReportSelected: () -> Unit,
     onKnowledgeSelected: () -> Unit,
 ) {
+    var showTypeFilterSheet by remember { mutableStateOf(false) }
     Scaffold(
         containerColor = WorkspaceBackground,
         topBar = {
@@ -131,9 +132,14 @@ fun ObservationRiskScreen(
                 selectedGroupId = observation.selectedGroup?.id.orEmpty(),
                 onSelected = onGroupSelected,
             )
-            TypeFilterChips(
-                selected = observation.typeFilter,
-                onSelected = onTypeFilterSelected,
+            CompactFilterBar(
+                items = listOf(
+                    CompactFilterItem(
+                        label = "标的类型",
+                        value = observation.typeFilter?.label ?: "全部",
+                        onClick = { showTypeFilterSheet = true },
+                    ),
+                ),
             )
             WatchItemList(
                 loading = loading,
@@ -147,6 +153,21 @@ fun ObservationRiskScreen(
             }
             Spacer(Modifier.height(72.dp))
         }
+    }
+
+    if (showTypeFilterSheet) {
+        val filters = listOf<WatchTargetType?>(null, WatchTargetType.Stock, WatchTargetType.Bond, WatchTargetType.Index)
+        FilterOptionSheet(
+            title = "选择标的类型",
+            options = filters.map { type ->
+                FilterOptionItem(type?.apiValue ?: "ALL", type?.label ?: "全部")
+            },
+            selectedKey = observation.typeFilter?.apiValue ?: "ALL",
+            onSelected = { key ->
+                onTypeFilterSelected(filters.firstOrNull { type -> (type?.apiValue ?: "ALL") == key })
+            },
+            onDismiss = { showTypeFilterSheet = false },
+        )
     }
 
     observation.selectedItem?.let { item ->
@@ -343,7 +364,7 @@ private fun WatchItemList(
             HeaderCell("预警", 1f, TextAlign.End)
         }
         when {
-            loading -> EmptyObservationRow("正在同步观察池和预警配置。")
+            loading -> EmptyObservationRow("正在加载观察池和预警配置。")
             items.isEmpty() -> EmptyObservationRow("当前分组暂无匹配标的。")
             else -> items.forEach { item ->
                 WatchItemRow(
@@ -552,7 +573,7 @@ private fun AlertDetailCard(alert: StockAlertConfig?, item: WatchItem) {
     val detail = when {
         !item.targetType.supportsAlert -> "当前类型不支持预警配置。"
         alert != null -> "距设定阈值 ${formatNumber(alert.thresholdPercent, 2)}% 仅差 ${formatNumber(alertDistance(alert), 2)}%"
-        else -> "可通过新增观察标的时同步创建风险预警。"
+        else -> "可通过新增观察标的时同时创建风险预警。"
     }
     Column(
         modifier = Modifier

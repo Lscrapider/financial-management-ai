@@ -17,6 +17,12 @@ import androidx.compose.runtime.setValue
 import com.scrapider.finance.androidapp.data.ApiClient
 import com.scrapider.finance.androidapp.data.AddWatchTargetFormState
 import com.scrapider.finance.androidapp.data.AppFontScale
+import com.scrapider.finance.androidapp.data.AiChatMessage
+import com.scrapider.finance.androidapp.data.AiChatProgressStep
+import com.scrapider.finance.androidapp.data.AiChatRole
+import com.scrapider.finance.androidapp.data.AiChatSocket
+import com.scrapider.finance.androidapp.data.AiChatSocketEvent
+import com.scrapider.finance.androidapp.data.AiChatUiState
 import com.scrapider.finance.androidapp.data.FinanceRepository
 import com.scrapider.finance.androidapp.data.KnowledgeMaterialFormState
 import com.scrapider.finance.androidapp.data.KnowledgeMaterialTask
@@ -37,6 +43,7 @@ import com.scrapider.finance.androidapp.data.ReportTargetType
 import com.scrapider.finance.androidapp.data.SessionState
 import com.scrapider.finance.androidapp.data.WatchTargetType
 import com.scrapider.finance.androidapp.data.WorkbenchSummary
+import com.scrapider.finance.androidapp.ui.AiChatScreen
 import com.scrapider.finance.androidapp.ui.FinanceTheme
 import com.scrapider.finance.androidapp.ui.KnowledgeMaterialScreen
 import com.scrapider.finance.androidapp.ui.LoginScreen
@@ -47,6 +54,7 @@ import com.scrapider.finance.androidapp.ui.UserCenterScreen
 import com.scrapider.finance.androidapp.ui.WorkbenchScreen
 import java.io.ByteArrayOutputStream
 import java.time.LocalDateTime
+import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 
 private enum class AppScreen {
@@ -57,6 +65,7 @@ private enum class AppScreen {
     Report,
     Knowledge,
     UserCenter,
+    AiChat,
 }
 
 private data class AppUiState(
@@ -75,6 +84,7 @@ private data class AppUiState(
     val observation: ObservationRiskUiState = ObservationRiskUiState(),
     val report: ReportResearchUiState = ReportResearchUiState(),
     val knowledge: KnowledgeMaterialUiState = KnowledgeMaterialUiState(),
+    val aiChat: AiChatUiState = AiChatUiState(),
     val fontScale: AppFontScale = AppFontScale.Compact,
 )
 
@@ -106,6 +116,14 @@ class MainActivity : ComponentActivity() {
     private var state by mutableStateOf(AppUiState())
     private var screenBackStack by mutableStateOf(listOf(AppScreen.Workbench))
     private var materialPollRunnable: Runnable? = null
+    private var aiChatSocket: AiChatSocket? = null
+    private var aiChatMessageSequence = 0
+    private var aiChatLocalMessageId = 0L
+    private var aiChatProgressSequence = 0L
+    private var pendingAiAssistantMessageId: Long? = null
+    private var pendingAiAnswer = ""
+    private var aiChatClosedByUser = false
+    private val aiChatTimeFormat = DateTimeFormatter.ofPattern("HH:mm")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -116,7 +134,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             FinanceTheme(fontScale = state.fontScale.scale) {
                 BackHandler(enabled = state.screen != AppScreen.Login && screenBackStack.size > 1) {
-                    popTopLevelScreen()
+                    if (state.screen == AppScreen.AiChat) {
+                        dismissAiChatSheet()
+                    } else {
+                        popTopLevelScreen()
+                    }
                 }
                 when (state.screen) {
                     AppScreen.Login -> LoginScreen(
@@ -142,11 +164,20 @@ class MainActivity : ComponentActivity() {
                         summary = state.workbench,
                         showKnowledge = state.session.isAdmin,
                         onRefresh = ::refreshWorkbench,
+                        onAiChatOpen = ::openAiChatSheet,
                         onMarketSelected = ::showMarket,
                         onObservationSelected = ::showObservation,
                         onReportSelected = ::showReport,
                         onKnowledgeSelected = ::showKnowledge,
                         onUserCenterSelected = ::showUserCenter,
+                    )
+
+                    AppScreen.AiChat -> AiChatScreen(
+                        aiChat = state.aiChat,
+                        onDismiss = ::dismissAiChatSheet,
+                        onInputChange = ::changeAiChatInput,
+                        onSend = ::submitAiChatMessage,
+                        onClear = ::clearAiChatMessages,
                     )
 
                     AppScreen.Market -> MarketScreen(
@@ -300,6 +331,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         stopMaterialPolling()
+        closeAiChatConnection()
         apiClient.shutdown()
         super.onDestroy()
     }
@@ -328,7 +360,7 @@ class MainActivity : ComponentActivity() {
                 screen = AppScreen.Workbench,
                 loading = false,
                 session = session,
-                statusMessage = "登录成功：${session.displayName}，正在同步投资工作台。",
+                statusMessage = "登录成功：${session.displayName}，正在加载投资工作台。",
                 errorMessage = "",
             )
             screenBackStack = listOf(AppScreen.Workbench)
@@ -343,7 +375,7 @@ class MainActivity : ComponentActivity() {
             return
         }
         val currentMarket = state.market
-        state = state.copy(loading = true, statusMessage = "正在同步${currentMarket.assetType.label}行情。")
+        state = state.copy(loading = true, statusMessage = "正在加载${currentMarket.assetType.label}行情。")
         repository.loadMarketQuotes(currentMarket.assetType, currentMarket.marketFilter.marketCode, currentMarket.sortOrder) { result, market ->
             if (result.statusCode == 401) {
                 handleExpiredSession("登录态已失效，请重新登录。")
@@ -358,8 +390,8 @@ class MainActivity : ComponentActivity() {
                 loading = false,
                 market = nextMarket,
                 statusMessage = when {
-                    result.success -> "行情中心已同步：${nextMarket.assetType.label} ${nextMarket.quotes.size} 条，上涨 ${nextMarket.upCount}，下跌 ${nextMarket.downCount}。"
-                    market.hasAnyData -> "部分同步完成：${market.assetType.label} ${market.quotes.size} 条。${result.message}"
+                    result.success -> ""
+                    market.hasAnyData -> result.message
                     else -> result.message
                 },
             )
@@ -404,6 +436,289 @@ class MainActivity : ComponentActivity() {
         if (!state.workbench.hasAnyData) {
             refreshWorkbench()
         }
+    }
+
+    private fun openAiChatSheet() {
+        if (!state.session.authenticated) {
+            showLogin("请先登录，登录后使用 AI 研究助手。")
+            return
+        }
+        aiChatClosedByUser = false
+        val currentStack = screenBackStack.ifEmpty { listOf(AppScreen.Workbench) }
+        screenBackStack = if (currentStack.lastOrNull() == AppScreen.AiChat) {
+            currentStack
+        } else {
+            currentStack + AppScreen.AiChat
+        }
+        state = state.copy(
+            screen = AppScreen.AiChat,
+            aiChat = state.aiChat.copy(visible = true),
+        )
+    }
+
+    private fun dismissAiChatSheet() {
+        aiChatClosedByUser = true
+        closeAiChatConnection()
+        val currentStack = screenBackStack.ifEmpty { listOf(AppScreen.Workbench) }
+        val nextStack = if (currentStack.lastOrNull() == AppScreen.AiChat) {
+            currentStack.dropLast(1).ifEmpty { listOf(AppScreen.Workbench) }
+        } else {
+            currentStack
+        }
+        screenBackStack = nextStack
+        state = state.copy(
+            screen = if (state.screen == AppScreen.AiChat) nextStack.last() else state.screen,
+            aiChat = state.aiChat.copy(
+                visible = false,
+                loading = false,
+                progressText = "",
+            ),
+        )
+    }
+
+    private fun changeAiChatInput(input: String) {
+        state = state.copy(aiChat = state.aiChat.copy(input = input))
+    }
+
+    private fun applyAiChatQuickPrompt(prompt: String) {
+        if (state.aiChat.loading) return
+        state = state.copy(aiChat = state.aiChat.copy(input = prompt))
+    }
+
+    private fun clearAiChatMessages() {
+        if (state.aiChat.loading) return
+        state = state.copy(aiChat = state.aiChat.copy(messages = emptyList(), progressText = ""))
+    }
+
+    private fun submitAiChatMessage() {
+        if (!state.session.authenticated) {
+            showLogin("请先登录，登录后使用 AI 研究助手。")
+            return
+        }
+        val content = state.aiChat.input.trim()
+        if (content.isBlank() || state.aiChat.loading) {
+            return
+        }
+        pendingAiAssistantMessageId = null
+        pendingAiAnswer = ""
+        aiChatClosedByUser = false
+        state = state.copy(
+            aiChat = state.aiChat.copy(
+                input = "",
+                loading = true,
+                progressText = "正在分析",
+                progressSteps = emptyList(),
+                messages = state.aiChat.messages + createAiChatMessage(AiChatRole.User, content),
+            ),
+        )
+        val socket = aiChatSocket
+        if (socket != null) {
+            sendAiChatMessage(socket, content)
+            return
+        }
+        repository.openAiChatSocket(
+            callback = { result, openedSocket ->
+                if (!result.success || openedSocket == null) {
+                    if (result.statusCode == 401) {
+                        handleExpiredSession("登录态已失效，请重新登录后使用 AI 研究助手。")
+                        return@openAiChatSocket
+                    }
+                    finishAiChatWithError("AI 服务暂时不可用，请稍后再试。")
+                    Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show()
+                    return@openAiChatSocket
+                }
+                aiChatSocket = openedSocket
+                sendAiChatMessage(openedSocket, content)
+            },
+            onEvent = ::handleAiChatSocketEvent,
+        )
+    }
+
+    private fun sendAiChatMessage(socket: AiChatSocket, content: String) {
+        aiChatMessageSequence += 1
+        val messageId = "msg-${System.currentTimeMillis()}-$aiChatMessageSequence"
+        if (!socket.sendUserMessage(messageId, content)) {
+            closeAiChatConnection()
+            finishAiChatWithError("AI Chat 连接已断开，请稍后再试。")
+        }
+    }
+
+    private fun handleAiChatSocketEvent(event: AiChatSocketEvent) {
+        when (event.type) {
+            "agent_progress" -> {
+                val progress = event.content.ifBlank { aiChatStatusLabel(event.status) }
+                if (progress.isNotBlank()) {
+                    appendAiChatProgress(progress, event.status, event.answeredAt)
+                }
+            }
+
+            "answer_delta" -> {
+                val content = event.content
+                if (content.isBlank()) return
+                pendingAiAnswer += content
+                val assistantId = pendingAiAssistantMessageId
+                if (assistantId == null) {
+                    val message = createAiChatMessage(
+                        role = AiChatRole.Assistant,
+                        content = pendingAiAnswer,
+                        model = "AI 研究助手",
+                    )
+                    pendingAiAssistantMessageId = message.id
+                    state = state.copy(
+                        aiChat = state.aiChat.copy(
+                            progressText = "正在生成回答",
+                            messages = state.aiChat.messages + message,
+                        ),
+                    )
+                } else {
+                    replaceAiChatMessage(assistantId) { it.copy(content = pendingAiAnswer) }
+                    state = state.copy(aiChat = state.aiChat.copy(progressText = "正在生成回答"))
+                }
+            }
+
+            "final_answer" -> {
+                val answer = event.content.ifBlank { pendingAiAnswer.ifBlank { "没有返回内容。" } }
+                val assistantId = pendingAiAssistantMessageId
+                if (assistantId == null) {
+                    state = state.copy(
+                        aiChat = state.aiChat.copy(
+                            messages = state.aiChat.messages + createAiChatMessage(
+                                role = AiChatRole.Assistant,
+                                content = answer,
+                                model = event.model.ifBlank { "AI 研究助手" },
+                                createdAt = formatAiChatTime(event.answeredAt),
+                            ),
+                        ),
+                    )
+                } else {
+                    replaceAiChatMessage(assistantId) {
+                        it.copy(
+                            content = answer,
+                            model = event.model.ifBlank { it.model.ifBlank { "AI 研究助手" } },
+                            createdAt = formatAiChatTime(event.answeredAt),
+                        )
+                    }
+                }
+                pendingAiAssistantMessageId = null
+                pendingAiAnswer = ""
+                state = state.copy(aiChat = state.aiChat.copy(loading = false, progressText = "回答完成"))
+            }
+
+            "closed" -> {
+                aiChatSocket = null
+                if (!aiChatClosedByUser && state.aiChat.loading) {
+                    finishAiChatWithError("AI Chat 连接已断开。")
+                }
+            }
+
+            "error", "client_error" -> {
+                aiChatSocket = null
+                if (!aiChatClosedByUser) {
+                    finishAiChatWithError(event.content.ifBlank { "AI 服务暂时不可用，请稍后再试。" })
+                }
+            }
+        }
+    }
+
+    private fun finishAiChatWithError(message: String) {
+        val assistantId = pendingAiAssistantMessageId
+        val nextMessages = if (assistantId != null && pendingAiAnswer.isNotBlank()) {
+            state.aiChat.messages.map { current ->
+                if (current.id == assistantId) {
+                    current.copy(content = "${current.content}\n\n（连接中断，回答可能不完整。）")
+                } else {
+                    current
+                }
+            }
+        } else {
+            state.aiChat.messages + createAiChatMessage(AiChatRole.Assistant, message, model = "AI 研究助手")
+        }
+        state = state.copy(
+            aiChat = state.aiChat.copy(
+                loading = false,
+                progressText = message,
+                messages = nextMessages,
+            ),
+        )
+        pendingAiAssistantMessageId = null
+        pendingAiAnswer = ""
+    }
+
+    private fun closeAiChatConnection() {
+        aiChatSocket?.close()
+        aiChatSocket = null
+        pendingAiAssistantMessageId = null
+        pendingAiAnswer = ""
+    }
+
+    private fun createAiChatMessage(
+        role: AiChatRole,
+        content: String,
+        model: String = "",
+        createdAt: String = formatAiChatTime(),
+    ): AiChatMessage {
+        aiChatLocalMessageId += 1
+        return AiChatMessage(
+            id = aiChatLocalMessageId,
+            role = role,
+            content = content,
+            createdAt = createdAt,
+            model = model,
+        )
+    }
+
+    private fun appendAiChatProgress(content: String, status: String, answeredAt: String) {
+        aiChatProgressSequence += 1
+        val step = AiChatProgressStep(
+            id = aiChatProgressSequence,
+            content = content,
+            status = status,
+            createdAt = formatAiChatTime(answeredAt),
+        )
+        val currentSteps = state.aiChat.progressSteps
+        val nextSteps = if (currentSteps.lastOrNull()?.content == content) {
+            currentSteps
+        } else {
+            (currentSteps + step).takeLast(8)
+        }
+        state = state.copy(
+            aiChat = state.aiChat.copy(
+                progressText = content,
+                progressSteps = nextSteps,
+            ),
+        )
+    }
+
+    private fun aiChatStatusLabel(status: String): String = when (status) {
+        "running" -> "正在执行数据查询"
+        "ready" -> "正在准备研究上下文"
+        "finished", "success" -> "数据查询完成"
+        "failed" -> "数据查询失败"
+        else -> ""
+    }
+
+    private fun replaceAiChatMessage(id: Long, transform: (AiChatMessage) -> AiChatMessage) {
+        state = replaceAiChatMessageState(id, transform)
+    }
+
+    private fun replaceAiChatMessageState(id: Long, transform: (AiChatMessage) -> AiChatMessage): AppUiState =
+        state.copy(
+            aiChat = state.aiChat.copy(
+                messages = state.aiChat.messages.map { message ->
+                    if (message.id == id) transform(message) else message
+                },
+            ),
+        )
+
+    private fun formatAiChatTime(value: String = ""): String {
+        if (value.isBlank()) {
+            return LocalDateTime.now().format(aiChatTimeFormat)
+        }
+        return runCatching {
+            OffsetDateTime.parse(value).toLocalTime().format(aiChatTimeFormat)
+        }.recoverCatching {
+            LocalDateTime.parse(value).format(aiChatTimeFormat)
+        }.getOrDefault(LocalDateTime.now().format(aiChatTimeFormat))
     }
 
     private fun showMarket() {
@@ -463,6 +778,7 @@ class MainActivity : ComponentActivity() {
         val currentFontScale = state.fontScale
         clearLoginState()
         stopMaterialPolling()
+        closeAiChatConnection()
         screenBackStack = listOf(AppScreen.Workbench)
         state = AppUiState(
             username = if (state.rememberAccount) state.username else "",
@@ -504,7 +820,7 @@ class MainActivity : ComponentActivity() {
             state = state.copy(statusMessage = "普通用户不能新增标的。")
             return
         }
-        state = state.copy(loading = true, statusMessage = "正在新增股票 ${stockCode.trim()} 并同步行情。")
+        state = state.copy(loading = true, statusMessage = "正在新增股票 ${stockCode.trim()} 并更新行情。")
         repository.addStockConfig(stockCode, stockName) { result ->
             handleSystemConfigResult(result)
         }
@@ -516,7 +832,7 @@ class MainActivity : ComponentActivity() {
             state = state.copy(statusMessage = "普通用户不能新增标的。")
             return
         }
-        state = state.copy(loading = true, statusMessage = "正在新增可转债 ${bondCode.trim()} 并同步基础资料。")
+        state = state.copy(loading = true, statusMessage = "正在新增可转债 ${bondCode.trim()} 并更新基础资料。")
         repository.addBondConfig(bondCode, bondName) { result ->
             handleSystemConfigResult(result)
         }
@@ -577,7 +893,7 @@ class MainActivity : ComponentActivity() {
             return
         }
         val current = state.report
-        state = state.copy(loading = true, statusMessage = "正在同步${current.targetType.label}报告列表。")
+        state = state.copy(loading = true, statusMessage = "正在加载${current.targetType.label}报告列表。")
         repository.loadReportResearch(current.targetType) { result, report ->
             if (result.statusCode == 401) {
                 handleExpiredSession("登录态已失效，请重新登录。")
@@ -601,8 +917,8 @@ class MainActivity : ComponentActivity() {
                 loading = false,
                 report = nextReport,
                 statusMessage = when {
-                    result.success -> "报告研究已同步：${nextReport.targets.size} 个标的。"
-                    report.hasAnyData -> "部分同步完成：${result.message}"
+                    result.success -> ""
+                    report.hasAnyData -> result.message
                     else -> result.message
                 },
             )
@@ -1205,7 +1521,7 @@ class MainActivity : ComponentActivity() {
             showLogin("请先登录，登录后进入 OCR 导入。")
             return
         }
-        state = state.copy(loading = true, statusMessage = "正在同步 OCR 导入队列。")
+        state = state.copy(loading = true, statusMessage = "正在加载 OCR 导入队列。")
         repository.loadOcrTasks { result, tasks ->
             if (result.statusCode == 401) {
                 handleExpiredSession("登录态已失效，请重新登录。")
@@ -1226,7 +1542,7 @@ class MainActivity : ComponentActivity() {
                         updatedAt = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm")),
                     ),
                 ),
-                statusMessage = "OCR队列已同步：${tasks.size} 个任务。",
+                statusMessage = "",
             )
         }
     }
@@ -1497,7 +1813,7 @@ class MainActivity : ComponentActivity() {
             showLogin("请先登录，登录后进入手动导入。")
             return
         }
-        state = state.copy(loading = true, statusMessage = "正在同步手动导入队列。")
+        state = state.copy(loading = true, statusMessage = "正在加载手动导入队列。")
         repository.loadManualKnowledgeTasks { result, tasks ->
             if (result.statusCode == 401) {
                 handleExpiredSession("登录态已失效，请重新登录。")
@@ -1520,7 +1836,7 @@ class MainActivity : ComponentActivity() {
                         updatedAt = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm")),
                     ),
                 ),
-                statusMessage = "手动导入队列已同步：${tasks.size} 个任务。",
+                statusMessage = "",
             )
         }
     }
@@ -1617,7 +1933,7 @@ class MainActivity : ComponentActivity() {
             showLogin("请先登录，登录后进入投资工作台。")
             return
         }
-        state = state.copy(loading = true, statusMessage = "正在同步投资工作台：观察池、布控提醒和报告动态。")
+        state = state.copy(loading = true, statusMessage = "正在加载投资工作台：观察池、布控提醒和报告动态。")
         repository.loadWorkbench { result, summary ->
             if (result.statusCode == 401) {
                 handleExpiredSession("登录态已失效，请重新登录。")
@@ -1627,8 +1943,8 @@ class MainActivity : ComponentActivity() {
                 loading = false,
                 workbench = if (result.success || summary.hasAnyData) summary else state.workbench,
                 statusMessage = when {
-                    result.success -> "投资工作台已同步：观察池 ${summary.watchItemCount} 个标的，关注 ${summary.focusCount} 项。"
-                    summary.hasAnyData -> "部分同步完成：观察池 ${summary.watchItemCount} 个标的，关注 ${summary.focusCount} 项。${result.message}"
+                    result.success -> ""
+                    summary.hasAnyData -> result.message
                     else -> result.message
                 },
             )
@@ -1644,7 +1960,7 @@ class MainActivity : ComponentActivity() {
             return
         }
         val current = state.observation
-        state = state.copy(loading = true, statusMessage = "正在同步观察池分组、标的和风险预警。")
+        state = state.copy(loading = true, statusMessage = "正在加载观察池分组、标的和风险预警。")
         repository.loadObservationRisk { result, observation ->
             if (result.statusCode == 401) {
                 handleExpiredSession("登录态已失效，请重新登录。")
@@ -1669,8 +1985,8 @@ class MainActivity : ComponentActivity() {
                     addForm = current.addForm.copy(selectedGroupId = formGroupId),
                 ),
                 statusMessage = when {
-                    result.success -> "观察风控已同步：观察池 ${observation.watchItemCount} 个标的，启用预警 ${observation.enabledAlertCount} 项。"
-                    observation.groups.isNotEmpty() || observation.alerts.isNotEmpty() -> "部分同步完成：${result.message}"
+                    result.success -> ""
+                    observation.groups.isNotEmpty() || observation.alerts.isNotEmpty() -> result.message
                     else -> result.message
                 },
             )
@@ -1912,7 +2228,7 @@ class MainActivity : ComponentActivity() {
             username = if (rememberAccount) session.username.ifBlank { rememberedUsername } else "",
             rememberAccount = rememberAccount,
             session = session,
-            statusMessage = "正在恢复登录态并同步投资工作台。",
+            statusMessage = "正在恢复登录态并加载投资工作台。",
             fontScale = fontScale,
         )
     }
@@ -1943,6 +2259,7 @@ class MainActivity : ComponentActivity() {
 
     private fun handleExpiredSession(message: String) {
         clearLoginState()
+        closeAiChatConnection()
         screenBackStack = listOf(AppScreen.Workbench)
         state = state.copy(
             screen = AppScreen.Login,
