@@ -1,23 +1,6 @@
 name: financial-management-ai
 
 services:
-  postgres:
-    image: pgvector/pgvector:pg15
-    container_name: finance-postgres
-    ports:
-      - "5432:5432"
-    env_file:
-      - ../.env
-    environment:
-      POSTGRES_DB: ${POSTGRES_ADMIN_DATABASE:-finance_management}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-123456}
-    command: postgres -c timezone='Asia/Shanghai'
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    networks:
-      - finance-network
-
   database-init:
     build:
       context: ..
@@ -26,73 +9,13 @@ services:
     env_file:
       - ../.env
     environment:
-      POSTGRES_HOST: postgres
+      POSTGRES_HOST: common-postgres
       POSTGRES_PORT: 5432
-    depends_on:
-      - postgres
+      RABBITMQ_HOST: common-rabbitmq
+      RABBITMQ_MANAGEMENT_PORT: 15672
+      INFLUXDB_URL: http://common-influxdb:8086
     networks:
-      - finance-network
-
-  influxdb:
-    image: influxdb:2.7
-    container_name: finance-influxdb
-    ports:
-      - "${INFLUXDB_PORT:-8086}:8086"
-    env_file:
-      - ../.env
-    environment:
-      DOCKER_INFLUXDB_INIT_MODE: setup
-      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_USERNAME:-admin}
-      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_PASSWORD:-admin123456}
-      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG:-finance}
-      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET:-stock_intraday}
-      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_ADMIN_TOKEN:-finance-management-local-token}
-    volumes:
-      - influxdb-data:/var/lib/influxdb2
-      - influxdb-config:/etc/influxdb2
-    networks:
-      - finance-network
-
-  rabbitmq:
-    image: rabbitmq:3.13-management
-    container_name: finance-rabbitmq
-    ports:
-      - "${RABBITMQ_PORT:-5672}:5672"
-      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
-    env_file:
-      - ../.env
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-finance}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-finance123456}
-      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-finance}
-    volumes:
-      - rabbitmq-data:/var/lib/rabbitmq
-      - ../database/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
-      - ../database/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
-    networks:
-      - finance-network
-
-  minio:
-    image: minio/minio:latest
-    container_name: finance-minio
-    ports:
-      - "${MINIO_API_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
-    env_file:
-      - ../.env
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-finance}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-finance123456}
-    command: server /data --console-address ":9001"
-    volumes:
-      - minio-data:/data
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    networks:
-      - finance-network
+      - database-common-network
 
   minio-init:
     image: minio/mc:latest
@@ -100,22 +23,43 @@ services:
     env_file:
       - ../.env
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-finance}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-finance123456}
+      MINIO_ENDPOINT: http://common-minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio-root}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio-root-password}
+      MINIO_USER: ${MINIO_USER:-finance}
+      MINIO_PASSWORD: ${MINIO_PASSWORD:-finance-minio-password}
       MINIO_OCR_BUCKET: ${MINIO_OCR_BUCKET:-finance-ocr}
+      MINIO_POLICY_NAME: ${MINIO_POLICY_NAME:-finance-ocr-policy}
     entrypoint: /bin/sh
     command:
       - -c
       - |
-        until mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"; do
+        until mc alias set common "$${MINIO_ENDPOINT}" "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"; do
           sleep 2
         done
-        mc mb --ignore-existing "local/$${MINIO_OCR_BUCKET}"
-        mc anonymous set none "local/$${MINIO_OCR_BUCKET}"
-    depends_on:
-      - minio
+        mc mb --ignore-existing "common/$${MINIO_OCR_BUCKET}"
+        cat > /tmp/minio-policy.json <<EOF
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": ["s3:*"],
+              "Resource": [
+                "arn:aws:s3:::$${MINIO_OCR_BUCKET}",
+                "arn:aws:s3:::$${MINIO_OCR_BUCKET}/*"
+              ]
+            }
+          ]
+        }
+        EOF
+        mc admin user add common "$${MINIO_USER}" "$${MINIO_PASSWORD}" || true
+        mc admin user enable common "$${MINIO_USER}"
+        mc admin policy create common "$${MINIO_POLICY_NAME}" /tmp/minio-policy.json || true
+        mc admin policy attach common "$${MINIO_POLICY_NAME}" --user "$${MINIO_USER}"
+        mc anonymous set none "common/$${MINIO_OCR_BUCKET}"
     networks:
-      - finance-network
+      - database-common-network
 
   finance-service:
     build:
@@ -127,13 +71,18 @@ services:
     env_file:
       - ../.env
     environment:
-      POSTGRES_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-finance_management}
-      POSTGRES_USERNAME: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      INFLUXDB_URL: http://influxdb:8086
-      RABBITMQ_HOST: rabbitmq
-      MINIO_ENDPOINT: http://minio:9000
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      POSTGRES_URL: jdbc:postgresql://common-postgres:5432/${POSTGRES_DB:-finance_management}
+      POSTGRES_USERNAME: ${POSTGRES_USER:-finance}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-finance-password}
+      POSTGRES_HOST: common-postgres
+      POSTGRES_PORT: 5432
+      INFLUXDB_URL: http://common-influxdb:8086
+      RABBITMQ_HOST: common-rabbitmq
+      MINIO_ENDPOINT: http://common-minio:9000
+      MINIO_ROOT_USER: ${MINIO_USER:-finance}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-finance-minio-password}
+      AGENT_CALLBACK_URL: http://finance-service:8081/internal/agent/callback
+      AGENT_DATA_GATEWAY_URL: http://finance-service:8081/internal/agent/data/query
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
       DEEPSEEK_COMPLETIONS_PATH: ${DEEPSEEK_COMPLETIONS_PATH:-/chat/completions}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-pro}
@@ -142,12 +91,12 @@ services:
       DEEPSEEK_THINKING_ENABLED: ${DEEPSEEK_THINKING_ENABLED:-true}
       DEEPSEEK_THINKING_TYPE: ${DEEPSEEK_THINKING_TYPE:-enabled}
     depends_on:
-      - postgres
-      - influxdb
-      - rabbitmq
-      - minio
+      database-init:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
     networks:
-      - finance-network
+      - database-common-network
 
   finance-python-worker:
     build:
@@ -159,37 +108,46 @@ services:
     env_file:
       - ../.env
     environment:
-      POSTGRES_HOST: postgres
+      POSTGRES_HOST: common-postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-finance_management}
-      POSTGRES_USERNAME: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-123456}
-      RABBITMQ_HOST: rabbitmq
+      POSTGRES_USERNAME: ${POSTGRES_USER:-finance}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-finance-password}
+      RABBITMQ_HOST: common-rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-finance}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-finance123456}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-finance-rabbitmq-password}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST:-finance}
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-finance}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-finance123456}
+      MINIO_ENDPOINT: common-minio:9000
+      MINIO_ROOT_USER: ${MINIO_USER:-finance}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-finance-minio-password}
       MINIO_OCR_BUCKET: ${MINIO_OCR_BUCKET:-finance-ocr}
-      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      FINANCE_API_BASE_URL: http://finance-service:8081
       DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
       QWEN_OCR_MODEL: ${QWEN_OCR_MODEL:-qwen-vl-ocr-latest}
     depends_on:
-      - postgres
-      - rabbitmq
-      - minio
+      database-init:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
     networks:
-      - finance-network
+      - database-common-network
 
-volumes:
-  postgres-data:
-  influxdb-data:
-  influxdb-config:
-  rabbitmq-data:
-  minio-data:
+  finance-frontend:
+    build:
+      context: ../frontend-vue
+      dockerfile: Dockerfile
+    container_name: finance-frontend
+    ports:
+      - "${FRONTEND_PORT:-5777}:5777"
+    environment:
+      VITE_BACKEND_PROXY_TARGET: http://finance-service:8081
+    depends_on:
+      - finance-service
+    networks:
+      - database-common-network
 
 networks:
-  finance-network:
-    name: finance-network
+  database-common-network:
+    external: true
+    name: docker-database-common-network

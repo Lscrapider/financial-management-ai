@@ -1,37 +1,56 @@
-# Database Services
+# Finance Resource Initialization
 
-本目录维护后端本地数据库依赖、PostgreSQL 初始化脚本和 InfluxDB 本地服务配置。
+本目录维护 finance 项目在通用数据库栈上的资源初始化脚本。
+通用 PostgreSQL、InfluxDB、RabbitMQ、MinIO、Redis 由 `/Users/qinzeyu/study/docker-database-common` 提供，本目录不再启动这些基础服务。
 
 ## 服务组成
 
 | 服务 | 说明 |
 | --- | --- |
-| PostgreSQL | 业务关系型数据库，默认库名 `finance_management`。 |
-| database-init | 等待 PostgreSQL 可用后，创建业务库并按文件名顺序执行 `migrations` 和 `seed`。 |
-| InfluxDB | 股票分钟级分时走势时序库，默认 bucket 为 `stock_intraday`。 |
+| database-init | 连接 common PostgreSQL、RabbitMQ、InfluxDB，创建 finance 专属账号、库、vhost、队列、bucket/token，并执行 `migrations` 和 `seed`。 |
+| minio-init | 连接 common MinIO，创建 finance 专属 bucket、用户和 bucket policy。 |
 
-## 启动数据库依赖
+## 初始化 finance 资源
 
-在项目根目录执行：
+先启动通用数据库栈：
 
 ```bash
-docker compose -f database/docker-compose.yml up -d
+cd /Users/qinzeyu/study/docker-database-common
+docker compose up -d
+```
+
+再在本项目根目录执行：
+
+```bash
+docker compose -f database/docker-compose.yml up --build
 ```
 
 常用地址：
 
 - PostgreSQL：`localhost:${POSTGRES_PORT:-5432}`
 - InfluxDB：`http://localhost:${INFLUXDB_PORT:-8086}`
+- RabbitMQ Management：`http://localhost:${RABBITMQ_MANAGEMENT_PORT:-15672}`
+- MinIO Console：`http://localhost:${MINIO_CONSOLE_PORT:-9001}`
 
 ## 初始化流程
 
 `database-init` 使用 `init_database.py` 执行以下步骤：
 
 1. 读取项目根目录 `.env`。
-2. 等待 PostgreSQL 可连接。
-3. 如果目标数据库不存在，则创建数据库。
-4. 按文件名顺序执行 `database/migrations/*.sql`。
-5. 按文件名顺序执行 `database/seed/*.sql`。
+2. 等待 common PostgreSQL 可连接。
+3. 用 PostgreSQL 管理账号创建 finance 用户和 `finance_management` 数据库。
+4. 在 finance 数据库中启用 `postgis` 和 `vector` 扩展。
+5. 用 finance 用户按文件名顺序执行 `database/migrations/*.sql`。
+6. 用 finance 用户按文件名顺序执行 `database/seed/*.sql`。
+7. 用 RabbitMQ 管理账号创建 finance 用户、vhost、权限、exchange、queue 和 binding。
+8. 用 InfluxDB 管理 token 创建 finance org、股票/指数/可转债分时 bucket 和项目 token。
+
+`minio-init` 执行以下步骤：
+
+1. 用 MinIO root 账号连接 common MinIO。
+2. 创建 `finance-ocr` bucket。
+3. 创建 finance MinIO 用户。
+4. 创建并绑定只允许访问 `finance-ocr` 的 policy。
 
 ## 迁移脚本
 
@@ -112,18 +131,27 @@ docker compose -f database/docker-compose.yml up -d
 | --- | --- | --- |
 | `POSTGRES_PORT` | `5432` | 本地 PostgreSQL 映射端口。 |
 | `POSTGRES_DB` | `finance_management` | 业务库名。 |
-| `POSTGRES_ADMIN_DATABASE` | `finance_management` / `postgres` | 容器初始化库或脚本连接的管理库。 |
-| `POSTGRES_USER` | `postgres` | PostgreSQL 用户名。 |
-| `POSTGRES_PASSWORD` | `123456` | PostgreSQL 密码。 |
+| `POSTGRES_ADMIN_DATABASE` | `postgres` | 初始化脚本连接的管理库。 |
+| `POSTGRES_ADMIN_USER` | `postgres-root` | common PostgreSQL 管理用户名。 |
+| `POSTGRES_ADMIN_PASSWORD` | `postgres-root-password` | common PostgreSQL 管理密码。 |
+| `POSTGRES_USER` | `finance` | finance 应用 PostgreSQL 用户名。 |
+| `POSTGRES_PASSWORD` | `finance-password` | finance 应用 PostgreSQL 密码。 |
 | `DATABASE_INIT_MAX_ATTEMPTS` | `30` | 初始化脚本等待数据库最大重试次数。 |
 | `DATABASE_INIT_RETRY_SECONDS` | `2` | 初始化脚本重试间隔秒数。 |
 | `INFLUXDB_PORT` | `8086` | 本地 InfluxDB 映射端口。 |
 | `INFLUXDB_ORG` | `finance` | InfluxDB 组织。 |
-| `INFLUXDB_BUCKET` | `stock_intraday` | 股票分时 bucket。 |
-| `INFLUXDB_ADMIN_TOKEN` | `finance-management-local-token` | InfluxDB 管理 Token。 |
-
-## 单独启动 InfluxDB
-
-```bash
-docker compose -f database/influxdb/docker-compose.yml up -d
-```
+| `INFLUXDB_BUCKET` | `stock_intraday` | 默认股票分时 bucket。 |
+| `INFLUXDB_INDEX_MINUTE_BUCKET` | `index_intraday` | 指数分时 bucket。 |
+| `INFLUXDB_BOND_MINUTE_BUCKET` | `bond_intraday` | 可转债分时 bucket。 |
+| `COMMON_INFLUXDB_ADMIN_TOKEN` | `common-influxdb-root-token` | common InfluxDB 管理 Token，仅初始化使用。 |
+| `INFLUXDB_TOKEN` | 初始化脚本输出 | finance 应用 InfluxDB Token。 |
+| `RABBITMQ_ADMIN_USER` | `rabbitmq-root` | common RabbitMQ 管理用户名。 |
+| `RABBITMQ_ADMIN_PASSWORD` | `rabbitmq-root-password` | common RabbitMQ 管理密码。 |
+| `RABBITMQ_USERNAME` | `finance` | finance 应用 RabbitMQ 用户名。 |
+| `RABBITMQ_PASSWORD` | `finance-rabbitmq-password` | finance 应用 RabbitMQ 密码。 |
+| `RABBITMQ_VHOST` | `finance` | finance RabbitMQ vhost。 |
+| `MINIO_ROOT_USER` | `minio-root` | common MinIO root 用户名，仅初始化使用。 |
+| `MINIO_ROOT_PASSWORD` | `minio-root-password` | common MinIO root 密码。 |
+| `MINIO_USER` | `finance` | finance 应用 MinIO 用户名。 |
+| `MINIO_PASSWORD` | `finance-minio-password` | finance 应用 MinIO 密码。 |
+| `MINIO_OCR_BUCKET` | `finance-ocr` | finance OCR bucket。 |

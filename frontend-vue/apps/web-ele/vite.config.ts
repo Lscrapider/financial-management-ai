@@ -3,6 +3,9 @@ import { VitePWA } from 'vite-plugin-pwa';
 import ElementPlus from 'unplugin-element-plus/vite';
 
 export default defineConfig(async () => {
+  const backendProxyTarget =
+    process.env.VITE_BACKEND_PROXY_TARGET ?? 'http://localhost:8081';
+
   return {
     application: {
       pwa: false,
@@ -38,13 +41,13 @@ export default defineConfig(async () => {
         proxy: {
           '/api/stocks': {
             changeOrigin: true,
-            target: 'http://localhost:8081',
+            target: backendProxyTarget,
             ws: true,
           },
           '/api': {
             changeOrigin: true,
             rewrite: (path) => path.replace(/^\/api/, ''),
-            target: 'http://localhost:8081/api',
+            target: `${backendProxyTarget}/api`,
             ws: true,
           },
         },

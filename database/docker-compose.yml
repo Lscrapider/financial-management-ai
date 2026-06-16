@@ -1,23 +1,6 @@
-name: finance-database
+name: finance-database-init
 
 services:
-  postgres:
-    image: pgvector/pgvector:pg15
-    container_name: finance-postgres
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-    env_file:
-      - ../.env
-    environment:
-      POSTGRES_DB: ${POSTGRES_ADMIN_DATABASE:-finance_management}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-123456}
-    command: postgres -c timezone='Asia/Shanghai'
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    networks:
-      - finance-database-network
-
   database-init:
     build:
       context: ..
@@ -26,73 +9,13 @@ services:
     env_file:
       - ../.env
     environment:
-      POSTGRES_HOST: postgres
+      POSTGRES_HOST: common-postgres
       POSTGRES_PORT: 5432
-    depends_on:
-      - postgres
+      RABBITMQ_HOST: common-rabbitmq
+      RABBITMQ_MANAGEMENT_PORT: 15672
+      INFLUXDB_URL: http://common-influxdb:8086
     networks:
-      - finance-database-network
-
-  influxdb:
-    image: influxdb:2.7
-    container_name: finance-influxdb
-    ports:
-      - "${INFLUXDB_PORT:-8086}:8086"
-    env_file:
-      - ../.env
-    environment:
-      DOCKER_INFLUXDB_INIT_MODE: setup
-      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_USERNAME:-admin}
-      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_PASSWORD:-admin123456}
-      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG:-finance}
-      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET:-stock_intraday}
-      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_ADMIN_TOKEN:-finance-management-local-token}
-    volumes:
-      - influxdb-data:/var/lib/influxdb2
-      - influxdb-config:/etc/influxdb2
-    networks:
-      - finance-database-network
-
-  rabbitmq:
-    image: rabbitmq:3.13-management
-    container_name: finance-rabbitmq
-    ports:
-      - "${RABBITMQ_PORT:-5672}:5672"
-      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
-    env_file:
-      - ../.env
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-finance}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-finance123456}
-      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-finance}
-    volumes:
-      - rabbitmq-data:/var/lib/rabbitmq
-      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
-      - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
-    networks:
-      - finance-database-network
-
-  minio:
-    image: minio/minio:latest
-    container_name: finance-minio
-    ports:
-      - "${MINIO_API_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
-    env_file:
-      - ../.env
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-finance}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-finance123456}
-    command: server /data --console-address ":9001"
-    volumes:
-      - minio-data:/data
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    networks:
-      - finance-database-network
+      - database-common-network
 
   minio-init:
     image: minio/mc:latest
@@ -100,30 +23,45 @@ services:
     env_file:
       - ../.env
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-finance}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-finance123456}
+      MINIO_ENDPOINT: http://common-minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio-root}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio-root-password}
+      MINIO_USER: ${MINIO_USER:-finance}
+      MINIO_PASSWORD: ${MINIO_PASSWORD:-finance-minio-password}
       MINIO_OCR_BUCKET: ${MINIO_OCR_BUCKET:-finance-ocr}
+      MINIO_POLICY_NAME: ${MINIO_POLICY_NAME:-finance-ocr-policy}
     entrypoint: /bin/sh
     command:
       - -c
       - |
-        until mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"; do
+        until mc alias set common "$${MINIO_ENDPOINT}" "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"; do
           sleep 2
         done
-        mc mb --ignore-existing "local/$${MINIO_OCR_BUCKET}"
-        mc anonymous set none "local/$${MINIO_OCR_BUCKET}"
-    depends_on:
-      - minio
+        mc mb --ignore-existing "common/$${MINIO_OCR_BUCKET}"
+        cat > /tmp/minio-policy.json <<EOF
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": ["s3:*"],
+              "Resource": [
+                "arn:aws:s3:::$${MINIO_OCR_BUCKET}",
+                "arn:aws:s3:::$${MINIO_OCR_BUCKET}/*"
+              ]
+            }
+          ]
+        }
+        EOF
+        mc admin user add common "$${MINIO_USER}" "$${MINIO_PASSWORD}" || true
+        mc admin user enable common "$${MINIO_USER}"
+        mc admin policy create common "$${MINIO_POLICY_NAME}" /tmp/minio-policy.json || true
+        mc admin policy attach common "$${MINIO_POLICY_NAME}" --user "$${MINIO_USER}"
+        mc anonymous set none "common/$${MINIO_OCR_BUCKET}"
     networks:
-      - finance-database-network
-
-volumes:
-  postgres-data:
-  influxdb-data:
-  influxdb-config:
-  rabbitmq-data:
-  minio-data:
+      - database-common-network
 
 networks:
-  finance-database-network:
-    name: finance-database-network
+  database-common-network:
+    external: true
+    name: docker-database-common-network
