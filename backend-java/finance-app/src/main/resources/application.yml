@@ -31,7 +31,7 @@ spring:
       chat:
         completions-path: /chat/completions
         options:
-          model: deepseek-v4-pro
+          model: ${DEEPSEEK_MODEL}
           temperature: 0.3
           reasoning-effort: high
   datasource:

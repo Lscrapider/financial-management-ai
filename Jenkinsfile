@@ -81,6 +81,7 @@ pipeline {
           MINIO_USER
           MINIO_PASSWORD
           DEEPSEEK_BASE_URL
+          DEEPSEEK_MODEL
           DEEPSEEK_API_KEY
           DASHSCOPE_BASE_URL
           DASHSCOPE_API_KEY

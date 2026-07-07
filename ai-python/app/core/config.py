@@ -81,7 +81,7 @@ class QwenOcrSettings:
 class DeepSeekSettings:
     api_key: str = _env("DEEPSEEK_API_KEY")
     base_url: str = _env("DEEPSEEK_BASE_URL")
-    model: str = "deepseek-v4-pro"
+    model: str = _env("DEEPSEEK_MODEL")
     thinking_type: str = "disabled"
     temperature: float = 0.3
     timeout_seconds: int = 120
