@@ -64,4 +64,4 @@ services:
 networks:
   database-common-network:
     external: true
-    name: docker-database-common-network
+    name: database-common-network
