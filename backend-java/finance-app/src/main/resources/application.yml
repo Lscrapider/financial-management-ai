@@ -136,9 +136,9 @@ bond:
 influxdb:
   url: ${INFLUXDB_URL}
   token: ${INFLUXDB_TOKEN}
-  org: finance
-  bucket: stock_intraday
-  stock-minute-bucket: stock_intraday
+  org: ${INFLUXDB_ORG:finance}
+  bucket: ${INFLUXDB_BUCKET:stock_intraday}
+  stock-minute-bucket: ${INFLUXDB_STOCK_MINUTE_BUCKET:${INFLUXDB_BUCKET:stock_intraday}}
   index-minute-bucket: index_intraday
   bond-minute-bucket: bond_intraday
   stock-minute-measurement: stock_minute
