@@ -2,8 +2,8 @@ package com.scrapider.finance.domain.po;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.scrapider.finance.config.JsonbTypeHandler;
 import com.scrapider.finance.domain.enums.SceneAnalysisTaskStatusEnum;
 import java.time.LocalDateTime;
 import lombok.Data;
@@ -21,15 +21,15 @@ public class SceneAnalysisTaskPO {
     private String reportType;
     private String configProfile;
 
-    @TableField(typeHandler = JacksonTypeHandler.class)
+    @TableField(typeHandler = JsonbTypeHandler.class)
     private JsonNode configSnapshot;
 
     private String status;
 
-    @TableField(typeHandler = JacksonTypeHandler.class)
+    @TableField(typeHandler = JsonbTypeHandler.class)
     private JsonNode currentScenesPayload;
 
-    @TableField(typeHandler = JacksonTypeHandler.class)
+    @TableField(typeHandler = JsonbTypeHandler.class)
     private JsonNode reportPayload;
 
     private String reportText;

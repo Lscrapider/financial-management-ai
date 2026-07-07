@@ -2,8 +2,8 @@ package com.scrapider.finance.domain.po;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.scrapider.finance.config.JsonbTypeHandler;
 import java.time.LocalDateTime;
 import lombok.Data;
 
@@ -20,19 +20,19 @@ public class OcrTaskStagePO {
     private Integer attemptCount;
     private Integer maxAttempts;
 
-    @TableField(typeHandler = JacksonTypeHandler.class)
+    @TableField(typeHandler = JsonbTypeHandler.class)
     private JsonNode inputMessage;
 
-    @TableField(typeHandler = JacksonTypeHandler.class)
+    @TableField(typeHandler = JsonbTypeHandler.class)
     private JsonNode outputMessage;
 
-    @TableField(typeHandler = JacksonTypeHandler.class)
+    @TableField(typeHandler = JsonbTypeHandler.class)
     private JsonNode inputRef;
 
-    @TableField(typeHandler = JacksonTypeHandler.class)
+    @TableField(typeHandler = JsonbTypeHandler.class)
     private JsonNode outputRef;
 
-    @TableField(typeHandler = JacksonTypeHandler.class)
+    @TableField(typeHandler = JsonbTypeHandler.class)
     private JsonNode metrics;
 
     private String errorMessage;

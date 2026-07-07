@@ -1,7 +1,7 @@
 package com.scrapider.finance.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
+import com.scrapider.finance.config.JsonbTypeHandler;
 import com.scrapider.finance.domain.dto.KnowledgeVectorSearchDTO;
 import com.scrapider.finance.domain.po.KnowledgeVectorPO;
 import java.util.List;
@@ -39,7 +39,7 @@ public interface KnowledgeVectorMapper extends BaseMapper<KnowledgeVectorPO> {
             @Result(column = "task_no", property = "taskNo"),
             @Result(column = "chunk_index", property = "chunkIndex"),
             @Result(column = "text", property = "text"),
-            @Result(column = "metadata", property = "metadata", typeHandler = JacksonTypeHandler.class),
+            @Result(column = "metadata", property = "metadata", typeHandler = JsonbTypeHandler.class),
             @Result(column = "semantic_score", property = "semanticScore")
     })
     @Select("""

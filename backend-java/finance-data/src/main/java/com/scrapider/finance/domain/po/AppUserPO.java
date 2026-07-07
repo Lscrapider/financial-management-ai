@@ -2,8 +2,8 @@ package com.scrapider.finance.domain.po;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.scrapider.finance.config.JsonbTypeHandler;
 import com.scrapider.finance.domain.constant.AuthConstant;
 import com.scrapider.finance.domain.param.RegisterParam;
 import java.time.LocalDateTime;
@@ -26,7 +26,7 @@ public class AppUserPO {
     private String phone;
     private Boolean emailNotification;
 
-    @TableField(typeHandler = JacksonTypeHandler.class)
+    @TableField(typeHandler = JsonbTypeHandler.class)
     private JsonNode agentExecutionBudgetJson;
 
     private LocalDateTime createdAt;

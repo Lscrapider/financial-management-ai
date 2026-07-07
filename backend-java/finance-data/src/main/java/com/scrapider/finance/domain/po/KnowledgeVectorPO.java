@@ -2,8 +2,8 @@ package com.scrapider.finance.domain.po;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.scrapider.finance.config.JsonbTypeHandler;
 import java.time.OffsetDateTime;
 import lombok.Data;
 
@@ -16,7 +16,7 @@ public class KnowledgeVectorPO {
     private Integer chunkIndex;
     private String text;
 
-    @TableField(typeHandler = JacksonTypeHandler.class)
+    @TableField(typeHandler = JsonbTypeHandler.class)
     private JsonNode metadata;
 
     private OffsetDateTime createdAt;

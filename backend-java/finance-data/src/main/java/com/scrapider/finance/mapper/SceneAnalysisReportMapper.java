@@ -1,7 +1,7 @@
 package com.scrapider.finance.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
+import com.scrapider.finance.config.JsonbTypeHandler;
 import com.scrapider.finance.domain.dto.SceneAnalysisReportHistoryDTO;
 import com.scrapider.finance.domain.dto.SceneAnalysisReportTargetDTO;
 import com.scrapider.finance.domain.po.SceneAnalysisReportPO;
@@ -60,7 +60,7 @@ public interface SceneAnalysisReportMapper extends BaseMapper<SceneAnalysisRepor
             @Result(column = "generation_type", property = "generationType"),
             @Result(column = "version_no", property = "versionNo"),
             @Result(column = "status", property = "status"),
-            @Result(column = "report_content", property = "reportContent", typeHandler = JacksonTypeHandler.class),
+            @Result(column = "report_content", property = "reportContent", typeHandler = JsonbTypeHandler.class),
             @Result(column = "report_text", property = "reportText"),
             @Result(column = "model", property = "model"),
             @Result(column = "error_message", property = "errorMessage"),
