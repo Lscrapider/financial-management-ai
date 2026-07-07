@@ -1,0 +1,206 @@
+server:
+  port: 8081
+
+jwt:
+  secret: ${JWT_SECRET}
+  issuer: finance-management-ai
+  access-token-expiration-ms: 7200000
+  refresh-session-expiration-ms: 604800000
+  refresh-session-cookie-max-age-seconds: 604800
+  refresh-session-cookie-secure: false
+
+spring:
+  profiles:
+    active: dev
+  application:
+    name: finance-service
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 500MB
+  rabbitmq:
+    host: ${RABBITMQ_HOST}
+    port: ${RABBITMQ_PORT}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
+    virtual-host: ${RABBITMQ_VHOST}
+  ai:
+    openai:
+      api-key: ${DEEPSEEK_API_KEY}
+      base-url: ${DEEPSEEK_BASE_URL}
+      chat:
+        completions-path: /chat/completions
+        options:
+          model: deepseek-v4-pro
+          temperature: 0.3
+          reasoning-effort: high
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: ${POSTGRES_URL}
+    username: ${POSTGRES_USERNAME}
+    password: ${POSTGRES_PASSWORD}
+  mail:
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+
+deepseek:
+  chat:
+    thinking-enabled: true
+    thinking-type: enabled
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+market:
+  provider:
+    historical-kline: tushare
+    stock-fundamental: eastmoney
+    convertible-bond: tushare
+  trading:
+    closed-dates: 2026-01-01,2026-01-02,2026-01-03,2026-02-15,2026-02-16,2026-02-17,2026-02-18,2026-02-19,2026-02-20,2026-02-21,2026-02-22,2026-02-23,2026-04-04,2026-04-05,2026-04-06,2026-05-01,2026-05-02,2026-05-03,2026-05-04,2026-05-05,2026-06-19,2026-06-20,2026-06-21,2026-09-25,2026-09-26,2026-09-27,2026-10-01,2026-10-02,2026-10-03,2026-10-04,2026-10-05,2026-10-06,2026-10-07
+
+tushare:
+  base-url: ${TUSHARE_BASE_URL}
+  token: ${TUSHARE_TOKEN}
+
+stock:
+  sync:
+    enabled: true
+    initial-delay-ms: 10000
+    fixed-delay-ms: 120000
+    request-interval-ms: 0
+    daily-kline-enabled: true
+    daily-kline-limit: 250
+    weekly-kline-enabled: true
+    weekly-kline-limit: 250
+    monthly-kline-enabled: true
+    monthly-kline-limit: 250
+    trend-enabled: true
+    start-time: 09:28
+    end-time: 16:00
+    timezone: Asia/Shanghai
+  alert:
+    enabled: true
+    initial-delay-ms: 30000
+    fixed-delay-ms: 120000
+
+index:
+  sync:
+    enabled: true
+    daily-kline-enabled: true
+    daily-kline-limit: 250
+    weekly-kline-enabled: true
+    weekly-kline-limit: 250
+    monthly-kline-enabled: true
+    monthly-kline-limit: 250
+    trend-enabled: true
+    initial-delay-ms: 15000
+    fixed-delay-ms: 300000
+    request-interval-ms: 0
+    start-time: 09:28
+    end-time: 16:00
+    timezone: Asia/Shanghai
+
+bond:
+  sync:
+    enabled: true
+    daily-kline-enabled: true
+    daily-kline-limit: 250
+    weekly-kline-enabled: true
+    weekly-kline-limit: 250
+    monthly-kline-enabled: true
+    monthly-kline-limit: 250
+    trend-enabled: true
+    convertible-data-enabled: true
+    convertible-data-cron: 0 0 19 * * ?
+    convertible-data-catch-up-enabled: true
+    convertible-data-run-after: 19:00
+    convertible-daily-limit: 250
+    initial-delay-ms: 20000
+    fixed-delay-ms: 300000
+    request-interval-ms: 0
+    start-time: 09:28
+    end-time: 16:00
+    timezone: Asia/Shanghai
+
+influxdb:
+  url: ${INFLUXDB_URL}
+  token: ${INFLUXDB_TOKEN}
+  org: finance
+  bucket: stock_intraday
+  stock-minute-bucket: stock_intraday
+  index-minute-bucket: index_intraday
+  bond-minute-bucket: bond_intraday
+  stock-minute-measurement: stock_minute
+  index-minute-measurement: index_minute
+  bond-minute-measurement: bond_minute
+  timezone: Asia/Shanghai
+
+finance:
+  ai-token-usage:
+    pricing:
+      currency: CNY
+      models:
+        deepseek-v4-flash:
+          cache-hit-input-yuan-per-million: 0.02
+          cache-miss-input-yuan-per-million: 1
+          output-yuan-per-million: 2
+        deepseek-v4-pro:
+          cache-hit-input-yuan-per-million: 0.025
+          cache-miss-input-yuan-per-million: 3
+          output-yuan-per-million: 6
+  agent:
+    callback-url: ${AGENT_CALLBACK_URL}
+    data-gateway-url: ${AGENT_DATA_GATEWAY_URL}
+    session-ttl-seconds: 1800
+    signature-window-seconds: 60
+    conversation-cleanup-delay-minutes: 30
+    conversation-cleanup-delay-ms: 1800000
+    rabbitmq:
+      exchange: finance.agent.topic
+      run-start-queue: finance.agent.run.start
+      run-start-routing-key: agent.run.start
+      cleanup-delay-queue: finance.agent.conversation.cleanup.delay
+      cleanup-delay-routing-key: conversation.cleanup.delay
+      cleanup-queue: finance.agent.conversation.cleanup
+      cleanup-routing-key: conversation.cleanup
+      dead-letter-exchange: finance.agent.dlx
+      dead-letter-queue: finance.agent.dlq
+  minio:
+    endpoint: ${MINIO_ENDPOINT}
+    access-key: ${MINIO_USER:${MINIO_ROOT_USER}}
+    secret-key: ${MINIO_PASSWORD:${MINIO_ROOT_PASSWORD}}
+    ocr-bucket: finance-ocr
+  ocr:
+    rabbitmq:
+      exchange: finance.ocr.topic
+      normalize-routing-key: ocr.document.normalize
+      quality-validate-queue: finance.ocr.quality.validate
+      chunk-tag-rule-routing-key: ocr.chunk.tag.rule
+      embedding-index-routing-key: ocr.embedding.index
+      reembed-routing-key: knowledge.chunk.reembed
+  scene-analysis:
+    callback-token:
+      ttl-seconds: 21600
+    rabbitmq:
+      exchange: finance.scene-analysis.topic
+      retry-exchange: finance.scene-analysis.retry.topic
+      dead-letter-exchange: finance.scene-analysis.dlx
+      current-scene-queue: finance.scene-analysis.current.generate
+      current-scene-retry-queue: finance.scene-analysis.current.generate.retry
+      current-scene-routing-key: scene.analysis.current.generate
+      retrieval-embedding-queue: finance.scene-analysis.retrieval.embedding
+      retrieval-embedding-retry-queue: finance.scene-analysis.retrieval.embedding.retry
+      retrieval-embedding-routing-key: scene.analysis.retrieval.embedding
+      dead-letter-queue: finance.scene-analysis.dlq
+      retry-ttl-ms: 30000
