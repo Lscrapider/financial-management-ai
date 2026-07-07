@@ -146,9 +146,11 @@ pipeline {
       steps {
         sh '''
           docker run --rm financial-management-ai-finance-frontend:latest \
-            sh -c 'test -f /usr/share/nginx/html/finance/index.html \
-              && grep -q "src=\\"/finance/" /usr/share/nginx/html/finance/index.html \
-              && ! grep -q "%VITE_APP_TITLE%" /usr/share/nginx/html/finance/index.html'
+            sh -ec "INDEX=/usr/share/nginx/html/finance/index.html; \
+              test -f \\"$INDEX\\"; \
+              head -c 500 \\"$INDEX\\"; echo; \
+              grep -q 'src=\\"/finance/' \\"$INDEX\\"; \
+              ! grep -q '%VITE_APP_TITLE%' \\"$INDEX\\""
         '''
       }
     }

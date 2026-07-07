@@ -20,7 +20,8 @@ RUN corepack enable && corepack prepare pnpm@11.2.2 --activate
 COPY . .
 
 RUN pnpm install --frozen-lockfile
-RUN VITE_APP_STORE_SECURE_KEY=please-replace-me-with-your-own-key pnpm build:ele
+RUN rm -rf apps/web-ele/dist apps/web-ele/dist.zip \
+  && VITE_APP_STORE_SECURE_KEY=please-replace-me-with-your-own-key pnpm -F @vben/web-ele build
 
 FROM nginx:1.27-alpine
 
