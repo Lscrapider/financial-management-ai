@@ -7,13 +7,13 @@ services:
       dockerfile: database/Dockerfile
     container_name: finance-database-init
     env_file:
-      - ../.env
+      - ${COMPOSE_ENV_FILE:-../.env}
     environment:
-      POSTGRES_HOST: common-postgres
-      POSTGRES_PORT: 5432
-      RABBITMQ_HOST: common-rabbitmq
-      RABBITMQ_MANAGEMENT_PORT: 15672
-      INFLUXDB_URL: http://common-influxdb:8086
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_MANAGEMENT_PORT: ${RABBITMQ_MANAGEMENT_PORT}
+      INFLUXDB_URL: ${INFLUXDB_URL}
     networks:
       - database-common-network
 
@@ -21,13 +21,13 @@ services:
     image: minio/mc:latest
     container_name: finance-minio-init
     env_file:
-      - ../.env
+      - ${COMPOSE_ENV_FILE:-../.env}
     environment:
-      MINIO_ENDPOINT: http://common-minio:9000
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio-root}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio-root-password}
-      MINIO_USER: ${MINIO_USER:-finance}
-      MINIO_PASSWORD: ${MINIO_PASSWORD:-finance-minio-password}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_USER: ${MINIO_USER}
+      MINIO_PASSWORD: ${MINIO_PASSWORD}
       MINIO_OCR_BUCKET: ${MINIO_OCR_BUCKET:-finance-ocr}
       MINIO_POLICY_NAME: ${MINIO_POLICY_NAME:-finance-ocr-policy}
     entrypoint: /bin/sh
@@ -69,27 +69,21 @@ services:
     ports:
       - "8081:8081"
     env_file:
-      - ../.env
+      - ${COMPOSE_ENV_FILE:-../.env}
     environment:
-      POSTGRES_URL: jdbc:postgresql://common-postgres:5432/${POSTGRES_DB:-finance_management}
-      POSTGRES_USERNAME: ${POSTGRES_USER:-finance}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-finance-password}
-      POSTGRES_HOST: common-postgres
-      POSTGRES_PORT: 5432
-      INFLUXDB_URL: http://common-influxdb:8086
-      RABBITMQ_HOST: common-rabbitmq
-      MINIO_ENDPOINT: http://common-minio:9000
-      MINIO_ROOT_USER: ${MINIO_USER:-finance}
-      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-finance-minio-password}
-      AGENT_CALLBACK_URL: http://finance-service:8081/internal/agent/callback
-      AGENT_DATA_GATEWAY_URL: http://finance-service:8081/internal/agent/data/query
-      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
-      DEEPSEEK_COMPLETIONS_PATH: ${DEEPSEEK_COMPLETIONS_PATH:-/chat/completions}
-      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-pro}
-      DEEPSEEK_TEMPERATURE: ${DEEPSEEK_TEMPERATURE:-0.3}
-      DEEPSEEK_REASONING_EFFORT: ${DEEPSEEK_REASONING_EFFORT:-high}
-      DEEPSEEK_THINKING_ENABLED: ${DEEPSEEK_THINKING_ENABLED:-true}
-      DEEPSEEK_THINKING_TYPE: ${DEEPSEEK_THINKING_TYPE:-enabled}
+      POSTGRES_URL: ${POSTGRES_URL}
+      POSTGRES_USERNAME: ${POSTGRES_USERNAME}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      INFLUXDB_URL: ${INFLUXDB_URL}
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_PORT: ${RABBITMQ_PORT}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ROOT_USER: ${MINIO_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
+      AGENT_CALLBACK_URL: ${AGENT_CALLBACK_URL}
+      AGENT_DATA_GATEWAY_URL: ${AGENT_DATA_GATEWAY_URL}
     depends_on:
       database-init:
         condition: service_completed_successfully
@@ -106,25 +100,22 @@ services:
         EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME:-BAAI/bge-base-zh-v1.5}
     container_name: finance-python-worker
     env_file:
-      - ../.env
+      - ${COMPOSE_ENV_FILE:-../.env}
     environment:
-      POSTGRES_HOST: common-postgres
-      POSTGRES_PORT: 5432
-      POSTGRES_DB: ${POSTGRES_DB:-finance_management}
-      POSTGRES_USERNAME: ${POSTGRES_USER:-finance}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-finance-password}
-      RABBITMQ_HOST: common-rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-finance}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-finance-rabbitmq-password}
-      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-finance}
-      MINIO_ENDPOINT: common-minio:9000
-      MINIO_ROOT_USER: ${MINIO_USER:-finance}
-      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-finance-minio-password}
-      MINIO_OCR_BUCKET: ${MINIO_OCR_BUCKET:-finance-ocr}
-      FINANCE_API_BASE_URL: http://finance-service:8081
-      DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
-      QWEN_OCR_MODEL: ${QWEN_OCR_MODEL:-qwen-vl-ocr-latest}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USERNAME: ${POSTGRES_USERNAME}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_PORT: ${RABBITMQ_PORT}
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ROOT_USER: ${MINIO_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
+      FINANCE_API_BASE_URL: ${FINANCE_API_BASE_URL}
     depends_on:
       database-init:
         condition: service_completed_successfully
@@ -139,9 +130,9 @@ services:
       dockerfile: Dockerfile
     container_name: finance-frontend
     ports:
-      - "${FRONTEND_PORT:-5777}:5777"
+      - "${FRONTEND_PORT:-5777}:80"
     environment:
-      VITE_BACKEND_PROXY_TARGET: http://finance-service:8081
+      VITE_BACKEND_PROXY_TARGET: ${VITE_BACKEND_PROXY_TARGET:-http://finance-service:8081}
     depends_on:
       - finance-service
     networks:

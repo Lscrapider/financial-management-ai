@@ -7,13 +7,13 @@ services:
       dockerfile: database/Dockerfile
     container_name: finance-database-init
     env_file:
-      - ../.env
+      - ${COMPOSE_ENV_FILE:-../.env}
     environment:
-      POSTGRES_HOST: common-postgres
-      POSTGRES_PORT: 5432
-      RABBITMQ_HOST: common-rabbitmq
-      RABBITMQ_MANAGEMENT_PORT: 15672
-      INFLUXDB_URL: http://common-influxdb:8086
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_MANAGEMENT_PORT: ${RABBITMQ_MANAGEMENT_PORT}
+      INFLUXDB_URL: ${INFLUXDB_URL}
     networks:
       - database-common-network
 
@@ -21,13 +21,13 @@ services:
     image: minio/mc:latest
     container_name: finance-minio-init
     env_file:
-      - ../.env
+      - ${COMPOSE_ENV_FILE:-../.env}
     environment:
-      MINIO_ENDPOINT: http://common-minio:9000
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio-root}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio-root-password}
-      MINIO_USER: ${MINIO_USER:-finance}
-      MINIO_PASSWORD: ${MINIO_PASSWORD:-finance-minio-password}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_USER: ${MINIO_USER}
+      MINIO_PASSWORD: ${MINIO_PASSWORD}
       MINIO_OCR_BUCKET: ${MINIO_OCR_BUCKET:-finance-ocr}
       MINIO_POLICY_NAME: ${MINIO_POLICY_NAME:-finance-ocr-policy}
     entrypoint: /bin/sh

@@ -15,13 +15,18 @@
 logs/
 
 # 环境变量与本地配置
-.env
+**/.env
+!/.env
 .env.*
 !.env.example
 application-local.yml
 application-local.yaml
+application-dev.yml
+application-dev.yaml
 application-dev-local.yml
 application-dev-local.yaml
+**/application-dev.yml
+**/application-dev.yaml
 
 # Java / Spring Boot
 target/
@@ -107,11 +112,11 @@ docker-compose.override.yml
 .cache/
 .parcel-cache/
 /backend-java/finance-service/src/main/resources/application.yml
-/ai-python/app/core/config.py
 /database/seed/
 /.superpowers/
 /.impeccable
 /.claude/
 /.*/
-/backend-java/finance-app/src/main/resources/application.yml
+!/.github/
+!/.github/**
 stitch_exports/

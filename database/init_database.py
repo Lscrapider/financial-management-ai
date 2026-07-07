@@ -2,6 +2,7 @@ from base64 import b64encode
 from pathlib import Path
 import json
 import os
+import sys
 import time
 from urllib import error, parse, request
 
@@ -15,22 +16,23 @@ MIGRATIONS_DIR = BASE_DIR / "migrations"
 SEED_DIR = BASE_DIR / "seed"
 RABBITMQ_DEFINITIONS_FILE = BASE_DIR / "rabbitmq" / "definitions.json"
 
+sys.path.insert(0, str(ROOT_DIR))
+from env_loader import load_env_file
+
 
 def load_env() -> None:
-    env_path = ROOT_DIR / ".env"
-    if not env_path.exists():
-        return
-
-    for line in env_path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
-            continue
-        key, value = stripped.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+    load_env_file(ROOT_DIR)
 
 
 def env(name: str, default: str = "") -> str:
     return os.environ.get(name, default)
+
+
+def required_env(name: str) -> str:
+    value = env(name)
+    if not value:
+        raise RuntimeError(f"{name} is required")
+    return value
 
 
 def int_env(name: str, default: int) -> int:
@@ -38,33 +40,34 @@ def int_env(name: str, default: int) -> int:
     return int(value) if value else default
 
 
+def required_int_env(name: str) -> int:
+    return int(required_env(name))
+
+
 def postgres_admin_user() -> str:
-    return env("POSTGRES_ADMIN_USER", env("POSTGRES_SUPERUSER", "postgres-root"))
+    return required_env("POSTGRES_ADMIN_USER")
 
 
 def postgres_admin_password() -> str:
-    return env(
-        "POSTGRES_ADMIN_PASSWORD",
-        env("POSTGRES_SUPERUSER_PASSWORD", "postgres-root-password"),
-    )
+    return required_env("POSTGRES_ADMIN_PASSWORD")
 
 
 def postgres_app_user() -> str:
-    return env("POSTGRES_USER", "finance")
+    return required_env("POSTGRES_USER")
 
 
 def postgres_app_password() -> str:
-    return env("POSTGRES_PASSWORD", "finance-password")
+    return required_env("POSTGRES_PASSWORD")
 
 
 def postgres_database() -> str:
-    return env("POSTGRES_DB", "finance_management")
+    return required_env("POSTGRES_DB")
 
 
 def connect_postgres(database: str, user: str, password: str):
     return psycopg.connect(
-        host=env("POSTGRES_HOST", "localhost"),
-        port=int_env("POSTGRES_PORT", 5432),
+        host=required_env("POSTGRES_HOST"),
+        port=required_int_env("POSTGRES_PORT"),
         user=user,
         password=password,
         dbname=database,
@@ -74,7 +77,7 @@ def connect_postgres(database: str, user: str, password: str):
 
 
 def wait_for_postgres() -> None:
-    admin_database = env("POSTGRES_ADMIN_DATABASE", "postgres")
+    admin_database = required_env("POSTGRES_ADMIN_DATABASE")
     max_attempts = int_env("DATABASE_INIT_MAX_ATTEMPTS", 30)
     delay_seconds = float(env("DATABASE_INIT_RETRY_SECONDS", "2"))
 
@@ -95,7 +98,7 @@ def wait_for_postgres() -> None:
 
 def init_postgres() -> None:
     database_name = postgres_database()
-    admin_database = env("POSTGRES_ADMIN_DATABASE", "postgres")
+    admin_database = required_env("POSTGRES_ADMIN_DATABASE")
     app_user = postgres_app_user()
     app_password = postgres_app_password()
 
@@ -221,14 +224,14 @@ def wait_for_http(url: str, headers: dict[str, str] | None = None) -> None:
 
 
 def rabbitmq_api(path: str) -> str:
-    host = env("RABBITMQ_HOST", "localhost")
-    port = int_env("RABBITMQ_MANAGEMENT_PORT", 15672)
+    host = required_env("RABBITMQ_HOST")
+    port = required_int_env("RABBITMQ_MANAGEMENT_PORT")
     return f"http://{host}:{port}/api{path}"
 
 
 def rabbitmq_headers() -> dict[str, str]:
-    username = env("RABBITMQ_ADMIN_USER", "rabbitmq-root")
-    password = env("RABBITMQ_ADMIN_PASSWORD", "rabbitmq-root-password")
+    username = required_env("RABBITMQ_ADMIN_USER")
+    password = required_env("RABBITMQ_ADMIN_PASSWORD")
     return {"Authorization": basic_auth(username, password)}
 
 
@@ -240,9 +243,9 @@ def init_rabbitmq() -> None:
     headers = rabbitmq_headers()
     wait_for_http(rabbitmq_api("/overview"), headers=headers)
 
-    username = env("RABBITMQ_USERNAME", "finance")
-    password = env("RABBITMQ_PASSWORD", "finance-rabbitmq-password")
-    vhost = env("RABBITMQ_VHOST", "finance")
+    username = required_env("RABBITMQ_USERNAME")
+    password = required_env("RABBITMQ_PASSWORD")
+    vhost = required_env("RABBITMQ_VHOST")
 
     http_json(
         "PUT",
@@ -309,12 +312,12 @@ def init_rabbitmq() -> None:
 
 
 def influxdb_headers() -> dict[str, str]:
-    token = env("COMMON_INFLUXDB_ADMIN_TOKEN", env("INFLUXDB_ADMIN_TOKEN", ""))
+    token = required_env("COMMON_INFLUXDB_ADMIN_TOKEN")
     return {"Authorization": f"Token {token}"}
 
 
 def influxdb_url(path: str) -> str:
-    return f"{env('INFLUXDB_URL', 'http://localhost:8086').rstrip('/')}{path}"
+    return f"{required_env('INFLUXDB_URL').rstrip('/')}{path}"
 
 
 def init_influxdb() -> None:

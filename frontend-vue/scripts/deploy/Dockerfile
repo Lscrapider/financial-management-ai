@@ -1,38 +1,35 @@
-FROM node:22-slim AS builder
+FROM node:22.18-bookworm-slim AS builder
 
-# --max-old-space-size
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
 ENV NODE_OPTIONS=--max-old-space-size=8192
 ENV TZ=Asia/Shanghai
 ENV CI=true
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+ENV VITE_BASE=/
+ENV VITE_GLOB_API_URL=/api
+ENV VITE_COMPRESS=none
+ENV VITE_PWA=false
+ENV VITE_ROUTER_HISTORY=hash
+ENV VITE_INJECT_APP_LOADING=true
+ENV VITE_ARCHIVER=true
+ENV VITE_APP_TITLE=理财投资AI知识库
+ENV VITE_APP_NAMESPACE=vben-web-ele
 
-RUN npm i -g corepack
+RUN corepack enable && corepack prepare pnpm@11.2.2 --activate
 
 WORKDIR /app
 
-# copy package.json and pnpm-lock.yaml to workspace
 COPY . /app
 
-# 安装依赖
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
-RUN pnpm run build --filter=\!./docs
+RUN pnpm install --frozen-lockfile
+RUN VITE_APP_STORE_SECURE_KEY=please-replace-me-with-your-own-key pnpm build:ele
 
-RUN echo "Builder Success 🎉"
+FROM nginx:1.27-alpine AS production
 
-FROM nginx:stable-alpine AS production
+ENV VITE_BACKEND_PROXY_TARGET=http://finance-service:8081
 
-# 配置 nginx
-RUN echo "types { application/javascript js mjs; }" > /etc/nginx/conf.d/mjs.conf \
-    && rm -rf /etc/nginx/conf.d/default.conf
+COPY scripts/deploy/default.conf.template /etc/nginx/templates/default.conf.template
+COPY --from=builder /app/apps/web-ele/dist /usr/share/nginx/html
 
-# 复制构建产物
-COPY --from=builder /app/playground/dist /usr/share/nginx/html
+EXPOSE 80
 
-# 复制 nginx 配置
-COPY --from=builder /app/scripts/deploy/nginx.conf /etc/nginx/nginx.conf
-
-EXPOSE 8080
-
-# 启动 nginx
 CMD ["nginx", "-g", "daemon off;"]
