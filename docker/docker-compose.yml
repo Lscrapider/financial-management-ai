@@ -133,7 +133,7 @@ services:
     ports:
       - "${FRONTEND_PORT:-5777}:80"
     environment:
-      VITE_BACKEND_PROXY_TARGET: ${VITE_BACKEND_PROXY_TARGET:-http://finance-service:8081}
+      BACKEND_PROXY_TARGET: ${BACKEND_PROXY_TARGET:-http://finance-service:8081}
     depends_on:
       - finance-service
     networks:

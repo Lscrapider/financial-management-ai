@@ -4,7 +4,11 @@ import ElementPlus from 'unplugin-element-plus/vite';
 
 export default defineConfig(async () => {
   const backendProxyTarget =
-    process.env.VITE_BACKEND_PROXY_TARGET ?? 'http://localhost:8081';
+    process.env.BACKEND_PROXY_TARGET ?? 'http://localhost:8081';
+  const apiContextPath = normalizeContextPath(
+    process.env.VITE_GLOB_API_CONTEXT_PATH ?? '/finance-api',
+  );
+  const apiProxyPrefix = `${apiContextPath}/api`;
 
   return {
     application: {
@@ -39,15 +43,9 @@ export default defineConfig(async () => {
       ],
       server: {
         proxy: {
-          '/api/stocks': {
+          [apiProxyPrefix]: {
             changeOrigin: true,
             target: backendProxyTarget,
-            ws: true,
-          },
-          '/api': {
-            changeOrigin: true,
-            rewrite: (path) => path.replace(/^\/api/, ''),
-            target: `${backendProxyTarget}/api`,
             ws: true,
           },
         },
@@ -55,3 +53,14 @@ export default defineConfig(async () => {
     },
   };
 });
+
+function normalizeContextPath(contextPath: string) {
+  let normalized = contextPath.trim();
+  if (!normalized || normalized === '/') {
+    return '';
+  }
+  if (!normalized.startsWith('/')) {
+    normalized = `/${normalized}`;
+  }
+  return normalized.endsWith('/') ? normalized.slice(0, -1) : normalized;
+}

@@ -54,6 +54,7 @@ async function loadEnv<T = Record<string, string>>(
       console.error(`Error while parsing ${confFile}`, error);
     }
   }
+  envConfig = { ...envConfig, ...process.env };
   const reg = new RegExp(`^(${match})`);
   Object.keys(envConfig).forEach((key) => {
     if (!reg.test(key)) {

@@ -94,7 +94,7 @@ pipeline {
           AGENT_CALLBACK_URL
           AGENT_DATA_GATEWAY_URL
           FINANCE_API_BASE_URL
-          VITE_BACKEND_PROXY_TARGET
+          BACKEND_PROXY_TARGET
           FRONTEND_PORT
           "
 

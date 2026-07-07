@@ -1,5 +1,7 @@
 server:
   port: 8081
+  servlet:
+    context-path: /finance-api
 
 jwt:
   secret: ${JWT_SECRET}

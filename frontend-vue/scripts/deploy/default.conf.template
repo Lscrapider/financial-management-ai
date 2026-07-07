@@ -5,8 +5,12 @@ server {
   root /usr/share/nginx/html;
   index index.html;
 
-  location = /api {
-    proxy_pass ${VITE_BACKEND_PROXY_TARGET}/api;
+  location = / {
+    return 302 /finance/;
+  }
+
+  location = /finance-api/api {
+    proxy_pass ${BACKEND_PROXY_TARGET}/finance-api/api;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
@@ -16,8 +20,8 @@ server {
     proxy_set_header Connection "upgrade";
   }
 
-  location /api/ {
-    proxy_pass ${VITE_BACKEND_PROXY_TARGET}/api/;
+  location /finance-api/api/ {
+    proxy_pass ${BACKEND_PROXY_TARGET}/finance-api/api/;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
@@ -27,7 +31,7 @@ server {
     proxy_set_header Connection "upgrade";
   }
 
-  location / {
-    try_files $uri $uri/ /index.html;
+  location /finance/ {
+    try_files $uri $uri/ /finance/index.html;
   }
 }

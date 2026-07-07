@@ -96,7 +96,9 @@ cd apps/web-ele && pnpm dev   # 直接在 app 目录下启动
 | 变量 | 说明 |
 |---|---|
 | `VITE_PORT` | 开发服务器端口（默认 5777） |
-| `VITE_GLOB_API_URL` | API 接口地址（开发环境默认 `/api`） |
+| `VITE_GLOB_CONTEXT_PATH` | 前端页面上下文（默认 `/finance`） |
+| `VITE_GLOB_API_CONTEXT_PATH` | 后端接口上下文（默认 `/finance-api`） |
+| `VITE_GLOB_API_URL` | 完整 API 接口地址；留空时由后端接口上下文派生为 `/finance-api/api` |
 | `VITE_APP_TITLE` | 应用标题 |
 | `VITE_APP_NAMESPACE` | store 缓存命名空间前缀 |
 | `VITE_NITRO_MOCK` | 是否开启 Nitro Mock 服务 |

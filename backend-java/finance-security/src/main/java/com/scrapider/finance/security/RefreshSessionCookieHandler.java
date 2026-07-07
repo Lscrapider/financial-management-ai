@@ -13,16 +13,19 @@ public class RefreshSessionCookieHandler {
 
     public static final String REFRESH_COOKIE_NAME = "refresh_sid";
 
-    private static final String REFRESH_COOKIE_PATH = "/api/auth";
+    private static final String REFRESH_COOKIE_BASE_PATH = "/api/auth";
 
     private final long refreshCookieMaxAgeSeconds;
     private final boolean refreshCookieSecure;
+    private final String refreshCookiePath;
 
     public RefreshSessionCookieHandler(
             @Value("${jwt.refresh-session-cookie-max-age-seconds}") long refreshCookieMaxAgeSeconds,
-            @Value("${jwt.refresh-session-cookie-secure}") boolean refreshCookieSecure) {
+            @Value("${jwt.refresh-session-cookie-secure}") boolean refreshCookieSecure,
+            @Value("${server.servlet.context-path:}") String contextPath) {
         this.refreshCookieMaxAgeSeconds = refreshCookieMaxAgeSeconds;
         this.refreshCookieSecure = refreshCookieSecure;
+        this.refreshCookiePath = refreshCookiePath(contextPath);
     }
 
     public String resolveRefreshSid(HttpServletRequest request) {
@@ -50,9 +53,23 @@ public class RefreshSessionCookieHandler {
                 .httpOnly(true)
                 .secure(this.refreshCookieSecure)
                 .sameSite("Lax")
-                .path(REFRESH_COOKIE_PATH)
+                .path(this.refreshCookiePath)
                 .maxAge(maxAgeSeconds)
                 .build()
                 .toString();
+    }
+
+    private static String refreshCookiePath(String contextPath) {
+        String normalized = contextPath == null ? "" : contextPath.trim();
+        if (normalized.isBlank() || "/".equals(normalized)) {
+            return REFRESH_COOKIE_BASE_PATH;
+        }
+        if (!normalized.startsWith("/")) {
+            normalized = "/" + normalized;
+        }
+        if (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        return normalized + REFRESH_COOKIE_BASE_PATH;
     }
 }

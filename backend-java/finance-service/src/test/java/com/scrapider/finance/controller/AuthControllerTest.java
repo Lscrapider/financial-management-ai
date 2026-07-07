@@ -39,7 +39,7 @@ class AuthControllerTest {
         this.mockMvc = MockMvcBuilders
                 .standaloneSetup(new AuthController(
                         this.authService,
-                        new RefreshSessionCookieHandler(604_800L, false)))
+                        new RefreshSessionCookieHandler(604_800L, false, "/finance-api")))
                 .build();
         this.objectMapper = new ObjectMapper();
     }
@@ -56,6 +56,7 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.data.refreshSid").doesNotExist())
                 .andExpect(cookie().value(REFRESH_COOKIE_NAME, "refresh-sid"))
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("HttpOnly")))
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Path=/finance-api/api/auth")))
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("SameSite=Lax")));
     }
 

@@ -8,9 +8,11 @@ declare module 'vue-router' {
 }
 
 export interface VbenAdminProAppConfigRaw {
-  VITE_GLOB_API_URL: string;
-  VITE_GLOB_AUTH_DINGDING_CLIENT_ID: string;
-  VITE_GLOB_AUTH_DINGDING_CORP_ID: string;
+  VITE_GLOB_API_URL?: string;
+  VITE_GLOB_API_CONTEXT_PATH?: string;
+  VITE_GLOB_AUTH_DINGDING_CLIENT_ID?: string;
+  VITE_GLOB_AUTH_DINGDING_CORP_ID?: string;
+  VITE_GLOB_CONTEXT_PATH?: string;
 }
 
 interface AuthConfig {
@@ -21,8 +23,10 @@ interface AuthConfig {
 }
 
 export interface ApplicationConfig {
+  apiContextPath: string;
   apiURL: string;
   auth: AuthConfig;
+  contextPath: string;
 }
 
 declare global {
