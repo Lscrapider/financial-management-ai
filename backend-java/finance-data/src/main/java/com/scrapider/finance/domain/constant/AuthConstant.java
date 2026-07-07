@@ -12,6 +12,8 @@ public final class AuthConstant {
     public static final String DEFAULT_AVATAR = "";
     public static final String DEFAULT_HOME_PATH = "/investment-workbench";
     public static final String DEFAULT_USER_DESC = "";
+    public static final int DEFAULT_AI_DAILY_REPORT_LIMIT = 3;
+    public static final int DEFAULT_AI_DAILY_CHAT_LIMIT = 10;
     private static final Set<String> SUPPORTED_ROLE_CODES = Set.of(ADMIN_ROLE_CODE, USER_ROLE_CODE);
 
     private AuthConstant() {

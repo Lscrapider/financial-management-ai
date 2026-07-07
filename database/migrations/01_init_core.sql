@@ -116,6 +116,8 @@ CREATE TABLE IF NOT EXISTS app_user (
     phone VARCHAR(32),
     email_notification BOOLEAN NOT NULL DEFAULT TRUE,
     agent_execution_budget_json JSONB,
+    ai_daily_report_limit INTEGER DEFAULT 3,
+    ai_daily_chat_limit INTEGER DEFAULT 10,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uk_app_user_username UNIQUE (username)
@@ -129,9 +131,17 @@ ALTER TABLE app_user ADD COLUMN IF NOT EXISTS email VARCHAR(128);
 ALTER TABLE app_user ADD COLUMN IF NOT EXISTS phone VARCHAR(32);
 ALTER TABLE app_user ADD COLUMN IF NOT EXISTS email_notification BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE app_user ADD COLUMN IF NOT EXISTS agent_execution_budget_json JSONB;
+ALTER TABLE app_user ADD COLUMN IF NOT EXISTS ai_daily_report_limit INTEGER DEFAULT 3;
+ALTER TABLE app_user ADD COLUMN IF NOT EXISTS ai_daily_chat_limit INTEGER DEFAULT 10;
+ALTER TABLE app_user ALTER COLUMN ai_daily_report_limit SET DEFAULT 3;
+ALTER TABLE app_user ALTER COLUMN ai_daily_chat_limit SET DEFAULT 10;
 UPDATE app_user
 SET home_path = '/investment-workbench'
 WHERE role_code = 'user' AND home_path = '/analytics';
+UPDATE app_user
+SET ai_daily_report_limit = NULL,
+    ai_daily_chat_limit = NULL
+WHERE role_code = 'admin';
 
 COMMENT ON TABLE app_user IS '系统登录用户表';
 COMMENT ON COLUMN app_user.username IS '登录用户名';
@@ -142,10 +152,12 @@ COMMENT ON COLUMN app_user.avatar IS '用户头像地址';
 COMMENT ON COLUMN app_user.enabled IS '是否启用';
 COMMENT ON COLUMN app_user.home_path IS '登录后默认首页';
 COMMENT ON COLUMN app_user.agent_execution_budget_json IS 'AI Chat Agent 执行预算 JSON；为空时使用系统默认预算';
+COMMENT ON COLUMN app_user.ai_daily_report_limit IS '每日 AI 报告生成次数限制；为空表示不限制';
+COMMENT ON COLUMN app_user.ai_daily_chat_limit IS '每日 AI 对话次数限制；为空表示不限制';
 
 -- 默认管理员
-INSERT INTO app_user (username, password, real_name, role_code, home_path)
-VALUES ('admin', 'MTIzNDU2', 'Admin', 'admin', '/analytics')
+INSERT INTO app_user (username, password, real_name, role_code, home_path, ai_daily_report_limit, ai_daily_chat_limit)
+VALUES ('admin', 'MTIzNDU2', 'Admin', 'admin', '/analytics', NULL, NULL)
     ON CONFLICT (username) DO NOTHING;
 
 -- ================================================================================

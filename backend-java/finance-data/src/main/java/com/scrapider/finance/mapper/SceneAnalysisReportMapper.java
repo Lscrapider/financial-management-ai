@@ -71,6 +71,21 @@ public interface SceneAnalysisReportMapper extends BaseMapper<SceneAnalysisRepor
     SceneAnalysisReportPO latestByTaskNo(@Param("taskNo") String taskNo);
 
     @Select("""
+            SELECT COUNT(*)
+            FROM scene_analysis_report r
+            JOIN scene_analysis_task t ON t.id = r.task_id
+            WHERE t.user_id = #{userId}
+              AND r.generation_type = #{generationType}
+              AND r.created_at >= #{startTime}
+              AND r.created_at < #{endTime}
+            """)
+    long countByUserAndGenerationTypeBetween(
+            @Param("userId") Long userId,
+            @Param("generationType") String generationType,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime);
+
+    @Select("""
             <script>
             WITH ranked AS (
                 SELECT

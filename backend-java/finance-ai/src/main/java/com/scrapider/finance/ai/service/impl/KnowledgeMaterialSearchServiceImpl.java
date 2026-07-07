@@ -26,6 +26,7 @@ import com.scrapider.finance.ai.service.SceneKnowledgeRetrievalService;
 import com.scrapider.finance.ai.service.SceneTargetDataProvider;
 import com.scrapider.finance.domain.dto.KnowledgeVectorSearchDTO;
 import com.scrapider.finance.domain.enums.SceneAnalysisTaskStatusEnum;
+import com.scrapider.finance.domain.exception.BusinessException;
 import com.scrapider.finance.domain.po.OcrTaskPO;
 import com.scrapider.finance.domain.po.SceneAnalysisTaskPO;
 import com.scrapider.finance.manage.KnowledgeVectorManage;
@@ -94,7 +95,7 @@ public class KnowledgeMaterialSearchServiceImpl implements KnowledgeMaterialSear
     @Override
     public KnowledgeMaterialSubmitVO submit(KnowledgeMaterialSearchParam param) {
         if (param == null) {
-            throw new IllegalArgumentException("request body is required");
+            throw new BusinessException("请求体不能为空。");
         }
         String searchMode = this.normalizeSearchMode(param.searchMode());
         if (SEARCH_MODE_TARGET.equals(searchMode)) {
@@ -106,10 +107,10 @@ public class KnowledgeMaterialSearchServiceImpl implements KnowledgeMaterialSear
     @Override
     public void callback(String taskNo, String callbackToken, SceneAnalysisCallbackParam param) {
         if (StrUtil.isBlank(taskNo)) {
-            throw new IllegalArgumentException("taskNo is required");
+            throw new BusinessException("任务编号不能为空。");
         }
         if (param == null) {
-            throw new IllegalArgumentException("request body is required");
+            throw new BusinessException("请求体不能为空。");
         }
         try {
             if (param.currentScenesPayload() != null) {
@@ -121,7 +122,7 @@ public class KnowledgeMaterialSearchServiceImpl implements KnowledgeMaterialSear
                 this.callbackTokenStore.revoke(taskNo);
                 return;
             }
-            throw new IllegalArgumentException("currentScenesPayload or retrievalEmbeddings is required");
+            throw new BusinessException("当前场景结果或召回向量不能为空。");
         } catch (Exception ex) {
             this.callbackTokenStore.revoke(taskNo);
             this.sceneAnalysisTaskManage.markFailed(taskNo, ex.getMessage());
@@ -157,7 +158,7 @@ public class KnowledgeMaterialSearchServiceImpl implements KnowledgeMaterialSear
         String targetCode = StrUtil.trim(param.targetCode());
         this.requireTotalChunks(param.totalChunks());
         if (StrUtil.hasBlank(targetType, targetCode)) {
-            throw new IllegalArgumentException("targetType and targetCode are required");
+            throw new BusinessException("标的类型和标的代码不能为空。");
         }
         Long userId = CurrentUserContext.currentUserId();
         String taskNo = this.newTaskNo();
@@ -206,7 +207,7 @@ public class KnowledgeMaterialSearchServiceImpl implements KnowledgeMaterialSear
         String queryText = StrUtil.trim(param.queryText());
         this.requireTotalChunks(param.totalChunks());
         if (StrUtil.isBlank(queryText)) {
-            throw new IllegalArgumentException("queryText is required");
+            throw new BusinessException("查询文本不能为空。");
         }
         String rewrittenQuery = StrUtil.blankToDefault(this.queryRewriteService.rewrite(queryText), queryText).trim();
         Long userId = CurrentUserContext.currentUserId();
@@ -319,7 +320,7 @@ public class KnowledgeMaterialSearchServiceImpl implements KnowledgeMaterialSear
         String queryEmbedding = this.formatVector(retrievalEmbedding.queryEmbedding());
         int chunkCount = retrievalEmbedding.chunkCount() == null ? 0 : retrievalEmbedding.chunkCount();
         if (chunkCount <= 0) {
-            throw new IllegalArgumentException("retrieval chunkCount must be greater than 0");
+            throw new BusinessException("召回片段数量必须大于 0。");
         }
         List<KnowledgeVectorSearchDTO> rows = this.knowledgeVectorManage.searchBySemantic(
                 List.of(),
@@ -422,11 +423,11 @@ public class KnowledgeMaterialSearchServiceImpl implements KnowledgeMaterialSear
 
     private SceneAnalysisTaskPO requireMaterialTask(String taskNo) {
         if (StrUtil.isBlank(taskNo) || !taskNo.startsWith(MATERIAL_TASK_PREFIX)) {
-            throw new IllegalArgumentException("knowledge material task not found: " + taskNo);
+            throw new BusinessException("知识库材料任务不存在: " + taskNo);
         }
         SceneAnalysisTaskPO task = this.sceneAnalysisTaskManage.findByTaskNo(taskNo);
         if (task == null) {
-            throw new IllegalArgumentException("knowledge material task not found: " + taskNo);
+            throw new BusinessException("知识库材料任务不存在: " + taskNo);
         }
         return task;
     }
@@ -436,7 +437,7 @@ public class KnowledgeMaterialSearchServiceImpl implements KnowledgeMaterialSear
             return;
         }
         if (!Objects.equals(task.getUserId(), CurrentUserContext.currentUserId())) {
-            throw new IllegalArgumentException("knowledge material task not found: " + task.getTaskNo());
+            throw new BusinessException("知识库材料任务不存在: " + task.getTaskNo());
         }
     }
 
@@ -444,18 +445,18 @@ public class KnowledgeMaterialSearchServiceImpl implements KnowledgeMaterialSear
         return this.targetDataProviders.stream()
                 .filter(provider -> provider.supports(targetType))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("unsupported targetType: " + targetType));
+                .orElseThrow(() -> new BusinessException("不支持的标的类型: " + targetType));
     }
 
     private String normalizeSearchMode(String searchMode) {
         if (StrUtil.isBlank(searchMode)) {
-            throw new IllegalArgumentException("searchMode is required");
+            throw new BusinessException("搜索模式不能为空。");
         }
         String normalized = searchMode.trim().toLowerCase(Locale.ROOT);
         return switch (normalized) {
             case SEARCH_MODE_TARGET -> SEARCH_MODE_TARGET;
             case "query", "natural", "text", SEARCH_MODE_NATURAL_LANGUAGE -> SEARCH_MODE_NATURAL_LANGUAGE;
-            default -> throw new IllegalArgumentException("unsupported searchMode: " + searchMode);
+            default -> throw new BusinessException("不支持的搜索模式: " + searchMode);
         };
     }
 
@@ -474,7 +475,7 @@ public class KnowledgeMaterialSearchServiceImpl implements KnowledgeMaterialSear
 
     private void requireTotalChunks(Integer totalChunks) {
         if (totalChunks == null || totalChunks <= 0) {
-            throw new IllegalArgumentException("totalChunks is required and must be greater than 0");
+            throw new BusinessException("召回片段数量必须大于 0。");
         }
     }
 
@@ -515,11 +516,11 @@ public class KnowledgeMaterialSearchServiceImpl implements KnowledgeMaterialSear
 
     private String formatVector(List<Double> embedding) {
         if (embedding == null || embedding.isEmpty()) {
-            throw new IllegalArgumentException("retrieval queryEmbedding is required");
+            throw new IllegalStateException("召回向量不能为空。");
         }
         if (embedding.size() != EXPECTED_EMBEDDING_DIMENSION) {
-            throw new IllegalArgumentException(
-                    "retrieval queryEmbedding dimension must match knowledge_vector.embedding dimension: "
+            throw new IllegalStateException(
+                    "召回向量维度必须与 knowledge_vector.embedding 维度一致: "
                             + EXPECTED_EMBEDDING_DIMENSION);
         }
         StringBuilder builder = new StringBuilder("[");

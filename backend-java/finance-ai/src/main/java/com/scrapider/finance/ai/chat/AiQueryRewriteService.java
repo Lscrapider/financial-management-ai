@@ -100,12 +100,12 @@ public class AiQueryRewriteService {
     }
     private String extractJson(String content) {
         if (content == null || content.isBlank()) {
-            throw new IllegalArgumentException("empty rewrite response");
+            throw new IllegalArgumentException("改写结果为空。");
         }
         int start = content.indexOf('{');
         int end = content.lastIndexOf('}');
         if (start < 0 || end < start) {
-            throw new IllegalArgumentException("rewrite response is not json");
+            throw new IllegalArgumentException("改写结果不是 JSON。");
         }
         return content.substring(start, end + 1);
     }

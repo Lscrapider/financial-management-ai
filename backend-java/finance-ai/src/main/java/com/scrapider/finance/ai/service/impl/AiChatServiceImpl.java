@@ -9,6 +9,7 @@ import com.scrapider.finance.ai.service.AiChatService;
 import com.scrapider.finance.ai.chat.AiMarketDataQueryService;
 import com.scrapider.finance.ai.chat.AiQueryRewriteService;
 import com.scrapider.finance.ai.service.AiTokenUsageService;
+import com.scrapider.finance.domain.exception.BusinessException;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.beans.factory.annotation.Value;
@@ -72,7 +73,7 @@ public class AiChatServiceImpl implements AiChatService {
 
     private String normalizeMessage(AiChatParam param) {
         if (param == null || param.message() == null || param.message().isBlank()) {
-            throw new IllegalArgumentException("message不能为空");
+            throw new BusinessException("消息内容不能为空。");
         }
         return param.message().trim();
     }

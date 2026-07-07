@@ -4,6 +4,7 @@ import cn.hutool.core.util.StrUtil;
 import com.scrapider.finance.converter.AuthConverter;
 import com.scrapider.finance.domain.constant.AuthConstant;
 import com.scrapider.finance.domain.dto.AuthSessionDTO;
+import com.scrapider.finance.domain.exception.BusinessException;
 import com.scrapider.finance.domain.param.ChangePasswordParam;
 import com.scrapider.finance.domain.param.LoginParam;
 import com.scrapider.finance.domain.param.RegisterParam;
@@ -70,7 +71,7 @@ public class AuthServiceImpl implements AuthService {
         String roleCode = this.requireSupportedRoleCode(loginUser.getRoleCode());
         String requestedRoleCode = this.requireSupportedRoleCode(param.getRoleCode());
         if (!roleCode.equals(requestedRoleCode)) {
-            throw new IllegalArgumentException("Role does not match the current user.");
+            throw new BusinessException("登录角色与当前用户不匹配。");
         }
         String accessToken = this.jwtUtils.generateAccessToken(
                 loginUser.getUser().getId(),
@@ -85,7 +86,7 @@ public class AuthServiceImpl implements AuthService {
         this.validateRegisterParam(param);
 
         if (this.appUserManage.existsByUsername(param.getUsername())) {
-            throw new IllegalArgumentException("Username already exists.");
+            throw new BusinessException("用户名已存在。");
         }
 
         AppUserPO user = AppUserPO.fromRegisterParam(
@@ -108,7 +109,7 @@ public class AuthServiceImpl implements AuthService {
     public UserInfoVO getUserInfo(LoginUser loginUser, String token) {
         AppUserPO user = this.appUserManage.getById(loginUser.getUser().getId());
         if (user == null) {
-            throw new IllegalArgumentException("User not found.");
+            throw new BusinessException("用户不存在。");
         }
         return AuthConverter.toUserInfo(user, this.requireSupportedRoleCode(user.getRoleCode()), token);
     }
@@ -116,19 +117,19 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthSessionDTO refresh(String refreshSid) {
         if (StrUtil.isBlank(refreshSid)) {
-            throw new IllegalArgumentException("Refresh session is required.");
+            throw new BusinessException("刷新会话不能为空。");
         }
         LocalDateTime now = LocalDateTime.now();
         String oldSessionHash = this.hash(refreshSid);
         RefreshSessionStore.RefreshSession session =
                 this.refreshSessionStore.getActiveBySessionHash(oldSessionHash, now);
         if (session == null) {
-            throw new IllegalArgumentException("Refresh session is invalid or expired.");
+            throw new BusinessException("刷新会话无效或已过期。");
         }
         AppUserPO user = this.appUserManage.getById(session.userId());
         if (user == null || !Boolean.TRUE.equals(user.getEnabled())) {
             this.refreshSessionStore.revokeSession(oldSessionHash);
-            throw new IllegalArgumentException("User not found or disabled.");
+            throw new BusinessException("用户不存在或已被禁用。");
         }
 
         String newRefreshSid = this.createRefreshSession(user.getId(), now);
@@ -163,15 +164,15 @@ public class AuthServiceImpl implements AuthService {
         if (param == null
                 || StrUtil.isBlank(param.getOldPassword())
                 || StrUtil.isBlank(param.getNewPassword())) {
-            throw new IllegalArgumentException("Old password and new password are required.");
+            throw new BusinessException("旧密码和新密码不能为空。");
         }
         if (!param.getNewPassword().equals(param.getConfirmPassword())) {
-            throw new IllegalArgumentException("Password confirmation does not match.");
+            throw new BusinessException("两次输入的新密码不一致。");
         }
 
         AppUserPO user = this.appUserManage.getById(loginUser.getUser().getId());
         if (!this.passwordEncoder.matches(param.getOldPassword(), user.getPassword())) {
-            throw new IllegalArgumentException("Old password is incorrect.");
+            throw new BusinessException("旧密码不正确。");
         }
 
         user.setPassword(this.passwordEncoder.encode(param.getNewPassword()));
@@ -191,10 +192,10 @@ public class AuthServiceImpl implements AuthService {
         if (param == null
                 || StrUtil.isBlank(param.getUsername())
                 || StrUtil.isBlank(param.getPassword())) {
-            throw new IllegalArgumentException("Username and password are required.");
+            throw new BusinessException("用户名和密码不能为空。");
         }
         if (!param.getPassword().equals(param.getConfirmPassword())) {
-            throw new IllegalArgumentException("Password confirmation does not match.");
+            throw new BusinessException("两次输入的密码不一致。");
         }
     }
 
@@ -216,7 +217,7 @@ public class AuthServiceImpl implements AuthService {
     private String requireSupportedRoleCode(String roleCode) {
         String normalizedRoleCode = AuthConstant.normalizeRoleCode(roleCode);
         if (!AuthConstant.isSupportedRoleCode(normalizedRoleCode)) {
-            throw new IllegalArgumentException("Unsupported roleCode: " + roleCode);
+            throw new BusinessException("不支持的角色类型: " + roleCode);
         }
         return normalizedRoleCode;
     }
@@ -227,7 +228,7 @@ public class AuthServiceImpl implements AuthService {
             byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
             return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
         } catch (NoSuchAlgorithmException ex) {
-            throw new IllegalStateException("SHA-256 is unavailable.", ex);
+            throw new IllegalStateException("SHA-256 算法不可用。", ex);
         }
     }
 }

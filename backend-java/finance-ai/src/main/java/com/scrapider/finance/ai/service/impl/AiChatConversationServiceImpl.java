@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scrapider.finance.ai.domain.dto.AiChatConversationBindingDTO;
 import com.scrapider.finance.ai.domain.dto.ConversationCleanupMessageDTO;
+import com.scrapider.finance.domain.exception.BusinessException;
 import com.scrapider.finance.domain.po.AiChatConversationPO;
 import com.scrapider.finance.domain.po.AiChatMessagePO;
 import com.scrapider.finance.domain.po.AiUserMemoryPO;
@@ -43,7 +44,7 @@ public class AiChatConversationServiceImpl implements AiChatConversationService 
             AiUserMemoryManage userMemoryManage,
             AgentMessagePublisher agentMessagePublisher,
             ObjectMapper objectMapper,
-            @Value("${finance.agent.conversation-cleanup-delay-minutes:30}") int cleanupDelayMinutes) {
+            @Value("${finance.agent.conversation-cleanup-delay-minutes:1440}") int cleanupDelayMinutes) {
         this.conversationManage = conversationManage;
         this.messageManage = messageManage;
         this.userMemoryManage = userMemoryManage;
@@ -55,7 +56,7 @@ public class AiChatConversationServiceImpl implements AiChatConversationService 
     @Override
     public AiChatConversationBindingDTO bind(Long userId) {
         if (userId == null) {
-            throw new IllegalArgumentException("conversation userId is required");
+            throw new BusinessException("对话用户 ID 不能为空。");
         }
         AiChatConversationPO conversation = this.conversationManage.findLatestActiveByUserId(userId);
         if (conversation == null) {
@@ -68,7 +69,7 @@ public class AiChatConversationServiceImpl implements AiChatConversationService 
     @Override
     public AiChatConversationBindingDTO bind(Long userId, String conversationId) {
         if (userId == null || StrUtil.isBlank(conversationId)) {
-            throw new IllegalArgumentException("conversation userId and conversationId are required");
+            throw new BusinessException("对话用户 ID 和对话 ID 不能为空。");
         }
         AiChatConversationPO conversation = this.ensureConversation(userId, conversationId);
         return this.bindActiveConversation(userId, conversation);
@@ -162,7 +163,7 @@ public class AiChatConversationServiceImpl implements AiChatConversationService 
             return conversation;
         }
         if (!userId.equals(conversation.getUserId())) {
-            throw new IllegalArgumentException("conversation does not belong to current user");
+            throw new BusinessException("对话不属于当前用户。");
         }
         return conversation;
     }

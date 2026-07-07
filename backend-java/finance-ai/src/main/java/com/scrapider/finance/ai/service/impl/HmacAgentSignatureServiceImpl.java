@@ -42,17 +42,17 @@ public class HmacAgentSignatureServiceImpl implements AgentSignatureService {
         String nonce = request.getHeader(NONCE_HEADER);
         String signature = request.getHeader(SIGNATURE_HEADER);
         if (StrUtil.hasBlank(agentSessionId, timestamp, nonce, signature)) {
-            throw new AccessDeniedException("agent signature headers are required");
+            throw new AccessDeniedException("Agent 签名请求头不能为空。");
         }
         AgentSessionDTO session = this.agentSessionService.findActive(agentSessionId)
-                .orElseThrow(() -> new AccessDeniedException("agent session is invalid or expired"));
+                .orElseThrow(() -> new AccessDeniedException("Agent 会话无效或已过期。"));
         this.verifyTimestamp(timestamp);
         String expected = this.sign(session.sessionSecret(), this.canonicalString(request, timestamp, nonce, rawBody));
         if (!MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8), signature.getBytes(StandardCharsets.UTF_8))) {
-            throw new AccessDeniedException("agent signature is invalid");
+            throw new AccessDeniedException("Agent 签名无效。");
         }
         if (!this.agentSessionService.markNonceUsed(agentSessionId, nonce)) {
-            throw new AccessDeniedException("agent request nonce is reused");
+            throw new AccessDeniedException("Agent 请求 nonce 已被使用。");
         }
         return session;
     }
@@ -62,12 +62,12 @@ public class HmacAgentSignatureServiceImpl implements AgentSignatureService {
         try {
             epochMillis = Long.parseLong(timestamp);
         } catch (NumberFormatException ex) {
-            throw new AccessDeniedException("agent timestamp is invalid");
+            throw new AccessDeniedException("Agent 时间戳无效。");
         }
         Instant requestTime = Instant.ofEpochMilli(epochMillis);
         Instant now = Instant.now();
         if (requestTime.isBefore(now.minus(this.signatureWindow)) || requestTime.isAfter(now.plus(this.signatureWindow))) {
-            throw new AccessDeniedException("agent timestamp is expired");
+            throw new AccessDeniedException("Agent 时间戳已过期。");
         }
     }
 
@@ -90,7 +90,7 @@ public class HmacAgentSignatureServiceImpl implements AgentSignatureService {
             return Base64.getUrlEncoder().withoutPadding()
                     .encodeToString(mac.doFinal(canonicalString.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception ex) {
-            throw new IllegalStateException("failed to sign agent request", ex);
+            throw new IllegalStateException("Agent 请求签名失败。", ex);
         }
     }
 
@@ -104,7 +104,7 @@ public class HmacAgentSignatureServiceImpl implements AgentSignatureService {
             }
             return builder.toString();
         } catch (Exception ex) {
-            throw new IllegalStateException("failed to hash agent request", ex);
+            throw new IllegalStateException("Agent 请求摘要计算失败。", ex);
         }
     }
 }

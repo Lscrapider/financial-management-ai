@@ -68,6 +68,14 @@ public class SceneAnalysisTaskManage extends ServiceImpl<SceneAnalysisTaskMapper
                 .one();
     }
 
+    public long countSubmittedByUserBetween(Long userId, LocalDateTime startTime, LocalDateTime endTime) {
+        return this.lambdaQuery()
+                .eq(SceneAnalysisTaskPO::getUserId, userId)
+                .ge(SceneAnalysisTaskPO::getSubmittedAt, startTime)
+                .lt(SceneAnalysisTaskPO::getSubmittedAt, endTime)
+                .count();
+    }
+
     public void saveKnowledgeContextPayload(String taskNo, JsonNode reportPayload) {
         this.baseMapper.saveReportPayload(
                 taskNo,

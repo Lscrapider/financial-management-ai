@@ -164,13 +164,13 @@ finance:
     data-gateway-url: ${AGENT_DATA_GATEWAY_URL}
     session-ttl-seconds: 1800
     signature-window-seconds: 60
-    conversation-cleanup-delay-minutes: 30
-    conversation-cleanup-delay-ms: 1800000
+    conversation-cleanup-delay-minutes: 1440
+    conversation-cleanup-delay-ms: 86400000
     rabbitmq:
       exchange: finance.agent.topic
       run-start-queue: finance.agent.run.start
       run-start-routing-key: agent.run.start
-      cleanup-delay-queue: finance.agent.conversation.cleanup.delay
+      cleanup-delay-queue: finance.agent.conversation.cleanup.delay.24h
       cleanup-delay-routing-key: conversation.cleanup.delay
       cleanup-queue: finance.agent.conversation.cleanup
       cleanup-routing-key: conversation.cleanup

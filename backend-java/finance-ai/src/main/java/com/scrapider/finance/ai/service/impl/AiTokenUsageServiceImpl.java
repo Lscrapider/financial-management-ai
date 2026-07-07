@@ -16,6 +16,7 @@ import com.scrapider.finance.ai.service.AiTokenUsageCostCalculator;
 import com.scrapider.finance.ai.service.AiTokenUsageService;
 import com.scrapider.finance.domain.enums.AiTokenUsagePhaseEnum;
 import com.scrapider.finance.domain.enums.AiTokenUsageSourceEnum;
+import com.scrapider.finance.domain.exception.BusinessException;
 import com.scrapider.finance.domain.po.AppUserPO;
 import com.scrapider.finance.domain.po.AiTokenUsageLogPO;
 import com.scrapider.finance.manage.AppUserManage;
@@ -67,7 +68,7 @@ public class AiTokenUsageServiceImpl implements AiTokenUsageService {
             String sourceRefId,
             AiTokenUsagePhaseEnum phase) {
         if (response == null || response.isNull() || response.path("usage").isMissingNode()) {
-            throw new IllegalArgumentException("DeepSeek response usage must not be empty");
+            throw new IllegalStateException("DeepSeek 返回的 token usage 不能为空。");
         }
         AiTokenUsageLogPO saved = this.aiTokenUsageLogManage.saveLog(AiTokenUsageLogPO.fromDeepSeekResponse(
                 response,
@@ -241,7 +242,7 @@ public class AiTokenUsageServiceImpl implements AiTokenUsageService {
 
     private void validateTimeRange(LocalDateTime startTime, LocalDateTime endTime) {
         if (startTime != null && endTime != null && startTime.isAfter(endTime)) {
-            throw new IllegalArgumentException("startTime must be before endTime");
+            throw new BusinessException("开始时间不能晚于结束时间。");
         }
     }
 
@@ -251,7 +252,7 @@ public class AiTokenUsageServiceImpl implements AiTokenUsageService {
             return null;
         }
         if (AiTokenUsageSourceEnum.fromCode(normalizedSource) == null) {
-            throw new IllegalArgumentException("unsupported token usage source: " + normalizedSource);
+            throw new BusinessException("不支持的 token 使用来源: " + normalizedSource);
         }
         return normalizedSource;
     }
@@ -262,7 +263,7 @@ public class AiTokenUsageServiceImpl implements AiTokenUsageService {
             return null;
         }
         if (AiTokenUsagePhaseEnum.fromCode(normalizedPhase) == null) {
-            throw new IllegalArgumentException("unsupported token usage phase: " + normalizedPhase);
+            throw new BusinessException("不支持的 token 使用阶段: " + normalizedPhase);
         }
         return normalizedPhase;
     }

@@ -17,9 +17,11 @@ import com.scrapider.finance.ai.domain.vo.SceneAnalysisReportVO;
 import com.scrapider.finance.ai.security.CurrentUserContext;
 import com.scrapider.finance.ai.service.SceneAnalysisReportService;
 import com.scrapider.finance.ai.service.AiTokenUsageService;
+import com.scrapider.finance.ai.service.AiUsageLimitService;
 import com.scrapider.finance.domain.enums.AiTokenUsagePhaseEnum;
 import com.scrapider.finance.domain.enums.AiTokenUsageSourceEnum;
 import com.scrapider.finance.domain.enums.SceneAnalysisReportTypeEnum;
+import com.scrapider.finance.domain.exception.BusinessException;
 import com.scrapider.finance.domain.po.OcrTaskPO;
 import com.scrapider.finance.domain.po.SceneAnalysisReportPO;
 import com.scrapider.finance.domain.po.SceneAnalysisTaskPO;
@@ -48,8 +50,6 @@ public class SceneAnalysisReportServiceImpl implements SceneAnalysisReportServic
     private static final int DEFAULT_PAGE_NUM = 1;
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MAX_PAGE_SIZE = 100;
-    private static final String GENERATION_TYPE_INITIAL = "initial";
-    private static final String GENERATION_TYPE_REGENERATE = "regenerate";
     private static final String SYSTEM_PROMPT = """
             你是一个面向个人投资研究的理财分析报告生成助手。
             必须基于输入的 marketContext、currentScenes 和 knowledgeContext 生成结构化 JSON 报告。
@@ -75,6 +75,7 @@ public class SceneAnalysisReportServiceImpl implements SceneAnalysisReportServic
     private final OcrTaskManage ocrTaskManage;
     private final DeepSeekChatCompletionApi deepSeekChatCompletionApi;
     private final AiTokenUsageService aiTokenUsageService;
+    private final AiUsageLimitService aiUsageLimitService;
     private final ObjectMapper objectMapper;
     private final Executor sceneAnalysisReportExecutor;
 
@@ -84,6 +85,7 @@ public class SceneAnalysisReportServiceImpl implements SceneAnalysisReportServic
             OcrTaskManage ocrTaskManage,
             DeepSeekChatCompletionApi deepSeekChatCompletionApi,
             AiTokenUsageService aiTokenUsageService,
+            AiUsageLimitService aiUsageLimitService,
             ObjectMapper objectMapper,
             @Qualifier("sceneAnalysisReportExecutor") Executor sceneAnalysisReportExecutor) {
         this.sceneAnalysisTaskManage = sceneAnalysisTaskManage;
@@ -91,18 +93,19 @@ public class SceneAnalysisReportServiceImpl implements SceneAnalysisReportServic
         this.ocrTaskManage = ocrTaskManage;
         this.deepSeekChatCompletionApi = deepSeekChatCompletionApi;
         this.aiTokenUsageService = aiTokenUsageService;
+        this.aiUsageLimitService = aiUsageLimitService;
         this.objectMapper = objectMapper;
         this.sceneAnalysisReportExecutor = sceneAnalysisReportExecutor;
     }
 
     @Override
     public void generateAfterKnowledgeRetrieved(String taskNo) {
-        this.submitGeneration(taskNo, GENERATION_TYPE_INITIAL);
+        this.submitGeneration(taskNo, SceneAnalysisReportPO.GENERATION_TYPE_INITIAL);
     }
 
     @Override
     public void regenerateFromStoredContext(String taskNo) {
-        this.submitGenerationForCurrentUser(taskNo, GENERATION_TYPE_REGENERATE);
+        this.submitGenerationForCurrentUser(taskNo, SceneAnalysisReportPO.GENERATION_TYPE_REGENERATE);
     }
 
     @Override
@@ -148,10 +151,10 @@ public class SceneAnalysisReportServiceImpl implements SceneAnalysisReportServic
     @Override
     public List<SceneAnalysisReportHistoryVO> listHistory(String targetType, String targetCode) {
         if (StrUtil.isBlank(targetType)) {
-            throw new IllegalArgumentException("targetType is required");
+            throw new BusinessException("标的类型不能为空。");
         }
         if (StrUtil.isBlank(targetCode)) {
-            throw new IllegalArgumentException("targetCode is required");
+            throw new BusinessException("标的代码不能为空。");
         }
         return this.sceneAnalysisReportManage
                 .listHistory(targetType, targetCode, CurrentUserContext.ownerUserIdForQuery())
@@ -163,12 +166,12 @@ public class SceneAnalysisReportServiceImpl implements SceneAnalysisReportServic
     @Override
     public SceneAnalysisReportDetailVO detail(Long reportId) {
         if (reportId == null) {
-            throw new IllegalArgumentException("reportId is required");
+            throw new BusinessException("报告 ID 不能为空。");
         }
         SceneAnalysisReportPO report = this.sceneAnalysisReportManage
                 .findByIdForOwner(reportId, CurrentUserContext.ownerUserIdForQuery());
         if (report == null) {
-            throw new IllegalArgumentException("scene analysis report not found: " + reportId);
+            throw new BusinessException("场景分析报告不存在: " + reportId);
         }
         return SceneAnalysisReportConverter.detail(report);
     }
@@ -183,6 +186,7 @@ public class SceneAnalysisReportServiceImpl implements SceneAnalysisReportServic
     private void submitGenerationForCurrentUser(String taskNo, String generationType) {
         SceneAnalysisTaskPO task = this.reportReadyTask(taskNo);
         this.requireCurrentUserCanAccess(task);
+        this.aiUsageLimitService.requireCanGenerateReport(task.getUserId());
         SceneAnalysisReportPO report = this.sceneAnalysisReportManage.createGeneratingReport(task, generationType);
         this.sceneAnalysisReportExecutor.execute(
                 () -> this.generateFromTaskSnapshotSafely(taskNo, report.getId(), generationType));
@@ -201,7 +205,7 @@ public class SceneAnalysisReportServiceImpl implements SceneAnalysisReportServic
             return;
         }
         if (!Objects.equals(task.getUserId(), CurrentUserContext.currentUserId())) {
-            throw new IllegalArgumentException("scene analysis task not found: " + task.getTaskNo());
+            throw new BusinessException("场景分析任务不存在: " + task.getTaskNo());
         }
     }
 
@@ -213,13 +217,13 @@ public class SceneAnalysisReportServiceImpl implements SceneAnalysisReportServic
                     report.reportContent(),
                     report.reportText(),
                     this.deepSeekChatCompletionApi.model());
-            if (GENERATION_TYPE_INITIAL.equals(generationType)) {
+            if (SceneAnalysisReportPO.GENERATION_TYPE_INITIAL.equals(generationType)) {
                 this.sceneAnalysisTaskManage.markReportSucceeded(taskNo);
             }
         } catch (RuntimeException ex) {
             LOGGER.error("scene analysis report generation failed task_no={}", taskNo, ex);
             this.sceneAnalysisReportManage.markFailed(reportId, ex.getMessage());
-            if (GENERATION_TYPE_INITIAL.equals(generationType)) {
+            if (SceneAnalysisReportPO.GENERATION_TYPE_INITIAL.equals(generationType)) {
                 this.sceneAnalysisTaskManage.markFailed(taskNo, ex.getMessage());
             }
         }
@@ -255,7 +259,7 @@ public class SceneAnalysisReportServiceImpl implements SceneAnalysisReportServic
             JsonNode knowledgeContext,
             String generationType) {
         JsonNode storedLlmInput = reportPayload.path("llmInput");
-        if (GENERATION_TYPE_REGENERATE.equals(generationType) && storedLlmInput.isObject()) {
+        if (SceneAnalysisReportPO.GENERATION_TYPE_REGENERATE.equals(generationType) && storedLlmInput.isObject()) {
             return storedLlmInput;
         }
         JsonNode requestPayload = SceneAnalysisReportPayloadConverter.requestPayload(
@@ -270,11 +274,11 @@ public class SceneAnalysisReportServiceImpl implements SceneAnalysisReportServic
 
     private SceneAnalysisTaskPO loadTask(String taskNo) {
         if (taskNo == null || taskNo.isBlank()) {
-            throw new IllegalArgumentException("taskNo is required");
+            throw new BusinessException("任务编号不能为空。");
         }
         SceneAnalysisTaskPO task = this.sceneAnalysisTaskManage.findByTaskNo(taskNo);
         if (task == null) {
-            throw new IllegalArgumentException("scene analysis task not found: " + taskNo);
+            throw new BusinessException("场景分析任务不存在: " + taskNo);
         }
         this.requireReportTask(task);
         return task;
@@ -284,13 +288,13 @@ public class SceneAnalysisReportServiceImpl implements SceneAnalysisReportServic
         try {
             SceneAnalysisReportTypeEnum.of(task.getReportType());
         } catch (IllegalArgumentException ex) {
-            throw new IllegalArgumentException("scene analysis report task not found: " + task.getTaskNo());
+            throw new BusinessException("场景分析报告任务不存在: " + task.getTaskNo());
         }
     }
 
     private JsonNode requiredObject(JsonNode node, String name) {
         if (node == null || node.isNull() || node.isMissingNode() || !node.isObject()) {
-            throw new IllegalArgumentException(name + " is required");
+            throw new BusinessException(this.requiredObjectMessage(name));
         }
         return node;
     }
@@ -300,7 +304,7 @@ public class SceneAnalysisReportServiceImpl implements SceneAnalysisReportServic
             return this.objectMapper.createObjectNode();
         }
         if (!reportPayload.isObject()) {
-            throw new IllegalArgumentException("reportPayload must be object");
+            throw new BusinessException("报告上下文必须是对象。");
         }
         return reportPayload.deepCopy();
     }
@@ -313,16 +317,16 @@ public class SceneAnalysisReportServiceImpl implements SceneAnalysisReportServic
                 .path("content")
                 .asText("");
         if (content.isBlank()) {
-            throw new IllegalArgumentException("DeepSeek response content is empty");
+            throw new IllegalStateException("DeepSeek 返回内容为空。");
         }
         try {
             JsonNode node = this.objectMapper.readTree(content);
             if (!node.isObject()) {
-                throw new IllegalArgumentException("DeepSeek report content must be JSON object");
+                throw new IllegalStateException("DeepSeek 报告内容必须是 JSON 对象。");
             }
             return node;
         } catch (JsonProcessingException ex) {
-            throw new IllegalArgumentException("DeepSeek report content is not valid JSON", ex);
+            throw new IllegalStateException("DeepSeek 报告内容不是合法 JSON。", ex);
         }
     }
 
@@ -349,7 +353,7 @@ public class SceneAnalysisReportServiceImpl implements SceneAnalysisReportServic
                 .filter(id -> !allowedChunkIds.contains(id))
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         if (!invalid.isEmpty()) {
-            throw new IllegalArgumentException("reportContent contains invalid chunkIds: " + invalid);
+            throw new IllegalStateException("报告内容包含无效的知识片段 ID: " + invalid);
         }
     }
 
@@ -392,6 +396,14 @@ public class SceneAnalysisReportServiceImpl implements SceneAnalysisReportServic
             return null;
         }
         return text.trim();
+    }
+
+    private String requiredObjectMessage(String name) {
+        return switch (name) {
+            case "currentScenesPayload" -> "当前场景结果不能为空。";
+            case "knowledgeContext" -> "知识库召回上下文不能为空。";
+            default -> name + " 不能为空。";
+        };
     }
 
     private void recordTokenUsage(JsonNode response, SceneAnalysisTaskPO task, Long reportId) {

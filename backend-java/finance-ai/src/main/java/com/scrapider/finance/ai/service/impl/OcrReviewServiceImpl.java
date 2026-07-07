@@ -13,6 +13,7 @@ import com.scrapider.finance.ai.service.OcrFileStorageService;
 import com.scrapider.finance.ai.service.OcrReviewService;
 import com.scrapider.finance.ai.publisher.OcrTaskMessagePublisher;
 import com.scrapider.finance.domain.enums.OcrTaskStageEnum;
+import com.scrapider.finance.domain.exception.BusinessException;
 import com.scrapider.finance.domain.po.OcrReviewPO;
 import com.scrapider.finance.domain.po.OcrTaskStagePO;
 import com.scrapider.finance.manage.OcrReviewManage;
@@ -52,7 +53,7 @@ public class OcrReviewServiceImpl implements OcrReviewService {
     @Override
     public void initialize(OcrQualityValidateMessageDTO message) {
         if (message == null || message.inputRef() == null) {
-            throw new IllegalArgumentException("OCR 质量校验消息不能为空");
+            throw new BusinessException("OCR 质量校验消息不能为空。");
         }
         String stage = OcrTaskStageEnum.QUALITY_VALIDATE.getCode();
         this.ocrTaskStageManage.startTaskStage(
@@ -98,22 +99,22 @@ public class OcrReviewServiceImpl implements OcrReviewService {
     @Override
     public void saveDraft(String taskNo, OcrReviewDraftParam param) {
         if (param == null || param.draftContent() == null || param.draftContent().isNull()) {
-            throw new IllegalArgumentException("复核草稿不能为空");
+            throw new BusinessException("复核草稿不能为空。");
         }
         this.ocrReviewManage.findByTaskNo(taskNo)
-                .orElseThrow(() -> new IllegalArgumentException("OCR 复核任务不存在"));
+                .orElseThrow(() -> new BusinessException("OCR 复核任务不存在。"));
         this.ocrReviewManage.saveDraft(taskNo, param.draftContent());
     }
 
     @Override
     public void submit(String taskNo, OcrReviewDraftParam param) {
         OcrReviewPO review = this.ocrReviewManage.findByTaskNo(taskNo)
-                .orElseThrow(() -> new IllegalArgumentException("OCR 复核任务不存在"));
+                .orElseThrow(() -> new BusinessException("OCR 复核任务不存在。"));
         JsonNode finalContent = param != null && param.draftContent() != null && !param.draftContent().isNull()
                 ? param.draftContent()
                 : review.getDraftContent();
         if (finalContent == null || finalContent.isNull()) {
-            throw new IllegalArgumentException("复核提交内容不能为空");
+            throw new BusinessException("复核提交内容不能为空。");
         }
         int reviewedParagraphCount = this.paragraphCount(finalContent);
 
@@ -154,7 +155,7 @@ public class OcrReviewServiceImpl implements OcrReviewService {
 
     private JsonNode findPage(String taskNo, Integer pageNo) {
         if (pageNo == null) {
-            throw new IllegalArgumentException("页码不能为空");
+            throw new BusinessException("页码不能为空。");
         }
         JsonNode pages = this.documentNormalizeOutputMessage(taskNo).path("pages");
         if (pages.isArray()) {
@@ -164,23 +165,23 @@ public class OcrReviewServiceImpl implements OcrReviewService {
                 }
             }
         }
-        throw new IllegalArgumentException("OCR 页面不存在");
+        throw new BusinessException("OCR 页面不存在。");
     }
 
     private JsonNode documentNormalizeOutputMessage(String taskNo) {
         OcrTaskStagePO stage = this.ocrTaskStageManage
                 .findByTaskNoAndStage(taskNo, OcrTaskStageEnum.DOCUMENT_NORMALIZE.getCode())
-                .orElseThrow(() -> new IllegalArgumentException("OCR 标准化阶段记录不存在"));
+                .orElseThrow(() -> new BusinessException("OCR 标准化阶段记录不存在。"));
         return stage.getOutputMessage();
     }
 
     private OcrReviewPO initializeFromTextCleanStage(String taskNo) {
         OcrTaskStagePO stage = this.ocrTaskStageManage
                 .findByTaskNoAndStage(taskNo, OcrTaskStageEnum.TEXT_CLEAN.getCode())
-                .orElseThrow(() -> new IllegalArgumentException("OCR 复核任务不存在"));
+                .orElseThrow(() -> new BusinessException("OCR 复核任务不存在。"));
         JsonNode outputRef = stage.getOutputRef();
         if (outputRef == null || outputRef.isNull()) {
-            throw new IllegalArgumentException("OCR 文本清洗产物不存在");
+            throw new BusinessException("OCR 文本清洗产物不存在。");
         }
         JsonNode cleanedContent = this.ocrFileStorageService.readJson(
                 outputRef.path("bucket").asText(),
@@ -196,13 +197,13 @@ public class OcrReviewServiceImpl implements OcrReviewService {
         this.ocrReviewManage.initializePendingByTaskNo(review);
         this.ocrTaskManage.markManualReviewRequired(taskNo);
         return this.ocrReviewManage.findByTaskNo(taskNo)
-                .orElseThrow(() -> new IllegalArgumentException("OCR 复核任务初始化失败"));
+                .orElseThrow(() -> new BusinessException("OCR 复核任务初始化失败。"));
     }
 
     private int paragraphCount(JsonNode finalContent) {
         JsonNode paragraphs = finalContent.path("paragraphs");
         if (!paragraphs.isArray()) {
-            throw new IllegalArgumentException("复核提交段落不能为空");
+            throw new BusinessException("复核提交段落不能为空。");
         }
         return paragraphs.size();
     }

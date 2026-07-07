@@ -10,6 +10,7 @@ import com.scrapider.finance.ai.domain.param.SceneAnalysisSceneModuleParam;
 import com.scrapider.finance.ai.domain.param.SceneRetrievalEmbeddingParam;
 import com.scrapider.finance.ai.service.SceneKnowledgeRetrievalService;
 import com.scrapider.finance.domain.dto.KnowledgeVectorSearchDTO;
+import com.scrapider.finance.domain.exception.BusinessException;
 import com.scrapider.finance.manage.KnowledgeVectorManage;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -69,15 +70,15 @@ public class SceneKnowledgeRetrievalServiceImpl implements SceneKnowledgeRetriev
     @Override
     public List<SceneChunkAllocationDTO> allocateChunks(SceneAnalysisCurrentScenesPayloadParam payload) {
         if (payload == null) {
-            throw new IllegalArgumentException("currentScenesPayload is required");
+            throw new BusinessException("当前场景结果不能为空。");
         }
         int totalChunks = payload.totalChunks() == null ? 0 : payload.totalChunks();
         if (totalChunks <= 0) {
-            throw new IllegalArgumentException("currentScenesPayload.totalChunks must be greater than 0");
+            throw new BusinessException("当前场景召回片段数量必须大于 0。");
         }
         SceneAnalysisCurrentScenesParam currentScenes = payload.currentScenes();
         if (currentScenes == null) {
-            throw new IllegalArgumentException("currentScenesPayload.currentScenes is required");
+            throw new BusinessException("当前场景明细不能为空。");
         }
         List<Candidate> candidates = this.activeCandidates(currentScenes, payload.reportType());
         if (candidates.isEmpty()) {
@@ -230,7 +231,7 @@ public class SceneKnowledgeRetrievalServiceImpl implements SceneKnowledgeRetriev
 
     private String queryText(SceneAnalysisSceneModuleParam module) {
         if (module == null || module.queryText() == null || module.queryText().isBlank()) {
-            throw new IllegalArgumentException("currentScenes module queryText is required");
+            throw new BusinessException("当前场景召回查询文本不能为空。");
         }
         return module.queryText().trim();
     }
@@ -339,11 +340,11 @@ public class SceneKnowledgeRetrievalServiceImpl implements SceneKnowledgeRetriev
 
     private String formatVector(List<Double> embedding) {
         if (embedding == null || embedding.isEmpty()) {
-            throw new IllegalStateException("retrieval queryEmbedding is required");
+            throw new IllegalStateException("召回向量不能为空。");
         }
         if (embedding.size() != EXPECTED_EMBEDDING_DIMENSION) {
             throw new IllegalStateException(
-                    "retrieval queryEmbedding dimension must match knowledge_vector.embedding dimension: "
+                    "召回向量维度必须与 knowledge_vector.embedding 维度一致: "
                             + EXPECTED_EMBEDDING_DIMENSION);
         }
         StringBuilder builder = new StringBuilder("[");

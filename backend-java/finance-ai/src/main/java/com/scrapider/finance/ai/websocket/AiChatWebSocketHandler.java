@@ -6,12 +6,14 @@ import com.scrapider.finance.ai.domain.dto.AgentRunStartMessageDTO;
 import com.scrapider.finance.ai.domain.dto.AgentSessionDTO;
 import com.scrapider.finance.ai.domain.param.AiChatWebSocketMessageParam;
 import com.scrapider.finance.ai.domain.vo.AiChatWebSocketMessageVO;
+import com.scrapider.finance.ai.exception.AiUsageLimitExceededException;
 import com.scrapider.finance.domain.po.AppUserPO;
 import com.scrapider.finance.manage.AppUserManage;
 import com.scrapider.finance.security.LoginUser;
 import com.scrapider.finance.ai.publisher.AgentMessagePublisher;
 import com.scrapider.finance.ai.service.AgentSessionService;
 import com.scrapider.finance.ai.service.AiChatConversationService;
+import com.scrapider.finance.ai.service.AiUsageLimitService;
 import cn.hutool.core.util.StrUtil;
 import java.io.IOException;
 import java.time.OffsetDateTime;
@@ -33,6 +35,7 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
     private final AgentSessionService agentSessionService;
     private final AgentMessagePublisher agentMessagePublisher;
     private final AiChatConversationService aiChatConversationService;
+    private final AiUsageLimitService aiUsageLimitService;
     private final AppUserManage appUserManage;
     private final String dataGatewayUrl;
     private final String callbackUrl;
@@ -43,6 +46,7 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
             AgentSessionService agentSessionService,
             AgentMessagePublisher agentMessagePublisher,
             AiChatConversationService aiChatConversationService,
+            AiUsageLimitService aiUsageLimitService,
             AppUserManage appUserManage,
             @Value("${finance.agent.data-gateway-url:http://localhost:8081/internal/agent/data/query}")
                     String dataGatewayUrl,
@@ -53,6 +57,7 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
         this.agentSessionService = agentSessionService;
         this.agentMessagePublisher = agentMessagePublisher;
         this.aiChatConversationService = aiChatConversationService;
+        this.aiUsageLimitService = aiUsageLimitService;
         this.appUserManage = appUserManage;
         this.dataGatewayUrl = dataGatewayUrl;
         this.callbackUrl = callbackUrl;
@@ -86,6 +91,7 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
         LoginUser loginUser = this.sessionRegistry.loginUser(session.getId())
                 .orElseThrow(() -> new IllegalStateException("websocket login user is missing"));
         try {
+            this.aiUsageLimitService.requireCanSendChat(loginUser.getUser().getId());
             this.aiChatConversationService.saveUserMessage(
                     loginUser.getUser().getId(),
                     boundConversationId,
@@ -102,6 +108,12 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
                     this.dataGatewayUrl,
                     this.callbackUrl,
                     this.agentExecutionBudget(loginUser.getUser().getId())));
+        } catch (AiUsageLimitExceededException ex) {
+            this.send(session, AiChatWebSocketMessageVO.finalAnswer(
+                    boundConversationId,
+                    param.messageId(),
+                    ex.getMessage(),
+                    OffsetDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)));
         } catch (Exception ex) {
             this.send(session, AiChatWebSocketMessageVO.finalAnswer(
                     boundConversationId,

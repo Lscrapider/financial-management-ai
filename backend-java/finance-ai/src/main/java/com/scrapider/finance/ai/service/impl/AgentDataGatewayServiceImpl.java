@@ -34,12 +34,12 @@ public class AgentDataGatewayServiceImpl implements AgentDataGatewayService {
         for (AgentDataActionHandler handler : handlers) {
             String action = handler.action();
             if (StrUtil.isBlank(action)) {
-                throw new IllegalStateException("Agent data action handler action 不能为空: "
+                throw new IllegalStateException("Agent 数据查询处理器 action 不能为空: "
                         + handler.getClass().getName());
             }
             AgentDataActionHandler exists = handlerMap.putIfAbsent(action, handler);
             if (exists != null) {
-                throw new IllegalStateException("Agent data action handler 重复注册: " + action);
+                throw new IllegalStateException("Agent 数据查询处理器重复注册: " + action);
             }
         }
         this.actionHandlers = Map.copyOf(handlerMap);

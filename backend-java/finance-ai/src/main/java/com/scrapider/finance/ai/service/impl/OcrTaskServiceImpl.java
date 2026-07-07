@@ -12,6 +12,7 @@ import com.scrapider.finance.ai.domain.vo.OcrStageDetailVO;
 import com.scrapider.finance.ai.domain.vo.OcrTaskPageVO;
 import com.scrapider.finance.ai.domain.vo.OcrTaskVO;
 import com.scrapider.finance.domain.enums.OcrTaskStageEnum;
+import com.scrapider.finance.domain.exception.BusinessException;
 import com.scrapider.finance.domain.po.OcrReviewPO;
 import com.scrapider.finance.ai.service.OcrFileStorageService;
 import com.scrapider.finance.ai.publisher.OcrTaskMessagePublisher;
@@ -71,7 +72,7 @@ public class OcrTaskServiceImpl implements OcrTaskService {
     @Override
     public List<OcrTaskVO> submit(List<MultipartFile> files) {
         if (files == null || files.isEmpty()) {
-            throw new IllegalArgumentException("上传文件不能为空");
+            throw new BusinessException("上传文件不能为空。");
         }
         files.forEach(this::validateFile);
         return files.stream().map(this::submitOne).toList();
@@ -90,7 +91,7 @@ public class OcrTaskServiceImpl implements OcrTaskService {
     @Override
     public OcrStageDetailVO stageDetail(String taskNo) {
         if (taskNo == null || taskNo.isBlank()) {
-            throw new IllegalArgumentException("任务编号不能为空");
+            throw new BusinessException("任务编号不能为空。");
         }
         String normalizedTaskNo = taskNo.trim();
         List<OcrStageDetailVO.StageVO> stages = this.ocrTaskStageManage.listTaskStages(normalizedTaskNo)
@@ -104,7 +105,7 @@ public class OcrTaskServiceImpl implements OcrTaskService {
     @Override
     public OcrChunkTagDetailVO chunkTagDetail(String taskNo) {
         if (taskNo == null || taskNo.isBlank()) {
-            throw new IllegalArgumentException("任务编号不能为空");
+            throw new BusinessException("任务编号不能为空。");
         }
         String normalizedTaskNo = taskNo.trim();
         List<OcrTaskStagePO> stages = this.ocrTaskStageManage.listChunkStages(
@@ -120,11 +121,11 @@ public class OcrTaskServiceImpl implements OcrTaskService {
     @Override
     public void delete(OcrTaskDeleteParam param) {
         if (param == null || param.taskNo() == null || param.taskNo().isBlank()) {
-            throw new IllegalArgumentException("任务编号不能为空");
+            throw new BusinessException("任务编号不能为空。");
         }
         boolean deleted = this.ocrTaskManage.softDelete(param.taskNo().trim());
         if (!deleted) {
-            throw new IllegalArgumentException("OCR 任务不存在或已删除");
+            throw new BusinessException("OCR 任务不存在或已删除。");
         }
         this.knowledgeVectorManage.deleteByTaskNo(param.taskNo().trim());
     }
@@ -156,14 +157,14 @@ public class OcrTaskServiceImpl implements OcrTaskService {
 
     private void validateFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("上传文件不能为空");
+            throw new BusinessException("上传文件不能为空。");
         }
         if (file.getSize() > MAX_FILE_SIZE) {
-            throw new IllegalArgumentException("上传文件不能超过50MB");
+            throw new BusinessException("上传文件不能超过 50MB。");
         }
         String fileType = this.fileType(this.originalFilename(file));
         if (!ALLOWED_FILE_TYPES.contains(fileType)) {
-            throw new IllegalArgumentException("仅支持 PDF、PNG、JPG、JPEG、WEBP 文件");
+            throw new BusinessException("仅支持 PDF、PNG、JPG、JPEG、WEBP 文件。");
         }
         if (PDF_FILE_TYPE.equals(fileType)) {
             this.validatePdfPageCount(file);
@@ -173,17 +174,17 @@ public class OcrTaskServiceImpl implements OcrTaskService {
     private void validatePdfPageCount(MultipartFile file) {
         try (PDDocument document = Loader.loadPDF(file.getBytes())) {
             if (document.getNumberOfPages() > MAX_PDF_PAGE_COUNT) {
-                throw new IllegalArgumentException("PDF 文件不能超过20页");
+                throw new BusinessException("PDF 文件不能超过 20 页。");
             }
         } catch (IOException ex) {
-            throw new IllegalArgumentException("PDF 文件解析失败，请确认文件格式正确");
+            throw new BusinessException("PDF 文件解析失败，请确认文件格式正确。", ex);
         }
     }
 
     private String originalFilename(MultipartFile file) {
         String originalFilename = file.getOriginalFilename();
         if (originalFilename == null || originalFilename.isBlank()) {
-            throw new IllegalArgumentException("上传文件名不能为空");
+            throw new BusinessException("上传文件名不能为空。");
         }
         return Path.of(originalFilename).getFileName().toString();
     }

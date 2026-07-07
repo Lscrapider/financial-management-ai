@@ -11,6 +11,7 @@ import com.scrapider.finance.ai.domain.vo.KnowledgeOverviewVO;
 import com.scrapider.finance.ai.domain.vo.KnowledgeStatsVO;
 import com.scrapider.finance.ai.service.KnowledgeService;
 import com.scrapider.finance.ai.publisher.OcrTaskMessagePublisher;
+import com.scrapider.finance.domain.exception.BusinessException;
 import com.scrapider.finance.domain.param.KnowledgeChunkUpdateParam;
 import com.scrapider.finance.domain.po.KnowledgeVectorPO;
 import com.scrapider.finance.domain.po.OcrTaskPO;
@@ -136,7 +137,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         }
         String trimmedCategory = category != null ? category.trim() : null;
         if (trimmedCategory != null && !trimmedCategory.isBlank() && !ALLOWED_CATEGORIES.contains(trimmedCategory)) {
-            throw new IllegalArgumentException("未知的场景类别: " + trimmedCategory);
+            throw new BusinessException("未知的场景类别: " + trimmedCategory);
         }
         List<String> tags = null;
         if (tag != null && !tag.isBlank()) {
@@ -152,7 +153,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                     valid = VALID_TAGS.values().stream().anyMatch(s -> s.contains(t));
                 }
                 if (!valid) {
-                    throw new IllegalArgumentException("未知的标签: " + t);
+                    throw new BusinessException("未知的标签: " + t);
                 }
             }
         }
@@ -165,11 +166,11 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     @Override
     public KnowledgeChunkVO chunkDetail(Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("id 不能为空");
+            throw new BusinessException("知识条目 ID 不能为空。");
         }
         KnowledgeVectorPO po = this.knowledgeVectorManage.findById(id);
         if (po == null) {
-            throw new IllegalArgumentException("知识条目不存在");
+            throw new BusinessException("知识条目不存在。");
         }
         return KnowledgeChunkVO.fromPO(po, this.originalFilename(po.getTaskNo()));
     }
@@ -177,14 +178,14 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     @Override
     public KnowledgeChunkVO updateChunk(Long id, KnowledgeChunkUpdateParam param) {
         if (id == null) {
-            throw new IllegalArgumentException("id 不能为空");
+            throw new BusinessException("知识条目 ID 不能为空。");
         }
         if (param == null) {
-            throw new IllegalArgumentException("参数不能为空");
+            throw new BusinessException("参数不能为空。");
         }
         KnowledgeVectorPO po = this.knowledgeVectorManage.findById(id);
         if (po == null) {
-            throw new IllegalArgumentException("知识条目不存在");
+            throw new BusinessException("知识条目不存在。");
         }
         String chunkId = null;
         if (po.getMetadata() != null && po.getMetadata().has("chunkId")) {
@@ -204,12 +205,12 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             for (Map.Entry<String, List<String>> entry : scenes.entrySet()) {
                 String category = entry.getKey();
                 if (!ALLOWED_CATEGORIES.contains(category)) {
-                    throw new IllegalArgumentException("未知的场景类别: " + category);
+                    throw new BusinessException("未知的场景类别: " + category);
                 }
                 Set<String> allowedTags = VALID_TAGS.get(category);
                 for (String tag : entry.getValue()) {
                     if (!allowedTags.contains(tag)) {
-                        throw new IllegalArgumentException(
+                        throw new BusinessException(
                                 "类别 '" + category + "' 中不包含标签: " + tag);
                     }
                 }

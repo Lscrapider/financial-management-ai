@@ -106,7 +106,7 @@ public class AgentInternalController {
                 || !session.agentSessionId().equals(param.agentSessionId())
                 || !session.conversationId().equals(param.conversationId())
                 || !session.messageId().equals(param.messageId())) {
-            throw new IllegalArgumentException("agent callback session mismatch");
+            throw new IllegalArgumentException("Agent 回调会话不匹配。");
         }
     }
 

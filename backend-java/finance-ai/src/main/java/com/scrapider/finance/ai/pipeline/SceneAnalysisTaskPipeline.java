@@ -11,6 +11,7 @@ import com.scrapider.finance.ai.domain.param.SceneRetrievalEmbeddingParam;
 import com.scrapider.finance.ai.publisher.SceneAnalysisMessagePublisher;
 import com.scrapider.finance.ai.service.SceneAnalysisReportService;
 import com.scrapider.finance.ai.service.SceneKnowledgeRetrievalService;
+import com.scrapider.finance.domain.exception.BusinessException;
 import com.scrapider.finance.domain.po.SceneAnalysisTaskPO;
 import com.scrapider.finance.manage.SceneAnalysisTaskManage;
 import java.util.List;
@@ -74,7 +75,7 @@ public class SceneAnalysisTaskPipeline {
             String taskNo,
             List<SceneRetrievalEmbeddingParam> retrievalEmbeddings) {
         if (retrievalEmbeddings == null || retrievalEmbeddings.isEmpty()) {
-            throw new IllegalArgumentException("retrievalEmbeddings is required");
+            throw new BusinessException("召回向量不能为空。");
         }
         SceneAnalysisCurrentScenesPayloadParam currentScenesPayload = this.currentScenesPayload(taskNo);
         List<SceneChunkAllocationDTO> allocations =
@@ -99,14 +100,14 @@ public class SceneAnalysisTaskPipeline {
     private SceneAnalysisCurrentScenesPayloadParam currentScenesPayload(String taskNo) {
         SceneAnalysisTaskPO task = this.sceneAnalysisTaskManage.findByTaskNo(taskNo);
         if (task == null || task.getCurrentScenesPayload() == null || task.getCurrentScenesPayload().isNull()) {
-            throw new IllegalArgumentException("currentScenesPayload is not ready");
+            throw new BusinessException("当前场景结果尚未就绪。");
         }
         try {
             return this.objectMapper.treeToValue(
                     task.getCurrentScenesPayload(),
                     SceneAnalysisCurrentScenesPayloadParam.class);
         } catch (Exception ex) {
-            throw new IllegalArgumentException("Failed to parse currentScenesPayload", ex);
+            throw new IllegalStateException("当前场景结果解析失败。", ex);
         }
     }
 }

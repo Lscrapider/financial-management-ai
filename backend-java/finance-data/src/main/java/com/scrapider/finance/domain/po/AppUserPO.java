@@ -29,6 +29,9 @@ public class AppUserPO {
     @TableField(typeHandler = JsonbTypeHandler.class)
     private JsonNode agentExecutionBudgetJson;
 
+    private Integer aiDailyReportLimit;
+    private Integer aiDailyChatLimit;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -42,6 +45,8 @@ public class AppUserPO {
         user.setEnabled(true);
         user.setHomePath(AuthConstant.DEFAULT_HOME_PATH);
         user.setEmailNotification(true);
+        user.setAiDailyReportLimit(AuthConstant.DEFAULT_AI_DAILY_REPORT_LIMIT);
+        user.setAiDailyChatLimit(AuthConstant.DEFAULT_AI_DAILY_CHAT_LIMIT);
         return user;
     }
 }

@@ -1,5 +1,6 @@
 package com.scrapider.finance.ai.security;
 
+import com.scrapider.finance.domain.exception.BusinessException;
 import java.lang.reflect.Method;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -26,9 +27,9 @@ public final class CurrentUserContext {
                 return number.longValue();
             }
         } catch (ReflectiveOperationException ex) {
-            throw new IllegalArgumentException("login user id is unavailable", ex);
+            throw new BusinessException("登录用户 ID 不可用。", ex);
         }
-        throw new IllegalArgumentException("login user id is unavailable");
+        throw new BusinessException("登录用户 ID 不可用。");
     }
 
     public static Long ownerUserIdForQuery() {
@@ -44,7 +45,7 @@ public final class CurrentUserContext {
     private static Authentication currentAuthentication() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getPrincipal() == null) {
-            throw new IllegalArgumentException("login required");
+            throw new BusinessException("请先登录。");
         }
         return authentication;
     }

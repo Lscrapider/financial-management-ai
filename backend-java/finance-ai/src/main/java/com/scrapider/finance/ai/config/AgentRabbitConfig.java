@@ -36,10 +36,10 @@ public class AgentRabbitConfig {
 
     @Bean
     public Queue conversationCleanupDelayQueue(
-            @Value("${finance.agent.rabbitmq.cleanup-delay-queue:finance.agent.conversation.cleanup.delay}") String queue,
+            @Value("${finance.agent.rabbitmq.cleanup-delay-queue:finance.agent.conversation.cleanup.delay.24h}") String queue,
             @Value("${finance.agent.rabbitmq.exchange:finance.agent.topic}") String exchange,
             @Value("${finance.agent.rabbitmq.cleanup-routing-key:conversation.cleanup}") String routingKey,
-            @Value("${finance.agent.conversation-cleanup-delay-ms:1800000}") int cleanupDelayMs) {
+            @Value("${finance.agent.conversation-cleanup-delay-ms:86400000}") int cleanupDelayMs) {
         return QueueBuilder.durable(queue)
                 .ttl(cleanupDelayMs)
                 .deadLetterExchange(exchange)

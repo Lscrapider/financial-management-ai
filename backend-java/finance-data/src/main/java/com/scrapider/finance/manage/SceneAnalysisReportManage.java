@@ -34,6 +34,14 @@ public class SceneAnalysisReportManage extends ServiceImpl<SceneAnalysisReportMa
         return this.baseMapper.latestByTaskNo(taskNo);
     }
 
+    public long countByUserAndGenerationTypeBetween(
+            Long userId,
+            String generationType,
+            LocalDateTime startTime,
+            LocalDateTime endTime) {
+        return this.baseMapper.countByUserAndGenerationTypeBetween(userId, generationType, startTime, endTime);
+    }
+
     public Long countTargets(String targetName, String targetCode, String targetType, Long ownerUserId) {
         return this.baseMapper.countTargets(targetName, targetCode, targetType, ownerUserId);
     }

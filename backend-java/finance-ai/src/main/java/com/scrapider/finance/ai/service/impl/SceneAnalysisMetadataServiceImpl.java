@@ -14,6 +14,7 @@ import com.scrapider.finance.ai.domain.vo.SceneAnalysisReportTypeVO;
 import com.scrapider.finance.ai.domain.vo.SceneAnalysisTargetOptionVO;
 import com.scrapider.finance.ai.service.SceneAnalysisMetadataService;
 import com.scrapider.finance.domain.enums.SceneAnalysisReportTypeEnum;
+import com.scrapider.finance.domain.exception.BusinessException;
 import com.scrapider.finance.domain.po.SceneAnalysisConfigProfilePO;
 import com.scrapider.finance.manage.BondConfigManage;
 import com.scrapider.finance.manage.IndexConfigManage;
@@ -339,12 +340,12 @@ public class SceneAnalysisMetadataServiceImpl implements SceneAnalysisMetadataSe
     @Override
     public SceneAnalysisConfigProfileVO update(Long id, SceneAnalysisConfigProfileParam param) {
         if (id == null) {
-            throw new IllegalArgumentException("config profile id is required");
+            throw new BusinessException("配置方案 ID 不能为空。");
         }
         Long userId = this.currentUserId();
         SceneAnalysisConfigProfilePO existing = this.sceneAnalysisConfigProfileManage.getAvailable(id, userId);
         if (existing == null || Boolean.TRUE.equals(existing.getSystemDefault())) {
-            throw new IllegalArgumentException("config profile is not editable");
+            throw new BusinessException("配置方案不可编辑。");
         }
         NormalizedProfile normalized = this.normalized(param, existing.getConfigProfile());
         existing.setName(normalized.name());
@@ -354,7 +355,7 @@ public class SceneAnalysisMetadataServiceImpl implements SceneAnalysisMetadataSe
         existing.setReportType(normalized.reportType());
         existing.setConfigJson(normalized.configJson());
         if (!this.sceneAnalysisConfigProfileManage.updateEditable(existing)) {
-            throw new IllegalArgumentException("config profile is not editable");
+            throw new BusinessException("配置方案不可编辑。");
         }
         return SceneAnalysisConfigProfileVO.fromPO(existing);
     }
@@ -362,7 +363,7 @@ public class SceneAnalysisMetadataServiceImpl implements SceneAnalysisMetadataSe
     @Override
     public void delete(Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("config profile id is required");
+            throw new BusinessException("配置方案 ID 不能为空。");
         }
         Long userId = this.currentUserId();
         SceneAnalysisConfigProfilePO existing = this.sceneAnalysisConfigProfileManage.getById(id);
@@ -372,7 +373,7 @@ public class SceneAnalysisMetadataServiceImpl implements SceneAnalysisMetadataSe
         if (Boolean.TRUE.equals(existing.getSystemDefault())
                 || existing.getUserId() == null
                 || !Objects.equals(existing.getUserId(), userId)) {
-            throw new IllegalArgumentException("config profile is not editable");
+            throw new BusinessException("配置方案不可编辑。");
         }
         if (!Boolean.TRUE.equals(existing.getEnabled())) {
             return;
@@ -382,7 +383,7 @@ public class SceneAnalysisMetadataServiceImpl implements SceneAnalysisMetadataSe
             if (latest != null && !Boolean.TRUE.equals(latest.getEnabled())) {
                 return;
             }
-            throw new IllegalArgumentException("config profile is not editable");
+            throw new BusinessException("配置方案不可编辑。");
         }
     }
 
@@ -403,17 +404,17 @@ public class SceneAnalysisMetadataServiceImpl implements SceneAnalysisMetadataSe
             case "CONVERTIBLE_BOND" -> this.bondConfigManage.searchEnabledBonds(normalizedKeyword, limited).stream()
                     .map(SceneAnalysisTargetConverter::bondOption)
                     .toList();
-            default -> throw new IllegalArgumentException("unsupported targetType: " + targetType);
+            default -> throw new BusinessException("不支持的标的类型: " + targetType);
         };
     }
 
     private NormalizedProfile normalized(SceneAnalysisConfigProfileParam param, String configProfile) {
         if (param == null) {
-            throw new IllegalArgumentException("request body is required");
+            throw new BusinessException("请求体不能为空。");
         }
         String name = StrUtil.trim(param.name());
         if (StrUtil.isBlank(name)) {
-            throw new IllegalArgumentException("config profile name is required");
+            throw new BusinessException("配置方案名称不能为空。");
         }
         JsonNode configJson = this.configJson(param.configJson());
         String reportType = this.normalizeReportType(this.firstNotBlank(
@@ -432,7 +433,7 @@ public class SceneAnalysisMetadataServiceImpl implements SceneAnalysisMetadataSe
                 configProfile,
                 targetType);
         if (!normalizedJson.path("userOverrides").isObject()) {
-            throw new IllegalArgumentException("userOverrides must be an object");
+            throw new BusinessException("用户自定义参数必须是对象。");
         }
         return new NormalizedProfile(
                 name,
@@ -455,7 +456,7 @@ public class SceneAnalysisMetadataServiceImpl implements SceneAnalysisMetadataSe
             return JsonNodeFactory.instance.objectNode();
         }
         if (!node.isObject()) {
-            throw new IllegalArgumentException("configJson must be an object");
+            throw new BusinessException("配置内容必须是对象。");
         }
         return node;
     }
@@ -463,7 +464,7 @@ public class SceneAnalysisMetadataServiceImpl implements SceneAnalysisMetadataSe
     private int totalChunks(JsonNode configJson) {
         int totalChunks = configJson.path("totalChunks").asInt(DEFAULT_TOTAL_CHUNKS);
         if (totalChunks <= 0) {
-            throw new IllegalArgumentException("totalChunks must be greater than 0");
+            throw new BusinessException("召回片段数量必须大于 0。");
         }
         return totalChunks;
     }
@@ -477,7 +478,7 @@ public class SceneAnalysisMetadataServiceImpl implements SceneAnalysisMetadataSe
             case "STOCK" -> "STOCK";
             case "INDEX" -> "INDEX";
             case "CONVERTIBLE_BOND", "BOND" -> "CONVERTIBLE_BOND";
-            default -> throw new IllegalArgumentException("unsupported targetType: " + targetType);
+            default -> throw new BusinessException("不支持的标的类型: " + targetType);
         };
     }
 
@@ -511,7 +512,7 @@ public class SceneAnalysisMetadataServiceImpl implements SceneAnalysisMetadataSe
     private Long currentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getPrincipal() == null) {
-            throw new IllegalArgumentException("login required");
+            throw new BusinessException("请先登录。");
         }
         Object principal = authentication.getPrincipal();
         try {
@@ -526,9 +527,9 @@ public class SceneAnalysisMetadataServiceImpl implements SceneAnalysisMetadataSe
                 return number.longValue();
             }
         } catch (ReflectiveOperationException ex) {
-            throw new IllegalArgumentException("login user id is unavailable", ex);
+            throw new BusinessException("登录用户 ID 不可用。", ex);
         }
-        throw new IllegalArgumentException("login user id is unavailable");
+        throw new BusinessException("登录用户 ID 不可用。");
     }
 
     private record NormalizedProfile(

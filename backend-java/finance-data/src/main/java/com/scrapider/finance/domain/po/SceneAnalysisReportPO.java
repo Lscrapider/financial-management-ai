@@ -12,6 +12,9 @@ import lombok.Data;
 @TableName(value = "scene_analysis_report", autoResultMap = true)
 public class SceneAnalysisReportPO {
 
+    public static final String GENERATION_TYPE_INITIAL = "initial";
+    public static final String GENERATION_TYPE_REGENERATE = "regenerate";
+
     private Long id;
     private Long taskId;
     private String taskNo;

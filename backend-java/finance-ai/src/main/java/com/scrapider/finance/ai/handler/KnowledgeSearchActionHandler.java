@@ -298,7 +298,7 @@ public class KnowledgeSearchActionHandler implements AgentDataActionHandler {
         try {
             return this.objectMapper.writeValueAsString(values);
         } catch (Exception ex) {
-            throw new IllegalArgumentException("queryEmbedding 序列化失败", ex);
+            throw new IllegalStateException("查询向量序列化失败。", ex);
         }
     }
 

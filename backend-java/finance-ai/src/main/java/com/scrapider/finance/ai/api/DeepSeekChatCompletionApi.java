@@ -48,7 +48,7 @@ public class DeepSeekChatCompletionApi {
 
     public JsonNode generateJsonReport(String systemPrompt, String userPrompt) {
         if (this.apiKey == null || this.apiKey.isBlank()) {
-            throw new IllegalStateException("DEEPSEEK_API_KEY is required");
+            throw new IllegalStateException("DeepSeek API Key 未配置。");
         }
         Map<String, Object> body = new java.util.LinkedHashMap<>();
         body.put("model", this.model);
