@@ -136,7 +136,19 @@ pipeline {
     stage('Build Images') {
       steps {
         sh '''
-          docker compose --env-file "$ENV_FILE_PATH" -f "$COMPOSE_FILE_PATH" build
+          docker compose --env-file "$ENV_FILE_PATH" -f "$COMPOSE_FILE_PATH" build database-init finance-service finance-python-worker
+          docker compose --env-file "$ENV_FILE_PATH" -f "$COMPOSE_FILE_PATH" build --no-cache finance-frontend
+        '''
+      }
+    }
+
+    stage('Validate Frontend Image') {
+      steps {
+        sh '''
+          docker run --rm financial-management-ai-finance-frontend:latest \
+            sh -c 'test -f /usr/share/nginx/html/finance/index.html \
+              && grep -q "src=\\"/finance/" /usr/share/nginx/html/finance/index.html \
+              && ! grep -q "%VITE_APP_TITLE%" /usr/share/nginx/html/finance/index.html'
         '''
       }
     }
