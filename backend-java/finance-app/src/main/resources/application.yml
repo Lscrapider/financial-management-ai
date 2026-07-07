@@ -84,8 +84,8 @@ stock:
     monthly-kline-enabled: true
     monthly-kline-limit: 250
     trend-enabled: true
-    start-time: 09:28
-    end-time: 16:00
+    start-time: "09:28"
+    end-time: "16:00"
     timezone: Asia/Shanghai
   alert:
     enabled: true
@@ -105,8 +105,8 @@ index:
     initial-delay-ms: 15000
     fixed-delay-ms: 300000
     request-interval-ms: 0
-    start-time: 09:28
-    end-time: 16:00
+    start-time: "09:28"
+    end-time: "16:00"
     timezone: Asia/Shanghai
 
 bond:
@@ -120,15 +120,15 @@ bond:
     monthly-kline-limit: 250
     trend-enabled: true
     convertible-data-enabled: true
-    convertible-data-cron: 0 0 19 * * ?
+    convertible-data-cron: "0 0 19 * * ?"
     convertible-data-catch-up-enabled: true
-    convertible-data-run-after: 19:00
+    convertible-data-run-after: "19:00"
     convertible-daily-limit: 250
     initial-delay-ms: 20000
     fixed-delay-ms: 300000
     request-interval-ms: 0
-    start-time: 09:28
-    end-time: 16:00
+    start-time: "09:28"
+    end-time: "16:00"
     timezone: Asia/Shanghai
 
 influxdb:
