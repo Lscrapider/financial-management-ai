@@ -5,6 +5,8 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV HF_HOME=/app/.cache/huggingface
+ARG HF_ENDPOINT=https://hf-mirror.com
+ENV HF_ENDPOINT=${HF_ENDPOINT}
 
 COPY ai-python/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt

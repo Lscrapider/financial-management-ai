@@ -98,6 +98,7 @@ services:
       dockerfile: ai-python/Dockerfile
       args:
         EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME:-BAAI/bge-base-zh-v1.5}
+        HF_ENDPOINT: ${HF_ENDPOINT:-https://hf-mirror.com}
     container_name: finance-python-worker
     env_file:
       - ${COMPOSE_ENV_FILE:-../.env}
