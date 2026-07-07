@@ -10,6 +10,7 @@ import com.scrapider.finance.service.MarketTradingCalendarService;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +24,8 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 public class ConvertibleBondDataSyncTask {
+
+    private static final DateTimeFormatter COMPACT_TIME_FORMATTER = DateTimeFormatter.ofPattern("HHmm");
 
     private final BondConfigManage bondConfigManage;
     private final ConvertibleBondDailyValuationManage convertibleBondDailyValuationManage;
@@ -101,10 +104,21 @@ public class ConvertibleBondDataSyncTask {
         if (!this.marketTradingCalendarService.isTradingDay(now.toLocalDate())) {
             return false;
         }
-        if (now.toLocalTime().isBefore(LocalTime.parse(this.runAfter))) {
+        if (now.toLocalTime().isBefore(this.parseRunAfter())) {
             return false;
         }
         return !this.convertibleBondDailyValuationManage.hasSyncedSince(now.toLocalDate().atStartOfDay());
+    }
+
+    private LocalTime parseRunAfter() {
+        String normalized = StrUtil.trim(this.runAfter);
+        if (StrUtil.isBlank(normalized)) {
+            return LocalTime.parse("19:00");
+        }
+        if (normalized.contains(StrUtil.COLON)) {
+            return LocalTime.parse(normalized);
+        }
+        return LocalTime.parse(normalized, COMPACT_TIME_FORMATTER);
     }
 
     private void runDailySyncIfIdle() {

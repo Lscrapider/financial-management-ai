@@ -10,8 +10,6 @@ jwt:
   refresh-session-cookie-secure: false
 
 spring:
-  profiles:
-    active: dev
   application:
     name: finance-service
   servlet:
