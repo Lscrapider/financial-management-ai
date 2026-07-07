@@ -22,10 +22,10 @@ pipeline {
 
     stage('Write Env') {
       steps {
-        withCredentials([string(credentialsId: 'finance-prod-env', variable: 'PROD_ENV')]) {
+        withCredentials([file(credentialsId: 'finance-prod-env-file', variable: 'PROD_ENV_FILE')]) {
           sh '''
             set +x
-            printf '%s\n' "$PROD_ENV" > "$ENV_FILE_PATH"
+            cp "$PROD_ENV_FILE" "$ENV_FILE_PATH"
             tr -d '\r' < "$ENV_FILE_PATH" > "$ENV_FILE_PATH.normalized"
             mv "$ENV_FILE_PATH.normalized" "$ENV_FILE_PATH"
             chmod 600 "$ENV_FILE_PATH"
@@ -40,7 +40,7 @@ pipeline {
           set +x
 
           if [ ! -s "$ENV_FILE_PATH" ]; then
-            echo "ERROR: $ENV_FILE_PATH is empty. Check Jenkins Secret Text credential: finance-prod-env"
+            echo "ERROR: $ENV_FILE_PATH is empty. Check Jenkins Secret File credential: finance-prod-env-file"
             exit 1
           fi
 
@@ -107,7 +107,7 @@ pipeline {
 
           if [ -n "$missing_keys" ]; then
             echo "ERROR: Required env keys are missing or empty:$missing_keys"
-            echo "Fix Jenkins Secret Text credential finance-prod-env and paste the full .env.github-secret content."
+            echo "Fix Jenkins Secret File credential finance-prod-env-file and upload the full .env.github-secret file."
             exit 1
           fi
 
