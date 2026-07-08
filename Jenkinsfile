@@ -84,6 +84,7 @@ pipeline {
           DEEPSEEK_MODEL
           DEEPSEEK_API_KEY
           DASHSCOPE_BASE_URL
+          DASHSCOPE_MODEL
           DASHSCOPE_API_KEY
           TUSHARE_BASE_URL
           TUSHARE_TOKEN

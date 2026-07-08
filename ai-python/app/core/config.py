@@ -73,7 +73,7 @@ class MinioSettings:
 class QwenOcrSettings:
     api_key: str = _env("DASHSCOPE_API_KEY")
     base_url: str = _env("DASHSCOPE_BASE_URL")
-    model: str = "qwen-vl-ocr-latest"
+    model: str = _env("DASHSCOPE_MODEL")
     timeout_seconds: int = 120
 
 
