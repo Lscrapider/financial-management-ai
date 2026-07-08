@@ -155,13 +155,13 @@ const logoSrc = computed(() => {
             <img
               :alt="appName"
               :src="sloganImage"
-              class="auth-slogan h-64 w-2/5 animate-float"
+              class="auth-slogan h-80 w-1/2 max-w-[560px] animate-float xl:h-96 xl:w-3/5"
             />
           </template>
           <SloganIcon
             v-else
             :alt="appName"
-            class="auth-slogan h-64 w-2/5 animate-float"
+            class="auth-slogan h-80 w-1/2 max-w-[560px] animate-float xl:h-96 xl:w-3/5"
           />
           <div class="text-1xl mt-6 font-sans text-foreground lg:text-2xl">
             {{ pageTitle }}
@@ -295,8 +295,8 @@ const logoSrc = computed(() => {
 
 .signal-orbit {
   position: absolute;
-  top: 50%;
-  left: 44%;
+  top: 51%;
+  left: 45%;
   border: 1px solid hsl(var(--primary) / 22%);
   border-radius: 999px;
   transform: translate(-50%, -50%) rotate(-12deg);
@@ -326,24 +326,24 @@ const logoSrc = computed(() => {
 }
 
 .signal-orbit-outer {
-  width: min(54vw, 720px);
-  height: min(28vw, 360px);
+  width: min(48vw, 640px);
+  height: min(24vw, 320px);
   animation: signal-drift 12s ease-in-out infinite;
 }
 
 .signal-orbit-inner {
-  width: min(36vw, 480px);
-  height: min(18vw, 250px);
+  width: min(32vw, 430px);
+  height: min(16vw, 220px);
   border-color: rgb(87 209 136 / 18%);
   animation: signal-drift 9s ease-in-out infinite reverse;
 }
 
 .signal-scan {
   position: absolute;
-  top: 12%;
-  left: 44%;
-  width: min(46vw, 620px);
-  height: min(46vw, 620px);
+  top: 22%;
+  left: 45%;
+  width: min(40vw, 540px);
+  height: min(40vw, 540px);
   background: conic-gradient(
     from 210deg,
     transparent 0 62%,
