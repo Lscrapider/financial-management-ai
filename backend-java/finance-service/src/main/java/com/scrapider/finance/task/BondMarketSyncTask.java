@@ -20,11 +20,10 @@ import com.scrapider.finance.manage.BondIntradayTrendInfluxManage;
 import com.scrapider.finance.manage.BondKlineManage;
 import com.scrapider.finance.manage.BondQuoteSnapshotManage;
 import com.scrapider.finance.manage.ConvertibleBondBasicManage;
-import com.scrapider.finance.manage.ConvertibleBondDailyValuationManage;
 import com.scrapider.finance.manage.MarketSyncJobManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
-import com.scrapider.finance.provider.ConvertibleBondDataProvider;
 import com.scrapider.finance.provider.HistoricalKlineProvider;
+import com.scrapider.finance.service.AssetDataEnsureService;
 import com.scrapider.finance.service.MarketTradingCalendarService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -47,7 +46,6 @@ import java.util.function.Function;
 import java.util.stream.StreamSupport;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -68,12 +66,11 @@ public class BondMarketSyncTask {
     private final BondKlineManage bondKlineManage;
     private final BondIntradayTrendInfluxManage bondIntradayTrendInfluxManage;
     private final HistoricalKlineProvider historicalKlineProvider;
-    private final ObjectProvider<ConvertibleBondDataProvider> convertibleBondDataProvider;
     private final ConvertibleBondBasicManage convertibleBondBasicManage;
-    private final ConvertibleBondDailyValuationManage convertibleBondDailyValuationManage;
     private final StockQuoteSnapshotManage stockQuoteSnapshotManage;
     private final MarketTradingCalendarService marketTradingCalendarService;
     private final MarketSyncJobManage marketSyncJobManage;
+    private final AssetDataEnsureService assetDataEnsureService;
     private final AtomicBoolean syncing = new AtomicBoolean(false);
 
     @Value("${bond.sync.enabled:false}")
@@ -100,10 +97,10 @@ public class BondMarketSyncTask {
     @Value("${bond.sync.request-interval-ms:1500}")
     private long requestIntervalMs;
 
-    @Value("${bond.sync.start-time:09:29}")
+    @Value("${bond.sync.start-time:09:28}")
     private String startTime;
 
-    @Value("${bond.sync.end-time:16:00}")
+    @Value("${bond.sync.end-time:15:02}")
     private String endTime;
 
     @Value("${bond.sync.timezone:Asia/Shanghai}")
@@ -115,9 +112,6 @@ public class BondMarketSyncTask {
     @Value("${bond.sync.convertible-data-enabled:true}")
     private boolean convertibleDataEnabled;
 
-    @Value("${bond.sync.convertible-daily-limit:250}")
-    private Integer convertibleDailyLimit;
-
     public BondMarketSyncTask(
             StockMarketApi stockMarketApi,
             BondConfigManage bondConfigManage,
@@ -125,24 +119,22 @@ public class BondMarketSyncTask {
             BondKlineManage bondKlineManage,
             BondIntradayTrendInfluxManage bondIntradayTrendInfluxManage,
             HistoricalKlineProvider historicalKlineProvider,
-            ObjectProvider<ConvertibleBondDataProvider> convertibleBondDataProvider,
             ConvertibleBondBasicManage convertibleBondBasicManage,
-            ConvertibleBondDailyValuationManage convertibleBondDailyValuationManage,
             StockQuoteSnapshotManage stockQuoteSnapshotManage,
             MarketTradingCalendarService marketTradingCalendarService,
-            MarketSyncJobManage marketSyncJobManage) {
+            MarketSyncJobManage marketSyncJobManage,
+            AssetDataEnsureService assetDataEnsureService) {
         this.stockMarketApi = stockMarketApi;
         this.bondConfigManage = bondConfigManage;
         this.bondQuoteSnapshotManage = bondQuoteSnapshotManage;
         this.bondKlineManage = bondKlineManage;
         this.bondIntradayTrendInfluxManage = bondIntradayTrendInfluxManage;
         this.historicalKlineProvider = historicalKlineProvider;
-        this.convertibleBondDataProvider = convertibleBondDataProvider;
         this.convertibleBondBasicManage = convertibleBondBasicManage;
-        this.convertibleBondDailyValuationManage = convertibleBondDailyValuationManage;
         this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
         this.marketTradingCalendarService = marketTradingCalendarService;
         this.marketSyncJobManage = marketSyncJobManage;
+        this.assetDataEnsureService = assetDataEnsureService;
     }
 
     @Scheduled(
@@ -233,17 +225,14 @@ public class BondMarketSyncTask {
 
     public boolean syncConvertibleDailyDataForBond(String bondCode) {
         BondConfigPO bond = this.bondConfigManage.getEnabledByBondCode(bondCode);
-        ConvertibleBondDataProvider provider = this.convertibleBondDataProvider.getIfAvailable();
-        if (!this.convertibleDataEnabled || bond == null || provider == null) {
-            log.warn("Cannot sync convertible bond daily data, bondCode: {}", bondCode);
+        if (!this.convertibleDataEnabled || bond == null) {
+            log.warn("无法同步可转债日度估值，bondCode: {}", bondCode);
             return false;
         }
         try {
-            this.convertibleBondDailyValuationManage.saveValuations(
-                    provider.getDailyValuations(bond, this.convertibleDailyLimit));
-            return true;
+            return this.assetDataEnsureService.ensureConvertibleBondDailyValuations(bond);
         } catch (Exception ex) {
-            log.warn("Failed to sync convertible bond daily data for bond: {}", bondCode, ex);
+            log.warn("同步可转债日度估值失败，bondCode: {}", bondCode, ex);
             return false;
         }
     }
@@ -663,10 +652,12 @@ public class BondMarketSyncTask {
     }
 
     private boolean isInSyncWindow() {
-        LocalTime now = LocalTime.now(ZoneId.of(this.timezone));
-        LocalTime start = LocalTime.parse(this.startTime);
-        LocalTime end = LocalTime.parse(this.endTime);
-        return !now.isBefore(start) && !now.isAfter(end);
+        return MarketSyncWindow.isInWindow(
+                LocalTime.now(ZoneId.of(this.timezone)),
+                LocalTime.parse(this.startTime),
+                LocalTime.parse(this.endTime),
+                MORNING_END,
+                AFTERNOON_START);
     }
 
     private boolean isNotFutureTrend(BondIntradayTrendPO trend, LocalDateTime now) {

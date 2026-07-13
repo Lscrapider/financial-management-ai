@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -23,7 +24,7 @@ public class TushareApi {
     private final String token;
 
     public TushareApi(
-            RestTemplate restTemplate,
+            @Qualifier("marketRestTemplate") RestTemplate restTemplate,
             ObjectMapper objectMapper,
             @Value("${tushare.base-url:" + DEFAULT_URL + "}") String baseUrl,
             @Value("${tushare.token:${TUSHARE_TOKEN:}}") String token) {

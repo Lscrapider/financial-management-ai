@@ -6,8 +6,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.scrapider.finance.domain.po.ConvertibleBondDailyValuationPO;
 import com.scrapider.finance.mapper.ConvertibleBondDailyValuationMapper;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -40,12 +43,28 @@ public class ConvertibleBondDailyValuationManage
         this.saveOrUpdateBatch(valuations);
     }
 
-    public boolean hasSyncedSince(LocalDateTime startAt) {
-        if (startAt == null) {
+    public boolean hasValuationsForAllBondCodes(Collection<String> bondCodes, LocalDate tradeDate) {
+        if (CollUtil.isEmpty(bondCodes) || tradeDate == null) {
             return false;
         }
-        return this.count(new LambdaQueryWrapper<ConvertibleBondDailyValuationPO>()
-                .ge(ConvertibleBondDailyValuationPO::getSyncedAt, startAt)) > 0;
+        Set<String> expectedBondCodes = bondCodes.stream()
+                .filter(StrUtil::isNotBlank)
+                .map(StrUtil::trim)
+                .collect(Collectors.toSet());
+        if (expectedBondCodes.isEmpty()) {
+            return false;
+        }
+        Set<String> valuationBondCodes = this.lambdaQuery()
+                .select(ConvertibleBondDailyValuationPO::getBondCode)
+                .eq(ConvertibleBondDailyValuationPO::getTradeDate, tradeDate)
+                .in(ConvertibleBondDailyValuationPO::getBondCode, expectedBondCodes)
+                .list()
+                .stream()
+                .map(ConvertibleBondDailyValuationPO::getBondCode)
+                .filter(StrUtil::isNotBlank)
+                .map(StrUtil::trim)
+                .collect(Collectors.toSet());
+        return valuationBondCodes.containsAll(expectedBondCodes);
     }
 
     private void fillExistingId(ConvertibleBondDailyValuationPO valuation) {

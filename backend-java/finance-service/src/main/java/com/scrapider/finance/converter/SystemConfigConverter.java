@@ -57,8 +57,7 @@ public final class SystemConfigConverter {
             ConvertibleBondBasicPO basic,
             String underlyingStockCode,
             StockConfigAddResultVO underlyingStock,
-            boolean marketDataSynced,
-            boolean dailyValuationSynced) {
+            boolean initializationScheduled) {
         BondConfigAddResultVO result = new BondConfigAddResultVO();
         result.setBondCode(bond.getBondCode());
         result.setBondName(bond.getBondName());
@@ -69,9 +68,10 @@ public final class SystemConfigConverter {
         result.setUnderlyingStockName(basic.getUnderlyingStockName());
         result.setBasicSynced(true);
         result.setUnderlyingStockSynced(underlyingStock != null);
-        result.setMarketDataSynced(marketDataSynced);
-        result.setDailyValuationSynced(dailyValuationSynced);
+        result.setMarketDataSynced(false);
+        result.setDailyValuationSynced(false);
         result.setShareSynced(false);
+        result.setInitializationScheduled(initializationScheduled);
         result.setUnderlyingStock(underlyingStock);
         return result;
     }

@@ -10,8 +10,10 @@ import com.scrapider.finance.manage.BondConfigManage;
 import com.scrapider.finance.manage.ConvertibleBondDailyValuationManage;
 import com.scrapider.finance.provider.ConvertibleBondDataProvider;
 import com.scrapider.finance.service.MarketTradingCalendarService;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -28,7 +30,7 @@ class ConvertibleBondDataSyncTaskTest {
                 bondConfigManage,
                 dailyValuationManage,
                 provider(provider),
-                new MarketTradingCalendarService(""));
+                new AlwaysTradingDayCalendarService());
         ReflectionTestUtils.setField(task, "enabled", true);
         ReflectionTestUtils.setField(task, "catchUpEnabled", true);
         ReflectionTestUtils.setField(task, "runAfter", "19:00");
@@ -43,10 +45,12 @@ class ConvertibleBondDataSyncTaskTest {
         assertThat(provider.basicCallCount).isZero();
         assertThat(provider.shareCallCount).isZero();
         assertThat(dailyValuationManage.savedBatchCount).isEqualTo(2);
+        assertThat(dailyValuationManage.requestedBondCodes).containsExactly("113001", "113002");
+        assertThat(dailyValuationManage.requestedTradeDate).isEqualTo(LocalDate.of(2026, 6, 8));
     }
 
     @Test
-    void startupCatchUpSkipsWhenTodayHasSynced() {
+    void startupCatchUpSkipsWhenAllEnabledBondsHaveTodayValuations() {
         FakeBondConfigManage bondConfigManage = new FakeBondConfigManage();
         FakeDailyValuationManage dailyValuationManage = new FakeDailyValuationManage();
         FakeProvider provider = new FakeProvider();
@@ -54,17 +58,20 @@ class ConvertibleBondDataSyncTaskTest {
                 bondConfigManage,
                 dailyValuationManage,
                 provider(provider),
-                new MarketTradingCalendarService(""));
+                new AlwaysTradingDayCalendarService());
         ReflectionTestUtils.setField(task, "enabled", true);
         ReflectionTestUtils.setField(task, "catchUpEnabled", true);
         ReflectionTestUtils.setField(task, "runAfter", "19:00");
         ReflectionTestUtils.setField(task, "timezone", "Asia/Shanghai");
-        dailyValuationManage.hasSyncedSince = true;
+        bondConfigManage.bonds = List.of(bond("113001"), bond("113002"));
+        dailyValuationManage.hasValuationsForAllBondCodes = true;
 
         task.catchUpAfterStartup(LocalDateTime.of(2026, 6, 8, 19, 30));
 
         assertThat(provider.dailyCallCount).isZero();
         assertThat(dailyValuationManage.savedBatchCount).isZero();
+        assertThat(dailyValuationManage.requestedBondCodes).containsExactly("113001", "113002");
+        assertThat(dailyValuationManage.requestedTradeDate).isEqualTo(LocalDate.of(2026, 6, 8));
     }
 
     private static class FakeBondConfigManage extends BondConfigManage {
@@ -77,17 +84,32 @@ class ConvertibleBondDataSyncTaskTest {
     }
 
     private static class FakeDailyValuationManage extends ConvertibleBondDailyValuationManage {
-        private boolean hasSyncedSince;
+        private boolean hasValuationsForAllBondCodes;
         private int savedBatchCount;
+        private List<String> requestedBondCodes = List.of();
+        private LocalDate requestedTradeDate;
 
         @Override
-        public boolean hasSyncedSince(LocalDateTime startAt) {
-            return this.hasSyncedSince;
+        public boolean hasValuationsForAllBondCodes(Collection<String> bondCodes, LocalDate tradeDate) {
+            this.requestedBondCodes = List.copyOf(bondCodes);
+            this.requestedTradeDate = tradeDate;
+            return this.hasValuationsForAllBondCodes;
         }
 
         @Override
         public void saveValuations(List<ConvertibleBondDailyValuationPO> valuations) {
             this.savedBatchCount++;
+        }
+    }
+
+    private static class AlwaysTradingDayCalendarService extends MarketTradingCalendarService {
+        private AlwaysTradingDayCalendarService() {
+            super(null, null);
+        }
+
+        @Override
+        public boolean isTradingDay(LocalDate date) {
+            return true;
         }
     }
 

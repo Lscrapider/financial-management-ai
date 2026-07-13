@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -27,7 +28,7 @@ public class StockMarketApi {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
-    public StockMarketApi(RestTemplate restTemplate, ObjectMapper objectMapper) {
+    public StockMarketApi(@Qualifier("marketRestTemplate") RestTemplate restTemplate, ObjectMapper objectMapper) {
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
     }

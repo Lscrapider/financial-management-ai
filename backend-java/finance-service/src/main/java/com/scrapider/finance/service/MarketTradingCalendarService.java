@@ -1,43 +1,97 @@
 package com.scrapider.finance.service;
 
-import cn.hutool.core.util.StrUtil;
-import java.time.DayOfWeek;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.scrapider.finance.api.TushareApi;
+import com.scrapider.finance.domain.po.MarketTradingCalendarPO;
+import com.scrapider.finance.manage.MarketTradingCalendarManage;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.Set;
-import java.util.stream.Collectors;
-import org.springframework.beans.factory.annotation.Value;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 public class MarketTradingCalendarService {
 
-    private static final String DEFAULT_CLOSED_DATES = "2026-01-01,2026-01-02,2026-01-03,"
-            + "2026-02-15,2026-02-16,2026-02-17,2026-02-18,2026-02-19,2026-02-20,2026-02-21,2026-02-22,2026-02-23,"
-            + "2026-04-04,2026-04-05,2026-04-06,"
-            + "2026-05-01,2026-05-02,2026-05-03,2026-05-04,2026-05-05,"
-            + "2026-06-19,2026-06-20,2026-06-21,"
-            + "2026-09-25,2026-09-26,2026-09-27,"
-            + "2026-10-01,2026-10-02,2026-10-03,2026-10-04,2026-10-05,2026-10-06,2026-10-07";
+    private static final String TUSHARE_TRADE_CAL_API = "trade_cal";
+    private static final String TUSHARE_TRADE_CAL_FIELDS = "exchange,cal_date,is_open";
 
-    private final Set<LocalDate> closedDates;
+    private final MarketTradingCalendarManage marketTradingCalendarManage;
+    private final TushareApi tushareApi;
+    private final ConcurrentMap<Integer, Object> yearLocks = new ConcurrentHashMap<>();
 
-    public MarketTradingCalendarService(@Value("${market.trading.closed-dates:}") String closedDatesText) {
-        String effectiveClosedDatesText = StrUtil.blankToDefault(closedDatesText, DEFAULT_CLOSED_DATES);
-        this.closedDates = StrUtil.splitTrim(effectiveClosedDatesText, ',').stream()
-                .filter(StrUtil::isNotBlank)
-                .map(LocalDate::parse)
-                .collect(Collectors.toUnmodifiableSet());
+    public MarketTradingCalendarService(
+            MarketTradingCalendarManage marketTradingCalendarManage,
+            TushareApi tushareApi) {
+        this.marketTradingCalendarManage = marketTradingCalendarManage;
+        this.tushareApi = tushareApi;
     }
 
     public boolean isTradingDay(ZoneId zoneId) {
+        if (zoneId == null) {
+            log.warn("交易日历时区为空，按非交易日处理。");
+            return false;
+        }
         return this.isTradingDay(LocalDate.now(zoneId));
     }
 
     public boolean isTradingDay(LocalDate date) {
-        DayOfWeek dayOfWeek = date.getDayOfWeek();
-        return !DayOfWeek.SATURDAY.equals(dayOfWeek)
-                && !DayOfWeek.SUNDAY.equals(dayOfWeek)
-                && !this.closedDates.contains(date);
+        if (date == null) {
+            log.warn("交易日历日期为空，按非交易日处理。");
+            return false;
+        }
+        try {
+            MarketTradingCalendarPO calendar = this.loadCalendar(date);
+            if (calendar == null) {
+                log.warn("交易日历未包含日期 {}，按非交易日处理。", date);
+                return false;
+            }
+            return Boolean.TRUE.equals(calendar.getOpen());
+        } catch (Exception ex) {
+            log.warn("查询交易日历失败，按非交易日处理。日期: {}", date, ex);
+            return false;
+        }
+    }
+
+    private MarketTradingCalendarPO loadCalendar(LocalDate date) {
+        MarketTradingCalendarPO calendar = this.marketTradingCalendarManage.findByExchangeAndCalendarDate(
+                MarketTradingCalendarPO.EXCHANGE_SSE, date);
+        if (calendar != null) {
+            return calendar;
+        }
+        this.refreshYear(date);
+        return this.marketTradingCalendarManage.findByExchangeAndCalendarDate(
+                MarketTradingCalendarPO.EXCHANGE_SSE, date);
+    }
+
+    private void refreshYear(LocalDate missingDate) {
+        Object yearLock = this.yearLocks.computeIfAbsent(missingDate.getYear(), ignored -> new Object());
+        synchronized (yearLock) {
+            if (this.marketTradingCalendarManage.findByExchangeAndCalendarDate(
+                            MarketTradingCalendarPO.EXCHANGE_SSE, missingDate)
+                    != null) {
+                return;
+            }
+            LocalDate yearStart = missingDate.withDayOfYear(1);
+            LocalDate yearEnd = yearStart.plusYears(1).minusDays(1);
+            ArrayNode rows = this.tushareApi.queryRows(
+                    TUSHARE_TRADE_CAL_API,
+                    Map.<String, Object>of(
+                            "exchange", MarketTradingCalendarPO.EXCHANGE_SSE,
+                            "start_date", yearStart.format(DateTimeFormatter.BASIC_ISO_DATE),
+                            "end_date", yearEnd.format(DateTimeFormatter.BASIC_ISO_DATE)),
+                    TUSHARE_TRADE_CAL_FIELDS);
+            List<MarketTradingCalendarPO> calendars = MarketTradingCalendarPO.fromTushareRows(
+                    MarketTradingCalendarPO.EXCHANGE_SSE, rows);
+            if (calendars.stream().noneMatch(calendar -> missingDate.equals(calendar.getCalendarDate()))) {
+                throw new IllegalStateException("tushare trade_cal response does not contain " + missingDate);
+            }
+            this.marketTradingCalendarManage.saveCalendars(calendars);
+        }
     }
 }

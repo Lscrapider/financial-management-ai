@@ -11,8 +11,8 @@ import com.scrapider.finance.domain.vo.StockConfigAddResultVO;
 import com.scrapider.finance.domain.vo.StockQuoteVO;
 import com.scrapider.finance.manage.StockConfigManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
+import com.scrapider.finance.service.AssetDataInitializationService;
 import com.scrapider.finance.service.SystemConfigStockService;
-import com.scrapider.finance.task.StockMarketSyncTask;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -21,17 +21,17 @@ public class SystemConfigStockServiceImpl implements SystemConfigStockService {
     private final StockMarketApi stockMarketApi;
     private final StockConfigManage stockConfigManage;
     private final StockQuoteSnapshotManage stockQuoteSnapshotManage;
-    private final StockMarketSyncTask stockMarketSyncTask;
+    private final AssetDataInitializationService assetDataInitializationService;
 
     public SystemConfigStockServiceImpl(
             StockMarketApi stockMarketApi,
             StockConfigManage stockConfigManage,
             StockQuoteSnapshotManage stockQuoteSnapshotManage,
-            StockMarketSyncTask stockMarketSyncTask) {
+            AssetDataInitializationService assetDataInitializationService) {
         this.stockMarketApi = stockMarketApi;
         this.stockConfigManage = stockConfigManage;
         this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
-        this.stockMarketSyncTask = stockMarketSyncTask;
+        this.assetDataInitializationService = assetDataInitializationService;
     }
 
     @Override
@@ -44,8 +44,8 @@ public class SystemConfigStockServiceImpl implements SystemConfigStockService {
         this.stockConfigManage.saveConfig(stock);
         this.stockQuoteSnapshotManage.saveLatest(snapshot);
 
-        boolean trendSynced = this.stockMarketSyncTask.syncStockTrend(stockCode);
-        return StockConfigAddResultVO.of(StockQuoteVO.fromPO(snapshot), trendSynced);
+        boolean initializationScheduled = this.assetDataInitializationService.scheduleStockInitialization(stock);
+        return StockConfigAddResultVO.of(StockQuoteVO.fromPO(snapshot), false, initializationScheduled);
     }
 
     private StockQuoteSnapshotPO fetchAndValidateQuote(

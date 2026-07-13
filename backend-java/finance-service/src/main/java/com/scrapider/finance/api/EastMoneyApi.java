@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scrapider.finance.domain.dto.StockMarketDataDTO;
 import java.io.IOException;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -18,7 +19,7 @@ public class EastMoneyApi {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
-    public EastMoneyApi(RestTemplate restTemplate, ObjectMapper objectMapper) {
+    public EastMoneyApi(@Qualifier("marketRestTemplate") RestTemplate restTemplate, ObjectMapper objectMapper) {
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
     }

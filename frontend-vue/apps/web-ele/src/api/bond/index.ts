@@ -103,6 +103,7 @@ export interface BondConfigAddResult {
   marketDataSynced: boolean;
   dailyValuationSynced: boolean;
   shareSynced: boolean;
+  initializationScheduled: boolean;
 }
 
 export function listBondQuotes(params: BondQuoteListParams) {

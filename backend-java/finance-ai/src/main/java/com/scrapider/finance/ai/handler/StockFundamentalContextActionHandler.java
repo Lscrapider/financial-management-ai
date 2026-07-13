@@ -18,14 +18,21 @@ import com.scrapider.finance.manage.StockDividendHistoryManage;
 import com.scrapider.finance.manage.StockFinancialIndicatorManage;
 import com.scrapider.finance.manage.StockQuoteSnapshotManage;
 import com.scrapider.finance.manage.StockValuationHistoryManage;
+import com.scrapider.finance.service.AssetDataEnsureResult;
+import com.scrapider.finance.service.AssetDataEnsurePolicy;
+import com.scrapider.finance.service.AssetDataEnsureService;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 public class StockFundamentalContextActionHandler implements AgentDataActionHandler {
 
@@ -45,18 +52,21 @@ public class StockFundamentalContextActionHandler implements AgentDataActionHand
     private final StockValuationHistoryManage stockValuationHistoryManage;
     private final StockFinancialIndicatorManage stockFinancialIndicatorManage;
     private final StockDividendHistoryManage stockDividendHistoryManage;
+    private final AssetDataEnsureService assetDataEnsureService;
 
     public StockFundamentalContextActionHandler(
             StockConfigManage stockConfigManage,
             StockQuoteSnapshotManage stockQuoteSnapshotManage,
             StockValuationHistoryManage stockValuationHistoryManage,
             StockFinancialIndicatorManage stockFinancialIndicatorManage,
-            StockDividendHistoryManage stockDividendHistoryManage) {
+            StockDividendHistoryManage stockDividendHistoryManage,
+            AssetDataEnsureService assetDataEnsureService) {
         this.stockConfigManage = stockConfigManage;
         this.stockQuoteSnapshotManage = stockQuoteSnapshotManage;
         this.stockValuationHistoryManage = stockValuationHistoryManage;
         this.stockFinancialIndicatorManage = stockFinancialIndicatorManage;
         this.stockDividendHistoryManage = stockDividendHistoryManage;
+        this.assetDataEnsureService = assetDataEnsureService;
     }
 
     @Override
@@ -78,17 +88,24 @@ public class StockFundamentalContextActionHandler implements AgentDataActionHand
         int limit = this.normalizeLimit(params);
         ResolvedStockTarget target = this.resolveTarget(targetCode, targetName);
 
-        List<StockValuationHistoryPO> valuations = List.of();
-        List<StockDividendHistoryPO> dividends = List.of();
-        if (sections.contains(SECTION_VALUATION) && StrUtil.isNotBlank(target.targetCode())) {
-            valuations = this.stockValuationHistoryManage.listByStockCode(target.targetCode(), VALUATION_HISTORY_LIMIT);
-            dividends = this.stockDividendHistoryManage.listByStockCode(target.targetCode(), DIVIDEND_HISTORY_LIMIT);
+        StockFundamentalData data = this.loadFundamentalData(target.targetCode(), sections, limit);
+        Map<String, Object> dataRefresh = null;
+        if (this.requiresRefresh(target.targetCode(), sections, data)) {
+            StockConfigPO stock = this.stockConfigManage.getEnabledByStockCode(target.targetCode());
+            if (stock != null) {
+                try {
+                    AssetDataEnsureResult result = this.assetDataEnsureService.ensureStockData(stock);
+                    dataRefresh = AgentDataRefreshMetadata.completed(List.copyOf(sections), result);
+                    data = this.loadFundamentalData(target.targetCode(), sections, limit);
+                } catch (Exception ex) {
+                    log.warn("Agent 股票基础数据兜底刷新失败，stockCode: {}", target.targetCode(), ex);
+                    dataRefresh = AgentDataRefreshMetadata.failed(List.copyOf(sections));
+                }
+            }
         }
-
-        List<StockFinancialIndicatorPO> indicators = List.of();
-        if (sections.contains(SECTION_FINANCIAL_INDICATORS) && StrUtil.isNotBlank(target.targetCode())) {
-            indicators = this.stockFinancialIndicatorManage.listByStockCode(target.targetCode(), limit);
-        }
+        List<StockValuationHistoryPO> valuations = data.valuations();
+        List<StockDividendHistoryPO> dividends = data.dividends();
+        List<StockFinancialIndicatorPO> indicators = data.indicators();
 
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("target", AiAgentDomainToolDataConverter.stockTarget(target.targetCode(), target.targetName()));
@@ -109,7 +126,59 @@ public class StockFundamentalContextActionHandler implements AgentDataActionHand
         metadata.put("limit", limit);
         metadata.put("valuationHistoryLimit", VALUATION_HISTORY_LIMIT);
         metadata.put("dividendHistoryLimit", DIVIDEND_HISTORY_LIMIT);
+        if (dataRefresh != null) {
+            metadata.put("dataRefresh", dataRefresh);
+        }
         return new AgentDataGatewayResponseVO(param.action(), true, List.of(row), metadata, null);
+    }
+
+    private StockFundamentalData loadFundamentalData(String targetCode, Set<String> sections, int limit) {
+        if (StrUtil.isBlank(targetCode)) {
+            return StockFundamentalData.empty();
+        }
+        List<StockValuationHistoryPO> valuations = List.of();
+        List<StockDividendHistoryPO> dividends = List.of();
+        if (sections.contains(SECTION_VALUATION)) {
+            valuations = this.stockValuationHistoryManage.listByStockCode(targetCode, VALUATION_HISTORY_LIMIT);
+            dividends = this.stockDividendHistoryManage.listByStockCode(targetCode, DIVIDEND_HISTORY_LIMIT);
+        }
+        List<StockFinancialIndicatorPO> indicators = List.of();
+        if (sections.contains(SECTION_FINANCIAL_INDICATORS)) {
+            indicators = this.stockFinancialIndicatorManage.listByStockCode(targetCode, limit);
+        }
+        return new StockFundamentalData(valuations, dividends, indicators);
+    }
+
+    private boolean requiresRefresh(String targetCode, Set<String> sections, StockFundamentalData data) {
+        if (StrUtil.isBlank(targetCode)) {
+            return false;
+        }
+        return (sections.contains(SECTION_VALUATION)
+                        && (data.valuations().isEmpty()
+                                || this.isValuationStale(data.valuations())
+                                || data.dividends().isEmpty()
+                                || this.isDividendDataStale(data.dividends())))
+                || (sections.contains(SECTION_FINANCIAL_INDICATORS)
+                        && (data.indicators().isEmpty() || this.isFinancialDataStale(data.indicators())));
+    }
+
+    private boolean isValuationStale(List<StockValuationHistoryPO> valuations) {
+        StockValuationHistoryPO latest = valuations.get(0);
+        return latest.getSyncedAt() == null || !LocalDate.now().equals(latest.getSyncedAt().toLocalDate());
+    }
+
+    private boolean isFinancialDataStale(List<StockFinancialIndicatorPO> indicators) {
+        StockFinancialIndicatorPO latest = indicators.get(0);
+        LocalDateTime syncedAt = latest.getSyncedAt();
+        return syncedAt == null || syncedAt.isBefore(
+                LocalDateTime.now().minusDays(AssetDataEnsurePolicy.STOCK_FUNDAMENTAL_FRESH_DAYS));
+    }
+
+    private boolean isDividendDataStale(List<StockDividendHistoryPO> dividends) {
+        StockDividendHistoryPO latest = dividends.get(0);
+        LocalDateTime syncedAt = latest.getSyncedAt();
+        return syncedAt == null || syncedAt.isBefore(
+                LocalDateTime.now().minusDays(AssetDataEnsurePolicy.STOCK_DIVIDEND_FRESH_DAYS));
     }
 
     private ResolvedStockTarget resolveTarget(String targetCode, String targetName) {
@@ -325,6 +394,16 @@ public class StockFundamentalContextActionHandler implements AgentDataActionHand
             boolean targetResolved,
             String missingReason,
             List<StockTargetCandidate> targetCandidates) {
+    }
+
+    private record StockFundamentalData(
+            List<StockValuationHistoryPO> valuations,
+            List<StockDividendHistoryPO> dividends,
+            List<StockFinancialIndicatorPO> indicators) {
+
+        private static StockFundamentalData empty() {
+            return new StockFundamentalData(List.of(), List.of(), List.of());
+        }
     }
 
     private record StockTargetCandidate(String targetCode, String targetName) {

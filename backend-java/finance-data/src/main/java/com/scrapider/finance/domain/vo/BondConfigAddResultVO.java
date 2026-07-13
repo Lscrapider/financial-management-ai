@@ -17,5 +17,6 @@ public class BondConfigAddResultVO {
     private Boolean marketDataSynced;
     private Boolean dailyValuationSynced;
     private Boolean shareSynced;
+    private Boolean initializationScheduled;
     private StockConfigAddResultVO underlyingStock;
 }

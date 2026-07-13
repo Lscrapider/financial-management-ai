@@ -10,9 +10,9 @@ import com.scrapider.finance.domain.vo.StockConfigAddResultVO;
 import com.scrapider.finance.manage.BondConfigManage;
 import com.scrapider.finance.manage.ConvertibleBondBasicManage;
 import com.scrapider.finance.provider.ConvertibleBondDataProvider;
+import com.scrapider.finance.service.AssetDataInitializationService;
 import com.scrapider.finance.service.SystemConfigBondService;
 import com.scrapider.finance.service.SystemConfigStockService;
-import com.scrapider.finance.task.BondMarketSyncTask;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
@@ -23,19 +23,19 @@ public class SystemConfigBondServiceImpl implements SystemConfigBondService {
     private final BondConfigManage bondConfigManage;
     private final ConvertibleBondBasicManage convertibleBondBasicManage;
     private final SystemConfigStockService systemConfigStockService;
-    private final BondMarketSyncTask bondMarketSyncTask;
+    private final AssetDataInitializationService assetDataInitializationService;
 
     public SystemConfigBondServiceImpl(
             ObjectProvider<ConvertibleBondDataProvider> convertibleBondDataProvider,
             BondConfigManage bondConfigManage,
             ConvertibleBondBasicManage convertibleBondBasicManage,
             SystemConfigStockService systemConfigStockService,
-            BondMarketSyncTask bondMarketSyncTask) {
+            AssetDataInitializationService assetDataInitializationService) {
         this.convertibleBondDataProvider = convertibleBondDataProvider;
         this.bondConfigManage = bondConfigManage;
         this.convertibleBondBasicManage = convertibleBondBasicManage;
         this.systemConfigStockService = systemConfigStockService;
-        this.bondMarketSyncTask = bondMarketSyncTask;
+        this.assetDataInitializationService = assetDataInitializationService;
     }
 
     @Override
@@ -49,9 +49,9 @@ public class SystemConfigBondServiceImpl implements SystemConfigBondService {
         this.convertibleBondBasicManage.saveBasic(basic);
 
         StockConfigAddResultVO underlyingStock = this.syncUnderlyingStock(basic);
-        boolean marketDataSynced = this.bondMarketSyncTask.syncMarketDataForBond(bondCode);
-        boolean dailyValuationSynced = this.bondMarketSyncTask.syncConvertibleDailyDataForBond(bondCode);
-        return this.toResult(bond, basic, underlyingStock, marketDataSynced, dailyValuationSynced);
+        boolean initializationScheduled = this.assetDataInitializationService
+                .scheduleConvertibleBondInitialization(bond);
+        return this.toResult(bond, basic, underlyingStock, initializationScheduled);
     }
 
     private ConvertibleBondBasicPO fetchAndValidateBasic(
@@ -88,15 +88,13 @@ public class SystemConfigBondServiceImpl implements SystemConfigBondService {
             BondConfigPO bond,
             ConvertibleBondBasicPO basic,
             StockConfigAddResultVO underlyingStock,
-            boolean marketDataSynced,
-            boolean dailyValuationSynced) {
+            boolean initializationScheduled) {
         return SystemConfigConverter.toBondConfigAddResult(
                 bond,
                 basic,
                 this.normalizeStockCode(basic.getUnderlyingStockCode()),
                 underlyingStock,
-                marketDataSynced,
-                dailyValuationSynced);
+                initializationScheduled);
     }
 
     private String normalizeBondCode(BondConfigAddParam param) {

@@ -116,6 +116,7 @@ export interface StockConfigAddResult {
   exchangeCode: string;
   quoteSynced: boolean;
   trendSynced: boolean;
+  initializationScheduled: boolean;
   quote: StockQuote;
 }
 

@@ -96,8 +96,11 @@ async function submitStockAdd() {
       stockCode: stockAddForm.stockCode.trim(),
       stockName: stockAddForm.stockName.trim(),
     });
-    const trendMessage = result.trendSynced ? '分时同步完成' : '分时同步未完成';
-    ElMessage.success(`${result.stockName} 快照同步完成，${trendMessage}`);
+    if (result.initializationScheduled) {
+      ElMessage.success(`${result.stockName} 快照同步完成，已加入后台初始化`);
+    } else {
+      ElMessage.warning(`${result.stockName} 快照同步完成，后台初始化未成功投递`);
+    }
     stockAddForm.stockCode = '';
     stockAddForm.stockName = '';
     stockAddFormRef.value?.clearValidate();
@@ -117,9 +120,13 @@ async function submitBondAdd() {
       bondName: bondAddForm.bondName.trim(),
     });
     const stockText = result.underlyingStockName
-      ? `，正股 ${result.underlyingStockName} 已同步`
+      ? `，正股 ${result.underlyingStockName} 已完成基础配置`
       : '';
-    ElMessage.success(`${result.bondName} 同步完成${stockText}`);
+    if (result.initializationScheduled) {
+      ElMessage.success(`${result.bondName} 基础资料同步完成${stockText}，已加入后台初始化`);
+    } else {
+      ElMessage.warning(`${result.bondName} 基础资料同步完成${stockText}，后台初始化未成功投递`);
+    }
     bondAddForm.bondCode = '';
     bondAddForm.bondName = '';
     bondAddFormRef.value?.clearValidate();
@@ -163,7 +170,7 @@ function labelOf(targetType: DeleteTargetType) {
   <Page>
     <div class="target-config-page">
       <PageHero
-        description="维护股票、指数和可转债基础标的，新增后可同步行情数据。"
+        description="维护股票、指数和可转债基础标的，新增后会在后台初始化行情与分析数据。"
         title="标的配置"
       />
 
@@ -172,7 +179,7 @@ function labelOf(targetType: DeleteTargetType) {
           <div class="target-card-header">
             <div>
               <h2>新增股票</h2>
-              <p>校验股票代码和名称，补齐腾讯快照与单只股票分时。</p>
+              <p>校验股票代码和名称并保存腾讯快照，分时和基本面数据会在后台初始化。</p>
             </div>
             <ElTag effect="plain" size="small">股票</ElTag>
           </div>
@@ -206,7 +213,7 @@ function labelOf(targetType: DeleteTargetType) {
               type="primary"
               @click="submitStockAdd"
             >
-              新增并同步
+              新增并初始化
             </ElButton>
           </ElForm>
         </ElCard>
@@ -215,7 +222,7 @@ function labelOf(targetType: DeleteTargetType) {
           <div class="target-card-header">
             <div>
               <h2>新增可转债</h2>
-              <p>同步 Tushare 基础资料、正股数据、转债行情和专属估值数据。</p>
+              <p>同步 Tushare 基础资料和正股配置，行情、估值和份额数据会在后台初始化。</p>
             </div>
             <ElTag effect="plain" size="small">可转债</ElTag>
           </div>
@@ -249,7 +256,7 @@ function labelOf(targetType: DeleteTargetType) {
               type="primary"
               @click="submitBondAdd"
             >
-              新增并同步
+              新增并初始化
             </ElButton>
           </ElForm>
         </ElCard>

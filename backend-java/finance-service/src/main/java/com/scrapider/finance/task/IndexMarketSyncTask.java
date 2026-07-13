@@ -88,10 +88,10 @@ public class IndexMarketSyncTask {
     @Value("${index.sync.request-interval-ms:1500}")
     private long requestIntervalMs;
 
-    @Value("${index.sync.start-time:09:29}")
+    @Value("${index.sync.start-time:09:28}")
     private String startTime;
 
-    @Value("${index.sync.end-time:16:00}")
+    @Value("${index.sync.end-time:15:02}")
     private String endTime;
 
     @Value("${index.sync.timezone:Asia/Shanghai}")
@@ -502,10 +502,12 @@ public class IndexMarketSyncTask {
     }
 
     private boolean isInSyncWindow() {
-        LocalTime now = LocalTime.now(ZoneId.of(this.timezone));
-        LocalTime start = LocalTime.parse(this.startTime);
-        LocalTime end = LocalTime.parse(this.endTime);
-        return !now.isBefore(start) && !now.isAfter(end);
+        return MarketSyncWindow.isInWindow(
+                LocalTime.now(ZoneId.of(this.timezone)),
+                LocalTime.parse(this.startTime),
+                LocalTime.parse(this.endTime),
+                MORNING_END,
+                AFTERNOON_START);
     }
 
     private boolean isNotFutureTrend(IndexIntradayTrendPO trend, LocalDateTime now) {

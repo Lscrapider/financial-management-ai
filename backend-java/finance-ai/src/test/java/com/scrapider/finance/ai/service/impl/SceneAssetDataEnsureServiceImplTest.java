@@ -3,22 +3,22 @@ package com.scrapider.finance.ai.service.impl;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.scrapider.finance.ai.domain.dto.ConvertibleBondSceneDataDTO;
-import com.scrapider.finance.provider.ConvertibleBondSceneDataProvider;
 import com.scrapider.finance.domain.po.BondConfigPO;
 import com.scrapider.finance.domain.po.BondQuoteSnapshotPO;
 import com.scrapider.finance.domain.po.ConvertibleBondBasicPO;
 import com.scrapider.finance.domain.po.ConvertibleBondDailyValuationPO;
 import com.scrapider.finance.domain.po.ConvertibleBondSharePO;
+import com.scrapider.finance.domain.po.StockConfigPO;
 import com.scrapider.finance.manage.ConvertibleBondBasicManage;
 import com.scrapider.finance.manage.ConvertibleBondDailyValuationManage;
 import com.scrapider.finance.manage.ConvertibleBondShareManage;
+import com.scrapider.finance.service.AssetDataEnsureResult;
+import com.scrapider.finance.service.AssetDataEnsureService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.ObjectProvider;
 
 class SceneAssetDataEnsureServiceImplTest {
 
@@ -27,17 +27,16 @@ class SceneAssetDataEnsureServiceImplTest {
         FakeBasicManage basicManage = new FakeBasicManage();
         FakeShareManage shareManage = new FakeShareManage();
         FakeValuationManage valuationManage = new FakeValuationManage();
-        FakeProvider provider = new FakeProvider();
+        FakeAssetDataEnsureService assetDataEnsureService = new FakeAssetDataEnsureService();
         SceneAssetDataEnsureServiceImpl service = new SceneAssetDataEnsureServiceImpl(
-                null,
+                assetDataEnsureService,
                 null,
                 null,
                 null,
                 null,
                 basicManage,
                 shareManage,
-                valuationManage,
-                provider(provider));
+                valuationManage);
         BondConfigPO bond = bond();
         ConvertibleBondBasicPO basic = basic(LocalDateTime.now().minusDays(1));
         ConvertibleBondSharePO share = share(LocalDateTime.now().minusDays(1));
@@ -62,8 +61,7 @@ class SceneAssetDataEnsureServiceImplTest {
         assertThat(overlay.getConversionValue()).isEqualByComparingTo("94.00");
         assertThat(overlay.getPremiumRate()).isEqualByComparingTo("27.66");
         assertThat(overlay.getPureBondValue()).isEqualByComparingTo("96.50");
-        assertThat(provider.basicCallCount).isZero();
-        assertThat(provider.shareCallCount).isZero();
+        assertThat(assetDataEnsureService.bondEnsureCalls).isEqualTo(1);
     }
 
     @Test
@@ -71,17 +69,16 @@ class SceneAssetDataEnsureServiceImplTest {
         FakeBasicManage basicManage = new FakeBasicManage();
         FakeShareManage shareManage = new FakeShareManage();
         FakeValuationManage valuationManage = new FakeValuationManage();
-        FakeProvider provider = new FakeProvider();
+        FakeAssetDataEnsureService assetDataEnsureService = new FakeAssetDataEnsureService();
         SceneAssetDataEnsureServiceImpl service = new SceneAssetDataEnsureServiceImpl(
-                null,
+                assetDataEnsureService,
                 null,
                 null,
                 null,
                 null,
                 basicManage,
                 shareManage,
-                valuationManage,
-                provider(provider));
+                valuationManage);
         BondConfigPO bond = bond();
         ConvertibleBondBasicPO basic = basic(LocalDateTime.now().minusDays(1));
         ConvertibleBondSharePO share = share(LocalDateTime.now().minusDays(1));
@@ -108,6 +105,7 @@ class SceneAssetDataEnsureServiceImplTest {
         assertThat(synthetic.getPureBondValue()).isEqualByComparingTo("96.50");
         assertThat(synthetic.getSource()).isEqualTo("snapshot_overlay");
         assertThat(result.valuationHistory().get(1).getTradeDate()).isEqualTo(LocalDate.of(2026, 6, 5));
+        assertThat(assetDataEnsureService.bondEnsureCalls).isEqualTo(1);
     }
 
     @Test
@@ -115,17 +113,16 @@ class SceneAssetDataEnsureServiceImplTest {
         FakeBasicManage basicManage = new FakeBasicManage();
         FakeShareManage shareManage = new FakeShareManage();
         FakeValuationManage valuationManage = new FakeValuationManage();
-        FakeProvider provider = new FakeProvider();
+        FakeAssetDataEnsureService assetDataEnsureService = new FakeAssetDataEnsureService();
         SceneAssetDataEnsureServiceImpl service = new SceneAssetDataEnsureServiceImpl(
-                null,
+                assetDataEnsureService,
                 null,
                 null,
                 null,
                 null,
                 basicManage,
                 shareManage,
-                valuationManage,
-                provider(provider));
+                valuationManage);
         BondConfigPO bond = bond();
         ConvertibleBondBasicPO staleBasic = basic(LocalDateTime.now().minusDays(8));
         ConvertibleBondSharePO staleShare = share(LocalDateTime.now().minusDays(8));
@@ -134,8 +131,10 @@ class SceneAssetDataEnsureServiceImplTest {
 
         basicManage.latest = staleBasic;
         shareManage.latest = staleShare;
-        provider.basic = refreshedBasic;
-        provider.shares = List.of(refreshedShare);
+        assetDataEnsureService.bondEnsureAction = () -> {
+            basicManage.saveBasic(refreshedBasic);
+            shareManage.saveShares(List.of(refreshedShare));
+        };
         valuationManage.valuations = List.of();
 
         ConvertibleBondSceneDataDTO result = service.ensureBondSceneData(bond, null, 250, 250);
@@ -144,6 +143,35 @@ class SceneAssetDataEnsureServiceImplTest {
         assertThat(result.latestShare()).isSameAs(refreshedShare);
         assertThat(basicManage.saved).isSameAs(refreshedBasic);
         assertThat(shareManage.saved).containsExactly(refreshedShare);
+    }
+
+    @Test
+    void ensureLoadsDailyValuationPersistedBySharedService() {
+        FakeBasicManage basicManage = new FakeBasicManage();
+        FakeShareManage shareManage = new FakeShareManage();
+        FakeValuationManage valuationManage = new FakeValuationManage();
+        FakeAssetDataEnsureService assetDataEnsureService = new FakeAssetDataEnsureService();
+        SceneAssetDataEnsureServiceImpl service = new SceneAssetDataEnsureServiceImpl(
+                assetDataEnsureService,
+                null,
+                null,
+                null,
+                null,
+                basicManage,
+                shareManage,
+                valuationManage);
+        ConvertibleBondDailyValuationPO daily = valuation(
+                LocalDate.of(2026, 6, 8),
+                LocalDateTime.of(2026, 6, 8, 18, 0),
+                "118.20",
+                "92.10",
+                "28.34");
+        assetDataEnsureService.bondEnsureAction = () -> valuationManage.valuations = List.of(daily);
+
+        ConvertibleBondSceneDataDTO result = service.ensureBondSceneData(bond(), null, 250, 250);
+
+        assertThat(assetDataEnsureService.bondEnsureCalls).isEqualTo(1);
+        assertThat(result.valuationHistory()).containsExactly(daily);
     }
 
     private static class FakeBasicManage extends ConvertibleBondBasicManage {
@@ -158,12 +186,13 @@ class SceneAssetDataEnsureServiceImplTest {
         @Override
         public void saveBasic(ConvertibleBondBasicPO basic) {
             this.saved = basic;
+            this.latest = basic;
         }
     }
 
     private static class FakeShareManage extends ConvertibleBondShareManage {
         private ConvertibleBondSharePO latest;
-        private List<ConvertibleBondSharePO> saved = new ArrayList<>();
+        private List<ConvertibleBondSharePO> saved = List.of();
 
         @Override
         public ConvertibleBondSharePO latestByBondCode(String bondCode) {
@@ -173,6 +202,7 @@ class SceneAssetDataEnsureServiceImplTest {
         @Override
         public void saveShares(List<ConvertibleBondSharePO> shares) {
             this.saved = shares;
+            this.latest = shares.isEmpty() ? null : shares.get(0);
         }
     }
 
@@ -185,47 +215,27 @@ class SceneAssetDataEnsureServiceImplTest {
         }
     }
 
-    private static class FakeProvider implements ConvertibleBondSceneDataProvider {
-        private ConvertibleBondBasicPO basic;
-        private List<ConvertibleBondSharePO> shares = List.of();
-        private int basicCallCount;
-        private int shareCallCount;
-
-        @Override
-        public ConvertibleBondBasicPO getBasic(BondConfigPO bond) {
-            this.basicCallCount++;
-            return this.basic;
-        }
-
-        @Override
-        public List<ConvertibleBondSharePO> getShareChanges(BondConfigPO bond, Integer limit) {
-            this.shareCallCount++;
-            return this.shares;
-        }
-    }
-
-    private static ObjectProvider<ConvertibleBondSceneDataProvider> provider(ConvertibleBondSceneDataProvider provider) {
-        return new ObjectProvider<>() {
-            @Override
-            public ConvertibleBondSceneDataProvider getObject(Object... args) {
-                return provider;
-            }
-
-            @Override
-            public ConvertibleBondSceneDataProvider getIfAvailable() {
-                return provider;
-            }
-
-            @Override
-            public ConvertibleBondSceneDataProvider getIfUnique() {
-                return provider;
-            }
-
-            @Override
-            public ConvertibleBondSceneDataProvider getObject() {
-                return provider;
-            }
+    private static class FakeAssetDataEnsureService implements AssetDataEnsureService {
+        private int bondEnsureCalls;
+        private Runnable bondEnsureAction = () -> {
         };
+
+        @Override
+        public AssetDataEnsureResult ensureStockData(StockConfigPO stock) {
+            return new AssetDataEnsureResult(false, List.of());
+        }
+
+        @Override
+        public AssetDataEnsureResult ensureConvertibleBondData(BondConfigPO bond) {
+            this.bondEnsureCalls++;
+            this.bondEnsureAction.run();
+            return new AssetDataEnsureResult(true, List.of());
+        }
+
+        @Override
+        public boolean ensureConvertibleBondDailyValuations(BondConfigPO bond) {
+            return false;
+        }
     }
 
     private static BondConfigPO bond() {

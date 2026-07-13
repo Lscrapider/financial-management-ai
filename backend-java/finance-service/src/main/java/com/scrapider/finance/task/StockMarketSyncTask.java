@@ -92,10 +92,10 @@ public class StockMarketSyncTask {
     @Value("${stock.sync.monthly-kline-limit:250}")
     private Integer monthlyKlineLimit;
 
-    @Value("${stock.sync.start-time:09:29}")
+    @Value("${stock.sync.start-time:09:28}")
     private String startTime;
 
-    @Value("${stock.sync.end-time:16:00}")
+    @Value("${stock.sync.end-time:15:02}")
     private String endTime;
 
     @Value("${stock.sync.timezone:Asia/Shanghai}")
@@ -533,10 +533,12 @@ public class StockMarketSyncTask {
     }
 
     private boolean isInSyncWindow() {
-        LocalTime now = LocalTime.now(ZoneId.of(this.timezone));
-        LocalTime start = LocalTime.parse(this.startTime);
-        LocalTime end = LocalTime.parse(this.endTime);
-        return !now.isBefore(start) && !now.isAfter(end);
+        return MarketSyncWindow.isInWindow(
+                LocalTime.now(ZoneId.of(this.timezone)),
+                LocalTime.parse(this.startTime),
+                LocalTime.parse(this.endTime),
+                MORNING_END,
+                AFTERNOON_START);
     }
 
     private boolean isNotFutureTrend(StockIntradayTrendPO trend, LocalDateTime now) {

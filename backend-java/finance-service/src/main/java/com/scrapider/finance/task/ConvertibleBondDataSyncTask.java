@@ -107,7 +107,21 @@ public class ConvertibleBondDataSyncTask {
         if (now.toLocalTime().isBefore(this.parseRunAfter())) {
             return false;
         }
-        return !this.convertibleBondDailyValuationManage.hasSyncedSince(now.toLocalDate().atStartOfDay());
+        List<BondConfigPO> bonds = this.bondConfigManage.listEnabledBonds();
+        if (CollUtil.isEmpty(bonds)) {
+            return false;
+        }
+        List<String> bondCodes = bonds.stream()
+                .map(BondConfigPO::getBondCode)
+                .filter(StrUtil::isNotBlank)
+                .map(StrUtil::trim)
+                .toList();
+        if (CollUtil.isEmpty(bondCodes)) {
+            log.debug("Convertible bond daily sync task has no enabled bond code.");
+            return false;
+        }
+        return !this.convertibleBondDailyValuationManage.hasValuationsForAllBondCodes(
+                bondCodes, now.toLocalDate());
     }
 
     private LocalTime parseRunAfter() {

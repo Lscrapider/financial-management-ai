@@ -12,9 +12,13 @@ public class StockConfigAddResultVO {
     private String exchangeCode;
     private Boolean quoteSynced;
     private Boolean trendSynced;
+    private Boolean initializationScheduled;
     private StockQuoteVO quote;
 
-    public static StockConfigAddResultVO of(StockQuoteVO quote, boolean trendSynced) {
+    public static StockConfigAddResultVO of(
+            StockQuoteVO quote,
+            boolean trendSynced,
+            boolean initializationScheduled) {
         StockConfigAddResultVO result = new StockConfigAddResultVO();
         result.setStockCode(quote.getStockCode());
         result.setStockName(quote.getStockName());
@@ -23,6 +27,7 @@ public class StockConfigAddResultVO {
         result.setExchangeCode(quote.getExchangeCode());
         result.setQuoteSynced(true);
         result.setTrendSynced(trendSynced);
+        result.setInitializationScheduled(initializationScheduled);
         result.setQuote(quote);
         return result;
     }

@@ -15,14 +15,20 @@ import com.scrapider.finance.manage.BondConfigManage;
 import com.scrapider.finance.manage.ConvertibleBondBasicManage;
 import com.scrapider.finance.manage.ConvertibleBondDailyValuationManage;
 import com.scrapider.finance.manage.ConvertibleBondShareManage;
+import com.scrapider.finance.service.AssetDataEnsurePolicy;
+import com.scrapider.finance.service.AssetDataEnsureResult;
+import com.scrapider.finance.service.AssetDataEnsureService;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 public class ConvertibleBondContextActionHandler implements AgentDataActionHandler {
 
@@ -40,16 +46,19 @@ public class ConvertibleBondContextActionHandler implements AgentDataActionHandl
     private final ConvertibleBondBasicManage convertibleBondBasicManage;
     private final ConvertibleBondDailyValuationManage convertibleBondDailyValuationManage;
     private final ConvertibleBondShareManage convertibleBondShareManage;
+    private final AssetDataEnsureService assetDataEnsureService;
 
     public ConvertibleBondContextActionHandler(
             BondConfigManage bondConfigManage,
             ConvertibleBondBasicManage convertibleBondBasicManage,
             ConvertibleBondDailyValuationManage convertibleBondDailyValuationManage,
-            ConvertibleBondShareManage convertibleBondShareManage) {
+            ConvertibleBondShareManage convertibleBondShareManage,
+            AssetDataEnsureService assetDataEnsureService) {
         this.bondConfigManage = bondConfigManage;
         this.convertibleBondBasicManage = convertibleBondBasicManage;
         this.convertibleBondDailyValuationManage = convertibleBondDailyValuationManage;
         this.convertibleBondShareManage = convertibleBondShareManage;
+        this.assetDataEnsureService = assetDataEnsureService;
     }
 
     @Override
@@ -71,20 +80,24 @@ public class ConvertibleBondContextActionHandler implements AgentDataActionHandl
         int limit = this.normalizeLimit(params);
         ResolvedBondTarget target = this.resolveTarget(targetCode, targetName);
 
-        ConvertibleBondBasicPO basic = null;
-        if (sections.contains(SECTION_BASIC) && StrUtil.isNotBlank(target.targetCode())) {
-            basic = this.convertibleBondBasicManage.latestByBondCode(target.targetCode());
+        ConvertibleBondContextData data = this.loadContextData(target.targetCode(), sections, limit);
+        Map<String, Object> dataRefresh = null;
+        if (this.requiresRefresh(target.targetCode(), sections, data)) {
+            BondConfigPO bond = this.bondConfigManage.getEnabledByBondCode(target.targetCode());
+            if (bond != null) {
+                try {
+                    AssetDataEnsureResult result = this.assetDataEnsureService.ensureConvertibleBondData(bond);
+                    dataRefresh = AgentDataRefreshMetadata.completed(List.copyOf(sections), result);
+                    data = this.loadContextData(target.targetCode(), sections, limit);
+                } catch (Exception ex) {
+                    log.warn("Agent 可转债上下文兜底刷新失败，bondCode: {}", target.targetCode(), ex);
+                    dataRefresh = AgentDataRefreshMetadata.failed(List.copyOf(sections));
+                }
+            }
         }
-
-        List<ConvertibleBondDailyValuationPO> valuationHistory = List.of();
-        if (sections.contains(SECTION_VALUATION_HISTORY) && StrUtil.isNotBlank(target.targetCode())) {
-            valuationHistory = this.convertibleBondDailyValuationManage.listByBondCode(target.targetCode(), limit);
-        }
-
-        List<ConvertibleBondSharePO> shareChanges = List.of();
-        if (sections.contains(SECTION_SHARE_CHANGES) && StrUtil.isNotBlank(target.targetCode())) {
-            shareChanges = this.convertibleBondShareManage.listByBondCode(target.targetCode(), limit);
-        }
+        ConvertibleBondBasicPO basic = data.basic();
+        List<ConvertibleBondDailyValuationPO> valuationHistory = data.valuationHistory();
+        List<ConvertibleBondSharePO> shareChanges = data.shareChanges();
 
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("target", AiAgentDomainToolDataConverter.bondTarget(target.targetCode(), target.targetName()));
@@ -106,7 +119,43 @@ public class ConvertibleBondContextActionHandler implements AgentDataActionHandl
         metadata.put("targetName", StrUtil.nullToEmpty(target.targetName()));
         metadata.put("sections", List.copyOf(sections));
         metadata.put("limit", limit);
+        if (dataRefresh != null) {
+            metadata.put("dataRefresh", dataRefresh);
+        }
         return new AgentDataGatewayResponseVO(param.action(), true, List.of(row), metadata, null);
+    }
+
+    private ConvertibleBondContextData loadContextData(String targetCode, Set<String> sections, int limit) {
+        if (StrUtil.isBlank(targetCode)) {
+            return ConvertibleBondContextData.empty();
+        }
+        ConvertibleBondBasicPO basic = sections.contains(SECTION_BASIC)
+                ? this.convertibleBondBasicManage.latestByBondCode(targetCode)
+                : null;
+        List<ConvertibleBondDailyValuationPO> valuationHistory = sections.contains(SECTION_VALUATION_HISTORY)
+                ? this.convertibleBondDailyValuationManage.listByBondCode(targetCode, limit)
+                : List.of();
+        List<ConvertibleBondSharePO> shareChanges = sections.contains(SECTION_SHARE_CHANGES)
+                ? this.convertibleBondShareManage.listByBondCode(targetCode, limit)
+                : List.of();
+        return new ConvertibleBondContextData(basic, valuationHistory, shareChanges);
+    }
+
+    private boolean requiresRefresh(String targetCode, Set<String> sections, ConvertibleBondContextData data) {
+        if (StrUtil.isBlank(targetCode)) {
+            return false;
+        }
+        return (sections.contains(SECTION_BASIC)
+                        && (data.basic() == null || this.isBondDataStale(data.basic().getSyncedAt())))
+                || (sections.contains(SECTION_VALUATION_HISTORY) && data.valuationHistory().isEmpty())
+                || (sections.contains(SECTION_SHARE_CHANGES)
+                        && (data.shareChanges().isEmpty()
+                                || this.isBondDataStale(data.shareChanges().get(0).getSyncedAt())));
+    }
+
+    private boolean isBondDataStale(LocalDateTime syncedAt) {
+        return syncedAt == null || syncedAt.isBefore(
+                LocalDateTime.now().minusDays(AssetDataEnsurePolicy.CONVERTIBLE_BOND_FRESH_DAYS));
     }
 
     private ResolvedBondTarget resolveTarget(String targetCode, String targetName) {
@@ -263,6 +312,16 @@ public class ConvertibleBondContextActionHandler implements AgentDataActionHandl
             boolean targetResolved,
             String missingReason,
             List<BondTargetCandidate> targetCandidates) {
+    }
+
+    private record ConvertibleBondContextData(
+            ConvertibleBondBasicPO basic,
+            List<ConvertibleBondDailyValuationPO> valuationHistory,
+            List<ConvertibleBondSharePO> shareChanges) {
+
+        private static ConvertibleBondContextData empty() {
+            return new ConvertibleBondContextData(null, List.of(), List.of());
+        }
     }
 
     private record BondTargetCandidate(String targetCode, String targetName) {
