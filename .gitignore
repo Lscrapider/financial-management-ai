@@ -117,6 +117,7 @@ docker-compose.override.yml
 /.impeccable
 /.claude/
 /.*/
+/.ci-artifacts/
 !/.github/
 !/.github/**
 stitch_exports/

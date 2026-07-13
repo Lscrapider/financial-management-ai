@@ -1,0 +1,14 @@
+**
+!database/
+!database/**
+!ai-python/
+!ai-python/**
+!env_loader.py
+!.ci-artifacts/
+!.ci-artifacts/python/
+!.ci-artifacts/python/database-wheels/
+!.ci-artifacts/python/database-wheels/**
+!.ci-artifacts/python/ai-wheels/
+!.ci-artifacts/python/ai-wheels/**
+!.ci-artifacts/python/ai-huggingface/
+!.ci-artifacts/python/ai-huggingface/**
