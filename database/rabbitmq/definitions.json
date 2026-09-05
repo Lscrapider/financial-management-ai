@@ -11,13 +11,13 @@
   ],
   "vhosts": [
     {
-      "name": "finance"
+      "name": "lan"
     }
   ],
   "permissions": [
     {
       "user": "finance",
-      "vhost": "finance",
+      "vhost": "lan",
       "configure": ".*",
       "write": ".*",
       "read": ".*"
@@ -26,7 +26,7 @@
   "exchanges": [
     {
       "name": "finance.ocr.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "type": "topic",
       "durable": true,
       "auto_delete": false,
@@ -35,7 +35,7 @@
     },
     {
       "name": "finance.ocr.dlx",
-      "vhost": "finance",
+      "vhost": "lan",
       "type": "topic",
       "durable": true,
       "auto_delete": false,
@@ -44,7 +44,7 @@
     },
     {
       "name": "finance.ocr.retry.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "type": "topic",
       "durable": true,
       "auto_delete": false,
@@ -53,7 +53,7 @@
     },
     {
       "name": "finance.scene-analysis.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "type": "topic",
       "durable": true,
       "auto_delete": false,
@@ -62,7 +62,7 @@
     },
     {
       "name": "finance.scene-analysis.dlx",
-      "vhost": "finance",
+      "vhost": "lan",
       "type": "topic",
       "durable": true,
       "auto_delete": false,
@@ -71,7 +71,7 @@
     },
     {
       "name": "finance.scene-analysis.retry.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "type": "topic",
       "durable": true,
       "auto_delete": false,
@@ -80,7 +80,7 @@
     },
     {
       "name": "finance.agent.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "type": "topic",
       "durable": true,
       "auto_delete": false,
@@ -89,7 +89,7 @@
     },
     {
       "name": "finance.agent.dlx",
-      "vhost": "finance",
+      "vhost": "lan",
       "type": "topic",
       "durable": true,
       "auto_delete": false,
@@ -100,7 +100,7 @@
   "queues": [
     {
       "name": "finance.ocr.document.normalize",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -110,7 +110,7 @@
     },
     {
       "name": "finance.ocr.recognize",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -120,7 +120,7 @@
     },
     {
       "name": "finance.ocr.text.clean",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -130,7 +130,7 @@
     },
     {
       "name": "finance.ocr.quality.validate",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -140,7 +140,7 @@
     },
     {
       "name": "finance.ocr.chunk.tag.rule",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -150,7 +150,7 @@
     },
     {
       "name": "finance.ocr.chunk.tag.llm",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -160,7 +160,7 @@
     },
     {
       "name": "finance.ocr.chunk.tag.correct",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -170,7 +170,7 @@
     },
     {
       "name": "finance.ocr.embedding.index",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -180,7 +180,7 @@
     },
     {
       "name": "finance.ocr.document.normalize.retry",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -191,7 +191,7 @@
     },
     {
       "name": "finance.ocr.recognize.retry",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -202,7 +202,7 @@
     },
     {
       "name": "finance.ocr.text.clean.retry",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -213,7 +213,7 @@
     },
     {
       "name": "finance.ocr.quality.validate.retry",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -224,7 +224,7 @@
     },
     {
       "name": "finance.ocr.chunk.tag.rule.retry",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -235,7 +235,7 @@
     },
     {
       "name": "finance.ocr.chunk.tag.llm.retry",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -246,7 +246,7 @@
     },
     {
       "name": "finance.ocr.chunk.tag.correct.retry",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -257,7 +257,7 @@
     },
     {
       "name": "finance.ocr.embedding.index.retry",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -268,7 +268,7 @@
     },
     {
       "name": "finance.knowledge.chunk.reembed",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -278,14 +278,14 @@
     },
     {
       "name": "finance.ocr.dlq",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {}
     },
     {
       "name": "finance.scene-analysis.current.generate",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -295,7 +295,7 @@
     },
     {
       "name": "finance.scene-analysis.current.generate.retry",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -306,7 +306,7 @@
     },
     {
       "name": "finance.scene-analysis.retrieval.embedding",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -316,7 +316,7 @@
     },
     {
       "name": "finance.scene-analysis.retrieval.embedding.retry",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -327,14 +327,14 @@
     },
     {
       "name": "finance.scene-analysis.dlq",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {}
     },
     {
       "name": "finance.agent.run.start",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -343,26 +343,26 @@
       }
     },
     {
-      "name": "finance.agent.conversation.cleanup.delay",
-      "vhost": "finance",
+      "name": "finance.agent.conversation.cleanup.delay.24h",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {
-        "x-message-ttl": 1800000,
+        "x-message-ttl": 86400000,
         "x-dead-letter-exchange": "finance.agent.topic",
         "x-dead-letter-routing-key": "conversation.cleanup"
       }
     },
     {
       "name": "finance.agent.conversation.cleanup",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {}
     },
     {
       "name": "finance.agent.dlq",
-      "vhost": "finance",
+      "vhost": "lan",
       "durable": true,
       "auto_delete": false,
       "arguments": {}
@@ -371,7 +371,7 @@
   "bindings": [
     {
       "source": "finance.ocr.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.ocr.document.normalize",
       "destination_type": "queue",
       "routing_key": "ocr.document.normalize",
@@ -379,7 +379,7 @@
     },
     {
       "source": "finance.ocr.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.ocr.recognize",
       "destination_type": "queue",
       "routing_key": "ocr.recognize",
@@ -387,7 +387,7 @@
     },
     {
       "source": "finance.ocr.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.ocr.text.clean",
       "destination_type": "queue",
       "routing_key": "ocr.text.clean",
@@ -395,7 +395,7 @@
     },
     {
       "source": "finance.ocr.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.ocr.quality.validate",
       "destination_type": "queue",
       "routing_key": "ocr.quality.validate",
@@ -403,7 +403,7 @@
     },
     {
       "source": "finance.ocr.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.ocr.chunk.tag.rule",
       "destination_type": "queue",
       "routing_key": "ocr.chunk.tag.rule",
@@ -411,7 +411,7 @@
     },
     {
       "source": "finance.ocr.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.ocr.chunk.tag.llm",
       "destination_type": "queue",
       "routing_key": "ocr.chunk.tag.llm",
@@ -419,7 +419,7 @@
     },
     {
       "source": "finance.ocr.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.ocr.chunk.tag.correct",
       "destination_type": "queue",
       "routing_key": "ocr.chunk.tag.correct",
@@ -427,7 +427,7 @@
     },
     {
       "source": "finance.ocr.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.ocr.embedding.index",
       "destination_type": "queue",
       "routing_key": "ocr.embedding.index",
@@ -435,7 +435,7 @@
     },
     {
       "source": "finance.ocr.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.knowledge.chunk.reembed",
       "destination_type": "queue",
       "routing_key": "knowledge.chunk.reembed",
@@ -443,7 +443,7 @@
     },
     {
       "source": "finance.ocr.dlx",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.ocr.dlq",
       "destination_type": "queue",
       "routing_key": "#",
@@ -451,7 +451,7 @@
     },
     {
       "source": "finance.ocr.retry.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.ocr.document.normalize.retry",
       "destination_type": "queue",
       "routing_key": "ocr.document.normalize.retry",
@@ -459,7 +459,7 @@
     },
     {
       "source": "finance.ocr.retry.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.ocr.recognize.retry",
       "destination_type": "queue",
       "routing_key": "ocr.recognize.retry",
@@ -467,7 +467,7 @@
     },
     {
       "source": "finance.ocr.retry.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.ocr.text.clean.retry",
       "destination_type": "queue",
       "routing_key": "ocr.text.clean.retry",
@@ -475,7 +475,7 @@
     },
     {
       "source": "finance.ocr.retry.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.ocr.quality.validate.retry",
       "destination_type": "queue",
       "routing_key": "ocr.quality.validate.retry",
@@ -483,7 +483,7 @@
     },
     {
       "source": "finance.ocr.retry.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.ocr.chunk.tag.rule.retry",
       "destination_type": "queue",
       "routing_key": "ocr.chunk.tag.rule.retry",
@@ -491,7 +491,7 @@
     },
     {
       "source": "finance.ocr.retry.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.ocr.chunk.tag.llm.retry",
       "destination_type": "queue",
       "routing_key": "ocr.chunk.tag.llm.retry",
@@ -499,7 +499,7 @@
     },
     {
       "source": "finance.ocr.retry.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.ocr.chunk.tag.correct.retry",
       "destination_type": "queue",
       "routing_key": "ocr.chunk.tag.correct.retry",
@@ -507,7 +507,7 @@
     },
     {
       "source": "finance.ocr.retry.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.ocr.embedding.index.retry",
       "destination_type": "queue",
       "routing_key": "ocr.embedding.index.retry",
@@ -515,7 +515,7 @@
     },
     {
       "source": "finance.scene-analysis.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.scene-analysis.current.generate",
       "destination_type": "queue",
       "routing_key": "scene.analysis.current.generate",
@@ -523,7 +523,7 @@
     },
     {
       "source": "finance.scene-analysis.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.scene-analysis.retrieval.embedding",
       "destination_type": "queue",
       "routing_key": "scene.analysis.retrieval.embedding",
@@ -531,7 +531,7 @@
     },
     {
       "source": "finance.scene-analysis.dlx",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.scene-analysis.dlq",
       "destination_type": "queue",
       "routing_key": "#",
@@ -539,7 +539,7 @@
     },
     {
       "source": "finance.scene-analysis.retry.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.scene-analysis.current.generate.retry",
       "destination_type": "queue",
       "routing_key": "scene.analysis.current.generate.retry",
@@ -547,7 +547,7 @@
     },
     {
       "source": "finance.scene-analysis.retry.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.scene-analysis.retrieval.embedding.retry",
       "destination_type": "queue",
       "routing_key": "scene.analysis.retrieval.embedding.retry",
@@ -555,7 +555,7 @@
     },
     {
       "source": "finance.agent.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.agent.run.start",
       "destination_type": "queue",
       "routing_key": "agent.run.start",
@@ -563,15 +563,15 @@
     },
     {
       "source": "finance.agent.topic",
-      "vhost": "finance",
-      "destination": "finance.agent.conversation.cleanup.delay",
+      "vhost": "lan",
+      "destination": "finance.agent.conversation.cleanup.delay.24h",
       "destination_type": "queue",
       "routing_key": "conversation.cleanup.delay",
       "arguments": {}
     },
     {
       "source": "finance.agent.topic",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.agent.conversation.cleanup",
       "destination_type": "queue",
       "routing_key": "conversation.cleanup",
@@ -579,7 +579,7 @@
     },
     {
       "source": "finance.agent.dlx",
-      "vhost": "finance",
+      "vhost": "lan",
       "destination": "finance.agent.dlq",
       "destination_type": "queue",
       "routing_key": "#",
