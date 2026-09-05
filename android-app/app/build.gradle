@@ -1,12 +1,11 @@
 plugins {
     id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
     id 'org.jetbrains.kotlin.plugin.compose'
 }
 
 android {
     namespace = 'com.scrapider.finance.androidapp'
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = 'com.scrapider.finance.androidapp'
@@ -21,17 +20,13 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = '17'
-    }
-
     buildFeatures {
         compose = true
     }
 }
 
 dependencies {
-    implementation platform('androidx.compose:compose-bom:2024.12.01')
+    implementation platform('androidx.compose:compose-bom:2026.05.01')
     implementation 'androidx.activity:activity-compose:1.9.3'
     implementation 'androidx.compose.material3:material3'
     implementation 'androidx.compose.ui:ui'
@@ -40,6 +35,7 @@ dependencies {
     implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7'
     implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7'
     implementation 'androidx.compose.material:material-icons-extended'
+    implementation 'top.yukonga.miuix.kmp:miuix-ui:0.9.3'
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     debugImplementation 'androidx.compose.ui:ui-tooling'
 }

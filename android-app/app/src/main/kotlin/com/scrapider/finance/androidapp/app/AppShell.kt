@@ -21,6 +21,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import com.scrapider.finance.androidapp.core.network.FinanceApiClient
 import com.scrapider.finance.androidapp.core.session.UserSession
 import com.scrapider.finance.androidapp.feature.market.MarketRoute
+import com.scrapider.finance.androidapp.feature.market.theme.MarketMiuixTheme
+import com.scrapider.finance.androidapp.feature.market.ui.MarketNavigationBar
+import com.scrapider.finance.androidapp.feature.market.ui.MarketNavigationItem
 import com.scrapider.finance.androidapp.feature.profile.ProfileScreen
 import com.scrapider.finance.androidapp.feature.workbench.WorkbenchRoute
 import kotlinx.coroutines.launch
@@ -35,18 +38,31 @@ fun AppShell(
     modifier: Modifier = Modifier,
 ) {
     if (selectedDestination == AppDestination.Market) {
-        MarketRoute(
-            session = session,
-            apiClient = apiClient,
-            onSessionExpired = onSignOut,
-            bottomBar = {
-                FinanceBottomNavigation(
-                    selectedDestination = selectedDestination,
-                    onDestinationSelected = onDestinationSelected,
-                )
-            },
-            modifier = modifier,
-        )
+        MarketMiuixTheme {
+            MarketRoute(
+                session = session,
+                apiClient = apiClient,
+                onSessionExpired = onSignOut,
+                bottomBar = {
+                    MarketNavigationBar(
+                        items = AppDestination.entries.map { destination ->
+                            MarketNavigationItem(
+                                id = destination.name,
+                                label = destination.label,
+                                icon = destination.icon(),
+                            )
+                        },
+                        selectedItemId = selectedDestination.name,
+                        onItemSelected = { destinationId ->
+                            AppDestination.entries
+                                .firstOrNull { destination -> destination.name == destinationId }
+                                ?.let(onDestinationSelected)
+                        },
+                    )
+                },
+                modifier = modifier,
+            )
+        }
         return
     }
 

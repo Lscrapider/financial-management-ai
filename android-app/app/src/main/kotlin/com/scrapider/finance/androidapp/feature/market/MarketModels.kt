@@ -140,7 +140,7 @@ data class MarketAlert(
     val outOfThreshold: Boolean,
 ) {
     val targetKey: String
-        get() = targetType + ":" + targetCode
+        get() = "$targetType:$targetCode"
 }
 
 @Immutable
@@ -150,7 +150,7 @@ data class MarketTargetOption(
     val targetName: String,
 ) {
     val targetKey: String
-        get() = targetType + ":" + targetCode
+        get() = "$targetType:$targetCode"
 }
 
 @Immutable

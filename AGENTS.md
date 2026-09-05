@@ -1,212 +1,90 @@
 # Agent Instructions
 
-每次开始处理本项目任务时，必须先阅读本文件，并按以下要求选择和使用 skill / tool。
+每次处理本项目任务时，必须先阅读本文件及相关子目录的 `AGENTS.md`，再理解项目结构、技术栈和当前上下文后行动。
 
 ## 优先级
 
-- 当前用户明确指令优先。
-- 本文件作为本项目的开发规范和执行约束。
-- 如果 skill / tool 的官方使用规则与本文件冲突，优先遵循对应 skill / tool 的官方规则。
-- 不确定时先说明假设，再执行。
-- 不要为了使用某个 skill / tool 而强行扩大任务范围。
-- 不要在未理解项目结构、技术栈和上下文的情况下直接修改代码。
+1. 当前用户的明确指令优先。
+2. 其次遵守本文件的项目约束与既有业务契约。
+3. 在不与前两者冲突时，遵循所选 skill / tool 的官方安全和工作流规则。
+
+- skill / tool 不能自行扩大任务范围、改变产品语义或绕过用户授权。
+- 不确定时先说明假设；不要凭空猜测实现或直接修改代码。
+- 未经用户明确同意，不得创建分支、提交、推送或新增单元测试。
 
 ## Skill / Tool 分工
 
-- Superpowers：用于任务拆解、方案设计、实现、修 bug、调试、代码审查、收尾验证和多 agent 协作。
-- Compose Expert Skill：用于 Jetpack Compose / Compose Multiplatform 工程正确性、Material 3、主题系统、动画、状态管理、性能优化、Navigation、Paging、可访问性和设计到代码落地。
-- impeccable：用于 UI 审美、视觉打磨、信息层级、交互细节、可访问性、信息架构和设计一致性。
-- Apple Design Skill：用于直接反馈、手势与 Sheet 交互、动效节奏、空间层级、排版、减弱动态效果和克制设计原则的审查与方案设计。
-- scrapider-guidelines：用于约束实现逻辑、最小改动、验证标准和项目现有分层规范。
-- codegraph_*：用于分析“这个功能怎么流转”“这个方法谁调用”“改这里影响哪里”等代码结构、调用链和影响范围问题。
+- **Superpowers**：任务拆解、方案设计、实现、调试、审查、验证和必要的多 agent 协作；按任务选择适用流程，不为使用流程而扩大范围。
+- **Apple Design**：Android UI 的体验方案主设计师，先定义空间层级、信息显隐、直接反馈、返回路径、Sheet / 菜单、排版节奏和克制动效；不是 iOS 复刻工具。
+- **impeccable**：Android UI 的设计评审与视觉精修。编码前审查信息架构、主次和视觉语言；编码后精修密度、排版、色彩、状态反馈和无障碍，而不只是最后“上妆”。
+- **Compose Expert**：Android 原生实现守门人，负责 Compose / Material 3 / 已批准局部 UI 库、主题、状态、性能、Navigation、Paging、无障碍和 design-to-compose；不主导视觉风格。涉及 PR 或 diff 审查时遵循其 Review Mode。
+- **product-design**：仅在需要比较视觉方向、审查真实 Android 截图或讨论页面流时作为补充，不替代前三者。
+- **scrapider-guidelines**：实现逻辑、最小改动、验证标准和现有分层规范。
+- **codegraph_***：调用链、影响范围、依赖关系和功能流转分析。
 
 ## 写代码 / 改代码
 
-- 使用 Superpowers 插件及其适用 skill：做新功能、改行为、实现功能、修 bug、调试、计划、头脑风暴、并行 agent 协作、代码审查和收尾验证时，按 Superpowers 的流程执行。
-- 修改前先理解现有项目结构、技术栈、代码约定和上下文。
-- 优先做最小必要改动，避免无关重构。
-- 不要为了完成当前任务而扩大改动范围。
-- 不强制新增单元测试，也不主动启动前端服务或打开浏览器查看页面；如需新增单元测试，先询问确认。
-- 可以直接运行项目已有测试、类型检查、静态检查或手动验证。
-- 使用 scrapider-guidelines 时，遵循实现逻辑、最小改动、验证标准和项目现有分层规范。
-- 如果当前项目不是 Spring Boot，不要强行套用 Spring Boot 分层规范。
-- 使用 codegraph_* 分析调用链、影响范围、依赖关系和功能流转。
-- 修改后进行必要的测试、类型检查、静态检查或手动验证。
-- 如果无法验证，必须说明未验证的原因和潜在风险。
+- 修改前检查相关文档、Screen / Component / ViewModel、主题、调用链和已有实现；修改后做与风险相称的类型检查、静态检查或手动验证。
+- 优先最小必要改动，避免无关重构；无法验证时说明原因和风险。
+- 不主动启动前端服务、浏览器或 Web live mode；Android Studio / 真机 / 截图验证仅在用户要求或明确授权时进行。
+- 不强制新建单元测试；可运行已有检查。若当前用户禁止测试，按用户指令执行。
+- 当前项目不是 Spring Boot，不强行套用 Spring Boot 分层；分析代码流优先使用可用的 `codegraph_*` 能力。
+- 交付时说明改动文件、原因、验证方式和未验证风险。
 
 ## 默认值 / 参数 / 业务契约
 
-- 已有默认值、阈值、枚举和策略参数均视为业务契约。
-- 新功能必须优先复用已有常量、配置项或枚举。
-- 禁止重新定义同义参数。
-- 禁止写死 magic number。
-- 未经用户明确确认，不得修改已有默认值、阈值、枚举含义或策略参数。
-- 如确实需要不同值，先说明原因、影响范围和替代方案，并等待用户确认。
-- 修改前应搜索项目中是否已有同义参数，例如 `defaultLimit`、`DEFAULT_LIMIT`、`limit`、`pageSize`、`windowSize`、`radius`、`timeout`、`retryCount` 等。
-- 不要为了通过当前功能而局部覆盖已有默认值。
+- 既有默认值、阈值、枚举、策略参数、接口和状态含义均为业务契约。
+- 新功能先复用已有常量、配置和枚举；禁止重复定义同义参数、写死 magic number 或为局部功能覆盖默认值。
+- 修改前搜索同义参数；需要调整契约时，先说明原因、影响和替代方案，等待用户确认。
 
 ## Android / Jetpack Compose 开发
 
-- 当前项目为 Android Kotlin + Jetpack Compose 应用时，必须按 Android 原生应用思路开发。
-- 严厉禁止手画 icon，必须使用 image generator 插件生成
-- 不要套用 Web / Vue / 后台管理系统的页面结构和交互习惯。
-- UI 默认基于 Material 3 和 Compose Material3 组件体系实现。
-- 优先使用已有主题、颜色、字体、Shape、Spacing 和组件封装。
-- 编写、重构或审查 Compose UI 时，优先使用 Compose Expert Skill。
-- Compose Expert Skill 负责 Compose 工程正确性，包括：
-    - `@Composable` 设计
-    - state hoisting
-    - `remember` / `derivedStateOf` / `LaunchedEffect` / `SideEffect` 使用
-    - `Modifier` 链顺序
-    - recomposition 性能
-    - `LazyColumn` / `LazyRow` / Paging 3 性能
-    - Navigation / NavHost
-    - Material 3 组件使用
-    - Material 3 motion
-    - Theme / Color / Typography / Shape
-    - accessibility
-    - animation
-    - atomic design systems
-    - design-to-code / design-to-compose 落地
-    - 避免已废弃或不推荐的 Compose 写法
-- 写 Compose UI 时注意：
-    - 优先组件拆分，避免单个 Composable 过大。
-    - 遵循 state hoisting，状态尽量由上层或 ViewModel 管理。
-    - UI 层只负责展示和交互，不在 Composable 中写复杂业务逻辑。
-    - 避免重复定义颜色、尺寸、圆角、阴影等设计参数。
-    - 避免硬编码 magic number，优先复用主题、常量或已有组件参数。
-    - 不要为了局部效果破坏全局主题一致性。
-    - 不要随意引入不必要的第三方 UI 库。
-    - 不要把一次性页面效果扩散成全局设计规范。
-    - 不要为了视觉效果引入复杂状态、过度重组或破坏 Material 3 语义。
+- 按 Android 原生应用思路开发，不套用 Web / Vue / SaaS 后台结构和交互。
+- 严禁手画图标；优先复用已有合法资源或已批准组件库图标。确实缺少视觉资产时，经用户授权再使用 image generator。
+- 默认使用 Android Compose 与现有 Material 3；用户明确批准的局部 UI 库只能在指定模块内使用，不得无边界扩散。
+- 优先复用现有主题、颜色、字体、Shape、Spacing、组件与 token；避免散落硬编码颜色、尺寸、圆角、阴影和字体。
+- 编写、重构或审查 Compose UI 时使用 Compose Expert。
+- UI 要 state hoisting、组件职责单一、业务逻辑留在 ViewModel / 上层；关注 `remember` / 副作用、Modifier 顺序、Lazy 列表 key/contentType、重组性能、Navigation、深浅色和无障碍。
+- 不为视觉效果引入复杂状态、过度重组、不必要依赖或破坏 Material / Android 语义的实现。
 
-## Android UI / 视觉设计方向
+## Android UI 设计流（强制）
 
-- UI 风格保持：简约、高级、克制、城市探索、轻任务感。
-- Android UI 必须优先考虑原生移动端体验，而不是 Web 后台体验。
-- 设计应符合 Material 3 的基础审美和交互习惯。
-- 页面应关注移动端单手操作、触控区域、信息层级、系统栏适配、深色模式和状态反馈。
-- 避免以下风格：
-    - 浮夸渐变
-    - 过重阴影
-    - 大面积玻璃拟态
-    - 发光边框
-    - Web SaaS Dashboard 风格
-    - Vue 后台模板风格
-    - 过度装饰性图标或插画
-    - 信息密度过高的后台管理系统布局
-- 地图、任务、地点选择相关页面应优先保证：
-    - 信息层级清晰
-    - 移动端单手操作友好
-    - 地图内容不被 UI 过度遮挡
-    - 主按钮明确
-    - 卡片轻量、留白克制
-    - 状态反馈清楚
-    - 关键操作路径短
-- 重点关注页面和组件：
-    - 地图选择页面
-    - 任务卡片
-    - 地点详情
-    - 底部导航
-    - 顶部栏
-    - 主要按钮
-    - 空状态 / 加载状态 / 错误状态
-    - 权限请求页面
-    - 定位 / 地图 / POI 相关交互
+- 目标是现代、沉稳、有设计感的 Android 应用：先让用户感到秩序、直接与可信，再看到组件本身。
+- 保持简约、高级、克制、城市探索与轻任务感；颜色优先表达数据状态、风险、完成度与操作优先级，而非装饰。
+- 不使用浮夸渐变、过重阴影、大面积玻璃拟态、发光边框、装饰性弹跳或信息密度过高的后台式布局。
+- 支持单手操作、触控目标、系统栏、深浅色、字体缩放、无障碍与减弱动态效果。
 
-## 做前端 / 移动端 UI 设计
+1. 整页、跨页面流或全 App 视觉体系任务，先按 Superpowers 澄清目标、范围和成功标准；没有用户确认的方案不得改 UI。用户已明确批准的实现请求视为对相应方案的授权。
+2. Apple Design 先给出体验方案：页面结构、视觉重心、信息层级、操作与返回路径、Sheet / 菜单和必要动效，遵循直接、可预测、可打断原则。
+3. impeccable 在编码前评审，发现“功能平铺”或“卡片堆叠”时优先重做信息架构、排版和层次；Compose Expert 再将已确认方案正确落成 Android Compose，并校验主题 token、状态、列表、Navigation、性能、无障碍和组件语义。
+4. impeccable 在实现后做有限轮次精修；有真实截图或 Android Studio 预览时，可选用 product-design 审查页面流。不得无限循环微调。
 
-- 使用 impeccable 处理 UI 设计、重构、视觉打磨、交互、响应式、可访问性和信息架构。
-- 如果当前项目是 Android Kotlin + Jetpack Compose，必须按 Android 原生应用和 Material 3 设计习惯处理。
-- 不要套用 Web 前端、Vue 后台模板或 SaaS Dashboard 风格。
-- impeccable 负责设计审查、视觉 polish、信息层级和品牌感优化。
-- Compose Expert Skill 负责 Compose 代码结构、状态管理、性能、Material 3 API、Android 工程实现和设计到代码落地。
-- 当 impeccable 的视觉建议与 Compose 工程实践冲突时，先说明冲突点，再优先保证 Compose 工程正确性和 Android 原生体验。
-- 不要只依赖 impeccable 编写 Compose 代码。
-- 做 Android UI 方案时，应结合 Compose Expert Skill 的 Material 3、motion、theming、accessibility 和 design-to-compose 规则。
+### 页面与容器
 
-## Impeccable 使用规则
+- 先用内容画布、留白、对齐、排版、分组和滚动节奏建立层级；不要用连续卡片代替信息架构。
+- 卡片 / 容器仅用于独立对象、需比较的数据、需隔离的表单或明确边界的操作；普通段落、列表行、筛选和页面区块默认不再包一层方块。
+- 每页有明确视觉重心和至多一个主操作；次级操作按上下文放入顶部栏、行内或菜单；始终回答“我在哪里、最重要的信息、下一步和返回/撤销”。
+- 明确区分加载、完成、警告、错误和空态，不用装饰颜色或动画掩盖状态。
 
-- 使用 impeccable 处理 UI 设计、视觉审查、信息架构、交互细节、可访问性和视觉打磨。
-- 本项目优先使用已安装的 impeccable skill 或 `/impeccable` 命令。
-- 不要假设项目内一定存在 impeccable 脚本目录。
-- 如果项目内没有 `.agents/skills/impeccable/scripts`、`.impeccable/scripts` 或 `.impeccable/live/config.json`，这是正常情况，不要视为错误。
-- 不要反复提示“impeccable 的项目内脚本路径不存在”。
-- 只有在 impeccable 完全不可用、无法执行或无法读取设计上下文时，才提示安装或路径问题。
-- 当前项目是 Android Kotlin + Jetpack Compose 时，不需要配置浏览器 live mode，除非用户明确引入 Web 前端。
-- impeccable 主要负责审美、设计一致性和视觉 polish。
-- Compose 代码结构、状态管理和 Android 工程实现仍需遵循 Android / Compose 开发规则。
+### Android 适配与冲突
 
-## Apple Design Skill 使用规则
+- 使用其空间一致性、即时按压反馈、可中断手势、对称进入/退出路径、类型层级与克制动效原则。
+- 仅在操作确有物理连续性时采用轻量动效；默认不弹跳，不为静态菜单或卡片添加多余动画。
+- 保持 Android 的系统返回、底部导航、无障碍和 Material / 已批准局部组件库语义；不引入 iOS 风格导航、毛玻璃、模糊或大面积半透明材质。
+- 优先顺序：用户明确产品与视觉方向 → Android 原生体验与无障碍 → 已确认的 Apple Design 方案 → 业务契约与 Compose 工程正确性 → impeccable 精修建议。
 
-- 本项目已安装 Apple Design Skill。
-- 涉及手势、按压反馈、底部 Sheet / Drawer、状态切换、动效节奏、空间层级、排版、减弱动态效果或克制设计原则时，优先使用 Apple Design Skill 进行方案设计或审查。
-- Apple Design Skill 用于提炼直接、可预测、可打断的交互与精细视觉反馈；不得将其理解为将 Android 界面复刻为 iOS。
-- Android 界面仍须优先遵循 Material 3、Compose 工程正确性、系统无障碍设置和现有主题；不因使用 Apple Design Skill 引入玻璃拟态、装饰性弹跳或与 Android 原生习惯冲突的导航模式。
-
-## Compose Expert Skill 使用规则
-
-- 本项目已安装 Compose Expert Skill。
-- 涉及 Jetpack Compose、Compose Multiplatform、MaterialTheme、Material 3、Modifier、recomposition、LazyColumn、NavHost、Paging 3、动画、主题、可访问性或设计到代码落地时，优先使用 Compose Expert Skill。
-- Compose Expert Skill 可以用于：
-    - 新增 Compose 页面
-    - 重构 Compose 组件
-    - 审查 Compose 代码
-    - 分析重组和性能问题
-    - 处理 Navigation / NavHost
-    - 处理 LazyList / Paging 3
-    - 优化 Material 3 主题
-    - 将设计方案落地为 Compose 组件
-    - 检查 accessibility
-    - 检查动画和 Material 3 motion
-- 如果任务是 GitHub PR、代码审查、diff 审查或用户提到 “review this PR”、“check this code”、“what's wrong with this” 等审查语义，应优先按 Compose Expert Skill 的 Review Mode 规则执行。
-- 不要把 Compose Expert Skill 当成纯审美工具；它主要负责 Compose 和 Android UI 工程质量。
-- 不要把 impeccable 当成 Compose 工程工具；它主要负责通用视觉审美和 polish。
-- 当两个 skill 的建议冲突时，优先保证：
-    1. Android 原生体验
-    2. Compose 工程正确性
-    3. Material 3 语义
-    4. 项目现有设计规范
-    5. 视觉 polish
+- 可选 skill 不可用不阻塞设计；不假设项目内存在 impeccable 脚本目录，也不反复提示其路径不存在。UI 审美改造不得静默改变业务状态、接口、默认参数或主题契约。
 
 ## 项目上下文文件
 
-- 修改 UI、产品逻辑或交互前，优先阅读：
-    - `PRODUCT.md`
-    - `DESIGN.md`
-    - `AGENTS.md`
-    - 当前页面对应的 Screen / Component / ViewModel
-    - Compose theme 相关文件
-- 如果 `PRODUCT.md`、`DESIGN.md` 与代码实现不一致，不要静默覆盖。
-- 发现产品文档、设计文档和代码实现存在冲突时，先说明冲突点，再按用户确认的方向修改。
-- 不要在未确认的情况下刷新或重写 `PRODUCT.md`、`DESIGN.md`。
+- 修改 UI、产品逻辑或交互前，优先阅读 `PRODUCT.md`、`DESIGN.md`、`AGENTS.md`、目标页面及其 ViewModel、主题文件。
+- 文档与代码冲突时先说明；未经确认不重写 `PRODUCT.md` / `DESIGN.md`。
 
 ## 多 Agent 协作
 
-- 对于可以并行、相互独立的任务，可以拆分给多个 agent 分别执行。
-- 对于存在强依赖关系的任务，不要盲目并行。
-- Codex 主线负责整体任务拆解、方案校验、代码审核、结果整合和最终验收。
-- 其他 agent 的输出必须经过 Codex 主线复核后再采用。
-- 如果多个 agent 的结论冲突，Codex 主线必须说明差异，并选择更符合项目规范和当前用户指令的方案。
-
-## 执行要求
-
-- 修改前先理解现有项目结构、技术栈、代码约定和上下文。
-- 修改前先确认相关文件、调用链和已有实现，不要凭空猜测。
-- 优先做最小必要改动，避免无关重构。
-- 不要为了完成当前任务而扩大改动范围。
-- 不要主动启动前端服务或打开浏览器做可视化验证，除非用户明确要求。
-- 修改后进行必要的测试、类型检查、静态检查或手动验证。
-- 如果无法验证，必须说明未验证的原因和潜在风险。
-- 输出结果时说明：
-    - 修改了哪些文件
-    - 为什么这样改
-    - 如何验证
-    - 是否存在未验证风险
+- 仅对可并行、相互独立的任务使用多 agent；主线负责拆解、校验、整合和最终验收，并复核子 agent 输出；结论冲突时说明差异并按优先级处理。
+- 设计文档、计划或子任务不构成分支、提交或推送授权。
 
 ## 语言要求
 
-- 项目文档使用中文。
-- 代码注释使用中文。
-- Git 提交信息使用中文。
-- 面向用户的说明优先使用中文。
+- 项目文档、代码注释、Git 提交信息和面向用户的说明优先使用中文。

@@ -21,6 +21,16 @@ internal fun MarketUiState.findTargetSnapshot(
     watchItemId = watchItemId,
 )
 
+internal fun MarketUiState.findWatchItem(itemId: String?): MarketWatchItem? {
+    if (itemId.isNullOrBlank()) return null
+    return groups.asSequence()
+        .flatMap { group -> group.items.asSequence() }
+        .firstOrNull { item -> item.id == itemId }
+}
+
+internal fun MarketUiState.alertFor(item: MarketWatchItem): MarketAlert? =
+    alerts.firstOrNull { alert -> alert.targetKey == item.targetKey }
+
 private fun MarketUiState.createTargetLookup(): MarketTargetLookup {
     val targetReferences = linkedMapOf<String, MarketTargetReference>()
     val systemTargetsByKey = linkedMapOf<String, MarketSystemTarget>()

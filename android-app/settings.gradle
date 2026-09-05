@@ -1,5 +1,8 @@
 pluginManagement {
     repositories {
+        // Google Maven 与 Maven Central 的可用镜像；官方仓库保留在后作为回退。
+        maven { url = uri('https://maven.aliyun.com/repository/google') }
+        maven { url = uri('https://maven.aliyun.com/repository/public') }
         google()
         mavenCentral()
         gradlePluginPortal()
@@ -9,6 +12,9 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        // Google Maven 与 Maven Central 的可用镜像；官方仓库保留在后作为回退。
+        maven { url = uri('https://maven.aliyun.com/repository/google') }
+        maven { url = uri('https://maven.aliyun.com/repository/public') }
         google()
         mavenCentral()
     }
