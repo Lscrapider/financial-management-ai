@@ -2,6 +2,7 @@ package com.scrapider.finance.androidapp.app
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.HorizontalDivider
@@ -89,7 +90,7 @@ fun AppShell(
                     },
                     onSessionExpired = onSignOut,
                     onUnavailableFeature = showUnavailableFeature,
-                    modifier = Modifier.padding(contentPadding),
+                    modifier = Modifier.padding(contentPadding).consumeWindowInsets(contentPadding),
                 )
             }
 

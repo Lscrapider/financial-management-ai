@@ -4,6 +4,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -43,9 +44,50 @@ class FinanceApiClient(
             .build(),
     )
 
+    /** 原页预览仍经过同一鉴权客户端，不将访问令牌交给外部图片加载器。 */
+    suspend fun getBytes(path: String): NetworkResult<ByteArray> = suspendCancellableCoroutine { continuation ->
+        val call = client.newCall(requestBuilder(path).get().build())
+        continuation.invokeOnCancellation { call.cancel() }
+        call.enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                if (continuation.isActive) continuation.resume(NetworkResult.Failure(NetworkFailure.Unavailable))
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                response.use {
+                    val result = try {
+                        val failure = responseFailure(it.code, false)
+                        when {
+                            failure != null -> NetworkResult.Failure(failure)
+                            it.body == null -> NetworkResult.Failure(NetworkFailure.InvalidResponse)
+                            else -> NetworkResult.Success(it.body!!.bytes())
+                        }
+                    } catch (_: IOException) {
+                        NetworkResult.Failure(NetworkFailure.Unavailable)
+                    }
+                    if (continuation.isActive) continuation.resume(result)
+                }
+            }
+        })
+    }
+
     suspend fun postJson(path: String, payload: JSONObject): ApiHttpResponse = execute(
         requestBuilder(path)
             .post(payload.toString().toRequestBody(jsonMediaType))
+            .build(),
+    )
+
+    suspend fun putJson(path: String, payload: JSONObject): ApiHttpResponse = execute(
+        requestBuilder(path)
+            .put(payload.toString().toRequestBody(jsonMediaType))
+            .build(),
+    )
+
+    suspend fun postMultipart(path: String, parts: List<MultipartBody.Part>): ApiHttpResponse = execute(
+        requestBuilder(path)
+            .post(MultipartBody.Builder().setType(MultipartBody.FORM).apply {
+                parts.forEach(::addPart)
+            }.build())
             .build(),
     )
 
@@ -100,20 +142,14 @@ class FinanceApiClient(
 }
 
 fun ApiHttpResponse.toJsonPayload(): NetworkResult<JSONObject> {
-    if (networkFailure) return NetworkResult.Failure(NetworkFailure.Unavailable)
-    if (statusCode == 401) return NetworkResult.Failure(NetworkFailure.Unauthorized)
-    if (statusCode == 403) return NetworkResult.Failure(NetworkFailure.Forbidden)
-    if (statusCode !in 200..299) return NetworkResult.Failure(NetworkFailure.Service)
+    responseFailure(statusCode, networkFailure)?.let { return NetworkResult.Failure(it) }
 
     return runCatching { NetworkResult.Success(JSONObject(body)) }
         .getOrElse { NetworkResult.Failure(NetworkFailure.InvalidResponse) }
 }
 
 fun ApiHttpResponse.toJsonArrayPayload(): NetworkResult<JSONArray> {
-    if (networkFailure) return NetworkResult.Failure(NetworkFailure.Unavailable)
-    if (statusCode == 401) return NetworkResult.Failure(NetworkFailure.Unauthorized)
-    if (statusCode == 403) return NetworkResult.Failure(NetworkFailure.Forbidden)
-    if (statusCode !in 200..299) return NetworkResult.Failure(NetworkFailure.Service)
+    responseFailure(statusCode, networkFailure)?.let { return NetworkResult.Failure(it) }
 
     return runCatching { NetworkResult.Success(JSONArray(body)) }
         .getOrElse { NetworkResult.Failure(NetworkFailure.InvalidResponse) }
@@ -131,3 +167,11 @@ fun ApiHttpResponse.toEnvelope(): NetworkResult<JSONObject> = when (val payload 
 }
 
 private fun String.ensureLeadingSlash(): String = if (startsWith('/')) this else "/$this"
+
+private fun responseFailure(statusCode: Int, networkFailure: Boolean): NetworkFailure? = when {
+    networkFailure -> NetworkFailure.Unavailable
+    statusCode == 401 -> NetworkFailure.Unauthorized
+    statusCode == 403 -> NetworkFailure.Forbidden
+    statusCode !in 200..299 -> NetworkFailure.Service
+    else -> null
+}

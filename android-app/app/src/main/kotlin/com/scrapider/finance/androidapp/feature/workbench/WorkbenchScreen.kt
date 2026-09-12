@@ -37,6 +37,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,9 +65,13 @@ import com.scrapider.finance.androidapp.core.session.UserSession
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceDimensions
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceSpacing
 import com.scrapider.finance.androidapp.designsystem.rememberFinanceSignalColors
+import com.scrapider.finance.androidapp.feature.workbench.reports.ReportsRoute
+import com.scrapider.finance.androidapp.feature.workbench.knowledge.KnowledgeRoute
+import com.scrapider.finance.androidapp.feature.workbench.imports.ImportsRoute
 import kotlinx.coroutines.flow.collect
 import java.time.LocalTime
 import java.util.Locale
+import java.util.UUID
 
 @Composable
 fun WorkbenchRoute(
@@ -77,6 +85,14 @@ fun WorkbenchRoute(
     val factory = remember(apiClient) { WorkbenchViewModel.Factory(apiClient) }
     val viewModel: WorkbenchViewModel = viewModel(factory = factory)
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val homeStateHolder = rememberSaveableStateHolder()
+    var reportEntryKey by rememberSaveable(session.accessToken) { mutableStateOf<String?>(null) }
+    var reportEntryId by rememberSaveable(session.accessToken) { mutableStateOf<String?>(null) }
+    var activeAdminTool by rememberSaveable(session.accessToken) { mutableStateOf<ResearchTool?>(null) }
+    val openReports: (String?) -> Unit = { id ->
+        reportEntryId = id
+        reportEntryKey = UUID.randomUUID().toString()
+    }
 
     LaunchedEffect(session.accessToken) {
         viewModel.loadForSession(session.accessToken)
@@ -89,19 +105,72 @@ fun WorkbenchRoute(
         }
     }
 
-    WorkbenchScreen(
-        state = state,
-        displayName = session.displayName,
-        isAdmin = session.isAdmin,
-        onRefresh = viewModel::refresh,
-        onFocusSelected = onMarketSelected,
-        onReportSelected = { onUnavailableFeature("研究报告详情将在下一份设计稿中重建。") },
-        onViewAllReports = { onUnavailableFeature("研究报告列表将在下一份设计稿中重建。") },
-        onToolSelected = { tool ->
-            onUnavailableFeature(tool.label + "将在下一份设计稿中重建。")
-        },
-        modifier = modifier,
-    )
+    when (activeAdminTool) {
+        ResearchTool.KnowledgeSearch -> {
+            KnowledgeRoute(
+                session = session,
+                apiClient = apiClient,
+                onClose = { activeAdminTool = null },
+                onSessionExpired = onSessionExpired,
+                onNotice = onUnavailableFeature,
+                modifier = modifier,
+            )
+            return
+        }
+        ResearchTool.MaterialImport -> {
+            ImportsRoute(
+                session = session,
+                apiClient = apiClient,
+                onClose = { activeAdminTool = null },
+                onSessionExpired = onSessionExpired,
+                onNotice = onUnavailableFeature,
+                modifier = modifier,
+            )
+            return
+        }
+        else -> Unit
+    }
+
+    val entryKey = reportEntryKey
+    if (entryKey != null) {
+        ReportsRoute(
+            session = session,
+            apiClient = apiClient,
+            entryKey = entryKey,
+            initialReportId = reportEntryId,
+            onClose = {
+                reportEntryKey = null
+                reportEntryId = null
+                viewModel.refresh()
+            },
+            onSessionExpired = onSessionExpired,
+            onNotice = onUnavailableFeature,
+            onReportsChanged = viewModel::refresh,
+            modifier = modifier,
+        )
+        return
+    }
+
+    homeStateHolder.SaveableStateProvider("workbench_home") {
+        WorkbenchScreen(
+            state = state,
+            displayName = session.displayName,
+            isAdmin = session.isAdmin,
+            onRefresh = viewModel::refresh,
+            onFocusSelected = onMarketSelected,
+            onReportSelected = { openReports(it.id) },
+            onViewAllReports = { openReports(null) },
+            onToolSelected = { tool ->
+                when {
+                    tool.adminOnly && !session.isAdmin -> onUnavailableFeature("仅管理员可用")
+                    tool == ResearchTool.Report -> openReports(null)
+                    tool == ResearchTool.KnowledgeSearch || tool == ResearchTool.MaterialImport -> activeAdminTool = tool
+                    else -> onUnavailableFeature(tool.label + "将在下一份设计稿中重建。")
+                }
+            },
+            modifier = modifier,
+        )
+    }
 }
 
 @Composable
