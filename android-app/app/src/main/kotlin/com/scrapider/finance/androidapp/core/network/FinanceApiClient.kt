@@ -9,6 +9,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
@@ -97,6 +99,19 @@ class FinanceApiClient(
             .build(),
     )
 
+    /**
+     * 使用与 HTTP 相同的 base URL（包括部署前缀）建立 WebSocket；票据留在 query 中，
+     * 不把 Bearer 凭证拼进 URL。
+     */
+    internal fun openWebSocket(path: String, listener: WebSocketListener): WebSocket =
+        client.newWebSocket(
+            Request.Builder()
+                .url(webSocketUrl(path))
+                .header("Accept", "application/json")
+                .build(),
+            listener,
+        )
+
     fun close() {
         client.dispatcher.cancelAll()
         client.dispatcher.executorService.shutdown()
@@ -111,6 +126,15 @@ class FinanceApiClient(
                 header("Authorization", "Bearer $accessToken")
             }
         }
+
+    private fun webSocketUrl(path: String): String {
+        val url = normalizedBaseUrl + path.ensureLeadingSlash()
+        return when {
+            url.startsWith("https://") -> "wss://${url.removePrefix("https://")}"
+            url.startsWith("http://") -> "ws://${url.removePrefix("http://")}"
+            else -> url
+        }
+    }
 
     private suspend fun execute(request: Request): ApiHttpResponse = suspendCancellableCoroutine { continuation ->
         val call = client.newCall(request)

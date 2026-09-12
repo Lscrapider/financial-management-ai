@@ -2,6 +2,8 @@ package com.scrapider.finance.androidapp.app
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -17,9 +19,13 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -62,6 +68,8 @@ fun AppShell(
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
+    var chatVisible by remember(session.accessToken) { mutableStateOf(false) }
+    val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     val coroutineScope = rememberCoroutineScope()
     val showUnavailableFeature: (String) -> Unit = { message ->
         coroutineScope.launch {
@@ -73,10 +81,12 @@ fun AppShell(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            FinanceBottomNavigation(
-                selectedDestination = selectedDestination,
-                onDestinationSelected = onDestinationSelected,
-            )
+            if (!chatVisible || !keyboardVisible) {
+                FinanceBottomNavigation(
+                    selectedDestination = selectedDestination,
+                    onDestinationSelected = onDestinationSelected,
+                )
+            }
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
     ) { contentPadding ->
@@ -90,6 +100,7 @@ fun AppShell(
                     },
                     onSessionExpired = onSignOut,
                     onUnavailableFeature = showUnavailableFeature,
+                    onChatVisibilityChanged = { chatVisible = it },
                     modifier = Modifier.padding(contentPadding).consumeWindowInsets(contentPadding),
                 )
             }

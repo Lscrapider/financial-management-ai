@@ -64,8 +64,21 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
     }
 
     @Override
-    public void afterConnectionEstablished(WebSocketSession session) {
+    public void afterConnectionEstablished(WebSocketSession session) throws IOException {
         this.sessionRegistry.register(session);
+        String conversationId = (String) session.getAttributes()
+                .get(AiChatWebSocketHandshakeInterceptor.CONVERSATION_ID_ATTRIBUTE);
+        if (StrUtil.isBlank(conversationId)) {
+            session.close(CloseStatus.BAD_DATA);
+            return;
+        }
+        this.send(session, new AiChatWebSocketMessageVO(
+                "session_ready",
+                conversationId,
+                null,
+                null,
+                null,
+                null));
     }
 
     @Override
@@ -134,7 +147,10 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
     }
 
     private void send(WebSocketSession session, AiChatWebSocketMessageVO payload) throws IOException {
-        session.sendMessage(new TextMessage(this.objectMapper.writeValueAsString(payload)));
+        // 与流式回调共用同一个发送锁，避免新连接的会话通知和后台回答并发写入。
+        synchronized (session) {
+            session.sendMessage(new TextMessage(this.objectMapper.writeValueAsString(payload)));
+        }
     }
 
     private JsonNode agentExecutionBudget(Long userId) {

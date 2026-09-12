@@ -68,6 +68,8 @@ import com.scrapider.finance.androidapp.designsystem.rememberFinanceSignalColors
 import com.scrapider.finance.androidapp.feature.workbench.reports.ReportsRoute
 import com.scrapider.finance.androidapp.feature.workbench.knowledge.KnowledgeRoute
 import com.scrapider.finance.androidapp.feature.workbench.imports.ImportsRoute
+import com.scrapider.finance.androidapp.feature.workbench.chat.ChatRoute
+import androidx.compose.runtime.DisposableEffect
 import kotlinx.coroutines.flow.collect
 import java.time.LocalTime
 import java.util.Locale
@@ -81,6 +83,7 @@ fun WorkbenchRoute(
     onSessionExpired: () -> Unit,
     onUnavailableFeature: (String) -> Unit,
     modifier: Modifier = Modifier,
+    onChatVisibilityChanged: (Boolean) -> Unit = {},
 ) {
     val factory = remember(apiClient) { WorkbenchViewModel.Factory(apiClient) }
     val viewModel: WorkbenchViewModel = viewModel(factory = factory)
@@ -89,6 +92,7 @@ fun WorkbenchRoute(
     var reportEntryKey by rememberSaveable(session.accessToken) { mutableStateOf<String?>(null) }
     var reportEntryId by rememberSaveable(session.accessToken) { mutableStateOf<String?>(null) }
     var activeAdminTool by rememberSaveable(session.accessToken) { mutableStateOf<ResearchTool?>(null) }
+    var chatEntryKey by rememberSaveable(session.accessToken) { mutableStateOf<String?>(null) }
     val openReports: (String?) -> Unit = { id ->
         reportEntryId = id
         reportEntryKey = UUID.randomUUID().toString()
@@ -103,6 +107,24 @@ fun WorkbenchRoute(
                 WorkbenchEvent.SessionExpired -> onSessionExpired()
             }
         }
+    }
+
+    val currentChatEntry = chatEntryKey
+    if (currentChatEntry != null) {
+        DisposableEffect(Unit) {
+            onChatVisibilityChanged(true)
+            onDispose { onChatVisibilityChanged(false) }
+        }
+        ChatRoute(
+            session = session,
+            apiClient = apiClient,
+            entryKey = currentChatEntry,
+            onClose = { chatEntryKey = null },
+            onSessionExpired = onSessionExpired,
+            onNotice = onUnavailableFeature,
+            modifier = modifier,
+        )
+        return
     }
 
     when (activeAdminTool) {
@@ -164,6 +186,7 @@ fun WorkbenchRoute(
                 when {
                     tool.adminOnly && !session.isAdmin -> onUnavailableFeature("仅管理员可用")
                     tool == ResearchTool.Report -> openReports(null)
+                    tool == ResearchTool.AiAssistant -> chatEntryKey = UUID.randomUUID().toString()
                     tool == ResearchTool.KnowledgeSearch || tool == ResearchTool.MaterialImport -> activeAdminTool = tool
                     else -> onUnavailableFeature(tool.label + "将在下一份设计稿中重建。")
                 }

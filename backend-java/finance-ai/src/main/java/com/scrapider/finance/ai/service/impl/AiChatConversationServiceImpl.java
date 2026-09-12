@@ -5,6 +5,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scrapider.finance.ai.domain.dto.AiChatConversationBindingDTO;
 import com.scrapider.finance.ai.domain.dto.ConversationCleanupMessageDTO;
+import com.scrapider.finance.ai.domain.vo.AiChatConversationMessageVO;
+import com.scrapider.finance.ai.domain.vo.AiChatConversationMessagesVO;
 import com.scrapider.finance.domain.exception.BusinessException;
 import com.scrapider.finance.domain.po.AiChatConversationPO;
 import com.scrapider.finance.domain.po.AiChatMessagePO;
@@ -17,6 +19,7 @@ import com.scrapider.finance.ai.service.AiChatConversationService;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -28,6 +31,7 @@ public class AiChatConversationServiceImpl implements AiChatConversationService 
 
     private static final int CLEANUP_SUMMARY_MESSAGE_LIMIT = 50;
     private static final int CLEANUP_SUMMARY_CONTENT_LIMIT = 4000;
+    private static final int CONVERSATION_MESSAGE_PAGE_SIZE = 20;
     private static final DateTimeFormatter MEMORY_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final AiChatConversationManage conversationManage;
@@ -134,6 +138,45 @@ public class AiChatConversationServiceImpl implements AiChatConversationService 
                         "messageId", message.getMessageId(),
                         "createdAt", message.getCreatedAt().toString()))
                 .toList();
+    }
+
+    @Override
+    public Optional<AiChatConversationMessagesVO> listMessages(
+            Long userId,
+            String conversationId,
+            Long beforeId) {
+        if (userId == null || StrUtil.isBlank(conversationId)) {
+            return Optional.empty();
+        }
+        if (this.conversationManage.findByUserIdAndConversationId(userId, conversationId) == null) {
+            return Optional.empty();
+        }
+        List<AiChatMessagePO> page = this.messageManage.listBeforeId(
+                userId,
+                conversationId,
+                beforeId,
+                CONVERSATION_MESSAGE_PAGE_SIZE + 1);
+        boolean hasMore = page.size() > CONVERSATION_MESSAGE_PAGE_SIZE;
+        List<AiChatMessagePO> messages = page.stream()
+                .limit(CONVERSATION_MESSAGE_PAGE_SIZE)
+                .sorted(java.util.Comparator.comparing(AiChatMessagePO::getId))
+                .toList();
+        String nextBeforeId = hasMore && !messages.isEmpty()
+                ? messages.get(0).getId().toString()
+                : null;
+        List<AiChatConversationMessageVO> messageVOs = messages.stream()
+                .map(message -> new AiChatConversationMessageVO(
+                        message.getId().toString(),
+                        message.getMessageId(),
+                        message.getRole(),
+                        message.getContent(),
+                        message.getCreatedAt().toString()))
+                .toList();
+        return Optional.of(new AiChatConversationMessagesVO(
+                conversationId,
+                messageVOs,
+                hasMore,
+                nextBeforeId));
     }
 
     @Override

@@ -25,6 +25,16 @@ public class AiChatMessageManage extends ServiceImpl<AiChatMessageMapper, AiChat
                 .toList();
     }
 
+    public List<AiChatMessagePO> listBeforeId(Long userId, String conversationId, Long beforeId, int limit) {
+        return this.lambdaQuery()
+                .eq(AiChatMessagePO::getUserId, userId)
+                .eq(AiChatMessagePO::getConversationId, conversationId)
+                .lt(beforeId != null, AiChatMessagePO::getId, beforeId)
+                .orderByDesc(AiChatMessagePO::getId)
+                .last("LIMIT " + limit)
+                .list();
+    }
+
     public boolean deleteByUserIdAndConversationId(Long userId, String conversationId) {
         return this.lambdaUpdate()
                 .eq(AiChatMessagePO::getUserId, userId)
