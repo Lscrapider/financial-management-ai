@@ -1,9 +1,11 @@
 package com.scrapider.finance.androidapp.feature.workbench
 
-import androidx.compose.foundation.BorderStroke
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -16,44 +18,49 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.ChevronRight
-import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.UploadFile
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.scrapider.finance.androidapp.R
 import com.scrapider.finance.androidapp.core.network.FinanceApiClient
 import com.scrapider.finance.androidapp.core.session.UserSession
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceDimensions
-import com.scrapider.finance.androidapp.designsystem.LocalFinanceSemanticColors
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceSpacing
+import com.scrapider.finance.androidapp.designsystem.rememberFinanceSignalColors
 import kotlinx.coroutines.flow.collect
 import java.time.LocalTime
 import java.util.Locale
@@ -110,113 +117,104 @@ fun WorkbenchScreen(
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalFinanceSpacing.current
-    val dimensions = LocalFinanceDimensions.current
+    val reportItems = state.reportItems.take(WORKBENCH_PREVIEW_ITEM_LIMIT)
+    val overview = state.watchlistOverview
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             start = spacing.xl,
-            top = spacing.xl,
+            top = spacing.md,
             end = spacing.xl,
             bottom = spacing.section,
         ),
     ) {
-        item {
+        item(key = "header", contentType = "header") {
             WorkbenchHeader(
                 displayName = displayName,
                 isRefreshing = state.isLoading,
                 onRefresh = onRefresh,
             )
         }
-        item { Spacer(Modifier.height(spacing.section)) }
-        item { SectionTitle(title = "今日关注") }
-        item { Spacer(Modifier.height(spacing.sm)) }
-
-        when {
-            state.isLoading && state.focusItems.isEmpty() -> {
-                item { LoadingPanel(text = "正在同步关注标的") }
-            }
-
-            state.focusItems.isEmpty() -> {
-                item {
-                    EmptyPanel(
-                        text = "暂未获取到关注标的",
-                    )
-                }
-            }
-
-            else -> {
-                items(
-                    items = state.focusItems,
-                    key = FocusItem::id,
-                ) { item ->
-                    FocusRow(item = item, onClick = onFocusSelected)
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                }
-            }
-        }
-
-        item { Spacer(Modifier.height(spacing.section)) }
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                SectionTitle(title = "研究报告")
-                TextButton(
-                    onClick = onViewAllReports,
-                    modifier = Modifier.heightIn(min = dimensions.minTouchTarget),
-                ) {
-                    Text("查看全部")
-                }
-            }
-        }
-        item { Spacer(Modifier.height(spacing.sm)) }
-
-        when {
-            state.isLoading && state.reportItems.isEmpty() -> {
-                item { LoadingPanel(text = "正在同步研究报告") }
-            }
-
-            state.reportItems.isEmpty() -> {
-                item {
-                    EmptyPanel(
-                        text = "暂未生成研究报告",
-                    )
-                }
-            }
-
-            else -> {
-                items(
-                    items = state.reportItems.take(WORKBENCH_PREVIEW_ITEM_LIMIT),
-                    key = ReportItem::id,
-                ) { item ->
-                    ReportRow(item = item, onClick = { onReportSelected(item) })
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                }
-            }
-        }
-
         if (state.syncMessage.isNotBlank()) {
-            item {
-                Spacer(Modifier.height(spacing.md))
-                Text(
-                    text = state.syncMessage,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
+            item(key = "sync_message", contentType = "sync_message") {
+                SyncMessage(
+                    message = state.syncMessage,
+                    isRefreshing = state.isLoading,
+                    onRetry = onRefresh,
                 )
             }
         }
-
-        item { Spacer(Modifier.height(spacing.section)) }
-        item { SectionTitle(title = "研究工具") }
-        item { Spacer(Modifier.height(spacing.sm)) }
-        item {
-            ResearchTools(
-                isAdmin = isAdmin,
-                onToolSelected = onToolSelected,
+        item(key = "tools", contentType = "tools") {
+            ResearchTools(isAdmin = isAdmin, onToolSelected = onToolSelected)
+        }
+        item(key = "overview_heading", contentType = "section_heading") {
+            SectionHeading(
+                title = "自选概况",
+                actionLabel = "查看行情",
+                onAction = onFocusSelected,
+                prominent = true,
             )
         }
+        when {
+            overview == null -> {
+                item(key = "overview_state", contentType = "content_state") {
+                    val waitingForData = state.isLoading || state.syncMessage.isBlank()
+                    ContentState(
+                        text = if (waitingForData) "正在同步自选行情" else "自选行情暂不可用，请刷新重试",
+                        isLoading = waitingForData,
+                    )
+                }
+            }
+            overview.totalCount == 0 -> {
+                item(key = "overview_state", contentType = "content_state") {
+                    ContentState(text = "还没有自选标的，可前往行情添加")
+                }
+            }
+            else -> {
+                item(key = "overview_counts", contentType = "overview_counts") {
+                    WatchlistCounts(overview = overview)
+                }
+                item(key = "overview_rankings", contentType = "overview_rankings") {
+                    WatchlistRankings(overview = overview, onOpenMarket = onFocusSelected)
+                }
+            }
+        }
+
+        item(key = "reports_heading", contentType = "section_heading") {
+            SectionHeading(
+                title = "研究报告",
+                actionLabel = "查看全部",
+                onAction = onViewAllReports,
+            )
+        }
+
+        when {
+            state.isLoading && state.reportItems.isEmpty() -> {
+                item(key = "reports_state", contentType = "content_state") {
+                    ContentState(text = "正在同步研究报告", isLoading = true)
+                }
+            }
+
+            state.reportItems.isEmpty() -> {
+                item(key = "reports_state", contentType = "content_state") {
+                    ContentState(text = "暂未生成研究报告")
+                }
+            }
+
+            else -> {
+                items(
+                    items = reportItems,
+                    key = { "report:" + it.id },
+                    contentType = { "report" },
+                ) { item ->
+                    CompactReportRow(item = item, onClick = { onReportSelected(item) })
+                    if (item.id != reportItems.last().id) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    }
+                }
+            }
+        }
+
     }
 }
 
@@ -227,26 +225,34 @@ private fun WorkbenchHeader(
     onRefresh: () -> Unit,
 ) {
     val dimensions = LocalFinanceDimensions.current
+    val signals = rememberFinanceSignalColors()
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Top,
     ) {
-        Column(modifier = Modifier.weight(1f)) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(LocalFinanceSpacing.current.xs),
+        ) {
             Text(
                 text = "工作台",
+                modifier = Modifier.semantics { heading() },
                 style = MaterialTheme.typography.displaySmall,
                 color = MaterialTheme.colorScheme.onBackground,
             )
             Text(
                 text = greeting(displayName),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                color = signals.onNeutralContainer,
             )
         }
         IconButton(
             onClick = onRefresh,
             enabled = !isRefreshing,
+            modifier = Modifier.semantics {
+                contentDescription = if (isRefreshing) "正在刷新工作台" else "刷新工作台"
+            },
         ) {
             if (isRefreshing) {
                 CircularProgressIndicator(
@@ -255,8 +261,8 @@ private fun WorkbenchHeader(
                 )
             } else {
                 Icon(
-                    imageVector = Icons.Outlined.Refresh,
-                    contentDescription = "刷新工作台",
+                    painter = painterResource(R.drawable.ic_phosphor_arrows_clockwise),
+                    contentDescription = null,
                 )
             }
         }
@@ -264,148 +270,183 @@ private fun WorkbenchHeader(
 }
 
 @Composable
-private fun SectionTitle(title: String) {
-    Text(
-        text = title,
-        modifier = Modifier.semantics { heading() },
-        style = MaterialTheme.typography.headlineSmall,
-        color = MaterialTheme.colorScheme.onSurface,
-    )
-}
-
-@Composable
-private fun FocusRow(
-    item: FocusItem,
-    onClick: () -> Unit,
-) {
-    val dimensions = LocalFinanceDimensions.current
-    val semanticColors = LocalFinanceSemanticColors.current
-    val changeColor = item.changePercent.changeColor(
-        positive = semanticColors.positive,
-        negative = semanticColors.negative,
-        neutral = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = dimensions.compactRowHeight)
-            .clickable(role = Role.Button, onClick = onClick)
-            .semantics {
-                contentDescription = item.targetName + "，" + item.status.label +
-                    item.changePercent.asPercentText()
-            },
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = item.targetName,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = item.targetTypeLabel + " · " + item.targetCode,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Column(
-            horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(LocalFinanceSpacing.current.xxs),
-        ) {
-            Text(
-                text = if (item.status == FocusStatus.ThresholdExceeded) {
-                    item.status.label
-                } else {
-                    item.changePercent.movementLabel()
-                },
-                style = MaterialTheme.typography.labelMedium,
-                color = if (item.status == FocusStatus.ThresholdExceeded) {
-                    semanticColors.warning
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
-            Text(
-                text = item.changePercent.asPercentText(),
-                style = MaterialTheme.typography.titleMedium,
-                color = changeColor,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ReportRow(
-    item: ReportItem,
-    onClick: () -> Unit,
-) {
-    val dimensions = LocalFinanceDimensions.current
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = dimensions.listRowHeight)
-            .clickable(role = Role.Button, onClick = onClick)
-            .semantics {
-                contentDescription = item.targetName + "，" + item.reportTypeLabel +
-                    "，" + item.status.label
-            },
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = item.targetName,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = item.reportTypeLabel + " · " + item.timeLabel,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Text(
-            text = item.status.label,
-            style = MaterialTheme.typography.titleMedium,
-            color = item.status.statusColor(),
-        )
-        Icon(
-            imageVector = Icons.Outlined.ChevronRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun ResearchTools(
-    isAdmin: Boolean,
-    onToolSelected: (ResearchTool) -> Unit,
+private fun SectionHeading(
+    title: String,
+    actionLabel: String? = null,
+    onAction: () -> Unit = {},
+    prominent: Boolean = false,
 ) {
     val spacing = LocalFinanceSpacing.current
-    Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
-        ResearchTool.entries.chunked(RESEARCH_TOOL_COLUMN_COUNT).forEach { rowTools ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+    Row(
+        modifier = Modifier
+            .padding(top = spacing.lg)
+            .fillMaxWidth()
+            .heightIn(min = LocalFinanceDimensions.current.minTouchTarget),
+        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = title,
+            modifier = Modifier.weight(1f).semantics { heading() },
+            style = if (prominent) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        if (actionLabel != null) {
+            TextButton(
+                onClick = onAction,
+                modifier = Modifier.heightIn(min = LocalFinanceDimensions.current.minTouchTarget),
             ) {
-                rowTools.forEach { tool ->
-                    ResearchToolCard(
-                        tool = tool,
-                        enabled = !tool.adminOnly || isAdmin,
-                        onClick = { onToolSelected(tool) },
-                        modifier = Modifier.weight(1f),
-                    )
+                Text(actionLabel)
+            }
+        }
+    }
+}
+
+@Composable
+private fun WatchlistCounts(overview: WatchlistOverview) {
+    val spacing = LocalFinanceSpacing.current
+    val dimensions = LocalFinanceDimensions.current
+    val signals = rememberFinanceSignalColors()
+    val fontScale = LocalDensity.current.fontScale
+    Column(verticalArrangement = Arrangement.spacedBy(spacing.md)) {
+        Text(
+            text = "全部分组 · 去重后 " + overview.totalCount + " 只",
+            style = MaterialTheme.typography.bodySmall,
+            color = signals.onNeutralContainer,
+        )
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val canShowColumns = (maxWidth - spacing.lg) / 2 >= dimensions.toolRowHeight * OVERVIEW_COLUMN_WIDTH_UNITS * fontScale
+            if (canShowColumns) {
+                Row(horizontalArrangement = Arrangement.spacedBy(spacing.lg)) {
+                    MovementCount("上涨", overview.risingCount, signals.onPositiveContainer, Modifier.weight(1f))
+                    MovementCount("下跌", overview.fallingCount, signals.onNegativeContainer, Modifier.weight(1f))
                 }
-                repeat(RESEARCH_TOOL_COLUMN_COUNT - rowTools.size) {
-                    Spacer(Modifier.weight(1f))
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                    MovementCount("上涨", overview.risingCount, signals.onPositiveContainer)
+                    MovementCount("下跌", overview.fallingCount, signals.onNegativeContainer)
+                }
+            }
+        }
+        Text(
+            text = "平盘 " + overview.flatCount + " 只 · 暂无行情 " + overview.unavailableCount + " 只",
+            style = MaterialTheme.typography.bodySmall,
+            color = signals.onNeutralContainer,
+        )
+    }
+}
+
+@Composable
+private fun MovementCount(label: String, count: Int, color: Color, modifier: Modifier = Modifier) {
+    val spacing = LocalFinanceSpacing.current
+    Row(
+        modifier = modifier.semantics(mergeDescendants = true) {},
+        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = color)
+        Text(
+            text = count.toString(),
+            style = MaterialTheme.typography.displaySmall.copy(fontFeatureSettings = "tnum"),
+            color = color,
+        )
+        Text("只", style = MaterialTheme.typography.bodySmall, color = color)
+    }
+}
+
+@Composable
+private fun WatchlistRankings(overview: WatchlistOverview, onOpenMarket: () -> Unit) {
+    val spacing = LocalFinanceSpacing.current
+    val dimensions = LocalFinanceDimensions.current
+    val signals = rememberFinanceSignalColors()
+    val fontScale = LocalDensity.current.fontScale
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(top = spacing.lg)) {
+        val hasBothDirections = overview.topGainers.isNotEmpty() && overview.topLosers.isNotEmpty()
+        val canShowColumns = (maxWidth - spacing.lg) / 2 >= dimensions.toolRowHeight * OVERVIEW_COLUMN_WIDTH_UNITS * fontScale
+        if (hasBothDirections && canShowColumns) {
+            Row(horizontalArrangement = Arrangement.spacedBy(spacing.lg)) {
+                RankingGroup(
+                    title = "领涨前三",
+                    items = overview.topGainers,
+                    emptyText = "暂无上涨标的",
+                    color = signals.onPositiveContainer,
+                    onOpenMarket = onOpenMarket,
+                    modifier = Modifier.weight(1f),
+                )
+                RankingGroup(
+                    title = "领跌前三",
+                    items = overview.topLosers,
+                    emptyText = "暂无下跌标的",
+                    color = signals.onNegativeContainer,
+                    onOpenMarket = onOpenMarket,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        } else {
+            // 单边行情或大字号不保留空半栏，两组内容按实际高度展开。
+            Column(verticalArrangement = Arrangement.spacedBy(spacing.md)) {
+                RankingGroup("领涨前三", overview.topGainers, "暂无上涨标的", signals.onPositiveContainer, onOpenMarket)
+                RankingGroup("领跌前三", overview.topLosers, "暂无下跌标的", signals.onNegativeContainer, onOpenMarket)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RankingGroup(
+    title: String,
+    items: List<WatchlistMover>,
+    emptyText: String,
+    color: Color,
+    onOpenMarket: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val spacing = LocalFinanceSpacing.current
+    val signals = rememberFinanceSignalColors()
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+        Text(
+            text = title,
+            modifier = Modifier.semantics { heading() },
+            style = MaterialTheme.typography.titleMedium,
+            color = color,
+        )
+        if (items.isEmpty()) {
+            Text(emptyText, style = MaterialTheme.typography.bodySmall, color = signals.onNeutralContainer)
+        } else {
+            items.forEachIndexed { index, item ->
+                key(item.targetKey) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = LocalFinanceDimensions.current.minTouchTarget)
+                            .clickable(role = Role.Button, onClickLabel = "前往行情", onClick = onOpenMarket)
+                            .padding(vertical = spacing.sm),
+                        verticalArrangement = Arrangement.spacedBy(spacing.xxs),
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text((index + 1).toString(), style = MaterialTheme.typography.labelMedium, color = color)
+                            Text(
+                                text = item.targetName,
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = item.changePercent.asPercentText(),
+                                style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
+                                color = color,
+                            )
+                        }
+                        Text(
+                            text = item.targetTypeLabel + " · " + item.targetCode,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = signals.onNeutralContainer,
+                        )
+                    }
                 }
             }
         }
@@ -413,114 +454,261 @@ private fun ResearchTools(
 }
 
 @Composable
-private fun ResearchToolCard(
+private fun CompactReportRow(item: ReportItem, onClick: () -> Unit) {
+    val spacing = LocalFinanceSpacing.current
+    val dimensions = LocalFinanceDimensions.current
+    val signals = rememberFinanceSignalColors()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = dimensions.compactRowHeight)
+            .clickable(role = Role.Button, onClickLabel = "查看报告", onClick = onClick)
+            .padding(vertical = spacing.sm),
+        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_phosphor_file_text_duotone),
+            contentDescription = null,
+            modifier = Modifier.size(dimensions.iconSize),
+            tint = MaterialTheme.colorScheme.primary,
+        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(spacing.xxs),
+        ) {
+            Text(item.targetName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+            Text(
+                text = item.reportTypeLabel + " · " + item.timeLabel,
+                style = MaterialTheme.typography.bodySmall,
+                color = signals.onNeutralContainer,
+            )
+        }
+        SignalLabel(
+            text = item.status.label,
+            containerColor = when (item.status) {
+                ReportStatus.Generated -> signals.positiveContainer
+                ReportStatus.Generating -> MaterialTheme.colorScheme.primaryContainer
+                ReportStatus.Failed -> signals.negativeContainer
+                ReportStatus.Pending, ReportStatus.Unknown -> signals.neutralContainer
+            },
+            contentColor = when (item.status) {
+                ReportStatus.Generated -> signals.onPositiveContainer
+                ReportStatus.Generating -> MaterialTheme.colorScheme.onPrimaryContainer
+                ReportStatus.Failed -> signals.onNegativeContainer
+                ReportStatus.Pending, ReportStatus.Unknown -> signals.onNeutralContainer
+            },
+        )
+    }
+}
+
+@Composable
+private fun SignalLabel(
+    text: String,
+    containerColor: Color,
+    contentColor: Color,
+    modifier: Modifier = Modifier,
+    style: TextStyle = MaterialTheme.typography.labelMedium,
+) {
+    val spacing = LocalFinanceSpacing.current
+    Text(
+        text = text,
+        modifier = modifier
+            .background(containerColor, MaterialTheme.shapes.extraSmall)
+            .padding(horizontal = spacing.sm, vertical = spacing.xxs),
+        style = style,
+        color = contentColor,
+    )
+}
+
+@Composable
+private fun ResearchTools(isAdmin: Boolean, onToolSelected: (ResearchTool) -> Unit) {
+    val spacing = LocalFinanceSpacing.current
+    val dimensions = LocalFinanceDimensions.current
+    val fontScale = LocalDensity.current.fontScale
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxWidth().padding(top = spacing.xl),
+    ) {
+        val minItemWidth = (dimensions.minTouchTarget + spacing.lg) * fontScale
+        val toolCount = ResearchTool.entries.size
+        val columns = when {
+            (maxWidth - spacing.sm * (toolCount - 1)) / toolCount >= minItemWidth -> toolCount
+            (maxWidth - spacing.sm) / 2 >= minItemWidth -> 2
+            else -> 1
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
+            ResearchTool.entries.chunked(columns).forEach { tools ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                ) {
+                    tools.forEach { tool ->
+                        key(tool) {
+                            ResearchToolEntry(
+                                tool = tool,
+                                enabled = !tool.adminOnly || isAdmin,
+                                onClick = { onToolSelected(tool) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                    repeat(columns - tools.size) { Spacer(modifier = Modifier.weight(1f)) }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ResearchToolEntry(
     tool: ResearchTool,
     enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val spacing = LocalFinanceSpacing.current
     val dimensions = LocalFinanceDimensions.current
-    val contentColor = if (enabled) {
-        MaterialTheme.colorScheme.onSurface
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    Card(
-        modifier = modifier
-            .heightIn(min = dimensions.toolRowHeight)
-            .then(
-                if (enabled) {
-                    Modifier
-                        .clickable(role = Role.Button, onClick = onClick)
-                        .semantics { contentDescription = tool.label }
-                } else {
-                    Modifier.semantics { contentDescription = tool.label + "，仅管理员可用" }
-                },
-            ),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(
-            width = dimensions.outlineWidth,
-            color = MaterialTheme.colorScheme.outlineVariant,
-        ),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(LocalFinanceSpacing.current.md),
-            horizontalArrangement = Arrangement.spacedBy(LocalFinanceSpacing.current.sm),
-            verticalAlignment = Alignment.CenterVertically,
+    val signals = rememberFinanceSignalColors()
+    val description = if (enabled) tool.description else "仅管理员可用"
+    // TooltipBox 把 modifier 用于内部 anchor；权重必须挂在 Row 的直接子节点上。
+    Box(modifier = modifier) {
+        TooltipBox(
+            modifier = Modifier.fillMaxWidth(),
+            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+            tooltip = { PlainTooltip { Text(description) } },
+            state = rememberTooltipState(),
         ) {
-            Icon(
-                imageVector = tool.icon(),
-                contentDescription = null,
-                tint = if (enabled) MaterialTheme.colorScheme.primary else contentColor,
-            )
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.small)
+                    .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+                    .semantics { contentDescription = tool.label + "，" + description }
+                    .padding(spacing.xs),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(spacing.sm),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(dimensions.minTouchTarget)
+                        .background(
+                            if (enabled) MaterialTheme.colorScheme.primaryContainer else signals.neutralContainer,
+                            MaterialTheme.shapes.medium,
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter = painterResource(tool.iconRes()),
+                        contentDescription = null,
+                        modifier = Modifier.size(spacing.section),
+                        tint = if (enabled) MaterialTheme.colorScheme.onPrimaryContainer else signals.onNeutralContainer,
+                    )
+                    if (!enabled) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_phosphor_lock_simple),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .background(signals.neutralContainer, MaterialTheme.shapes.extraSmall)
+                                .size(spacing.lg),
+                            tint = signals.onNeutralContainer,
+                        )
+                    }
+                }
                 Text(
                     text = tool.label,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = contentColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.clearAndSetSemantics {},
+                    minLines = 2,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (enabled) MaterialTheme.colorScheme.onSurface else signals.onNeutralContainer,
+                    textAlign = TextAlign.Center,
                 )
-                Text(
-                    text = if (enabled) tool.description else "仅管理员可用",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                if (!enabled) {
+                    Text(
+                        text = description,
+                        modifier = Modifier.clearAndSetSemantics {},
+                        style = MaterialTheme.typography.bodySmall,
+                        color = signals.onNeutralContainer,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun LoadingPanel(text: String) {
+private fun ContentState(text: String, isLoading: Boolean = false) {
     val spacing = LocalFinanceSpacing.current
-    Surface(
+    val dimensions = LocalFinanceDimensions.current
+    val signals = rememberFinanceSignalColors()
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = LocalFinanceDimensions.current.compactRowHeight),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = MaterialTheme.shapes.small,
+            .heightIn(min = dimensions.listRowHeight)
+            .padding(vertical = spacing.md)
+            .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
+        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = spacing.lg),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-        ) {
+        if (isLoading) {
             CircularProgressIndicator(
-                modifier = Modifier.size(LocalFinanceDimensions.current.iconSize),
-                strokeWidth = LocalFinanceDimensions.current.outlineWidth,
-            )
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(dimensions.iconSize),
+                strokeWidth = dimensions.outlineWidth,
             )
         }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = signals.onNeutralContainer,
+        )
     }
 }
 
 @Composable
-private fun EmptyPanel(text: String) {
-    Surface(
+private fun SyncMessage(message: String, isRefreshing: Boolean, onRetry: () -> Unit) {
+    val spacing = LocalFinanceSpacing.current
+    val signals = rememberFinanceSignalColors()
+    Row(
         modifier = Modifier
+            .padding(top = spacing.lg)
             .fillMaxWidth()
-            .heightIn(min = LocalFinanceDimensions.current.compactRowHeight),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = MaterialTheme.shapes.small,
+            .background(signals.negativeContainer, MaterialTheme.shapes.small)
+            .padding(spacing.md),
+        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier.padding(horizontal = LocalFinanceSpacing.current.lg),
-            contentAlignment = Alignment.CenterStart,
+        Icon(
+            painter = painterResource(R.drawable.ic_phosphor_warning_circle),
+            contentDescription = null,
+            modifier = Modifier.size(LocalFinanceDimensions.current.iconSize),
+            tint = signals.onNegativeContainer,
+        )
+        Column(
+            modifier = Modifier.weight(1f).semantics(mergeDescendants = true) {
+                liveRegion = LiveRegionMode.Polite
+            },
+            verticalArrangement = Arrangement.spacedBy(spacing.xxs),
         ) {
             Text(
-                text = text,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = "同步未完成",
+                style = MaterialTheme.typography.labelLarge,
+                color = signals.onNegativeContainer,
             )
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = signals.onNegativeContainer,
+            )
+        }
+        TextButton(
+            onClick = onRetry,
+            enabled = !isRefreshing,
+            modifier = Modifier.heightIn(min = LocalFinanceDimensions.current.minTouchTarget),
+            colors = ButtonDefaults.textButtonColors(contentColor = signals.onNegativeContainer),
+        ) {
+            Text("重试")
         }
     }
 }
@@ -534,49 +722,19 @@ private fun greeting(displayName: String): String {
     return salutation + "，" + displayName
 }
 
-private fun Double?.movementLabel(): String = when {
-    this == null -> "暂无行情"
-    this > 0.0 -> "上涨"
-    this < 0.0 -> "下跌"
-    else -> "平盘"
-}
-
 private fun Double?.asPercentText(): String {
     if (this == null) return "暂无数据"
     val prefix = if (this > 0.0) "+" else ""
     return prefix + String.format(Locale.CHINA, PERCENT_FORMAT, this)
 }
 
-@Composable
-private fun Double?.changeColor(
-    positive: Color,
-    negative: Color,
-    neutral: Color,
-): Color = when {
-    this == null -> neutral
-    this > 0.0 -> positive
-    this < 0.0 -> negative
-    else -> neutral
+@DrawableRes
+private fun ResearchTool.iconRes(): Int = when (this) {
+    ResearchTool.Report -> R.drawable.ic_phosphor_file_text_duotone
+    ResearchTool.KnowledgeSearch -> R.drawable.ic_phosphor_magnifying_glass_duotone
+    ResearchTool.MaterialImport -> R.drawable.ic_phosphor_upload_simple_duotone
+    ResearchTool.AiAssistant -> R.drawable.ic_phosphor_brain_duotone
 }
 
-@Composable
-private fun ReportStatus.statusColor(): Color {
-    val semantics = LocalFinanceSemanticColors.current
-    return when (this) {
-        ReportStatus.Generated -> semantics.positive
-        ReportStatus.Failed -> MaterialTheme.colorScheme.error
-        ReportStatus.Generating -> MaterialTheme.colorScheme.primary
-        ReportStatus.Pending,
-        ReportStatus.Unknown -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-}
-
-private fun ResearchTool.icon(): ImageVector = when (this) {
-    ResearchTool.Report -> Icons.Outlined.Description
-    ResearchTool.KnowledgeSearch -> Icons.Outlined.Search
-    ResearchTool.MaterialImport -> Icons.Outlined.UploadFile
-    ResearchTool.AiAssistant -> Icons.Outlined.AutoAwesome
-}
-
-private const val RESEARCH_TOOL_COLUMN_COUNT = 2
+private const val OVERVIEW_COLUMN_WIDTH_UNITS = 1.5f
 private const val PERCENT_FORMAT = "%.2f%%"

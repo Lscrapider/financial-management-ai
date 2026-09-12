@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "generatedAt": "2026-06-07T00:00:00+08:00",
-  "title": "Design System: Financial Management AI",
+  "title": "Design System: Financial Management AI — Web 预览扩展",
   "extensions": {
     "colorMeta": {
       "primary-blue": {
@@ -83,6 +83,7 @@
       }
     ],
     "rules": [
+      "This sidecar preserves the existing Web preview snippets, CSS tokens, motion and breakpoints. Android follows the platform-specific rules in root DESIGN.md, FinanceTheme.kt and the market-local MarketMiuixTheme.kt; these Web previews are not Android implementation specifications.",
       "Use investment context before system metrics on the home screen.",
       "Use semantic colors only for action, selection, market direction, or workflow state.",
       "Do not use traditional admin-dashboard hero cards as the primary page structure.",

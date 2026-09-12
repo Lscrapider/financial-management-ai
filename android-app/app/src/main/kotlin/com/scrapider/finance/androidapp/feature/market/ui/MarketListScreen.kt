@@ -1,9 +1,9 @@
 package com.scrapider.finance.androidapp.feature.market.ui
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -14,6 +14,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceSpacing
 import com.scrapider.finance.androidapp.feature.market.MARKET_OVERVIEW_ITEM_LIMIT
 import com.scrapider.finance.androidapp.feature.market.MarketSortOption
@@ -30,6 +32,8 @@ import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 private const val MARKET_ATTENTION_PREVIEW_ITEM_LIMIT = MARKET_OVERVIEW_ITEM_LIMIT
 
@@ -118,25 +122,49 @@ internal fun MarketListScreen(
                 bottom = spacing.section,
             ),
         ) {
-            item {
+            if (state.syncMessage.isNotBlank()) {
+                item(key = "sync-notice", contentType = "status") {
+                    MarketSyncNotice(
+                        message = state.syncMessage,
+                        modifier = Modifier.padding(bottom = spacing.lg),
+                    )
+                }
+            }
+            item(key = "market-overview", contentType = "overview") {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.md)) {
+                    Text(
+                        text = "市场概览",
+                        modifier = Modifier.semantics { heading() },
+                        style = MiuixTheme.textStyles.body2,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                    MarketOverviewContent(
+                        indices = state.marketOverview,
+                        isLoading = state.isLoading,
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(top = spacing.sm))
+                }
+            }
+            item(key = "market-groups", contentType = "groups") {
                 MarketGroupTabs(
                     groups = state.groups,
                     selectedGroupId = state.selectedGroupId,
                     onSelectGroup = onSelectGroup,
                     onManageGroups = onOpenManageGroups,
+                    modifier = Modifier.padding(top = spacing.md),
                 )
             }
-            item { Spacer(Modifier.height(spacing.md)) }
-            item {
-                MarketFilterBar(
-                    selectedFilter = state.targetTypeFilter,
-                    sortOption = state.sortOption,
-                    onSelectFilter = onSelectTargetTypeFilter,
-                    onOpenSort = { showSortSheet = true },
-                )
+            if (attentionItems.isNotEmpty()) {
+                item(key = "market-attention", contentType = "attention") {
+                    MarketAttentionSection(
+                        items = attentionItems.take(MARKET_ATTENTION_PREVIEW_ITEM_LIMIT),
+                        totalItemCount = attentionItems.size,
+                        onOpenTargetDetail = onOpenTargetDetail,
+                        modifier = Modifier.padding(vertical = spacing.lg),
+                    )
+                }
             }
-            item { Spacer(Modifier.height(spacing.xxl)) }
-            item {
+            item(key = "current-view", contentType = "heading") {
                 MarketCurrentViewHeader(
                     title = if (isAllTargetsSelected) {
                         if (state.targetTypeFilter == MarketTargetTypeFilter.All) {
@@ -157,32 +185,18 @@ internal fun MarketListScreen(
                     } else {
                         { onOpenAddTargets(selectedGroup?.id) }
                     },
+                    modifier = Modifier.padding(top = spacing.md),
                 )
             }
-            if (state.syncMessage.isNotBlank()) {
-                item { Spacer(Modifier.height(spacing.md)) }
-                item { MarketSyncNotice(message = state.syncMessage) }
-            }
-            if (attentionItems.isNotEmpty()) {
-                item { Spacer(Modifier.height(spacing.section)) }
-                item {
-                    MarketAttentionSection(
-                        items = attentionItems.take(MARKET_ATTENTION_PREVIEW_ITEM_LIMIT),
-                        totalItemCount = attentionItems.size,
-                        onOpenTargetDetail = onOpenTargetDetail,
-                    )
-                }
-            }
-            item { Spacer(Modifier.height(spacing.section)) }
-            item { MarketSectionTitle(title = "市场概览") }
-            item { Spacer(Modifier.height(spacing.lg)) }
-            item {
-                MarketOverviewContent(
-                    indices = state.marketOverview,
-                    isLoading = state.isLoading,
+            item(key = "market-filters", contentType = "filters") {
+                MarketFilterBar(
+                    selectedFilter = state.targetTypeFilter,
+                    sortOption = state.sortOption,
+                    onSelectFilter = onSelectTargetTypeFilter,
+                    onOpenSort = { showSortSheet = true },
+                    modifier = Modifier.padding(top = spacing.xs),
                 )
             }
-            item { Spacer(Modifier.height(spacing.section)) }
 
             if (isAllTargetsSelected) {
                 systemTargetItems(
@@ -260,7 +274,10 @@ private fun androidx.compose.foundation.lazy.LazyListScope.systemTargetItems(
                         MarketTargetTypeHeader(
                             targetType = targetType,
                             itemCount = targets.size,
-                            modifier = Modifier.padding(top = LocalFinanceSpacing.current.xl),
+                            modifier = Modifier.padding(
+                                top = LocalFinanceSpacing.current.md,
+                                bottom = LocalFinanceSpacing.current.xs,
+                            ),
                         )
                     }
                     itemsIndexed(

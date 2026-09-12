@@ -55,6 +55,7 @@ class WorkbenchViewModel(
                             focusItems = result.data.focusItems,
                             reportItems = result.data.reportItems,
                             syncMessage = result.data.partialFailure?.userMessage.orEmpty(),
+                            watchlistOverview = result.data.watchlistOverview,
                         )
                         if (result.data.partialFailure == NetworkFailure.Unauthorized) {
                             _events.emit(WorkbenchEvent.SessionExpired)

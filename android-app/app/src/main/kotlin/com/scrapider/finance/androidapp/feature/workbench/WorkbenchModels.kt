@@ -11,6 +11,7 @@ data class WorkbenchUiState(
     val focusItems: List<FocusItem> = emptyList(),
     val reportItems: List<ReportItem> = emptyList(),
     val syncMessage: String = "",
+    val watchlistOverview: WatchlistOverview? = null,
 )
 
 @Immutable
@@ -18,7 +19,31 @@ data class WorkbenchContent(
     val focusItems: List<FocusItem>,
     val reportItems: List<ReportItem>,
     val partialFailure: NetworkFailure? = null,
+    val watchlistOverview: WatchlistOverview? = null,
 )
+
+@Immutable
+data class WatchlistOverview(
+    val totalCount: Int,
+    val risingCount: Int,
+    val fallingCount: Int,
+    val flatCount: Int,
+    val unavailableCount: Int,
+    val topGainers: List<WatchlistMover>,
+    val topLosers: List<WatchlistMover>,
+)
+
+@Immutable
+data class WatchlistMover(
+    val targetType: String,
+    val targetCode: String,
+    val targetName: String,
+    val targetTypeLabel: String,
+    val changePercent: Double,
+) {
+    val targetKey: String
+        get() = targetType + ":" + targetCode
+}
 
 @Immutable
 data class FocusItem(

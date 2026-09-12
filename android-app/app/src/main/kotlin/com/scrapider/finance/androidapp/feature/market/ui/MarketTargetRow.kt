@@ -1,13 +1,16 @@
 package com.scrapider.finance.androidapp.feature.market.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -16,15 +19,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import com.scrapider.finance.androidapp.designsystem.FinanceSemanticColors
-import com.scrapider.finance.androidapp.designsystem.LocalFinanceSemanticColors
+import com.scrapider.finance.androidapp.designsystem.LocalFinanceDimensions
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceSpacing
 import com.scrapider.finance.androidapp.feature.market.MarketAlert
 import com.scrapider.finance.androidapp.feature.market.MarketSystemTarget
 import com.scrapider.finance.androidapp.feature.market.MarketWatchItem
 import com.scrapider.finance.androidapp.feature.market.marketTargetTypeLabel
+import com.scrapider.finance.androidapp.feature.market.theme.LocalMarketSignalColors
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
 import java.util.Locale
@@ -43,6 +46,7 @@ internal fun MarketSystemTargetRow(
 ) {
     BasicComponent(
         modifier = modifier,
+        insideMargin = PaddingValues(vertical = LocalFinanceSpacing.current.md),
         title = target.targetName,
         summary = "${target.targetCode} · ${target.targetType.marketTargetTypeLabel()}",
         onClick = onOpenDetail,
@@ -67,6 +71,7 @@ internal fun MarketWatchTargetRow(
 ) {
     BasicComponent(
         modifier = modifier,
+        insideMargin = PaddingValues(vertical = LocalFinanceSpacing.current.md),
         title = item.targetName,
         summary = "${item.targetCode} · ${item.targetType.marketTargetTypeLabel()}",
         onClick = onOpenDetail,
@@ -111,29 +116,51 @@ private fun MarketPriceChange(
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalFinanceSpacing.current
-    val semanticColors = LocalFinanceSemanticColors.current
     Column(
-        modifier = modifier.padding(end = spacing.sm),
+        modifier = modifier,
         horizontalAlignment = Alignment.End,
         verticalArrangement = Arrangement.spacedBy(spacing.xxs),
     ) {
         Text(
             text = latestPrice.asPriceText(),
-            style = MiuixTheme.textStyles.title3,
+            style = MiuixTheme.textStyles.title3.copy(fontFeatureSettings = "tnum"),
             color = MiuixTheme.colorScheme.onSurface,
         )
-        Text(
-            text = changePercent.asPercentText(),
+        MarketChangeLabel(
+            changePercent = changePercent,
             modifier = Modifier.widthIn(min = spacing.xxl * 3),
-            textAlign = TextAlign.End,
-            style = MiuixTheme.textStyles.body2,
-            color = changePercent.marketChangeColor(
-                positive = semanticColors.positive,
-                negative = semanticColors.negative,
-                neutral = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            ),
         )
     }
+}
+
+@Composable
+internal fun MarketChangeLabel(
+    changePercent: Double?,
+    modifier: Modifier = Modifier,
+    style: TextStyle = MiuixTheme.textStyles.body2,
+) {
+    val spacing = LocalFinanceSpacing.current
+    val signals = LocalMarketSignalColors.current
+    Text(
+        text = changePercent.asPercentText(),
+        modifier = modifier
+            .background(
+                color = changePercent.marketChangeColor(
+                    positive = signals.positiveContainer,
+                    negative = signals.negativeContainer,
+                    neutral = signals.neutralContainer,
+                ),
+                shape = MaterialTheme.shapes.extraSmall,
+            )
+            .padding(horizontal = spacing.xs, vertical = spacing.xxs),
+        style = style.copy(fontFeatureSettings = "tnum"),
+        textAlign = TextAlign.End,
+        color = changePercent.marketChangeColor(
+            positive = signals.onPositiveContainer,
+            negative = signals.onNegativeContainer,
+            neutral = signals.onNeutralContainer,
+        ),
+    )
 }
 
 @Composable
@@ -143,11 +170,18 @@ private fun MarketTargetActions(
     onDelete: () -> Unit,
 ) {
     var showActions by rememberSaveable { mutableStateOf(false) }
-    IconButton(onClick = { showActions = true }) {
+    val dimensions = LocalFinanceDimensions.current
+    IconButton(
+        onClick = { showActions = true },
+        modifier = Modifier.sizeIn(
+            minWidth = dimensions.minTouchTarget,
+            minHeight = dimensions.minTouchTarget,
+        ),
+    ) {
         Icon(
             imageVector = Icons.Outlined.MoreVert,
             contentDescription = "更多操作：$targetName",
-            tint = MiuixTheme.colorScheme.onSurfaceVariantActions,
+            tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
         )
     }
     OverlayBottomSheet(
@@ -180,7 +214,7 @@ private fun MarketTargetActions(
 @Composable
 private fun MarketAlertSummary(alert: MarketAlert?) {
     val spacing = LocalFinanceSpacing.current
-    val semanticColors = LocalFinanceSemanticColors.current
+    val signals = LocalMarketSignalColors.current
     Row(
         horizontalArrangement = Arrangement.spacedBy(spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
@@ -192,15 +226,17 @@ private fun MarketAlertSummary(alert: MarketAlert?) {
                 else -> "提醒已停用 · 阈值 ±${alert.thresholdPercent.asThresholdText()}"
             },
             style = MiuixTheme.textStyles.body2,
+            modifier = Modifier.weight(1f, fill = false),
             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
         )
         if (alert?.enabled == true && alert.outOfThreshold) {
             Text(
                 text = "已越界",
+                modifier = Modifier
+                    .background(signals.warningContainer, MaterialTheme.shapes.extraSmall)
+                    .padding(horizontal = spacing.xs, vertical = spacing.xxs),
                 style = MiuixTheme.textStyles.footnote1,
-                color = semanticColors.warning,
+                color = signals.onWarningContainer,
             )
         }
     }

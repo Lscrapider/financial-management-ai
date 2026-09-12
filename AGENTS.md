@@ -14,7 +14,7 @@
 
 ## Skill / Tool 分工
 
-- **Superpowers**：任务拆解、方案设计、实现、调试、审查、验证和必要的多 agent 协作；按任务选择适用流程，不为使用流程而扩大范围。
+- **Superpowers**：Sol和Astra模型无需使用superpower。负责任务拆解，避免过度推理。方案设计、实现、调试、审查、验证和必要的多 agent 协作；按任务选择适用流程，不为使用流程而扩大范围。
 - **Apple Design**：Android UI 的体验方案主设计师，先定义空间层级、信息显隐、直接反馈、返回路径、Sheet / 菜单、排版节奏和克制动效；不是 iOS 复刻工具。
 - **impeccable**：Android UI 的设计评审与视觉精修。编码前审查信息架构、主次和视觉语言；编码后精修密度、排版、色彩、状态反馈和无障碍，而不只是最后“上妆”。
 - **Compose Expert**：Android 原生实现守门人，负责 Compose / Material 3 / 已批准局部 UI 库、主题、状态、性能、Navigation、Paging、无障碍和 design-to-compose；不主导视觉风格。涉及 PR 或 diff 审查时遵循其 Review Mode。

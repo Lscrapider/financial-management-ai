@@ -31,14 +31,15 @@ class WorkbenchRepository(
             return@coroutineScope NetworkResult.Failure(failures.first())
         }
 
-        val watchTargets = (watchResult as? NetworkResult.Success)?.data.orEmpty()
+        val watchTargets = (watchResult as? NetworkResult.Success)?.data
         val alerts = (alertResult as? NetworkResult.Success)?.data.orEmpty()
         val reports = (reportResult as? NetworkResult.Success)?.data.orEmpty()
         NetworkResult.Success(
             WorkbenchContent(
-                focusItems = buildFocusItems(watchTargets, alerts),
+                focusItems = buildFocusItems(watchTargets.orEmpty(), alerts),
                 reportItems = reports,
                 partialFailure = failures.firstOrNull(),
+                watchlistOverview = watchTargets?.let(::buildWatchlistOverview),
             ),
         )
     }
@@ -137,6 +138,36 @@ class WorkbenchRepository(
                 )
             }
         }
+    }
+
+    private fun buildWatchlistOverview(watchTargets: List<WatchTarget>): WatchlistOverview {
+        val uniqueTargets = watchTargets.distinctBy(WatchTarget::targetKey)
+        val availableTargets = uniqueTargets.mapNotNull { target ->
+            val changePercent = target.changePercent?.takeIf(Double::isFinite)
+                ?: return@mapNotNull null
+            WatchlistMover(
+                targetType = target.targetType,
+                targetCode = target.targetCode,
+                targetName = target.targetName,
+                targetTypeLabel = targetTypeLabel(target.targetType),
+                changePercent = changePercent,
+            )
+        }
+        val risingTargets = availableTargets.filter { it.changePercent > 0.0 }
+        val fallingTargets = availableTargets.filter { it.changePercent < 0.0 }
+        return WatchlistOverview(
+            totalCount = uniqueTargets.size,
+            risingCount = risingTargets.size,
+            fallingCount = fallingTargets.size,
+            flatCount = availableTargets.size - risingTargets.size - fallingTargets.size,
+            unavailableCount = uniqueTargets.size - availableTargets.size,
+            topGainers = risingTargets
+                .sortedByDescending(WatchlistMover::changePercent)
+                .take(WORKBENCH_PREVIEW_ITEM_LIMIT),
+            topLosers = fallingTargets
+                .sortedBy(WatchlistMover::changePercent)
+                .take(WORKBENCH_PREVIEW_ITEM_LIMIT),
+        )
     }
 
     private fun buildFocusItems(

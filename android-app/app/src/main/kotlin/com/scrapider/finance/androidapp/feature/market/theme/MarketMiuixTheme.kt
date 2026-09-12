@@ -3,12 +3,18 @@ package com.scrapider.finance.androidapp.feature.market.theme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
+import com.scrapider.finance.androidapp.designsystem.FinanceSignalColors
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceSemanticColors
+import com.scrapider.finance.androidapp.designsystem.rememberFinanceSignalColors
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.darkColorScheme
 import top.yukonga.miuix.kmp.theme.defaultTextStyles
 import top.yukonga.miuix.kmp.theme.lightColorScheme
+
+internal val LocalMarketSignalColors = staticCompositionLocalOf { FinanceSignalColors() }
 
 /**
  * 行情模块的局部 Miuix 主题。
@@ -21,6 +27,7 @@ fun MarketMiuixTheme(content: @Composable () -> Unit) {
     val materialTypography = MaterialTheme.typography
     val semanticColors = LocalFinanceSemanticColors.current
     val isDark = isSystemInDarkTheme()
+    val signalColors = rememberFinanceSignalColors()
     val colors = remember(materialColors, semanticColors, isDark) {
         val base = if (isDark) darkColorScheme() else lightColorScheme()
         base.copy(
@@ -87,5 +94,7 @@ fun MarketMiuixTheme(content: @Composable () -> Unit) {
             title4 = materialTypography.labelLarge,
         )
     }
-    MiuixTheme(colors = colors, textStyles = textStyles, content = content)
+    CompositionLocalProvider(LocalMarketSignalColors provides signalColors) {
+        MiuixTheme(colors = colors, textStyles = textStyles, content = content)
+    }
 }

@@ -1,31 +1,40 @@
 package com.scrapider.finance.androidapp.feature.market.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import com.scrapider.finance.androidapp.designsystem.LocalFinanceSemanticColors
+import com.scrapider.finance.androidapp.designsystem.LocalFinanceDimensions
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceSpacing
 import com.scrapider.finance.androidapp.feature.market.MarketAlert
 import com.scrapider.finance.androidapp.feature.market.MarketIndexQuote
 import com.scrapider.finance.androidapp.feature.market.MarketWatchItem
 import com.scrapider.finance.androidapp.feature.market.marketTargetTypeLabel
+import com.scrapider.finance.androidapp.feature.market.theme.LocalMarketSignalColors
 import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 internal data class MarketAttentionItem(
@@ -37,12 +46,13 @@ internal data class MarketAttentionItem(
 internal fun MarketSectionTitle(
     title: String,
     modifier: Modifier = Modifier,
+    color: Color = MiuixTheme.colorScheme.onSurface,
 ) {
     Text(
         text = title,
         modifier = modifier.semantics { heading() },
         style = MiuixTheme.textStyles.title2,
-        color = MiuixTheme.colorScheme.onSurface,
+        color = color,
     )
 }
 
@@ -54,13 +64,14 @@ internal fun MarketAttentionSection(
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalFinanceSpacing.current
+    val signals = LocalMarketSignalColors.current
     Column(modifier = modifier) {
-        Row(
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(spacing.md),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(spacing.xs),
         ) {
-            MarketSectionTitle(title = "需要查看")
+            MarketSectionTitle(title = "需要查看", color = signals.onWarningContainer)
             Text(
                 text = if (totalItemCount > items.size) {
                     "已触发 $totalItemCount 条 · 优先展示 ${items.size} 条"
@@ -68,11 +79,17 @@ internal fun MarketAttentionSection(
                     "已触发 $totalItemCount 条"
                 },
                 style = MiuixTheme.textStyles.body2,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                color = signals.onWarningContainer,
             )
         }
         Spacer(Modifier.height(spacing.lg))
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.defaultColors(
+                color = signals.warningContainer,
+                contentColor = signals.onWarningContainer,
+            ),
+        ) {
             items.forEachIndexed { index, attentionItem ->
                 MarketAttentionRow(
                     attentionItem = attentionItem,
@@ -99,27 +116,23 @@ private fun MarketAttentionRow(
     val alertText = attentionItem.alert.thresholdPercent?.let { threshold ->
         "提醒阈值 ±${threshold.asThresholdText()} 已越界"
     } ?: "提醒阈值已越界"
-    val semanticColors = LocalFinanceSemanticColors.current
+    val signals = LocalMarketSignalColors.current
     BasicComponent(
         title = item.targetName,
         summary = alertText,
+        summaryColor = BasicComponentDefaults.summaryColor(color = signals.onWarningContainer),
         onClick = onOpenDetail,
         onClickLabel = "查看${item.targetName}详情",
         endActions = {
             Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = item.changePercent.asPercentText(),
+                MarketChangeLabel(
+                    changePercent = item.changePercent,
                     style = MiuixTheme.textStyles.title3,
-                    color = item.changePercent.marketChangeColor(
-                        positive = semanticColors.positive,
-                        negative = semanticColors.negative,
-                        neutral = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    ),
                 )
                 Text(
                     text = "已越界",
                     style = MiuixTheme.textStyles.footnote1,
-                    color = semanticColors.warning,
+                    color = signals.onWarningContainer,
                 )
             }
         },
@@ -143,45 +156,74 @@ internal fun MarketOverviewContent(
             modifier = modifier,
         )
 
-        else -> Column(modifier = modifier.fillMaxWidth()) {
-            indices.forEachIndexed { index, item ->
-                MarketIndexRow(item = item)
-                if (index < indices.lastIndex) HorizontalDivider()
+        else -> BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+            val spacing = LocalFinanceSpacing.current
+            val minColumnWidth = LocalFinanceDimensions.current.toolRowHeight * LocalDensity.current.fontScale
+            val columnWidth = (maxWidth - spacing.lg * (indices.size - 1)) / indices.size
+            if (columnWidth >= minColumnWidth) {
+                Row(horizontalArrangement = Arrangement.spacedBy(spacing.lg)) {
+                    indices.forEach { item ->
+                        MarketIndexQuoteContent(item = item, modifier = Modifier.weight(1f))
+                    }
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.md)) {
+                    indices.forEach { item ->
+                        MarketIndexQuoteContent(item = item, compact = true)
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun MarketIndexRow(item: MarketIndexQuote) {
+private fun MarketIndexQuoteContent(
+    item: MarketIndexQuote,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
+) {
     val spacing = LocalFinanceSpacing.current
-    val semanticColors = LocalFinanceSemanticColors.current
-    BasicComponent(
-        title = item.name,
-        endActions = {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(spacing.md),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = item.latestPrice.asPriceText(),
-                    style = MiuixTheme.textStyles.title3,
-                    color = MiuixTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = item.changePercent.asPercentText(),
-                    modifier = Modifier.widthIn(min = spacing.xxl * 3),
-                    textAlign = TextAlign.End,
-                    style = MiuixTheme.textStyles.body1,
-                    color = item.changePercent.marketChangeColor(
-                        positive = semanticColors.positive,
-                        negative = semanticColors.negative,
-                        neutral = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    ),
-                )
-            }
-        },
-    )
+    val signals = LocalMarketSignalColors.current
+    val quote: @Composable () -> Unit = {
+        Text(
+            text = item.latestPrice.asPriceText(),
+            style = MiuixTheme.textStyles.title3.copy(fontFeatureSettings = "tnum"),
+            color = item.changePercent.marketChangeColor(
+                positive = signals.onPositiveContainer,
+                negative = signals.onNegativeContainer,
+                neutral = MiuixTheme.colorScheme.onSurface,
+            ),
+        )
+        MarketChangeLabel(changePercent = item.changePercent)
+    }
+    if (compact) {
+        Row(
+            modifier = modifier.fillMaxWidth().semantics(mergeDescendants = true) {},
+            horizontalArrangement = Arrangement.spacedBy(spacing.lg),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = item.name,
+                modifier = Modifier.weight(1f),
+                style = MiuixTheme.textStyles.body1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            )
+            Column(horizontalAlignment = Alignment.End, content = { quote() })
+        }
+    } else {
+        Column(
+            modifier = modifier.semantics(mergeDescendants = true) {},
+            verticalArrangement = Arrangement.spacedBy(spacing.xs),
+        ) {
+            Text(
+                text = item.name,
+                style = MiuixTheme.textStyles.body2,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            )
+            quote()
+        }
+    }
 }
 
 @Composable
@@ -191,24 +233,42 @@ internal fun MarketCurrentViewHeader(
     onAddTargets: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
+    val spacing = LocalFinanceSpacing.current
+    val dimensions = LocalFinanceDimensions.current
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(LocalFinanceSpacing.current.md),
-            verticalAlignment = Alignment.CenterVertically,
+        FlowRow(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(spacing.xs),
         ) {
             MarketSectionTitle(title = title)
             Text(
                 text = "$itemCount 个标的",
-                style = MiuixTheme.textStyles.body1,
+                modifier = Modifier.align(Alignment.CenterVertically),
+                style = MiuixTheme.textStyles.body2,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
         }
         onAddTargets?.let { onAdd ->
-            TextButton(text = "添加", onClick = onAdd)
+            TextButton(
+                onClick = onAdd,
+                modifier = Modifier.heightIn(min = dimensions.minTouchTarget),
+                colors = ButtonDefaults.textButtonColors(
+                    containerColor = MiuixTheme.colorScheme.primary,
+                    contentColor = MiuixTheme.colorScheme.onPrimary,
+                ),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Add,
+                    contentDescription = null,
+                    tint = MiuixTheme.colorScheme.onPrimary,
+                )
+                Text(text = "添加", color = MiuixTheme.colorScheme.onPrimary)
+            }
         }
     }
 }
@@ -226,6 +286,7 @@ internal fun MarketTargetTypeHeader(
     ) {
         Text(
             text = targetType.marketTargetTypeLabel(),
+            modifier = Modifier.semantics { heading() },
             style = MiuixTheme.textStyles.title3,
             color = MiuixTheme.colorScheme.onSurface,
         )
