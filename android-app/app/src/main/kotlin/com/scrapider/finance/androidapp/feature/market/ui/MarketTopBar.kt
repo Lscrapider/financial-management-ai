@@ -14,6 +14,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceDimensions
+import com.scrapider.finance.androidapp.designsystem.financeChromeColor
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
@@ -30,7 +31,10 @@ internal fun MarketHomeTopBar(
         title = { Text(text = "行情", style = MiuixTheme.textStyles.title1) },
         modifier = modifier,
         windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = MiuixTheme.colorScheme.background),
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = financeChromeColor(),
+            scrolledContainerColor = financeChromeColor(),
+        ),
         actions = {
             IconButton(
                 onClick = onSearch,
@@ -60,7 +64,10 @@ internal fun MarketPageTopBar(
         title = { Text(text = title, style = MiuixTheme.textStyles.title3) },
         modifier = modifier,
         windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = MiuixTheme.colorScheme.background),
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = financeChromeColor(),
+            scrolledContainerColor = financeChromeColor(),
+        ),
         navigationIcon = {
             IconButton(
                 onClick = onNavigateBack,

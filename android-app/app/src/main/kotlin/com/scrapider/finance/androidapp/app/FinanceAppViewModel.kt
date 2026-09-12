@@ -20,7 +20,7 @@ data class AppUiState(
 class FinanceAppViewModel(application: Application) : AndroidViewModel(application) {
     private val sessionStore = SessionStore(application)
     private val initialSnapshot = sessionStore.load()
-    internal val apiClient = FinanceApiClient()
+    internal val apiClient = FinanceApiClient(sessionStore = sessionStore)
     private val _uiState = MutableStateFlow(
         AppUiState(
             session = initialSnapshot.session,
@@ -58,7 +58,7 @@ class FinanceAppViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun signOut() {
-        apiClient.setAccessToken("")
+        apiClient.clearAuthentication()
         sessionStore.clearSession()
         val snapshot = sessionStore.load()
         _uiState.value = AppUiState(

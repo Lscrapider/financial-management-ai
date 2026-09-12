@@ -64,7 +64,6 @@ internal fun ChatScreen(
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalFinanceSpacing.current
-    val dimensions = LocalFinanceDimensions.current
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     var followLatest by rememberSaveable { mutableStateOf(true) }
@@ -147,7 +146,7 @@ private fun ChatMessageItem(message: ChatMessage, onCopy: (String) -> Unit) {
     val secondary = rememberFinanceSignalColors().onNeutralContainer
     if (message.role == ChatMessageRole.User) {
         Column(Modifier.fillMaxWidth().padding(start = spacing.section), horizontalAlignment = Alignment.End) {
-            Surface(color = rememberFinanceSignalColors().neutralContainer, contentColor = MaterialTheme.colorScheme.onSurface,
+            Surface(color = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 shape = MaterialTheme.shapes.large) {
                 SelectionContainer {
                     Text(message.text, Modifier.padding(horizontal = spacing.lg, vertical = spacing.md),

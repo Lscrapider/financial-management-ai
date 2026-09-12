@@ -10,6 +10,7 @@ data class SessionSnapshot(
 
 class SessionStore(context: Context) {
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+    private val refreshSessionStorage = SecureRefreshSessionStorage(context)
 
     fun load(): SessionSnapshot {
         val rememberAccount = preferences.getBoolean(KEY_REMEMBER_ACCOUNT, true)
@@ -62,6 +63,15 @@ class SessionStore(context: Context) {
             .remove(KEY_REAL_NAME)
             .remove(KEY_ROLES)
             .apply()
+        clearRefreshSid()
+    }
+
+    fun loadRefreshSid(): String? = refreshSessionStorage.load()
+
+    fun saveRefreshSid(refreshSid: String): Boolean = refreshSessionStorage.save(refreshSid)
+
+    fun clearRefreshSid() {
+        refreshSessionStorage.clear()
     }
 
     private companion object {

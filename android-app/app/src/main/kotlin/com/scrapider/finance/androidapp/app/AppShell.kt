@@ -33,6 +33,7 @@ import com.scrapider.finance.androidapp.R
 import com.scrapider.finance.androidapp.core.network.FinanceApiClient
 import com.scrapider.finance.androidapp.core.session.UserSession
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceDimensions
+import com.scrapider.finance.androidapp.designsystem.financeChromeColor
 import com.scrapider.finance.androidapp.designsystem.rememberFinanceSignalColors
 import com.scrapider.finance.androidapp.feature.market.MarketRoute
 import com.scrapider.finance.androidapp.feature.market.theme.MarketMiuixTheme
@@ -99,7 +100,12 @@ fun AppShell(
 
     Scaffold(
         modifier = modifier,
-        containerColor = MaterialTheme.colorScheme.background,
+        // 工作台雾蓝页首延伸到状态栏，避免系统栏与背景之间出现横向色阶。
+        containerColor = if (selectedDestination == AppDestination.Workbench && !toolPageVisible) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.background
+        },
         bottomBar = {
             if (!toolPageVisible) {
                 FinanceBottomNavigation(
@@ -150,7 +156,7 @@ private fun FinanceBottomNavigation(
     Column {
         HorizontalDivider(color = colors.outlineVariant)
         NavigationBar(
-            containerColor = colors.surface,
+            containerColor = financeChromeColor(),
             contentColor = colors.onSurface,
             tonalElevation = NavigationBarDefaults.Elevation,
         ) {

@@ -49,6 +49,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.LayoutDirection
 import com.scrapider.finance.androidapp.R
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceDimensions
+import com.scrapider.finance.androidapp.designsystem.financeChromeColor
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceSpacing
 import com.scrapider.finance.androidapp.designsystem.rememberFinanceSignalColors
 import com.scrapider.finance.androidapp.feature.workbench.ReportStatus
@@ -65,6 +66,7 @@ internal fun ReportTopBar(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = LocalFinanceDimensions.current.controlHeight)
+            .background(financeChromeColor())
             .padding(horizontal = spacing.xl),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -324,7 +326,7 @@ private fun ReportDocumentIcon(
         modifier = modifier
             .size(dimensions.controlHeight)
             .background(
-                color = MaterialTheme.colorScheme.surfaceVariant,
+                color = MaterialTheme.colorScheme.primaryContainer,
                 shape = MaterialTheme.shapes.small,
             ),
         contentAlignment = Alignment.Center,

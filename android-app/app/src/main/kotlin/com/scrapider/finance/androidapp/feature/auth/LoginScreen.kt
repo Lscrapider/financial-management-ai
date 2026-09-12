@@ -1,5 +1,6 @@
 package com.scrapider.finance.androidapp.feature.auth
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
@@ -19,8 +21,6 @@ import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -34,12 +34,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.scrapider.finance.androidapp.R
 import com.scrapider.finance.androidapp.core.network.FinanceApiClient
 import com.scrapider.finance.androidapp.core.session.UserSession
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceDimensions
@@ -106,6 +108,12 @@ fun LoginScreen(
             .padding(horizontal = spacing.xl, vertical = spacing.section),
         verticalArrangement = Arrangement.Center,
     ) {
+        Image(
+            painter = painterResource(R.drawable.ic_launcher_optics),
+            contentDescription = null,
+            modifier = Modifier.size(dimensions.toolRowHeight),
+        )
+        Spacer(Modifier.height(spacing.sm))
         Text(
             text = "金融研究助手",
             style = MaterialTheme.typography.displaySmall,
@@ -118,13 +126,11 @@ fun LoginScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(spacing.section))
-        Card(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = CardDefaults.outlinedCardBorder(),
         ) {
             Column(
-                modifier = Modifier.padding(spacing.lg),
+                modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(spacing.md),
             ) {
                 OutlinedTextField(

@@ -4,15 +4,19 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,6 +30,8 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceDimensions
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceSpacing
@@ -61,6 +67,8 @@ internal fun MarketTargetDetailScreen(
     val spacing = LocalFinanceSpacing.current
     val dimensions = LocalFinanceDimensions.current
     val fontScale = LocalDensity.current.fontScale
+    val density = LocalDensity.current
+    val textMeasurer = rememberTextMeasurer()
     val targetKey = detail.targetKey.ifBlank { target.targetKey }
     var extraMetricsExpanded by rememberSaveable(targetKey) { mutableStateOf(false) }
     val quote = detail.quote
@@ -107,7 +115,7 @@ internal fun MarketTargetDetailScreen(
                         Text(
                             text = target.targetName,
                             modifier = Modifier.semantics { heading() },
-                            style = MiuixTheme.textStyles.title2,
+                            style = MaterialTheme.typography.displaySmall,
                             color = MiuixTheme.colorScheme.onSurface,
                         )
                         Text(
@@ -117,7 +125,23 @@ internal fun MarketTargetDetailScreen(
                         )
                     }
                     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                        val columnMinWidth = dimensions.toolRowHeight * fontScale
+                        // 按实际价格长度测量，放大报价后也不把长价格挤成两行。
+                        val priceWidth = textMeasurer.measure(
+                            AnnotatedString(quote?.latestPrice?.asPriceText() ?: "—"),
+                            MaterialTheme.typography.displayMedium.copy(fontWeight = FontWeight.Bold, fontFeatureSettings = "tnum"),
+                            maxLines = 1,
+                        ).size.width
+                        val changeText = quote?.changePercent?.asPercentText() ?: "—"
+                        val changeWidth = textMeasurer.measure(
+                            AnnotatedString(changeText),
+                            MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.SemiBold, fontFeatureSettings = "tnum"),
+                            maxLines = 1,
+                        ).size.width
+                        val columnMinWidth = maxOf(
+                            dimensions.toolRowHeight * fontScale,
+                            with(density) { priceWidth.toDp() },
+                            with(density) { changeWidth.toDp() } + spacing.xs * 2,
+                        )
                         val columnCount = if (maxWidth >= columnMinWidth * 2 + spacing.section) 2 else 1
                         if (columnCount == 1) {
                             Column(verticalArrangement = Arrangement.spacedBy(spacing.lg)) {
@@ -255,7 +279,7 @@ private fun MarketDetailPrimaryQuote(
         )
         Text(
             text = quote?.latestPrice?.asPriceText() ?: "—",
-            style = MaterialTheme.typography.headlineLarge.copy(fontFeatureSettings = "tnum"),
+            style = MaterialTheme.typography.displayMedium.copy(fontFeatureSettings = "tnum", fontWeight = FontWeight.Bold),
             color = when {
                 (quote?.changePercent ?: 0.0) > 0 -> LocalMarketSignalColors.current.onPositiveContainer
                 (quote?.changePercent ?: 0.0) < 0 -> LocalMarketSignalColors.current.onNegativeContainer
@@ -283,13 +307,13 @@ private fun MarketDetailChangeQuote(
         if (quote?.changePercent == null) {
             Text(
                 text = "—",
-                style = MaterialTheme.typography.headlineSmall.copy(fontFeatureSettings = "tnum"),
+                style = MaterialTheme.typography.headlineMedium.copy(fontFeatureSettings = "tnum"),
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
         } else {
             MarketChangeLabel(
                 changePercent = quote.changePercent,
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.SemiBold),
             )
         }
     }
@@ -328,30 +352,45 @@ private fun MarketQuoteState(
 @Composable
 private fun MarketPrimaryMetrics(metrics: List<MarketQuoteMetric>) {
     val spacing = LocalFinanceSpacing.current
+    val dimensions = LocalFinanceDimensions.current
     Column {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val fontScale = LocalDensity.current.fontScale
-            val minCellWidth = LocalFinanceDimensions.current.controlHeight * 1.5f * fontScale
+            val minCellWidth = dimensions.controlHeight * 1.5f * fontScale
             val columns = when {
                 maxWidth >= minCellWidth * 3 + spacing.sm * 2 -> 3
                 maxWidth >= minCellWidth * 2 + spacing.sm -> 2
                 else -> 1
             }
             Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                metrics.chunked(columns).forEach { rowMetrics ->
+                val rows = metrics.chunked(columns)
+                rows.forEachIndexed { rowIndex, rowMetrics ->
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Min),
                         horizontalArrangement = Arrangement.spacedBy(spacing.sm),
                     ) {
-                        rowMetrics.forEach { metric ->
-                            MarketMetricValue(
-                                metric = metric,
-                                modifier = Modifier.weight(1f),
-                            )
+                        repeat(columns) { columnIndex ->
+                            if (columnIndex < rowMetrics.size) {
+                                MarketMetricValue(
+                                    metric = rowMetrics[columnIndex],
+                                    modifier = Modifier.weight(1f),
+                                )
+                            } else {
+                                Spacer(Modifier.weight(1f))
+                            }
+                            if (columnIndex < columns - 1) {
+                                VerticalDivider(
+                                    modifier = Modifier.fillMaxHeight(),
+                                    thickness = dimensions.outlineWidth,
+                                    color = MaterialTheme.colorScheme.outlineVariant,
+                                )
+                            }
                         }
-                        repeat(columns - rowMetrics.size) {
-                            Spacer(Modifier.weight(1f))
-                        }
+                    }
+                    if (rowIndex < rows.lastIndex) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     }
                 }
             }

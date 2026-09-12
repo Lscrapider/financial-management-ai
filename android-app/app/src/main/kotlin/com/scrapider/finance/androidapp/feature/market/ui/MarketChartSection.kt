@@ -351,6 +351,9 @@ private fun MarketChartCanvas(
     val gridColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)
     val primaryColor = MiuixTheme.colorScheme.primary
     val neutralColor = MiuixTheme.colorScheme.onSurfaceVariantSummary
+    val ma5Color = MaterialTheme.colorScheme.primary
+    val ma10Color = MaterialTheme.colorScheme.secondary
+    val ma20Color = MaterialTheme.colorScheme.tertiary
     val density = LocalDensity.current
     val textMeasurer = rememberTextMeasurer()
     val axisStyle = MiuixTheme.textStyles.body2.copy(color = neutralColor, fontFeatureSettings = "tnum")
@@ -401,6 +404,9 @@ private fun MarketChartCanvas(
             neutralColor = neutralColor,
             positiveColor = signals.onPositiveContainer,
             negativeColor = signals.onNegativeContainer,
+            ma5Color = ma5Color,
+            ma10Color = ma10Color,
+            ma20Color = ma20Color,
             chartUnit = chartUnit,
             axisWidth = axisWidthPx,
             axisLabels = axisLabels,
@@ -423,24 +429,46 @@ private fun MarketChartRange(period: MarketChartPeriod, points: List<MarketChart
 private fun MarketSelectedPoint(period: MarketChartPeriod, point: MarketChartPoint) {
     val spacing = LocalFinanceSpacing.current
     val signals = LocalMarketSignalColors.current
+    val chartColors = MaterialTheme.colorScheme
     val entries = if (period == MarketChartPeriod.Intraday) listOf("价格" to point.close, "均价" to point.average)
         else listOf("开" to point.open, "高" to point.high, "低" to point.low, "收" to point.close)
-    FlowRow(Modifier.fillMaxWidth().padding(vertical = spacing.xs),
-        horizontalArrangement = Arrangement.spacedBy(spacing.md), verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-        Text(formatChartTime(point.time, period), style = MiuixTheme.textStyles.body2,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
-        entries.forEach { (label, number) ->
-            val reference = point.open
-            val color = if (period == MarketChartPeriod.Intraday) {
-                if (label == "价格") MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary
+    Column {
+        FlowRow(Modifier.fillMaxWidth().padding(vertical = spacing.xs),
+            horizontalArrangement = Arrangement.spacedBy(spacing.md), verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+            Text(formatChartTime(point.time, period), style = MiuixTheme.textStyles.body2,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+            entries.forEach { (label, number) ->
+                val reference = point.open
+                val color = if (period == MarketChartPeriod.Intraday) {
+                    if (label == "价格") MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary
+                }
+                    else if (reference != null && number != null && number > reference) signals.onPositiveContainer
+                    else if (reference != null && number != null && number < reference) signals.onNegativeContainer
+                    else MiuixTheme.colorScheme.onSurface
+                Text("$label ${marketDetailNumber(number)}", style = MiuixTheme.textStyles.body2.copy(fontFeatureSettings = "tnum"), color = color)
             }
-                else if (reference != null && number != null && number > reference) signals.onPositiveContainer
-                else if (reference != null && number != null && number < reference) signals.onNegativeContainer
-                else MiuixTheme.colorScheme.onSurface
-            Text("$label ${marketDetailNumber(number)}", style = MiuixTheme.textStyles.body2.copy(fontFeatureSettings = "tnum"), color = color)
+            Text("量 ${marketDetailNumber(point.volume)}", style = MiuixTheme.textStyles.body2,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
         }
-        Text("量 ${marketDetailNumber(point.volume)}", style = MiuixTheme.textStyles.body2,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+        if (period != MarketChartPeriod.Intraday) {
+            FlowRow(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(spacing.md),
+                verticalArrangement = Arrangement.spacedBy(spacing.xs),
+            ) {
+                listOf(
+                    Triple("MA5", point.ma5, chartColors.primary),
+                    Triple("MA10", point.ma10, chartColors.secondary),
+                    Triple("MA20", point.ma20, chartColors.tertiary),
+                ).forEach { (label, number, color) ->
+                    Text(
+                        "$label ${marketDetailNumber(number)}",
+                        style = MiuixTheme.textStyles.body2.copy(fontFeatureSettings = "tnum"),
+                        color = color,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -467,6 +495,9 @@ private fun DrawScope.drawMarketChart(
     neutralColor: Color,
     positiveColor: Color,
     negativeColor: Color,
+    ma5Color: Color,
+    ma10Color: Color,
+    ma20Color: Color,
     chartUnit: androidx.compose.ui.unit.Dp,
     axisWidth: Float,
     axisLabels: List<TextLayoutResult>,
@@ -574,6 +605,9 @@ private fun DrawScope.drawMarketChart(
                 strokeWidth = chartUnit.toPx() * 0.19f,
             )
         }
+        drawMovingAverageSeries(points, { it.ma5 }, xFor, yFor, ma5Color, chartUnit)
+        drawMovingAverageSeries(points, { it.ma10 }, xFor, yFor, ma10Color, chartUnit)
+        drawMovingAverageSeries(points, { it.ma20 }, xFor, yFor, ma20Color, chartUnit)
     }
     val safeSelected = selectedIndex.coerceIn(0, points.lastIndex)
     val selectedX = xFor(safeSelected)
@@ -595,6 +629,25 @@ private fun DrawScope.drawMarketChart(
             (y - label.size.height / 2f).coerceIn(0f, size.height - label.size.height)))
     }
 
+}
+
+private fun DrawScope.drawMovingAverageSeries(
+    points: List<MarketChartPoint>,
+    value: (MarketChartPoint) -> Double?,
+    xFor: (Int) -> Float,
+    yFor: (Double) -> Float,
+    color: Color,
+    chartUnit: androidx.compose.ui.unit.Dp,
+) {
+    if (points.none { value(it)?.isFinite() == true }) return
+    drawSeries(
+        points = points,
+        value = value,
+        xFor = xFor,
+        yFor = yFor,
+        color = color,
+        strokeWidth = chartUnit.toPx() * 0.2f,
+    )
 }
 
 private fun DrawScope.drawSeries(
@@ -646,6 +699,9 @@ private fun MarketChartPoint.rangeValues(period: MarketChartPeriod): List<Double
         open?.takeIf { it.isFinite() },
         high?.takeIf { it.isFinite() },
         low?.takeIf { it.isFinite() },
+        ma5?.takeIf { it.isFinite() },
+        ma10?.takeIf { it.isFinite() },
+        ma20?.takeIf { it.isFinite() },
     )
 }
 
@@ -662,7 +718,7 @@ private fun buildPointSummary(period: MarketChartPeriod, point: MarketChartPoint
     return if (period == MarketChartPeriod.Intraday) {
         "${formatChartTime(point.time, period)}，价格 ${marketDetailNumber(point.close)}，均价 ${marketDetailNumber(point.average)}，成交量 ${marketDetailNumber(point.volume)}"
     } else {
-        "${formatChartTime(point.time, period)}，开 ${marketDetailNumber(point.open)}，高 ${marketDetailNumber(point.high)}，低 ${marketDetailNumber(point.low)}，收 ${marketDetailNumber(point.close)}，成交量 ${marketDetailNumber(point.volume)}"
+        "${formatChartTime(point.time, period)}，开 ${marketDetailNumber(point.open)}，高 ${marketDetailNumber(point.high)}，低 ${marketDetailNumber(point.low)}，收 ${marketDetailNumber(point.close)}，MA5 ${marketDetailNumber(point.ma5)}，MA10 ${marketDetailNumber(point.ma10)}，MA20 ${marketDetailNumber(point.ma20)}，成交量 ${marketDetailNumber(point.volume)}"
     }
 }
 

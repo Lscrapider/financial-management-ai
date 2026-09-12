@@ -1,6 +1,7 @@
 package com.scrapider.finance.androidapp.feature.workbench.imports
 
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -25,6 +26,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceDimensions
+import com.scrapider.finance.androidapp.designsystem.financeChromeColor
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceSpacing
 import com.scrapider.finance.androidapp.designsystem.rememberFinanceSignalColors
 
@@ -38,7 +40,11 @@ internal fun ImportActionBar(
 ) {
     val spacing = LocalFinanceSpacing.current
     val dimensions = LocalFinanceDimensions.current
-    Column(modifier.fillMaxWidth()) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(financeChromeColor()),
+    ) {
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Button(
             onClick = onClick,

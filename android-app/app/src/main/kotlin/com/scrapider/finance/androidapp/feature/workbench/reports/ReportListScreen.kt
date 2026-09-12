@@ -1,5 +1,6 @@
 package com.scrapider.finance.androidapp.feature.workbench.reports
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -20,6 +21,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceDimensions
+import com.scrapider.finance.androidapp.designsystem.financeChromeColor
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceSpacing
 
 @Composable
@@ -160,6 +162,7 @@ internal fun ReportListScreen(
             shape = MaterialTheme.shapes.medium,
             modifier = Modifier
                 .fillMaxWidth()
+                .background(financeChromeColor())
                 .padding(horizontal = spacing.xl, vertical = spacing.sm)
                 .heightIn(min = dimensions.controlHeight),
         ) {

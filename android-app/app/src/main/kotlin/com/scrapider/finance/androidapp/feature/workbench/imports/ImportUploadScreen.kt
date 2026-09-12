@@ -1,5 +1,6 @@
 package com.scrapider.finance.androidapp.feature.workbench.imports
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,7 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -61,15 +61,22 @@ internal fun ImportUploadScreen(
                 item(key = "upload-preparing") { ReportLoadingState("正在读取并检查文件") }
             } else if (fileName != null) {
                 item(key = "upload-file") {
-                    Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.medium) {
-                        Row(Modifier.fillMaxWidth().padding(spacing.lg), horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
-                            Icon(painterResource(R.drawable.ic_phosphor_file_text_duotone), null,
-                                Modifier.size(LocalFinanceDimensions.current.iconSize))
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                                Text(fileName, style = MaterialTheme.typography.titleMedium)
-                                Text(fileDescription, style = MaterialTheme.typography.bodySmall,
-                                    color = rememberFinanceSignalColors().onNeutralContainer)
-                            }
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .padding(spacing.lg),
+                        horizontalArrangement = Arrangement.spacedBy(spacing.md),
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.ic_phosphor_file_text_duotone),
+                            null,
+                            Modifier.size(LocalFinanceDimensions.current.iconSize),
+                        )
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                            Text(fileName, style = MaterialTheme.typography.titleMedium)
+                            Text(fileDescription, style = MaterialTheme.typography.bodySmall,
+                                color = rememberFinanceSignalColors().onNeutralContainer)
                         }
                     }
                 }

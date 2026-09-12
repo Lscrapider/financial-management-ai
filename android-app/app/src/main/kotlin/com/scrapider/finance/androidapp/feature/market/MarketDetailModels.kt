@@ -25,6 +25,9 @@ data class MarketChartPoint(
     val low: Double? = null,
     val volume: Double? = null,
     val average: Double? = null,
+    val ma5: Double? = null,
+    val ma10: Double? = null,
+    val ma20: Double? = null,
 )
 
 @Immutable

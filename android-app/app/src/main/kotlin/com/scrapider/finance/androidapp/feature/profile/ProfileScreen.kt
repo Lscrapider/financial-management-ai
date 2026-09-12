@@ -1,6 +1,5 @@
 package com.scrapider.finance.androidapp.feature.profile
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,8 +19,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -169,7 +166,7 @@ private fun ProfileScreen(
                     Spacer(Modifier.height(spacing.lg))
                 }
                 item(key = "basic-content", contentType = "section") {
-                    ProfileSectionCard {
+                    ProfileSection {
                         ProfileValueRow(title = "姓名", value = profile.displayName)
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         ProfileValueRow(title = "用户名", value = profile.username.ifBlank { "未提供" })
@@ -190,7 +187,7 @@ private fun ProfileScreen(
                     Spacer(Modifier.height(spacing.lg))
                 }
                 item(key = "contacts-content", contentType = "section") {
-                    ProfileSectionCard {
+                    ProfileSection {
                         ProfileValueRow(title = "备用邮箱", value = profile.email.ifBlank { "未填写" })
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         ProfileValueRow(title = "密保手机", value = profile.phone.ifBlank { "未填写" })
@@ -209,7 +206,7 @@ private fun ProfileScreen(
                     Spacer(Modifier.height(spacing.lg))
                 }
                 item(key = "password-content", contentType = "section") {
-                    ProfileSectionCard {
+                    ProfileSection {
                         ProfileActionRow(
                             title = "修改密码",
                             summary = "需验证当前密码后才能保存",
@@ -224,7 +221,7 @@ private fun ProfileScreen(
                     Spacer(Modifier.height(spacing.lg))
                 }
                 item(key = "notification-content", contentType = "section") {
-                    ProfileSectionCard {
+                    ProfileSection {
                         EmailNotificationRow(
                             enabled = profile.emailNotification,
                             isUpdating = state.isUpdatingNotification,
@@ -318,19 +315,8 @@ private fun ProfileSectionTitle(title: String) {
 }
 
 @Composable
-private fun ProfileSectionCard(content: @Composable () -> Unit) {
-    val dimensions = LocalFinanceDimensions.current
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.small,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(
-            width = dimensions.outlineWidth,
-            color = MaterialTheme.colorScheme.outlineVariant,
-        ),
-    ) {
-        Column { content() }
-    }
+private fun ProfileSection(content: @Composable () -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth()) { content() }
 }
 
 @Composable

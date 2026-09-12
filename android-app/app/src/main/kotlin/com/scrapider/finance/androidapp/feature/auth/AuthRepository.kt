@@ -34,6 +34,7 @@ class AuthRepository(
                 .orEmpty()
         }
         if (token.isBlank()) {
+            apiClient.clearAuthentication()
             return NetworkResult.Failure(NetworkFailure.InvalidResponse)
         }
 
@@ -41,13 +42,13 @@ class AuthRepository(
         val userResponse = apiClient.get(ApiConfig.USER_INFO_PATH).toEnvelope()
         val userData = when (userResponse) {
             is NetworkResult.Failure -> {
-                apiClient.setAccessToken("")
+                apiClient.clearAuthentication()
                 return userResponse
             }
 
             is NetworkResult.Success -> userResponse.data.optJSONObject("data")
                 ?: run {
-                    apiClient.setAccessToken("")
+                    apiClient.clearAuthentication()
                     return NetworkResult.Failure(NetworkFailure.InvalidResponse)
                 }
         }

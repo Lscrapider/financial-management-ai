@@ -48,6 +48,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.ImeAction
 import com.scrapider.finance.androidapp.R
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceDimensions
+import com.scrapider.finance.androidapp.designsystem.financeChromeColor
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceSpacing
 import com.scrapider.finance.androidapp.designsystem.rememberFinanceSignalColors
 
@@ -507,7 +508,7 @@ private fun ReportSelectedTarget(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small)
+            .background(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.small)
             .padding(horizontal = spacing.md, vertical = spacing.sm)
             .semantics {
                 contentDescription = "已选择 ${target.targetName} ${target.targetCode}"
@@ -523,18 +524,18 @@ private fun ReportSelectedTarget(
             Text(
                 text = target.targetName,
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
             Text(
                 text = "${target.targetCode} · ${target.typeLabel}",
                 style = MaterialTheme.typography.bodySmall,
-                color = rememberFinanceSignalColors().onNeutralContainer,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
         }
         Text(
             text = "已选择",
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
         )
     }
 }
@@ -608,9 +609,10 @@ private fun ReportSubmitBar(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
+            .background(financeChromeColor())
             .padding(horizontal = spacing.xl, vertical = spacing.md),
     ) {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Button(
             onClick = onSubmit,
             enabled = enabled && !isSubmitting,

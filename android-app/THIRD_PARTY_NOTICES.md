@@ -26,6 +26,9 @@
 | `ic_phosphor_lock_simple.xml` | [`regular/lock-simple.svg`](https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/regular/lock-simple.svg) |
 | `ic_phosphor_arrow_right.xml` | [`regular/arrow-right.svg`](https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/regular/arrow-right.svg) |
 | `ic_phosphor_arrows_out.xml` | [`regular/arrows-out.svg`](https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/regular/arrows-out.svg) |
+| `ic_phosphor_paper_plane_tilt_fill.xml` | [`fill/paper-plane-tilt-fill.svg`](https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/fill/paper-plane-tilt-fill.svg) |
+
+新增发送图标的原始 SVG 保存在 `design/assets/paper-plane-tilt-fill.svg`。
 
 ### 原始 MIT 许可全文
 

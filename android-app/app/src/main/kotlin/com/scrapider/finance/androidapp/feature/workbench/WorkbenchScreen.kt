@@ -1,12 +1,15 @@
 package com.scrapider.finance.androidapp.feature.workbench
 
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ButtonDefaults
@@ -43,7 +47,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -215,30 +222,23 @@ fun WorkbenchScreen(
     val reportItems = state.reportItems.take(WORKBENCH_PREVIEW_ITEM_LIMIT)
     val overview = state.watchlistOverview
     LazyColumn(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface),
         contentPadding = PaddingValues(
-            start = spacing.xl,
-            top = spacing.md,
-            end = spacing.xl,
             bottom = spacing.section,
         ),
     ) {
         item(key = "header", contentType = "header") {
-            WorkbenchHeader(
-                displayName = displayName,
-            )
-        }
-        if (state.syncMessage.isNotBlank()) {
-            item(key = "sync_message", contentType = "sync_message") {
-                SyncMessage(
-                    message = state.syncMessage,
-                    isLoading = state.isLoading,
-                    onRetry = onRetry,
-                )
+            WorkbenchIntro {
+                WorkbenchHeader(displayName)
+                if (state.syncMessage.isNotBlank()) {
+                    SyncMessage(
+                        message = state.syncMessage,
+                        isLoading = state.isLoading,
+                        onRetry = onRetry,
+                    )
+                }
+                ResearchTools(isAdmin = isAdmin, onToolSelected = onToolSelected)
             }
-        }
-        item(key = "tools", contentType = "tools") {
-            ResearchTools(isAdmin = isAdmin, onToolSelected = onToolSelected)
         }
         item(key = "overview_heading", contentType = "section_heading") {
             SectionHeading(
@@ -302,7 +302,7 @@ fun WorkbenchScreen(
                 ) { item ->
                     CompactReportRow(item = item, onClick = { onReportSelected(item) })
                     if (item.id != reportItems.last().id) {
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        HorizontalDivider(Modifier.padding(horizontal = spacing.xl), color = MaterialTheme.colorScheme.outlineVariant)
                     }
                 }
             }
@@ -311,32 +311,61 @@ fun WorkbenchScreen(
     }
 }
 
+/** 标题与工具入口共用一张背景，图像下缘在内容层后自然消隐。 */
 @Composable
-private fun WorkbenchHeader(
-    displayName: String,
-) {
-    val signals = rememberFinanceSignalColors()
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top,
-    ) {
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(LocalFinanceSpacing.current.xs),
-        ) {
-            Text(
-                text = "工作台",
-                modifier = Modifier.semantics { heading() },
-                style = MaterialTheme.typography.displaySmall,
-                color = MaterialTheme.colorScheme.onBackground,
+private fun WorkbenchIntro(content: @Composable () -> Unit) {
+    val spacing = LocalFinanceSpacing.current
+    val dimensions = LocalFinanceDimensions.current
+    val colors = MaterialTheme.colorScheme
+    val dark = isSystemInDarkTheme()
+    val artworkHeight = dimensions.toolRowHeight + spacing.section
+    val artworkHeightPx = with(LocalDensity.current) { artworkHeight.toPx() }
+    Box(Modifier.fillMaxWidth().background(colors.surface)) {
+        Box(Modifier.matchParentSize().clipToBounds()) {
+            Box(Modifier.matchParentSize().background(Brush.verticalGradient(
+                listOf(colors.primaryContainer, colors.surface),
+            )))
+            Image(
+                painter = painterResource(R.drawable.bg_workbench_optics),
+                contentDescription = null,
+                modifier = Modifier.align(Alignment.TopEnd)
+                    .width(dimensions.toolRowHeight * 3)
+                    .height(artworkHeight),
+                contentScale = ContentScale.FillWidth,
+                alpha = if (dark) DARK_HEADER_ART_ALPHA else 1f,
             )
-            Text(
-                text = greeting(displayName),
-                style = MaterialTheme.typography.bodySmall,
-                color = signals.onNeutralContainer,
-            )
+            // 图片与雾蓝底一起淡出，而不是在标题容器边界硬切回白色。
+            Box(Modifier.matchParentSize().background(Brush.verticalGradient(
+                0f to Color.Transparent,
+                INTRO_FADE_START to colors.surface.copy(alpha = INTRO_FADE_ALPHA),
+                1f to colors.surface,
+                endY = artworkHeightPx,
+            )))
         }
+        Column { content() }
+    }
+}
+
+@Composable
+private fun WorkbenchHeader(displayName: String) {
+    val spacing = LocalFinanceSpacing.current
+    Column(
+        modifier = Modifier
+            .padding(horizontal = spacing.xl, vertical = spacing.md)
+            .fillMaxWidth(HEADER_TEXT_WIDTH_FRACTION),
+        verticalArrangement = Arrangement.spacedBy(spacing.xxs),
+    ) {
+        Text(
+            text = "工作台",
+            modifier = Modifier.semantics { heading() },
+            style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        Text(
+            text = greeting(displayName),
+            style = MaterialTheme.typography.bodySmall,
+            color = rememberFinanceSignalColors().onNeutralContainer,
+        )
     }
 }
 
@@ -348,26 +377,35 @@ private fun SectionHeading(
     prominent: Boolean = false,
 ) {
     val spacing = LocalFinanceSpacing.current
-    Row(
-        modifier = Modifier
-            .padding(top = spacing.lg)
-            .fillMaxWidth()
-            .heightIn(min = LocalFinanceDimensions.current.minTouchTarget),
-        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = title,
-            modifier = Modifier.weight(1f).semantics { heading() },
-            style = if (prominent) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
+    Column {
+        HorizontalDivider(
+            Modifier.padding(top = spacing.sm),
+            thickness = spacing.xs,
+            color = MaterialTheme.colorScheme.surfaceVariant,
         )
-        if (actionLabel != null) {
-            TextButton(
-                onClick = onAction,
-                modifier = Modifier.heightIn(min = LocalFinanceDimensions.current.minTouchTarget),
-            ) {
-                Text(actionLabel)
+        Row(
+            modifier = Modifier
+                .padding(horizontal = spacing.xl)
+                .fillMaxWidth()
+                .heightIn(min = LocalFinanceDimensions.current.minTouchTarget),
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = title,
+                modifier = Modifier.weight(1f).semantics { heading() },
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontWeight = if (prominent) FontWeight.Bold else FontWeight.SemiBold,
+                ),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            if (actionLabel != null) {
+                TextButton(
+                    onClick = onAction,
+                    modifier = Modifier.heightIn(min = LocalFinanceDimensions.current.minTouchTarget),
+                ) {
+                    Text(actionLabel)
+                }
             }
         }
     }
@@ -379,7 +417,7 @@ private fun WatchlistCounts(overview: WatchlistOverview) {
     val dimensions = LocalFinanceDimensions.current
     val signals = rememberFinanceSignalColors()
     val fontScale = LocalDensity.current.fontScale
-    Column(verticalArrangement = Arrangement.spacedBy(spacing.md)) {
+    Column(Modifier.padding(horizontal = spacing.xl), verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
         Text(
             text = "全部分组 · 去重后 " + overview.totalCount + " 只",
             style = MaterialTheme.typography.bodySmall,
@@ -410,18 +448,19 @@ private fun WatchlistCounts(overview: WatchlistOverview) {
 @Composable
 private fun MovementCount(label: String, count: Int, color: Color, modifier: Modifier = Modifier) {
     val spacing = LocalFinanceSpacing.current
-    Row(
+    FlowRow(
         modifier = modifier.semantics(mergeDescendants = true) {},
         horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(spacing.xxs),
+        itemVerticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = color)
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
         Text(
             text = count.toString(),
-            style = MaterialTheme.typography.displaySmall.copy(fontFeatureSettings = "tnum"),
+            style = MaterialTheme.typography.displayMedium.copy(fontFeatureSettings = "tnum", fontWeight = FontWeight.Bold),
             color = color,
         )
-        Text("只", style = MaterialTheme.typography.bodySmall, color = color)
+        Text("只", style = MaterialTheme.typography.bodySmall, color = rememberFinanceSignalColors().onNeutralContainer)
     }
 }
 
@@ -431,7 +470,7 @@ private fun WatchlistRankings(overview: WatchlistOverview, onOpenMarket: () -> U
     val dimensions = LocalFinanceDimensions.current
     val signals = rememberFinanceSignalColors()
     val fontScale = LocalDensity.current.fontScale
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(top = spacing.lg)) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.xl).padding(top = spacing.lg)) {
         val hasBothDirections = overview.topGainers.isNotEmpty() && overview.topLosers.isNotEmpty()
         val canShowColumns = (maxWidth - spacing.lg) / 2 >= dimensions.toolRowHeight * OVERVIEW_COLUMN_WIDTH_UNITS * fontScale
         if (hasBothDirections && canShowColumns) {
@@ -484,7 +523,7 @@ private fun RankingGroup(
         if (items.isEmpty()) {
             Text(emptyText, style = MaterialTheme.typography.bodySmall, color = signals.onNeutralContainer)
         } else {
-            items.forEachIndexed { index, item ->
+            items.forEach { item ->
                 key(item.targetKey) {
                     Column(
                         modifier = Modifier
@@ -498,7 +537,6 @@ private fun RankingGroup(
                             horizontalArrangement = Arrangement.spacedBy(spacing.xs),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text((index + 1).toString(), style = MaterialTheme.typography.labelMedium, color = color)
                             Text(
                                 text = item.targetName,
                                 modifier = Modifier.weight(1f),
@@ -532,6 +570,7 @@ private fun CompactReportRow(item: ReportItem, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = spacing.xl)
             .heightIn(min = dimensions.compactRowHeight)
             .clickable(role = Role.Button, onClickLabel = "查看报告", onClick = onClick)
             .padding(vertical = spacing.sm),
@@ -541,7 +580,10 @@ private fun CompactReportRow(item: ReportItem, onClick: () -> Unit) {
         Icon(
             painter = painterResource(R.drawable.ic_phosphor_file_text_duotone),
             contentDescription = null,
-            modifier = Modifier.size(dimensions.iconSize),
+            modifier = Modifier
+                .background(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.small)
+                .padding(spacing.sm)
+                .size(dimensions.iconSize),
             tint = MaterialTheme.colorScheme.primary,
         )
         Column(
@@ -598,17 +640,17 @@ private fun ResearchTools(isAdmin: Boolean, onToolSelected: (ResearchTool) -> Un
     val dimensions = LocalFinanceDimensions.current
     val fontScale = LocalDensity.current.fontScale
     BoxWithConstraints(
-        modifier = Modifier.fillMaxWidth().padding(top = spacing.xl),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.xl).padding(top = spacing.md),
     ) {
         val minItemWidth = (dimensions.minTouchTarget + spacing.lg) * fontScale
-        val toolCount = ResearchTool.entries.size
+        val toolCount = WORKBENCH_TOOL_ORDER.size
         val columns = when {
             (maxWidth - spacing.sm * (toolCount - 1)) / toolCount >= minItemWidth -> toolCount
             (maxWidth - spacing.sm) / 2 >= minItemWidth -> 2
             else -> 1
         }
         Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
-            ResearchTool.entries.chunked(columns).forEach { tools ->
+            WORKBENCH_TOOL_ORDER.chunked(columns).forEach { tools ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(spacing.sm),
@@ -673,7 +715,7 @@ private fun ResearchToolEntry(
                         painter = painterResource(tool.iconRes()),
                         contentDescription = null,
                         modifier = Modifier.size(spacing.section),
-                        tint = if (enabled) MaterialTheme.colorScheme.onPrimaryContainer else signals.onNeutralContainer,
+                        tint = if (enabled) MaterialTheme.colorScheme.primary else signals.onNeutralContainer,
                     )
                     if (!enabled) {
                         Icon(
@@ -688,9 +730,8 @@ private fun ResearchToolEntry(
                     }
                 }
                 Text(
-                    text = tool.label,
+                    text = if (tool == ResearchTool.AiAssistant) "AI 助手" else tool.label,
                     modifier = Modifier.clearAndSetSemantics {},
-                    minLines = 2,
                     style = MaterialTheme.typography.labelMedium,
                     color = if (enabled) MaterialTheme.colorScheme.onSurface else signals.onNeutralContainer,
                     textAlign = TextAlign.Center,
@@ -717,6 +758,7 @@ private fun ContentState(text: String, isLoading: Boolean = false) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = spacing.xl)
             .heightIn(min = dimensions.listRowHeight)
             .padding(vertical = spacing.md)
             .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
@@ -743,7 +785,7 @@ private fun SyncMessage(message: String, isLoading: Boolean, onRetry: () -> Unit
     val signals = rememberFinanceSignalColors()
     Row(
         modifier = Modifier
-            .padding(top = spacing.lg)
+            .padding(horizontal = spacing.xl).padding(top = spacing.lg)
             .fillMaxWidth()
             .background(signals.negativeContainer, MaterialTheme.shapes.small)
             .padding(spacing.md),
@@ -809,3 +851,11 @@ private fun ResearchTool.iconRes(): Int = when (this) {
 
 private const val OVERVIEW_COLUMN_WIDTH_UNITS = 1.5f
 private const val PERCENT_FORMAT = "%.2f%%"
+private const val HEADER_TEXT_WIDTH_FRACTION = 0.65f
+private const val DARK_HEADER_ART_ALPHA = 0.32f
+private const val INTRO_FADE_START = 0.45f
+private const val INTRO_FADE_ALPHA = 0.25f
+
+private val WORKBENCH_TOOL_ORDER = listOf(
+    ResearchTool.AiAssistant, ResearchTool.Report, ResearchTool.KnowledgeSearch, ResearchTool.MaterialImport,
+)

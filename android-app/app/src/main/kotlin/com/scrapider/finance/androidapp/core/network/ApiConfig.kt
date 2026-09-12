@@ -1,8 +1,9 @@
 package com.scrapider.finance.androidapp.core.network
 
 object ApiConfig {
-    const val DEFAULT_BASE_URL = "http://192.168.0.109:8081/finance-api"
+    const val DEFAULT_BASE_URL = "https://ali-finance.scrapider.cloud/finance-api"
     const val LOGIN_PATH = "/api/auth/login"
+    const val REFRESH_PATH = "/api/auth/refresh"
     const val USER_INFO_PATH = "/api/user/info"
     const val USER_PASSWORD_PATH = "/api/user/password"
     const val USER_NOTIFICATION_PATH = "/api/user/notification"

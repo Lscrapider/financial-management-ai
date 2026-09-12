@@ -28,7 +28,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -55,6 +54,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import com.scrapider.finance.androidapp.R
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceDimensions
+import com.scrapider.finance.androidapp.designsystem.financeChromeColor
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceSpacing
 import com.scrapider.finance.androidapp.designsystem.rememberFinanceSignalColors
 import com.scrapider.finance.androidapp.feature.workbench.reports.ReportTargetOption
@@ -546,14 +546,13 @@ private fun KnowledgeSelectionButton(
 ) {
     val spacing = LocalFinanceSpacing.current
     val dimensions = LocalFinanceDimensions.current
-    OutlinedButton(
-        onClick = onClick,
-        enabled = enabled,
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = dimensions.controlHeight),
-        shape = MaterialTheme.shapes.medium,
-        contentPadding = PaddingValues(horizontal = spacing.lg, vertical = spacing.sm),
+            .heightIn(min = dimensions.controlHeight)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .padding(vertical = spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(
             modifier = Modifier.weight(1f),
@@ -563,7 +562,7 @@ private fun KnowledgeSelectionButton(
             Text(
                 text = value,
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = if (enabled) MaterialTheme.colorScheme.onSurface else rememberFinanceSignalColors().onNeutralContainer,
             )
             Text(
                 text = supportingText,
@@ -578,6 +577,7 @@ private fun KnowledgeSelectionButton(
             tint = rememberFinanceSignalColors().onNeutralContainer,
         )
     }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -640,7 +640,7 @@ private fun KnowledgeSelectedTarget(target: ReportTargetOption) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small)
+            .background(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.small)
             .padding(horizontal = spacing.md, vertical = spacing.sm)
             .semantics {
                 contentDescription = "已选择 ${target.targetName} ${target.targetCode}"
@@ -653,14 +653,14 @@ private fun KnowledgeSelectedTarget(target: ReportTargetOption) {
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(spacing.xxs),
         ) {
-            Text(target.targetName, style = MaterialTheme.typography.titleMedium)
+            Text(target.targetName, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
             Text(
                 "${target.targetCode} · ${target.typeLabel}",
                 style = MaterialTheme.typography.bodySmall,
-                color = rememberFinanceSignalColors().onNeutralContainer,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
         }
-        Text("已选择", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+        Text("已选择", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
     }
 }
 
@@ -866,9 +866,10 @@ private fun KnowledgeSubmitBar(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
+            .background(financeChromeColor())
             .padding(horizontal = spacing.xl, vertical = spacing.md),
     ) {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Button(
             onClick = onSubmit,
             enabled = enabled && !isSubmitting,

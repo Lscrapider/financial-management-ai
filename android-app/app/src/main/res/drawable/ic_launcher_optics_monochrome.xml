@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 与彩色前景共用透明轮廓，避免单色图标偏移或产生另一套形状。 -->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/ic_launcher_optics"
+    android:gravity="fill"
+    android:tint="#FFFFFFFF"
+    android:tintMode="src_in" />

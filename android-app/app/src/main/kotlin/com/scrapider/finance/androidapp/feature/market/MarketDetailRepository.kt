@@ -59,7 +59,18 @@ class MarketDetailRepository(private val apiClient: FinanceApiClient) {
             if (period != MarketChartPeriod.Intraday) {
                 require(open != null && high != null && low != null && high >= maxOf(open, close) && low <= minOf(open, close))
             }
-            MarketChartPoint(time, close, open, high, low, row.number("volume"), row.number("averagePrice"))
+            MarketChartPoint(
+                time = time,
+                close = close,
+                open = open,
+                high = high,
+                low = low,
+                volume = row.number("volume"),
+                average = row.number("averagePrice"),
+                ma5 = row.number("ma5"),
+                ma10 = row.number("ma10"),
+                ma20 = row.number("ma20"),
+            )
         }.distinctBy { it.time }.sortedBy { it.time }
         if (period != MarketChartPeriod.Intraday || points.isEmpty()) return points
         val latestDay = points.last().time.take(DATE_LENGTH)
