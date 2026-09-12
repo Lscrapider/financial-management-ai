@@ -7,13 +7,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -23,10 +19,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import com.scrapider.finance.androidapp.R
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceDimensions
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceSpacing
 
@@ -40,7 +32,7 @@ internal fun ReportListScreen(
     onTypeSelected: (String) -> Unit,
     onOpenLatest: (ReportTarget) -> Unit,
     onOpenHistory: (ReportTarget) -> Unit,
-    onRefresh: () -> Unit,
+    onRetry: () -> Unit,
     onLoadMore: () -> Unit,
     onGenerate: () -> Unit,
     modifier: Modifier = Modifier,
@@ -57,26 +49,6 @@ internal fun ReportListScreen(
             title = "研究报告",
             onBack = onBack,
             actions = {
-                IconButton(
-                    onClick = onRefresh,
-                    enabled = !state.isLoading,
-                    modifier = Modifier.semantics {
-                        contentDescription = if (state.isLoading) "正在刷新研究报告" else "刷新研究报告"
-                    },
-                ) {
-                    if (state.isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(dimensions.iconSize),
-                            strokeWidth = dimensions.outlineWidth,
-                        )
-                    } else {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_phosphor_arrows_clockwise),
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                }
                 TextButton(
                     onClick = { showFilter = true },
                     modifier = Modifier.heightIn(min = dimensions.minTouchTarget),
@@ -117,7 +89,7 @@ internal fun ReportListScreen(
 
             if (state.errorMessage.isNotBlank()) {
                 item(key = "report-list-error", contentType = "error") {
-                    ReportErrorState(text = state.errorMessage, onRetry = onRefresh)
+                    ReportErrorState(text = state.errorMessage, onRetry = onRetry)
                 }
             }
 

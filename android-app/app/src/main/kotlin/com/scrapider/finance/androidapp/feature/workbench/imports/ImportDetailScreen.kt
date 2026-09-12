@@ -10,18 +10,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import com.scrapider.finance.androidapp.R
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceSpacing
 import com.scrapider.finance.androidapp.designsystem.rememberFinanceSignalColors
 import com.scrapider.finance.androidapp.feature.workbench.reports.ReportEmptyState
@@ -35,18 +31,14 @@ internal fun ImportDetailScreen(
     state: ImportsUiState,
     canEdit: Boolean,
     onEdit: () -> Unit,
-    onRefresh: () -> Unit,
+    onRetry: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalFinanceSpacing.current
     val task = state.selectedTask
     Column(modifier.fillMaxSize()) {
-        ReportTopBar(title = "资料详情", onBack = onBack, actions = {
-            IconButton(onClick = onRefresh, enabled = !state.isLoadingDetail) {
-                Icon(painterResource(R.drawable.ic_phosphor_arrows_clockwise), "刷新资料状态")
-            }
-        })
+        ReportTopBar(title = "资料详情", onBack = onBack)
         LazyColumn(
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(horizontal = spacing.xl, vertical = spacing.md),
@@ -83,15 +75,15 @@ internal fun ImportDetailScreen(
                         ReportInfoState("资料已完成处理，可在知识检索中查找相关内容。")
                     }
                     ImportTaskStatus.Failed -> item(key = "import-failure-info", contentType = "status") {
-                        ReportInfoState("本次处理未完成。可先刷新确认状态，检查原材料后再重新导入。")
+                        ReportInfoState("本次处理未完成。请检查原材料后重新导入，处理状态会自动更新。")
                     }
                     ImportTaskStatus.Unknown -> item(key = "import-unknown-info", contentType = "status") {
-                        ReportInfoState("暂时无法确认处理状态，请刷新后查看。")
+                        ReportInfoState("暂时无法确认处理状态，重新进入资料页时会自动更新。")
                     }
                 }
             }
             if (state.error != null) item(key = "import-detail-error", contentType = "error") {
-                ReportErrorState(state.error.userMessage, onRefresh)
+                ReportErrorState(state.error.userMessage, onRetry)
             }
             if (state.isLoadingDetail) item(key = "import-detail-loading") { ReportLoadingState("正在更新处理状态") }
             item(key = "import-stages-heading", contentType = "heading") { ImportHeading("处理阶段") }

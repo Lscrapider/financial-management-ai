@@ -24,6 +24,7 @@ class MainActivity : ComponentActivity() {
                     state = state,
                     apiClient = appViewModel.apiClient,
                     onAuthenticated = appViewModel::authenticate,
+                    onSessionUpdated = appViewModel::updateSession,
                     onDestinationSelected = appViewModel::selectDestination,
                     onSignOut = appViewModel::signOut,
                 )

@@ -15,7 +15,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -44,7 +43,7 @@ internal fun ImportListScreen(
     state: ImportsUiState,
     onCategory: (ImportCategory) -> Unit,
     onOpen: (ImportTask) -> Unit,
-    onRefresh: () -> Unit,
+    onRetry: () -> Unit,
     onLoadMore: () -> Unit,
     onImport: () -> Unit,
     onBack: () -> Unit,
@@ -55,11 +54,7 @@ internal fun ImportListScreen(
     val list = if (state.selectedCategory == ImportCategory.File) state.fileTasks else state.manualTasks
     val mutating = state.isUploading || state.isSaving || state.isSubmitting || state.isCreatingManual
     Column(modifier.fillMaxSize()) {
-        ReportTopBar(title = "资料导入", onBack = onBack, actions = {
-            IconButton(onClick = onRefresh, enabled = !list.isLoading) {
-                Icon(painterResource(R.drawable.ic_phosphor_arrows_clockwise), "刷新处理记录")
-            }
-        })
+        ReportTopBar(title = "资料导入", onBack = onBack)
         Row(Modifier.fillMaxWidth().padding(horizontal = spacing.xl)) {
             ImportCategory.entries.forEach { category ->
                 val selected = category == state.selectedCategory
@@ -85,10 +80,10 @@ internal fun ImportListScreen(
                     style = MaterialTheme.typography.bodySmall, color = rememberFinanceSignalColors().onNeutralContainer)
             }
             if (list.error != null) {
-                item(key = "import-list-error", contentType = "error") { ReportErrorState(list.error.userMessage, onRefresh) }
+                item(key = "import-list-error", contentType = "error") { ReportErrorState(list.error.userMessage, onRetry) }
             }
             if (state.submissionUnconfirmed) item(key = "import-unconfirmed", contentType = "status") {
-                ReportInfoState("上次操作结果待确认，请先刷新处理记录，检查是否已接收。")
+                ReportInfoState("上次操作结果待确认，系统会自动更新处理记录，请稍后检查。")
             }
             when {
                 list.isLoading && list.records.isEmpty() -> item(key = "import-list-loading") { ReportLoadingState("正在加载处理记录") }

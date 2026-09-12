@@ -26,7 +26,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -83,7 +82,7 @@ internal fun KnowledgeScreen(
     onSubmit: () -> Unit,
     onRetryMetadata: () -> Unit,
     onRetryTargetSearch: () -> Unit,
-    onRefreshTask: () -> Unit,
+    onRetryTask: () -> Unit,
     onRetryAfterUnconfirmed: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -115,28 +114,6 @@ internal fun KnowledgeScreen(
             ReportTopBar(
                 title = "知识检索",
                 onBack = onBack,
-                actions = {
-                    IconButton(
-                        onClick = onRefreshTask,
-                        enabled = state.task != null && !state.isLoadingTask,
-                        modifier = Modifier.semantics {
-                            contentDescription = if (state.isLoadingTask) "正在刷新材料任务" else "刷新材料任务"
-                        },
-                    ) {
-                        if (state.isLoadingTask) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(LocalFinanceDimensions.current.iconSize),
-                                strokeWidth = LocalFinanceDimensions.current.outlineWidth,
-                            )
-                        } else {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_phosphor_arrows_clockwise),
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                    }
-                },
             )
         },
         bottomBar = {
@@ -182,9 +159,8 @@ internal fun KnowledgeScreen(
                     onTargetQueryChanged = onTargetQueryChanged,
                     onSearchTargets = onSearchTargets,
                     onTargetSelected = onTargetSelected,
-                    onRetryMetadata = onRetryMetadata,
                     onRetryTargetSearch = onRetryTargetSearch,
-                    onRefreshTask = onRefreshTask,
+                    onRetryTask = onRetryTask,
                     onOpenChunk = { keyboard?.hide(); focus.clearFocus(); selectedChunk = it },
                 )
             }
@@ -264,9 +240,8 @@ private fun KnowledgeContent(
     onTargetQueryChanged: (String) -> Unit,
     onSearchTargets: () -> Unit,
     onTargetSelected: (ReportTargetOption) -> Unit,
-    onRetryMetadata: () -> Unit,
     onRetryTargetSearch: () -> Unit,
-    onRefreshTask: () -> Unit,
+    onRetryTask: () -> Unit,
     onOpenChunk: (KnowledgeChunk) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -340,14 +315,6 @@ private fun KnowledgeContent(
                 )
                 if (state.profiles.isEmpty() && !state.isLoadingMetadata) {
                     ReportEmptyState(text = "暂无可用检索配置")
-                    if (state.errorMessage.isBlank()) {
-                        TextButton(
-                            onClick = onRetryMetadata,
-                            modifier = Modifier.heightIn(min = LocalFinanceDimensions.current.minTouchTarget),
-                        ) {
-                            Text("重新加载")
-                        }
-                    }
                 }
             }
         }
@@ -481,15 +448,6 @@ private fun KnowledgeContent(
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                if (state.task != null) {
-                    TextButton(
-                        onClick = onRefreshTask,
-                        enabled = !state.isLoadingTask,
-                        modifier = Modifier.heightIn(min = LocalFinanceDimensions.current.minTouchTarget),
-                    ) {
-                        Text("刷新")
-                    }
-                }
             }
         }
 
@@ -504,7 +462,7 @@ private fun KnowledgeContent(
             }
             if (state.taskErrorMessage.isNotBlank()) {
                 item(key = "knowledge-task-error", contentType = "error") {
-                    ReportErrorState(text = state.taskErrorMessage, onRetry = onRefreshTask)
+                    ReportErrorState(text = state.taskErrorMessage, onRetry = onRetryTask)
                 }
             }
             when {
@@ -515,7 +473,7 @@ private fun KnowledgeContent(
                 }
                 task.status == KnowledgeTaskStatus.Failed -> {
                     item(key = "knowledge-task-failed", contentType = "error") {
-                        KnowledgeInlineError(text = "材料检索失败，请刷新任务状态或重新检索。")
+                        KnowledgeInlineError(text = "材料检索失败，可重新检索。")
                     }
                 }
                 task.status.isWorking -> {
@@ -530,7 +488,7 @@ private fun KnowledgeContent(
                 }
                 task.status == KnowledgeTaskStatus.Unknown -> {
                     item(key = "knowledge-task-unknown", contentType = "info") {
-                        ReportInfoState(text = "任务状态暂不可用，请刷新后重试")
+                        ReportInfoState(text = "任务状态暂不可用，重新进入页面时会自动更新")
                     }
                 }
             }

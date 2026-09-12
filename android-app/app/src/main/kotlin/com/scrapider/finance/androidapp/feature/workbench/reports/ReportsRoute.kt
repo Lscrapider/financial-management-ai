@@ -88,7 +88,7 @@ internal fun ReportsRoute(
                 onTypeSelected = viewModel::selectType,
                 onOpenLatest = viewModel::openTarget,
                 onOpenHistory = viewModel::openHistory,
-                onRefresh = { viewModel.refresh() },
+                onRetry = { viewModel.refresh() },
                 onLoadMore = viewModel::loadMore,
                 onGenerate = { dismissKeyboard(); viewModel.openCreate() },
                 modifier = contentModifier,
@@ -97,13 +97,13 @@ internal fun ReportsRoute(
                 state = state,
                 onBack = navigateBack,
                 onSelectReport = { viewModel.openRecord(it.reportId) },
-                onRefresh = viewModel::refreshHistory,
+                onRetry = viewModel::refreshHistory,
                 modifier = contentModifier,
             )
             ReportPage.Detail -> ReportReaderScreen(
                 state = state,
                 onBack = navigateBack,
-                onRefresh = viewModel::refreshDocument,
+                onRetry = viewModel::refreshDocument,
                 onRegenerate = viewModel::regenerate,
                 modifier = contentModifier,
             )

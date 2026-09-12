@@ -93,7 +93,7 @@ internal class ReportsViewModel(private val repository: ReportsRepository) : Vie
                     pageSize = result.data.pageSize
                     _uiState.value = _uiState.value.copy(isLoading = false, hasLoaded = true, targets = result.data.items, nextPage = result.data.nextPage)
                     if (_uiState.value.page == ReportPage.List && _uiState.value.create.submissionUnconfirmed) {
-                        // 列表成功刷新后，用户需要重新选择标的，才能有意发起下一次研究。
+                        // 列表成功更新后，用户需要重新选择标的，才能有意发起下一次研究。
                         updateCreate { copy(submissionUnconfirmed = false, selectedTarget = null, errorMessage = "") }
                     }
                     if (entryId != null && _uiState.value.page == ReportPage.List) {
@@ -178,7 +178,7 @@ internal class ReportsViewModel(private val repository: ReportsRepository) : Vie
         val document = _uiState.value.document
         val id = detailRequestId
         if ((document == null || document.taskNo.isBlank()) && id == null) {
-            _uiState.value = _uiState.value.copy(documentError = "该记录暂时没有可读取的报告，请返回列表刷新。")
+            _uiState.value = _uiState.value.copy(documentError = "该记录暂时没有可读取的报告，请返回列表后稍候再试。")
             return
         }
         _uiState.value = _uiState.value.copy(isLoadingDocument = true, documentError = "")
@@ -357,7 +357,7 @@ internal class ReportsViewModel(private val repository: ReportsRepository) : Vie
                         else _uiState.value.unconfirmedRegenerationTasks,
                     )
                     handleFailure(result.reason)
-                    eventChannel.send(ReportsEvent.Notice(if (unconfirmed) "提交结果未确认，请先刷新报告记录，避免重复生成。" else result.reason.userMessage))
+                    eventChannel.send(ReportsEvent.Notice(if (unconfirmed) "提交结果未确认，请先核对报告记录，避免重复生成。" else result.reason.userMessage))
                 }
                 is NetworkResult.Success -> {
                     _uiState.value = _uiState.value.copy(isRegenerating = false)

@@ -2,8 +2,6 @@ package com.scrapider.finance.androidapp.app
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -19,16 +17,18 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.scrapider.finance.androidapp.R
 import com.scrapider.finance.androidapp.core.network.FinanceApiClient
 import com.scrapider.finance.androidapp.core.session.UserSession
@@ -36,9 +36,12 @@ import com.scrapider.finance.androidapp.designsystem.LocalFinanceDimensions
 import com.scrapider.finance.androidapp.designsystem.rememberFinanceSignalColors
 import com.scrapider.finance.androidapp.feature.market.MarketRoute
 import com.scrapider.finance.androidapp.feature.market.theme.MarketMiuixTheme
-import com.scrapider.finance.androidapp.feature.profile.ProfileScreen
+import com.scrapider.finance.androidapp.feature.profile.ProfileEvent
+import com.scrapider.finance.androidapp.feature.profile.ProfileRoute
+import com.scrapider.finance.androidapp.feature.profile.ProfileViewModel
 import com.scrapider.finance.androidapp.feature.workbench.WorkbenchRoute
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collect
 
 @Composable
 fun AppShell(
@@ -46,9 +49,36 @@ fun AppShell(
     selectedDestination: AppDestination,
     apiClient: FinanceApiClient,
     onDestinationSelected: (AppDestination) -> Unit,
+    onSessionUpdated: (UserSession) -> Unit,
     onSignOut: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    var toolPageVisible by remember(session.accessToken) { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    val showUnavailableFeature: (String) -> Unit = { message ->
+        coroutineScope.launch {
+            snackbarHostState.showSnackbar(message)
+        }
+    }
+    val profileFactory = remember(apiClient) { ProfileViewModel.Factory(apiClient) }
+    val profileViewModel: ProfileViewModel = viewModel(factory = profileFactory)
+    val currentAccessToken by rememberUpdatedState(session.accessToken)
+    val currentOnSessionUpdated by rememberUpdatedState(onSessionUpdated)
+    val currentOnSignOut by rememberUpdatedState(onSignOut)
+
+    LaunchedEffect(profileViewModel) {
+        profileViewModel.events.collect { event ->
+            if (event.accessToken != currentAccessToken) return@collect
+            when (event) {
+                is ProfileEvent.Notice -> showUnavailableFeature(event.message)
+                is ProfileEvent.Saved -> showUnavailableFeature(event.message)
+                is ProfileEvent.SessionExpired -> currentOnSignOut()
+                is ProfileEvent.SessionUpdated -> currentOnSessionUpdated(event.session)
+            }
+        }
+    }
+
     if (selectedDestination == AppDestination.Market) {
         MarketMiuixTheme {
             MarketRoute(
@@ -67,21 +97,11 @@ fun AppShell(
         return
     }
 
-    val snackbarHostState = remember { SnackbarHostState() }
-    var chatVisible by remember(session.accessToken) { mutableStateOf(false) }
-    val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
-    val coroutineScope = rememberCoroutineScope()
-    val showUnavailableFeature: (String) -> Unit = { message ->
-        coroutineScope.launch {
-            snackbarHostState.showSnackbar(message)
-        }
-    }
-
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            if (!chatVisible || !keyboardVisible) {
+            if (!toolPageVisible) {
                 FinanceBottomNavigation(
                     selectedDestination = selectedDestination,
                     onDestinationSelected = onDestinationSelected,
@@ -100,14 +120,15 @@ fun AppShell(
                     },
                     onSessionExpired = onSignOut,
                     onUnavailableFeature = showUnavailableFeature,
-                    onChatVisibilityChanged = { chatVisible = it },
+                    onToolVisibilityChanged = { toolPageVisible = it },
                     modifier = Modifier.padding(contentPadding).consumeWindowInsets(contentPadding),
                 )
             }
 
             AppDestination.Profile -> {
-                ProfileScreen(
+                ProfileRoute(
                     session = session,
+                    viewModel = profileViewModel,
                     modifier = Modifier.padding(contentPadding),
                 )
             }

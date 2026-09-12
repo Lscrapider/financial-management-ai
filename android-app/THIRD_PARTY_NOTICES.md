@@ -25,6 +25,7 @@
 | `ic_phosphor_warning_circle.xml` | [`regular/warning-circle.svg`](https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/regular/warning-circle.svg) |
 | `ic_phosphor_lock_simple.xml` | [`regular/lock-simple.svg`](https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/regular/lock-simple.svg) |
 | `ic_phosphor_arrow_right.xml` | [`regular/arrow-right.svg`](https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/regular/arrow-right.svg) |
+| `ic_phosphor_arrows_out.xml` | [`regular/arrows-out.svg`](https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/regular/arrows-out.svg) |
 
 ### 原始 MIT 许可全文
 

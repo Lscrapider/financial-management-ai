@@ -23,7 +23,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
@@ -83,7 +82,7 @@ fun WorkbenchRoute(
     onSessionExpired: () -> Unit,
     onUnavailableFeature: (String) -> Unit,
     modifier: Modifier = Modifier,
-    onChatVisibilityChanged: (Boolean) -> Unit = {},
+    onToolVisibilityChanged: (Boolean) -> Unit = {},
 ) {
     val factory = remember(apiClient) { WorkbenchViewModel.Factory(apiClient) }
     val viewModel: WorkbenchViewModel = viewModel(factory = factory)
@@ -96,6 +95,14 @@ fun WorkbenchRoute(
     val openReports: (String?) -> Unit = { id ->
         reportEntryId = id
         reportEntryKey = UUID.randomUUID().toString()
+    }
+    val toolPageVisible = reportEntryKey != null || activeAdminTool != null || chatEntryKey != null
+
+    DisposableEffect(toolPageVisible) {
+        onToolVisibilityChanged(toolPageVisible)
+        onDispose {
+            if (toolPageVisible) onToolVisibilityChanged(false)
+        }
     }
 
     LaunchedEffect(session.accessToken) {
@@ -111,10 +118,6 @@ fun WorkbenchRoute(
 
     val currentChatEntry = chatEntryKey
     if (currentChatEntry != null) {
-        DisposableEffect(Unit) {
-            onChatVisibilityChanged(true)
-            onDispose { onChatVisibilityChanged(false) }
-        }
         ChatRoute(
             session = session,
             apiClient = apiClient,
@@ -178,7 +181,7 @@ fun WorkbenchRoute(
             state = state,
             displayName = session.displayName,
             isAdmin = session.isAdmin,
-            onRefresh = viewModel::refresh,
+            onRetry = viewModel::refresh,
             onFocusSelected = onMarketSelected,
             onReportSelected = { openReports(it.id) },
             onViewAllReports = { openReports(null) },
@@ -201,7 +204,7 @@ fun WorkbenchScreen(
     state: WorkbenchUiState,
     displayName: String,
     isAdmin: Boolean,
-    onRefresh: () -> Unit,
+    onRetry: () -> Unit,
     onFocusSelected: () -> Unit,
     onReportSelected: (ReportItem) -> Unit,
     onViewAllReports: () -> Unit,
@@ -223,16 +226,14 @@ fun WorkbenchScreen(
         item(key = "header", contentType = "header") {
             WorkbenchHeader(
                 displayName = displayName,
-                isRefreshing = state.isLoading,
-                onRefresh = onRefresh,
             )
         }
         if (state.syncMessage.isNotBlank()) {
             item(key = "sync_message", contentType = "sync_message") {
                 SyncMessage(
                     message = state.syncMessage,
-                    isRefreshing = state.isLoading,
-                    onRetry = onRefresh,
+                    isLoading = state.isLoading,
+                    onRetry = onRetry,
                 )
             }
         }
@@ -252,7 +253,7 @@ fun WorkbenchScreen(
                 item(key = "overview_state", contentType = "content_state") {
                     val waitingForData = state.isLoading || state.syncMessage.isBlank()
                     ContentState(
-                        text = if (waitingForData) "正在同步自选行情" else "自选行情暂不可用，请刷新重试",
+                        text = if (waitingForData) "正在同步自选行情" else "自选行情暂不可用，系统会自动更新",
                         isLoading = waitingForData,
                     )
                 }
@@ -313,10 +314,7 @@ fun WorkbenchScreen(
 @Composable
 private fun WorkbenchHeader(
     displayName: String,
-    isRefreshing: Boolean,
-    onRefresh: () -> Unit,
 ) {
-    val dimensions = LocalFinanceDimensions.current
     val signals = rememberFinanceSignalColors()
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -338,25 +336,6 @@ private fun WorkbenchHeader(
                 style = MaterialTheme.typography.bodySmall,
                 color = signals.onNeutralContainer,
             )
-        }
-        IconButton(
-            onClick = onRefresh,
-            enabled = !isRefreshing,
-            modifier = Modifier.semantics {
-                contentDescription = if (isRefreshing) "正在刷新工作台" else "刷新工作台"
-            },
-        ) {
-            if (isRefreshing) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(dimensions.iconSize),
-                    strokeWidth = dimensions.outlineWidth,
-                )
-            } else {
-                Icon(
-                    painter = painterResource(R.drawable.ic_phosphor_arrows_clockwise),
-                    contentDescription = null,
-                )
-            }
         }
     }
 }
@@ -759,7 +738,7 @@ private fun ContentState(text: String, isLoading: Boolean = false) {
 }
 
 @Composable
-private fun SyncMessage(message: String, isRefreshing: Boolean, onRetry: () -> Unit) {
+private fun SyncMessage(message: String, isLoading: Boolean, onRetry: () -> Unit) {
     val spacing = LocalFinanceSpacing.current
     val signals = rememberFinanceSignalColors()
     Row(
@@ -796,7 +775,7 @@ private fun SyncMessage(message: String, isRefreshing: Boolean, onRetry: () -> U
         }
         TextButton(
             onClick = onRetry,
-            enabled = !isRefreshing,
+            enabled = !isLoading,
             modifier = Modifier.heightIn(min = LocalFinanceDimensions.current.minTouchTarget),
             colors = ButtonDefaults.textButtonColors(contentColor = signals.onNegativeContainer),
         ) {

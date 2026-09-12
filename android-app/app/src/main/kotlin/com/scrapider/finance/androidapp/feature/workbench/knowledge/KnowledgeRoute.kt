@@ -107,7 +107,7 @@ internal fun KnowledgeRoute(
             dismissInput()
             viewModel.searchTargets()
         },
-        onRefreshTask = viewModel::refreshTask,
+        onRetryTask = viewModel::refreshTask,
         onRetryAfterUnconfirmed = {
             dismissInput()
             viewModel.retryAfterUnconfirmed()

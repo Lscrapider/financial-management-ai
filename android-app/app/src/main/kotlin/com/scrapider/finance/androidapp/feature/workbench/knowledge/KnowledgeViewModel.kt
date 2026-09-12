@@ -38,7 +38,10 @@ internal class KnowledgeViewModel(
     fun belongsToSession(accessToken: String): Boolean = accessToken.isNotBlank() && accessToken == sessionToken
 
     fun enter(accessToken: String) {
-        if (accessToken == sessionToken && sessionToken.isNotBlank()) return
+        if (accessToken == sessionToken && sessionToken.isNotBlank()) {
+            refreshTask()
+            return
+        }
 
         sessionGeneration += 1
         while (eventChannel.tryReceive().isSuccess) {

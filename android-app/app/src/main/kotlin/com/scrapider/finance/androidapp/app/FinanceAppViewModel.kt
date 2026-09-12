@@ -45,6 +45,14 @@ class FinanceAppViewModel(application: Application) : AndroidViewModel(applicati
         )
     }
 
+    fun updateSession(session: UserSession) {
+        val currentState = _uiState.value
+        val currentSession = currentState.session ?: return
+        if (currentSession.accessToken != session.accessToken || currentSession == session) return
+        sessionStore.save(session, currentState.rememberAccount)
+        _uiState.value = currentState.copy(session = session)
+    }
+
     fun selectDestination(destination: AppDestination) {
         _uiState.value = _uiState.value.copy(destination = destination)
     }

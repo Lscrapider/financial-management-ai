@@ -16,6 +16,9 @@ import top.yukonga.miuix.kmp.basic.SnackbarHostState
 @Composable
 internal fun MarketScreen(
     state: MarketUiState,
+    detail: MarketDetailState,
+    onPeriodSelected: (MarketChartPeriod) -> Unit,
+    onAdjustSelected: (MarketChartAdjust) -> Unit,
     snackbarHostState: SnackbarHostState,
     bottomBar: @Composable () -> Unit,
     groupSavedSignal: Long,
@@ -125,6 +128,9 @@ internal fun MarketScreen(
             } else {
                 MarketTargetDetailScreen(
                     target = target,
+                    detail = if (detail.targetKey == target.targetKey) detail else MarketDetailState(targetKey = target.targetKey, quoteLoading = true, chartLoading = true),
+                    onPeriodSelected = onPeriodSelected,
+                    onAdjustSelected = onAdjustSelected,
                     onNavigateBack = onNavigateBack,
                     onOpenTargetSettings = target.watchItemId?.let { itemId ->
                         { onOpenTargetSettings(itemId) }

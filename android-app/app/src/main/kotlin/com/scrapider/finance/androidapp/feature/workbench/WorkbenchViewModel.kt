@@ -24,7 +24,10 @@ class WorkbenchViewModel(
     private var requestGeneration: Long = 0L
 
     fun loadForSession(accessToken: String) {
-        if (accessToken == sessionToken) return
+        if (accessToken == sessionToken && accessToken.isNotBlank()) {
+            refresh()
+            return
+        }
         sessionToken = accessToken
         _uiState.value = WorkbenchUiState()
         refresh()

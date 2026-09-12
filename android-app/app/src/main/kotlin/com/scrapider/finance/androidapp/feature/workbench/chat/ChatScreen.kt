@@ -20,7 +20,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -85,12 +84,7 @@ internal fun ChatScreen(
     }
 
     Column(modifier.fillMaxSize()) {
-        ReportTopBar("AI 研究助手", onBack = onBack, actions = {
-            IconButton(onClick = onReconnect, enabled = !state.isSending && !isConnecting && !state.historyLoading) {
-                Icon(painterResource(R.drawable.ic_phosphor_arrows_clockwise), "重新连接并刷新对话记录",
-                    Modifier.size(dimensions.iconSize))
-            }
-        })
+        ReportTopBar("AI 研究助手", onBack = onBack)
         if (state.error.isNotBlank()) {
             ChatNotice(state.error, onReconnect, enabled = !isConnecting && !state.isSending)
         }

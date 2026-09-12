@@ -112,7 +112,7 @@ internal fun ImportsRoute(
     val showRecords: () -> Unit = {
         dismissKeyboard()
         page = ImportScreenPage.List
-        // 结果未确认时保留编辑内容；记录刷新失败也不能让长文本丢失。
+        // 结果未确认时保留编辑内容；记录更新失败也不能让长文本丢失。
         if (state.draft == null) viewModel.clearSelection()
         viewModel.refresh(state.selectedCategory)
     }
@@ -122,7 +122,7 @@ internal fun ImportsRoute(
             else viewModel.loadManualReview(task.taskNo)
         }
     }
-    val refreshDetail: () -> Unit = {
+    val retryDetail: () -> Unit = {
         state.selectedTask?.let { task ->
             viewModel.refresh(task.category)
             viewModel.loadStages(task.taskNo)
@@ -190,7 +190,7 @@ internal fun ImportsRoute(
                         else -> { viewModel.selectTask(task); page = ImportScreenPage.Detail }
                     }
                 },
-                onRefresh = { viewModel.refresh(state.selectedCategory) },
+                onRetry = { viewModel.refresh(state.selectedCategory) },
                 onLoadMore = { viewModel.loadMore(state.selectedCategory) },
                 onImport = {
                     if (!mutating) {
@@ -222,7 +222,7 @@ internal fun ImportsRoute(
                 state = state,
                 canEdit = state.canEditSelectedTask,
                 onEdit = { editorManual = state.selectedTask?.category == ImportCategory.Text; reloadReview(); page = ImportScreenPage.Editor },
-                onRefresh = refreshDetail,
+                onRetry = retryDetail,
                 onBack = navigateBack,
                 modifier = contentModifier,
             )

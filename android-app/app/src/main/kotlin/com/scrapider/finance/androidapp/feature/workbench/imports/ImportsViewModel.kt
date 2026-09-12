@@ -43,7 +43,11 @@ internal class ImportsViewModel(
     fun belongsToSession(accessToken: String): Boolean = this.accessToken == accessToken
 
     fun loadForSession(accessToken: String, isAdmin: Boolean) {
-        if (this.accessToken == accessToken && adminSession == isAdmin) return
+        if (this.accessToken == accessToken && adminSession == isAdmin && accessToken.isNotBlank()) {
+            refreshAll()
+            if (active) startPolling()
+            return
+        }
         viewModelScope.coroutineContext.cancelChildren()
         repository.clearDraftTemplate()
         while (eventChannel.tryReceive().isSuccess) {
@@ -540,7 +544,7 @@ internal class ImportsViewModel(
                     isSubmitting = false,
                     submissionUnconfirmed = unknown,
                     error = result.reason,
-                    notice = if (unknown) "提交结果尚未确认，请先刷新任务记录，避免重复提交。" else result.reason.userMessage,
+                    notice = if (unknown) "提交结果尚未确认，请先查看任务记录，避免重复提交。" else result.reason.userMessage,
                 )
                 handleFailure(result.reason)
             }
@@ -603,7 +607,7 @@ internal class ImportsViewModel(
     }
 
     fun consumeSubmissionUnconfirmed() {
-        // 只有对应分类的显式刷新成功后才解除未知结果锁，避免再次点击立即重复提交。
+        // 只有对应分类的更新成功后才解除未知结果锁，避免再次点击立即重复提交。
         refresh(_uiState.value.selectedCategory)
     }
 
@@ -648,7 +652,7 @@ internal class ImportsViewModel(
                 if (showLoading && _uiState.value.submissionUnconfirmed && matchesConfirmedCategory) {
                     _uiState.value = _uiState.value.copy(
                         submissionUnconfirmed = false,
-                        notice = "已刷新资料记录，请确认后继续。",
+                        notice = "资料记录已更新，请确认后继续。",
                     )
                 }
             }

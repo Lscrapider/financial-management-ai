@@ -11,34 +11,114 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class MarketViewModel(
     private val repository: MarketRepository,
+    private val detailRepository: MarketDetailRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(MarketUiState())
     val uiState = _uiState.asStateFlow()
+
+    private val _detailState = MutableStateFlow(MarketDetailState())
+    val detailState = _detailState.asStateFlow()
 
     private val _events = MutableSharedFlow<MarketEvent>()
     val events = _events.asSharedFlow()
 
     private var sessionToken: String = ""
     private var requestGeneration: Long = 0L
+    private var hasLoadedContent = false
 
     fun loadForSession(accessToken: String) {
         if (accessToken == sessionToken) return
         sessionToken = accessToken
+        requestGeneration += 1
+        hasLoadedContent = false
         _uiState.value = MarketUiState()
-        refresh()
+        _detailState.value = MarketDetailState()
     }
 
     fun refresh() {
+        viewModelScope.launch { refreshContent() }
+    }
+
+    private suspend fun refreshContent(keepPreviousOnPartialFailure: Boolean = false) {
         if (sessionToken.isBlank() || _uiState.value.isLoading) return
         val currentRequest = ++requestGeneration
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, syncMessage = "")
-            when (val result = repository.load()) {
+        _uiState.value = _uiState.value.copy(isLoading = true)
+        try {
+            when (val result = withContext(Dispatchers.Default) { repository.load() }) {
                 is NetworkResult.Failure -> onContentLoadFailure(currentRequest, result.reason)
-                is NetworkResult.Success -> onContentLoaded(currentRequest, result.data)
+                is NetworkResult.Success -> {
+                    val failure = result.data.partialFailure
+                    if (keepPreviousOnPartialFailure && hasLoadedContent && failure != null) {
+                        onContentLoadFailure(currentRequest, failure)
+                    } else {
+                        onContentLoaded(currentRequest, result.data)
+                    }
+                }
+            }
+        } finally {
+            if (currentRequest == requestGeneration) {
+                _uiState.value = _uiState.value.copy(isLoading = false)
+            }
+        }
+    }
+
+    /** 调用方的页面与前台生命周期拥有本次请求，离开页面即取消。 */
+    suspend fun updateVisibleContent(destination: MarketDestination) {
+        if (sessionToken.isBlank() || _uiState.value.isSaving || _uiState.value.destination != destination) return
+        when (destination) {
+            MarketDestination.List -> refreshContent(keepPreviousOnPartialFailure = true)
+            is MarketDestination.TargetDetail -> {
+                if (_uiState.value.findTargetSnapshot(destination.targetType, destination.targetCode, destination.watchItemId) != null) {
+                    loadDetail(destination)
+                }
+            }
+            else -> Unit
+        }
+    }
+
+    fun selectChartPeriod(period: MarketChartPeriod) {
+        if (_detailState.value.period == period) return
+        _detailState.value = _detailState.value.copy(period = period, points = emptyList(), chartError = "", chartLoading = true)
+    }
+
+    fun selectChartAdjust(adjust: MarketChartAdjust) {
+        if (_detailState.value.adjust == adjust) return
+        _detailState.value = _detailState.value.copy(adjust = adjust, points = emptyList(), chartError = "", chartLoading = true)
+    }
+
+    private suspend fun loadDetail(destination: MarketDestination.TargetDetail) = coroutineScope {
+        val key = "${destination.targetType}:${destination.targetCode}"
+        if (_detailState.value.targetKey != key) _detailState.value = MarketDetailState(targetKey = key)
+        val token = sessionToken
+        val request = _detailState.value
+        _detailState.value = request.copy(quoteLoading = request.quote == null, chartLoading = request.points.isEmpty())
+        try {
+            val quote = async { detailRepository.quote(destination.targetType, destination.targetCode) }
+            val chart = async { detailRepository.chart(destination.targetType, destination.targetCode, request.period, request.adjust) }
+            val quoteResult = quote.await()
+            val chartResult = chart.await()
+            val current = _detailState.value
+            if (token != sessionToken || current.targetKey != key || current.period != request.period || current.adjust != request.adjust) return@coroutineScope
+            _detailState.value = request.copy(
+                quote = (quoteResult as? NetworkResult.Success)?.data ?: request.quote,
+                points = (chartResult as? NetworkResult.Success)?.data ?: request.points,
+                quoteUnavailable = quoteResult is NetworkResult.Success && quoteResult.data == null,
+                quoteError = (quoteResult as? NetworkResult.Failure)?.reason?.userMessage.orEmpty(),
+                chartError = (chartResult as? NetworkResult.Failure)?.reason?.userMessage.orEmpty(),
+            )
+            if ((quoteResult as? NetworkResult.Failure)?.reason == NetworkFailure.Unauthorized ||
+                (chartResult as? NetworkResult.Failure)?.reason == NetworkFailure.Unauthorized) publishSessionExpired()
+        } finally {
+            val current = _detailState.value
+            if (token == sessionToken && current.targetKey == key && current.period == request.period && current.adjust == request.adjust) {
+                _detailState.value = current.copy(quoteLoading = false, chartLoading = false)
             }
         }
     }
@@ -68,6 +148,8 @@ class MarketViewModel(
         targetCode: String,
         watchItemId: String? = null,
     ) {
+        val key = "$targetType:$targetCode"
+        if (_detailState.value.targetKey != key) _detailState.value = MarketDetailState(targetKey = key)
         navigateTo(
             MarketDestination.TargetDetail(
                 targetType = targetType,
@@ -293,9 +375,14 @@ class MarketViewModel(
     ) {
         if (currentRequest != requestGeneration) return
         val currentState = _uiState.value
-        val selectedGroupId = currentState.selectedGroupId
-            ?.takeIf { currentId -> content.groups.any { it.id == currentId } }
-            ?: content.groups.firstOrNull()?.id
+        val selectedGroupId = if (hasLoadedContent && currentState.selectedGroupId == null) {
+            null
+        } else {
+            currentState.selectedGroupId
+                ?.takeIf { currentId -> content.groups.any { it.id == currentId } }
+                ?: content.groups.firstOrNull()?.id
+        }
+        hasLoadedContent = true
         _uiState.value = currentState.copy(
             isLoading = false,
             groups = content.groups,
@@ -338,11 +425,12 @@ class MarketViewModel(
         apiClient: FinanceApiClient,
     ) : ViewModelProvider.Factory {
         private val repository = MarketRepository(apiClient)
+        private val detailRepository = MarketDetailRepository(apiClient)
 
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(MarketViewModel::class.java)) {
-                return MarketViewModel(repository) as T
+                return MarketViewModel(repository, detailRepository) as T
             }
             throw IllegalArgumentException("未知的行情 ViewModel：" + modelClass.name)
         }

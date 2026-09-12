@@ -14,6 +14,7 @@ fun FinanceApp(
     state: AppUiState,
     apiClient: FinanceApiClient,
     onAuthenticated: (UserSession, Boolean) -> Unit,
+    onSessionUpdated: (UserSession) -> Unit,
     onDestinationSelected: (AppDestination) -> Unit,
     onSignOut: () -> Unit,
     modifier: Modifier = Modifier,
@@ -36,6 +37,7 @@ fun FinanceApp(
                 session = session,
                 selectedDestination = state.destination,
                 apiClient = apiClient,
+                onSessionUpdated = onSessionUpdated,
                 onDestinationSelected = onDestinationSelected,
                 onSignOut = onSignOut,
             )

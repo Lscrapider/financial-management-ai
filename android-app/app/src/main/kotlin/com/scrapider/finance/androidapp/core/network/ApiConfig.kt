@@ -4,6 +4,8 @@ object ApiConfig {
     const val DEFAULT_BASE_URL = "http://192.168.0.109:8081/finance-api"
     const val LOGIN_PATH = "/api/auth/login"
     const val USER_INFO_PATH = "/api/user/info"
+    const val USER_PASSWORD_PATH = "/api/user/password"
+    const val USER_NOTIFICATION_PATH = "/api/user/notification"
     const val WATCH_GROUPS_PATH = "/api/watch-pool/groups"
     const val WATCH_ITEMS_PATH = "/api/watch-pool/items"
     const val STOCK_ALERTS_PATH = "/api/stock-alerts"

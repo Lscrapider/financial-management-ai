@@ -9,16 +9,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -32,10 +28,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import com.scrapider.finance.androidapp.R
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceDimensions
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceSpacing
 import com.scrapider.finance.androidapp.designsystem.rememberFinanceSignalColors
@@ -47,34 +41,14 @@ internal fun ReportHistoryScreen(
     state: ReportsUiState,
     onBack: () -> Unit,
     onSelectReport: (ReportRecord) -> Unit,
-    onRefresh: () -> Unit,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalFinanceSpacing.current
-    val dimensions = LocalFinanceDimensions.current
     Column(modifier = modifier.fillMaxSize()) {
         ReportTopBar(
             title = "历史记录",
             onBack = onBack,
-            actions = {
-                IconButton(
-                    onClick = onRefresh,
-                    enabled = !state.isLoadingHistory,
-                ) {
-                    if (state.isLoadingHistory) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(dimensions.iconSize),
-                            strokeWidth = dimensions.outlineWidth,
-                        )
-                    } else {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_phosphor_arrows_clockwise),
-                            contentDescription = "刷新历史记录",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                }
-            },
         )
 
         state.historyTarget?.let { target ->
@@ -102,7 +76,7 @@ internal fun ReportHistoryScreen(
         ) {
             if (state.historyError.isNotBlank()) {
                 item(key = "history-error", contentType = "error") {
-                    ReportErrorState(text = state.historyError, onRetry = onRefresh)
+                    ReportErrorState(text = state.historyError, onRetry = onRetry)
                 }
             }
             when {
@@ -139,7 +113,7 @@ internal fun ReportHistoryScreen(
 internal fun ReportReaderScreen(
     state: ReportsUiState,
     onBack: () -> Unit,
-    onRefresh: () -> Unit,
+    onRetry: () -> Unit,
     onRegenerate: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -180,23 +154,6 @@ internal fun ReportReaderScreen(
             title = "报告详情",
             onBack = onBack,
             actions = {
-                IconButton(
-                    onClick = onRefresh,
-                    enabled = !state.isLoadingDocument,
-                ) {
-                    if (state.isLoadingDocument) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(dimensions.iconSize),
-                            strokeWidth = dimensions.outlineWidth,
-                        )
-                    } else {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_phosphor_arrows_clockwise),
-                            contentDescription = "刷新报告详情",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                }
                 ReportMoreMenu(
                     expanded = showMoreMenu,
                     onExpandedChange = { showMoreMenu = it },
@@ -233,7 +190,7 @@ internal fun ReportReaderScreen(
                         .fillMaxWidth()
                         .padding(horizontal = spacing.xl, vertical = spacing.md),
                 ) {
-                    ReportErrorState(text = state.documentError, onRetry = onRefresh)
+                    ReportErrorState(text = state.documentError, onRetry = onRetry)
                 }
             }
 
@@ -268,35 +225,35 @@ internal fun ReportReaderScreen(
                         }
                         if (hasRequestError) {
                             item(key = "document-request-error", contentType = "error") {
-                                ReportErrorState(text = state.documentError, onRetry = onRefresh)
+                                ReportErrorState(text = state.documentError, onRetry = onRetry)
                             }
                         }
                         if (regenerationUnconfirmed) {
                             item(key = "document-unconfirmed", contentType = "error") {
                                 ReportErrorState(
-                                    text = "提交结果待确认，请先刷新报告记录，再决定是否生成新版本。",
-                                    onRetry = onRefresh,
+                                    text = "提交结果待确认，请先核对报告记录，再决定是否生成新版本。",
+                                    onRetry = onRetry,
                                 )
                             }
                         }
                         when (currentDocument.status) {
                             ReportStatus.Generating -> {
                                 item(key = "document-generating", contentType = "status") {
-                                    ReportInfoState(text = "报告正在生成，请稍后刷新")
+                                    ReportInfoState(text = "报告正在生成，状态会自动更新")
                                 }
                             }
 
                             ReportStatus.Pending -> {
                                 item(key = "document-pending", contentType = "status") {
-                                    ReportInfoState(text = "报告已进入生成队列，请稍后刷新")
+                                    ReportInfoState(text = "报告已进入生成队列，状态会自动更新")
                                 }
                             }
 
                             ReportStatus.Failed -> {
                                 item(key = "document-failed", contentType = "status") {
                                     ReportErrorState(
-                                        text = "生成未完成，可刷新状态或返回列表重新发起研究",
-                                        onRetry = onRefresh,
+                                        text = "生成未完成，可重试读取状态或返回列表重新发起研究",
+                                        onRetry = onRetry,
                                     )
                                 }
                             }
