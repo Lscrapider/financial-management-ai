@@ -12,6 +12,8 @@ pipeline {
     ENV_FILE_PATH = '.env'
     DOCKER_NETWORK_NAME = 'database-common-network'
     HOST_BUILD_ARTIFACT_DIR = '.ci-artifacts'
+    PIP_INDEX_URL = 'https://pypi.tuna.tsinghua.edu.cn/simple'
+    PIP_DISABLE_PIP_VERSION_CHECK = '1'
   }
 
   stages {
@@ -193,9 +195,12 @@ pipeline {
           database_wheels="$artifact_root/database-wheels"
           ai_wheels="$artifact_root/ai-wheels"
           model_cache="$artifact_root/ai-huggingface"
+          cache_home="${JENKINS_HOME:-${HOME:-$PWD}}"
+          pip_cache_dir="$cache_home/.cache/financial-management-ai/pip"
 
           rm -rf "$artifact_root"
-          mkdir -p "$database_wheels" "$ai_wheels" "$model_cache"
+          mkdir -p "$database_wheels" "$ai_wheels" "$pip_cache_dir"
+          export PIP_CACHE_DIR="$pip_cache_dir"
 
           python3 -m venv "$venv_dir"
           "$venv_dir/bin/python" -m pip install --upgrade pip
@@ -215,9 +220,16 @@ pipeline {
 
           embedding_model_name="$(read_env_value EMBEDDING_MODEL_NAME 'BAAI/bge-base-zh-v1.5')"
           hf_endpoint="$(read_env_value HF_ENDPOINT 'https://hf-mirror.com')"
+          model_cache_key="$(printf '%s' "$embedding_model_name" | tr '/:@ ' '____')"
+          persistent_model_cache="$cache_home/.cache/financial-management-ai/huggingface/$model_cache_key"
 
-          HF_HOME="$model_cache" HF_ENDPOINT="$hf_endpoint" EMBEDDING_MODEL_NAME="$embedding_model_name" \
+          mkdir -p "$persistent_model_cache"
+
+          HF_HOME="$persistent_model_cache" HF_ENDPOINT="$hf_endpoint" EMBEDDING_MODEL_NAME="$embedding_model_name" \
             "$venv_dir/bin/python" -c 'from os import environ; from sentence_transformers import SentenceTransformer; SentenceTransformer(environ["EMBEDDING_MODEL_NAME"])'
+
+          mkdir -p "$model_cache"
+          cp -a "$persistent_model_cache/." "$model_cache/"
 
           test -n "$(find "$database_wheels" -maxdepth 1 -type f -name '*.whl' -print -quit)"
           test -n "$(find "$ai_wheels" -maxdepth 1 -type f -name '*.whl' -print -quit)"
