@@ -1,10 +1,14 @@
 import base64
 import json
+import logging
 from typing import Any
 
 from openai import OpenAI
 
 from app.core.config import QwenOcrSettings
+
+
+logger = logging.getLogger(__name__)
 
 
 OCR_PROMPT = """
@@ -66,6 +70,7 @@ class QwenVlOcrEngine:
     def recognize_png(self, image_bytes: bytes) -> dict[str, Any]:
         if not self._settings.api_key:
             raise ValueError("DASHSCOPE_API_KEY is required")
+        logger.info("dashscope OCR request model=%s", self._settings.model)
         completion = self._client.chat.completions.create(
             model=self._settings.model,
             messages=[
