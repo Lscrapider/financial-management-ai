@@ -32,6 +32,7 @@ import com.scrapider.finance.androidapp.feature.market.MarketWatchGroup
 import com.scrapider.finance.androidapp.feature.market.marketTargetTypeLabel
 import com.scrapider.finance.androidapp.feature.market.ui.MarketEmptyPanel
 import com.scrapider.finance.androidapp.feature.market.ui.MarketLoadingPanel
+import com.scrapider.finance.androidapp.feature.market.ui.MarketBottomSheet
 import com.scrapider.finance.androidapp.feature.market.ui.MarketPageTopBar
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
@@ -43,7 +44,6 @@ import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -187,20 +187,21 @@ private fun MarketTargetGroupPicker(
             },
         )
     }
-    OverlayBottomSheet(
-        show = showPicker,
-        title = "选择自选池",
-        onDismissRequest = { showPicker = false },
-    ) {
-        groups.forEach { group ->
-            BasicComponent(
-                title = group.name,
-                summary = "${group.items.size} 个标的",
-                onClick = {
-                    showPicker = false
-                    onSelectGroup(group.id)
-                },
-            )
+    if (showPicker) {
+        MarketBottomSheet(
+            title = "选择自选池",
+            onDismiss = { showPicker = false },
+        ) {
+            groups.forEach { group ->
+                BasicComponent(
+                    title = group.name,
+                    summary = "${group.items.size} 个标的",
+                    onClick = {
+                        showPicker = false
+                        onSelectGroup(group.id)
+                    },
+                )
+            }
         }
     }
 }

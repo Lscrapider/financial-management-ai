@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.scrapider.finance.androidapp.core.network.NetworkFailure
 import com.scrapider.finance.androidapp.core.network.NetworkResult
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.cancelChildren
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 internal class ImportsViewModel(
     private val repository: ImportsRepository,
@@ -621,9 +623,11 @@ internal class ImportsViewModel(
         if (epoch != sessionEpoch) return
         if (showLoading) updateList(category) { it.copy(isLoading = true, isLoadingMore = false, error = null, moreError = null) }
         val current = listState(category)
-        val result = when (category) {
-            ImportCategory.File -> repository.observeFileTasks(1, current.pageSize)
-            ImportCategory.Text -> repository.observeManualTasks(1, current.pageSize)
+        val result = withContext(Dispatchers.Default) {
+            when (category) {
+                ImportCategory.File -> repository.observeFileTasks(1, current.pageSize)
+                ImportCategory.Text -> repository.observeManualTasks(1, current.pageSize)
+            }
         }
         if (epoch != sessionEpoch) return
         when (result) {

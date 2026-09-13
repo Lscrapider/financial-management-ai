@@ -12,10 +12,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 internal class ReportsViewModel(private val repository: ReportsRepository) : ViewModel() {
     private val _uiState = MutableStateFlow(ReportsUiState())
@@ -84,7 +86,7 @@ internal class ReportsViewModel(private val repository: ReportsRepository) : Vie
         val type = appliedType
         _uiState.value = _uiState.value.copy(isLoading = true, isLoadingMore = false, errorMessage = "", moreError = "")
         listJob = viewModelScope.launch {
-            when (val result = repository.targets(query, type)) {
+            when (val result = withContext(Dispatchers.Default) { repository.targets(query, type) }) {
                 is NetworkResult.Failure -> {
                     _uiState.value = _uiState.value.copy(isLoading = false, hasLoaded = true, errorMessage = result.reason.userMessage)
                     handleFailure(result.reason)

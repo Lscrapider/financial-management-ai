@@ -326,8 +326,13 @@ internal fun ReportReaderScreen(
     if (showRegenerateConfirmation) {
         AlertDialog(
             onDismissRequest = { showRegenerateConfirmation = false },
-            title = { Text("重新生成报告") },
-            text = { Text("使用已有研究上下文生成新版本，原版本保留") },
+            title = { Text("重新生成报告", style = MaterialTheme.typography.titleMedium) },
+            text = {
+                Text(
+                    "使用已有研究上下文生成新版本，原版本保留",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -359,7 +364,7 @@ private fun ReportDocumentHeader(
     ) {
         Text(
             text = document.targetName,
-            style = MaterialTheme.typography.displaySmall,
+            style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
@@ -376,7 +381,11 @@ private fun ReportDocumentHeader(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            Text("·", color = MaterialTheme.colorScheme.outline)
+            Text(
+                text = "·",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.outline,
+            )
             ReportStatusLabel(status = document.status)
         }
         Text(
@@ -434,7 +443,7 @@ private fun ReportTextBlockView(
         Text(
             text = block.text,
             modifier = contentModifier,
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface,
         )
     }

@@ -11,11 +11,13 @@ import com.scrapider.finance.androidapp.feature.workbench.reports.reportTargetTy
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 internal class KnowledgeViewModel(
     private val repository: KnowledgeRepository,
@@ -68,7 +70,7 @@ internal class KnowledgeViewModel(
         _uiState.value = _uiState.value.copy(isLoadingMetadata = true, errorMessage = "")
         metadataJob?.cancel()
         metadataJob = viewModelScope.launch {
-            when (val result = repository.metadata()) {
+            when (val result = withContext(Dispatchers.Default) { repository.metadata() }) {
                 is NetworkResult.Failure -> {
                     if (generation != sessionGeneration) return@launch
                     _uiState.value = _uiState.value.copy(isLoadingMetadata = false, errorMessage = result.reason.userMessage)

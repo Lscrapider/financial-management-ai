@@ -47,7 +47,7 @@ internal fun ImportDetailScreen(
             if (task != null) {
                 item(key = "import-detail-header", contentType = "header") {
                     Column(verticalArrangement = Arrangement.spacedBy(spacing.md)) {
-                        Text(task.originalFilename, style = MaterialTheme.typography.displaySmall, modifier = Modifier.semantics { heading() })
+                        Text(task.originalFilename, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
                         ImportStatusLabel(task.status)
                         Text("${task.category.label}资料 · ${task.submittedAt}", style = MaterialTheme.typography.bodySmall,
                             color = rememberFinanceSignalColors().onNeutralContainer)

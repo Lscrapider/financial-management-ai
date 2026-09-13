@@ -6,7 +6,6 @@ import androidx.compose.runtime.Composable
 import com.scrapider.finance.androidapp.feature.market.MarketSortOption
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -15,10 +14,9 @@ internal fun MarketSortSheet(
     onDismiss: () -> Unit,
     onSelectOption: (MarketSortOption) -> Unit,
 ) {
-    OverlayBottomSheet(
-        show = true,
+    MarketBottomSheet(
         title = "排序方式",
-        onDismissRequest = onDismiss,
+        onDismiss = onDismiss,
     ) {
         MarketSortOption.entries.forEach { option ->
             BasicComponent(

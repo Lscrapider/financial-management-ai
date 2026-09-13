@@ -100,6 +100,6 @@ internal fun ImportHeading(text: String, modifier: Modifier = Modifier) {
         text = text,
         modifier = modifier.padding(top = LocalFinanceSpacing.current.lg, bottom = LocalFinanceSpacing.current.sm)
             .semantics { heading() },
-        style = MaterialTheme.typography.headlineSmall,
+        style = MaterialTheme.typography.titleMedium,
     )
 }

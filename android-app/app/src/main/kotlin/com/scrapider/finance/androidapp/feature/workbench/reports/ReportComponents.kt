@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -17,7 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -134,6 +135,7 @@ internal fun ReportSearchField(
         placeholder = {
             Text(
                 text = "搜索标的名称或代码",
+                style = MaterialTheme.typography.bodyMedium,
                 color = rememberFinanceSignalColors().onNeutralContainer,
             )
         },
@@ -154,6 +156,7 @@ internal fun ReportSearchField(
             }
         },
         singleLine = true,
+        textStyle = MaterialTheme.typography.bodyMedium,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(onSearch = { onSearch() }),
         shape = MaterialTheme.shapes.medium,
@@ -346,21 +349,22 @@ internal fun ReportLoadingState(
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalFinanceSpacing.current
-    val dimensions = LocalFinanceDimensions.current
-    Row(
+    Column(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = dimensions.controlHeight)
             .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }
-            .padding(vertical = spacing.lg),
-        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(vertical = spacing.md),
+        verticalArrangement = Arrangement.spacedBy(spacing.md),
     ) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(dimensions.iconSize),
-            strokeWidth = dimensions.outlineWidth,
+        LinearProgressIndicator(
+            modifier = Modifier.fillMaxWidth().height(spacing.xxs),
+            trackColor = MaterialTheme.colorScheme.surfaceVariant,
         )
-        Text(text = text, style = MaterialTheme.typography.bodyMedium)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = rememberFinanceSignalColors().onNeutralContainer,
+        )
     }
 }
 
@@ -485,7 +489,7 @@ internal fun ReportFilterSheet(
                     Text(
                         text = choice.label,
                         modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyLarge,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                     )
                     if (selected) {

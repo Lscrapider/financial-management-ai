@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceSpacing
 import com.scrapider.finance.androidapp.feature.market.MarketWatchGroup
 import com.scrapider.finance.androidapp.feature.market.ui.MarketConfirmationDialog
+import com.scrapider.finance.androidapp.feature.market.ui.MarketBottomSheet
 import com.scrapider.finance.androidapp.feature.market.ui.MarketPageTopBar
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Button
@@ -40,7 +41,6 @@ import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -206,30 +206,31 @@ private fun MarketGroupActions(
             contentDescription = "更多操作：$groupName",
         )
     }
-    OverlayBottomSheet(
-        show = showActions,
-        title = groupName,
-        onDismissRequest = { showActions = false },
-    ) {
-        BasicComponent(
-            title = "重命名",
-            summary = "修改自选池名称",
-            onClick = {
-                showActions = false
-                onRename()
-            },
-        )
-        BasicComponent(
-            title = "删除自选池",
-            summary = "将同时移除池内标的",
-            onClick = {
-                showActions = false
-                onDelete()
-            },
-            titleColor = top.yukonga.miuix.kmp.basic.BasicComponentDefaults.titleColor(
-                color = MiuixTheme.colorScheme.error,
-            ),
-        )
+    if (showActions) {
+        MarketBottomSheet(
+            title = groupName,
+            onDismiss = { showActions = false },
+        ) {
+            BasicComponent(
+                title = "重命名",
+                summary = "修改自选池名称",
+                onClick = {
+                    showActions = false
+                    onRename()
+                },
+            )
+            BasicComponent(
+                title = "删除自选池",
+                summary = "将同时移除池内标的",
+                onClick = {
+                    showActions = false
+                    onDelete()
+                },
+                titleColor = top.yukonga.miuix.kmp.basic.BasicComponentDefaults.titleColor(
+                    color = MiuixTheme.colorScheme.error,
+                ),
+            )
+        }
     }
 }
 
@@ -244,10 +245,9 @@ private fun MarketGroupEditorSheet(
 ) {
     var groupName by rememberSaveable(title, initialName) { mutableStateOf(initialName) }
     val spacing = LocalFinanceSpacing.current
-    OverlayBottomSheet(
-        show = true,
+    MarketBottomSheet(
         title = title,
-        onDismissRequest = onDismiss,
+        onDismiss = onDismiss,
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),

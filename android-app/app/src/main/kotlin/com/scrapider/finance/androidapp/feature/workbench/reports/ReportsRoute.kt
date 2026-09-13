@@ -6,8 +6,10 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
@@ -37,6 +39,8 @@ internal fun ReportsRoute(
     val currentOnSessionExpired by rememberUpdatedState(onSessionExpired)
     val currentOnNotice by rememberUpdatedState(onNotice)
     val currentOnReportsChanged by rememberUpdatedState(onReportsChanged)
+    // 首次绑定主动触发重组，避免加载分支尚未读取 state 时一直停留在占位页。
+    var initialized by remember(session.accessToken, entryKey) { mutableStateOf(false) }
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = LocalFocusManager.current
     val dismissKeyboard: () -> Unit = {
@@ -50,6 +54,7 @@ internal fun ReportsRoute(
 
     LaunchedEffect(session.accessToken, entryKey) {
         viewModel.enter(session.accessToken, entryKey, initialReportId)
+        initialized = true
     }
     LaunchedEffect(viewModel, session.accessToken) {
         viewModel.events.collect { event ->
@@ -67,8 +72,13 @@ internal fun ReportsRoute(
     BackHandler(onBack = navigateBack)
 
     val contentModifier = modifier.fillMaxSize().imePadding()
-    if (!viewModel.belongsToSession(session.accessToken)) {
-        ReportLoadingState(text = "正在加载研究报告", modifier = contentModifier)
+    if (!initialized || !viewModel.belongsToSession(session.accessToken)) {
+        ReportLoadingScreen(
+            title = "研究报告",
+            text = "正在加载研究报告",
+            onBack = navigateBack,
+            modifier = contentModifier,
+        )
         return
     }
     val savedPages = rememberSaveableStateHolder()

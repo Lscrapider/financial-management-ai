@@ -37,7 +37,7 @@ import com.scrapider.finance.androidapp.core.network.FinanceApiClient
 import com.scrapider.finance.androidapp.core.session.UserSession
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceSpacing
 import com.scrapider.finance.androidapp.feature.workbench.reports.ReportInfoState
-import com.scrapider.finance.androidapp.feature.workbench.reports.ReportLoadingState
+import com.scrapider.finance.androidapp.feature.workbench.reports.ReportLoadingScreen
 import com.scrapider.finance.androidapp.feature.workbench.reports.ReportTopBar
 import java.io.File
 
@@ -69,6 +69,7 @@ internal fun ImportsRoute(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val currentOnSessionExpired by rememberUpdatedState(onSessionExpired)
     val currentOnNotice by rememberUpdatedState(onNotice)
+    var initialized by remember(session.accessToken, session.isAdmin) { mutableStateOf(false) }
     var page by rememberSaveable(session.accessToken) { mutableStateOf(ImportScreenPage.List) }
     var editorManual by rememberSaveable(session.accessToken) { mutableStateOf(false) }
     var showMethodSheet by rememberSaveable { mutableStateOf(false) }
@@ -134,8 +135,9 @@ internal fun ImportsRoute(
         viewModel.previewPage(number, previewWidth)
     }
 
-    LaunchedEffect(session.accessToken) {
+    LaunchedEffect(session.accessToken, session.isAdmin) {
         viewModel.loadForSession(session.accessToken, session.isAdmin)
+        initialized = true
         // 进程重建后不恢复一个已没有内容的详情或编辑位置；配置变化由 ViewModel 保留内容。
         val restored = viewModel.uiState.value
         if ((page == ImportScreenPage.Detail && restored.selectedTask == null) ||
@@ -170,8 +172,13 @@ internal fun ImportsRoute(
     }
     BackHandler(onBack = navigateBack)
 
-    if (!viewModel.belongsToSession(session.accessToken)) {
-        ReportLoadingState("正在加载资料导入", contentModifier)
+    if (!initialized || !viewModel.belongsToSession(session.accessToken)) {
+        ReportLoadingScreen(
+            title = "资料导入",
+            text = "正在加载资料导入",
+            onBack = navigateBack,
+            modifier = contentModifier,
+        )
         return
     }
     val savedPages = rememberSaveableStateHolder()
@@ -267,8 +274,13 @@ internal fun ImportsRoute(
     }
     if (discardDialog) AlertDialog(
         onDismissRequest = { discardDialog = false },
-        title = { Text("放弃未保存的修改？") },
-        text = { Text("本次修改还没有保存。放弃后，已保存的内容不受影响。") },
+        title = { Text("放弃未保存的修改？", style = MaterialTheme.typography.titleMedium) },
+        text = {
+            Text(
+                "本次修改还没有保存。放弃后，已保存的内容不受影响。",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        },
         confirmButton = { TextButton(onClick = {
             val task = (state.fileTasks.records + state.manualTasks.records).find { it.taskNo == pendingTaskNo }
             discardDialog = false
@@ -280,8 +292,8 @@ internal fun ImportsRoute(
         dismissButton = { TextButton(onClick = { discardDialog = false }) { Text("继续编辑") } },
     )
     removeParagraph?.let { number ->
-        AlertDialog(onDismissRequest = { removeParagraph = null }, title = { Text("移除此段？") },
-            text = { Text("移除后，可在保存前重新补充内容。") },
+        AlertDialog(onDismissRequest = { removeParagraph = null }, title = { Text("移除此段？", style = MaterialTheme.typography.titleMedium) },
+            text = { Text("移除后，可在保存前重新补充内容。", style = MaterialTheme.typography.bodyMedium) },
             confirmButton = { TextButton(onClick = { viewModel.removeParagraph(number); removeParagraph = null }) { Text("移除") } },
             dismissButton = { TextButton(onClick = { removeParagraph = null }) { Text("保留") } })
     }

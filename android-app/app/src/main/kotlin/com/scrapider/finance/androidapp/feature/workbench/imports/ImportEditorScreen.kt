@@ -95,6 +95,7 @@ internal fun ImportEditorScreen(
                 if (isManual) item(key = "editor-title") {
                     OutlinedTextField(value = draft.title, onValueChange = onTitleChanged,
                         modifier = Modifier.fillMaxWidth(), label = { Text("资料标题") }, enabled = editable,
+                        textStyle = MaterialTheme.typography.bodyMedium,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                         shape = MaterialTheme.shapes.medium)
                 }
@@ -121,7 +122,7 @@ internal fun ImportEditorScreen(
                             minLines = 3,
                             maxLines = 12,
                             shape = MaterialTheme.shapes.medium,
-                            textStyle = MaterialTheme.typography.bodyLarge,
+                            textStyle = MaterialTheme.typography.bodyMedium,
                             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Default),
                         )
                         val sourcePages = source?.sourcePages.orEmpty().filter { it in pageNumbers }

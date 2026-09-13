@@ -421,7 +421,7 @@ private fun ReportSelectionButton(
         ) {
             Text(
                 text = value,
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 color = if (enabled) {
                     MaterialTheme.colorScheme.onSurface
                 } else {
@@ -467,6 +467,7 @@ private fun ReportTargetSearchField(
         placeholder = {
             Text(
                 text = "输入标的名称或代码",
+                style = MaterialTheme.typography.bodyMedium,
                 color = rememberFinanceSignalColors().onNeutralContainer,
             )
         },
@@ -488,6 +489,7 @@ private fun ReportTargetSearchField(
             }
         },
         singleLine = true,
+        textStyle = MaterialTheme.typography.bodyMedium,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(onSearch = { if (enabled && !isSearching) onSearch() }),
         shape = MaterialTheme.shapes.medium,
@@ -572,7 +574,7 @@ private fun ReportTargetOptionRow(
             Text(
                 text = target.targetName,
                 modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 color = if (selected) {
                     MaterialTheme.colorScheme.primary
                 } else {
@@ -772,7 +774,7 @@ private fun ReportSheetRow(
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 color = if (selected) {
                     MaterialTheme.colorScheme.primary
                 } else {

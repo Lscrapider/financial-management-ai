@@ -92,7 +92,7 @@ internal fun ChatScreen(
                 Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = spacing.xl, vertical = spacing.lg),
                     verticalArrangement = Arrangement.spacedBy(spacing.md)) {
                     when {
-                        isConnecting -> ChatProgress("正在连接研究助手")
+                        isConnecting || state.connectionState == ChatConnectionState.Idle -> ChatProgress("正在连接研究助手")
                         state.historyLoading -> ChatProgress("正在读取对话记录")
                         state.historyError.isNotBlank() -> {
                             Text(state.historyError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)

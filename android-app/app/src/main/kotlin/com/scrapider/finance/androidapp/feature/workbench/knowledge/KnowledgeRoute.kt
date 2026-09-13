@@ -8,8 +8,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -18,8 +20,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.scrapider.finance.androidapp.core.network.FinanceApiClient
 import com.scrapider.finance.androidapp.core.session.UserSession
-import com.scrapider.finance.androidapp.feature.workbench.reports.ReportLoadingState
 import com.scrapider.finance.androidapp.feature.workbench.reports.ReportInfoState
+import com.scrapider.finance.androidapp.feature.workbench.reports.ReportLoadingScreen
 import com.scrapider.finance.androidapp.feature.workbench.reports.ReportTopBar
 import com.scrapider.finance.androidapp.feature.workbench.reports.reportTargetTypes
 import kotlinx.coroutines.flow.collect
@@ -45,6 +47,8 @@ internal fun KnowledgeRoute(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val currentOnSessionExpired by rememberUpdatedState(onSessionExpired)
     val currentOnNotice by rememberUpdatedState(onNotice)
+    // 会话绑定必须主动触发重组，不能依赖提前返回后尚未读取的界面状态。
+    var initialized by remember(session.accessToken) { mutableStateOf(false) }
     val targetTypeOptions = remember {
         reportTargetTypes.filter { it.value.isNotBlank() }
     }
@@ -61,6 +65,7 @@ internal fun KnowledgeRoute(
 
     LaunchedEffect(session.accessToken) {
         viewModel.enter(session.accessToken)
+        initialized = true
     }
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
@@ -76,8 +81,13 @@ internal fun KnowledgeRoute(
     }
     BackHandler(onBack = navigateBack)
 
-    if (!viewModel.belongsToSession(session.accessToken)) {
-        ReportLoadingState(text = "正在加载知识检索", modifier = contentModifier)
+    if (!initialized || !viewModel.belongsToSession(session.accessToken)) {
+        ReportLoadingScreen(
+            title = "知识检索",
+            text = "正在加载知识检索",
+            onBack = navigateBack,
+            modifier = contentModifier,
+        )
         return
     }
 

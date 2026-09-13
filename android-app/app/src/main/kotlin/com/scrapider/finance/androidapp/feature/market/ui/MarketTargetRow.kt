@@ -35,7 +35,6 @@ import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -184,30 +183,31 @@ private fun MarketTargetActions(
             tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
         )
     }
-    OverlayBottomSheet(
-        show = showActions,
-        title = targetName,
-        onDismissRequest = { showActions = false },
-    ) {
-        BasicComponent(
-            title = "标的设置",
-            summary = "配置提醒和个人记录",
-            onClick = {
-                showActions = false
-                onOpenSettings()
-            },
-        )
-        BasicComponent(
-            title = "从自选池移除",
-            summary = "移除后不再出现在当前自选池",
-            onClick = {
-                showActions = false
-                onDelete()
-            },
-            titleColor = top.yukonga.miuix.kmp.basic.BasicComponentDefaults.titleColor(
-                color = MiuixTheme.colorScheme.error,
-            ),
-        )
+    if (showActions) {
+        MarketBottomSheet(
+            title = targetName,
+            onDismiss = { showActions = false },
+        ) {
+            BasicComponent(
+                title = "标的设置",
+                summary = "配置提醒和个人记录",
+                onClick = {
+                    showActions = false
+                    onOpenSettings()
+                },
+            )
+            BasicComponent(
+                title = "从自选池移除",
+                summary = "移除后不再出现在当前自选池",
+                onClick = {
+                    showActions = false
+                    onDelete()
+                },
+                titleColor = top.yukonga.miuix.kmp.basic.BasicComponentDefaults.titleColor(
+                    color = MiuixTheme.colorScheme.error,
+                ),
+            )
+        }
     }
 }
 

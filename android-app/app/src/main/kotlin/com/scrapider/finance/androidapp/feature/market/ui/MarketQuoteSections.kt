@@ -4,14 +4,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -33,7 +32,6 @@ import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
-import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -257,17 +255,16 @@ internal fun MarketCurrentViewHeader(
             TextButton(
                 onClick = onAdd,
                 modifier = Modifier.heightIn(min = dimensions.minTouchTarget),
+                contentPadding = PaddingValues(horizontal = spacing.md, vertical = spacing.xs),
                 colors = ButtonDefaults.textButtonColors(
-                    containerColor = MiuixTheme.colorScheme.primary,
-                    contentColor = MiuixTheme.colorScheme.onPrimary,
+                    contentColor = MiuixTheme.colorScheme.primary,
                 ),
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.Add,
-                    contentDescription = null,
-                    tint = MiuixTheme.colorScheme.onPrimary,
+                Text(
+                    text = "添加",
+                    style = MiuixTheme.textStyles.button,
+                    color = MiuixTheme.colorScheme.primary,
                 )
-                Text(text = "添加", color = MiuixTheme.colorScheme.onPrimary)
             }
         }
     }

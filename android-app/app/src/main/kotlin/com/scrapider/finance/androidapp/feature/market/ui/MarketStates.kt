@@ -2,28 +2,65 @@ package com.scrapider.finance.androidapp.feature.market.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text as MaterialText
+import androidx.compose.material3.TextButton as MaterialTextButton
+import androidx.compose.material3.Button as MaterialButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceDimensions
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceSpacing
 import top.yukonga.miuix.kmp.basic.BasicComponent
-import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun MarketBottomSheet(
+    title: String,
+    onDismiss: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val spacing = LocalFinanceSpacing.current
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = spacing.md)
+                .padding(bottom = spacing.md),
+        ) {
+            MaterialText(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = spacing.xs),
+            )
+            content()
+        }
+    }
+}
 
 @Composable
 internal fun MarketLoadingPanel(
@@ -116,31 +153,28 @@ internal fun MarketConfirmationDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    OverlayDialog(
-        show = show,
-        title = title,
-        summary = message,
-        onDismissRequest = onDismiss,
-    ) {
-        val spacing = LocalFinanceSpacing.current
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = spacing.md),
-            horizontalArrangement = Arrangement.spacedBy(spacing.sm, Alignment.End),
-        ) {
-            TextButton(
-                text = "取消",
-                onClick = onDismiss,
-                enabled = !isSaving,
-            )
-            Button(
-                onClick = onConfirm,
-                enabled = !isSaving,
-            ) {
-                Text(confirmText)
+    if (show) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { MaterialText(title, style = MaterialTheme.typography.titleMedium) },
+            text = { MaterialText(message, style = MaterialTheme.typography.bodyMedium) },
+            dismissButton = {
+                MaterialTextButton(
+                    onClick = onDismiss,
+                    enabled = !isSaving,
+                ) {
+                    MaterialText("取消")
+                }
+            },
+            confirmButton = {
+                MaterialButton(
+                    onClick = onConfirm,
+                    enabled = !isSaving,
+                ) {
+                    MaterialText(confirmText)
+                }
             }
-        }
+        )
     }
 }
 

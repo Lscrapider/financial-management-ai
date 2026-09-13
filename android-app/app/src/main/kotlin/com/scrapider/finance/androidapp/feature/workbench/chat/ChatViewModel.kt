@@ -8,6 +8,7 @@ import com.scrapider.finance.androidapp.core.network.FinanceApiClient
 import com.scrapider.finance.androidapp.core.network.NetworkFailure
 import com.scrapider.finance.androidapp.core.network.NetworkResult
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withContext
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -266,7 +268,9 @@ internal class ChatViewModel(
         _uiState.value = _uiState.value.copy(historyLoading = true, historyError = "")
         historyJob?.cancel()
         historyJob = viewModelScope.launch {
-            when (val result = repository.history(expectedConversation, beforeId)) {
+            when (val result = withContext(Dispatchers.Default) {
+                repository.history(expectedConversation, beforeId)
+            }) {
                 is NetworkResult.Failure -> {
                     if (epoch != sessionEpoch || expectedConversation != conversationId) return@launch
                     _uiState.value = _uiState.value.copy(
