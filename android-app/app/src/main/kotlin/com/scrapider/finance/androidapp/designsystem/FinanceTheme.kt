@@ -11,9 +11,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -61,11 +63,18 @@ val LocalFinanceSemanticColors = staticCompositionLocalOf {
 }
 
 @Composable
-fun FinanceTheme(content: @Composable () -> Unit) {
+fun FinanceTheme(
+    fontScaleFactor: Float = 1f,
+    content: @Composable () -> Unit,
+) {
     val darkTheme = isSystemInDarkTheme()
     val colorScheme = if (darkTheme) DarkFinanceColorScheme else LightFinanceColorScheme
     val semanticColors = if (darkTheme) DarkSemanticColors else LightSemanticColors
+    val baseDensity = LocalDensity.current
+    // 应用内字号档位：在系统字体缩放基础上整体乘系数，所有 sp 文案（含 Miuix 局部主题）统一生效。
+    val scaledDensity = Density(baseDensity.density, baseDensity.fontScale * fontScaleFactor)
     CompositionLocalProvider(
+        LocalDensity provides scaledDensity,
         LocalFinanceSpacing provides FinanceSpacing(),
         LocalFinanceDimensions provides FinanceDimensions(),
         LocalFinanceSemanticColors provides semanticColors,

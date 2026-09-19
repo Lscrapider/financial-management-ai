@@ -358,7 +358,7 @@ private fun WorkbenchHeader(displayName: String) {
         Text(
             text = "工作台",
             modifier = Modifier.semantics { heading() },
-            style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
+            style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onBackground,
         )
         Text(

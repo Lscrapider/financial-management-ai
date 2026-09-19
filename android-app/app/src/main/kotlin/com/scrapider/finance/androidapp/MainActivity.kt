@@ -19,7 +19,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val state by appViewModel.uiState.collectAsStateWithLifecycle()
-            FinanceTheme {
+            FinanceTheme(fontScaleFactor = state.fontScaleMode.factor) {
                 FinanceApp(
                     state = state,
                     apiClient = appViewModel.apiClient,
@@ -27,6 +27,7 @@ class MainActivity : ComponentActivity() {
                     onSessionUpdated = appViewModel::updateSession,
                     onDestinationSelected = appViewModel::selectDestination,
                     onSignOut = appViewModel::signOut,
+                    onFontScaleModeSelected = appViewModel::selectFontScaleMode,
                 )
             }
         }

@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.scrapider.finance.androidapp.R
 import com.scrapider.finance.androidapp.core.network.FinanceApiClient
+import com.scrapider.finance.androidapp.core.prefs.FontScaleMode
 import com.scrapider.finance.androidapp.core.session.UserSession
 import com.scrapider.finance.androidapp.designsystem.LocalFinanceDimensions
 import com.scrapider.finance.androidapp.designsystem.financeChromeColor
@@ -48,10 +49,12 @@ import kotlinx.coroutines.flow.collect
 fun AppShell(
     session: UserSession,
     selectedDestination: AppDestination,
+    fontScaleMode: FontScaleMode,
     apiClient: FinanceApiClient,
     onDestinationSelected: (AppDestination) -> Unit,
     onSessionUpdated: (UserSession) -> Unit,
     onSignOut: () -> Unit,
+    onFontScaleModeSelected: (FontScaleMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -135,6 +138,8 @@ fun AppShell(
                 ProfileRoute(
                     session = session,
                     viewModel = profileViewModel,
+                    fontScaleMode = fontScaleMode,
+                    onFontScaleModeSelected = onFontScaleModeSelected,
                     modifier = Modifier.padding(contentPadding),
                 )
             }

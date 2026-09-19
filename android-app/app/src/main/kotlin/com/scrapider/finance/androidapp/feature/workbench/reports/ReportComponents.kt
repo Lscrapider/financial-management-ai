@@ -240,28 +240,33 @@ internal fun ReportTargetRow(
                     style = MaterialTheme.typography.bodyMedium,
                     color = rememberFinanceSignalColors().onNeutralContainer,
                 )
-                Text(
-                    text = "${target.reportTypeLabel} · ${target.timeLabel}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = rememberFinanceSignalColors().onNeutralContainer,
-                )
-            }
-        }
-        if (target.reportCount > 1) {
-            TextButton(
-                onClick = onOpenHistory,
-                modifier = Modifier
-                    .align(Alignment.Start)
-                    .heightIn(min = dimensions.minTouchTarget)
-                    .padding(start = dimensions.controlHeight + spacing.md),
-                contentPadding = PaddingValues(horizontal = spacing.sm),
-            ) {
-                Text("查看 ${target.reportCount} 份记录")
-                Icon(
-                    painter = painterResource(R.drawable.ic_phosphor_arrow_right),
-                    contentDescription = null,
-                    modifier = Modifier.size(dimensions.iconSize),
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "${target.reportTypeLabel} · ${target.timeLabel}",
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = rememberFinanceSignalColors().onNeutralContainer,
+                    )
+                    // 多份记录的入口收进信息行内，避免在行下方额外占一整行高度。
+                    if (target.reportCount > 1) {
+                        TextButton(
+                            onClick = onOpenHistory,
+                            modifier = Modifier.heightIn(min = dimensions.minTouchTarget),
+                            contentPadding = PaddingValues(horizontal = spacing.sm),
+                        ) {
+                            Text("查看 ${target.reportCount} 份记录")
+                            Icon(
+                                painter = painterResource(R.drawable.ic_phosphor_arrow_right),
+                                contentDescription = null,
+                                modifier = Modifier.size(dimensions.iconSize),
+                            )
+                        }
+                    }
+                }
             }
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)

@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.AndroidViewModel
 import com.scrapider.finance.androidapp.core.network.FinanceApiClient
+import com.scrapider.finance.androidapp.core.prefs.DisplayPreferences
+import com.scrapider.finance.androidapp.core.prefs.FontScaleMode
 import com.scrapider.finance.androidapp.core.session.SessionStore
 import com.scrapider.finance.androidapp.core.session.UserSession
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,10 +17,12 @@ data class AppUiState(
     val destination: AppDestination = AppDestination.Workbench,
     val rememberedUsername: String = "",
     val rememberAccount: Boolean = true,
+    val fontScaleMode: FontScaleMode = FontScaleMode.MEDIUM,
 )
 
 class FinanceAppViewModel(application: Application) : AndroidViewModel(application) {
     private val sessionStore = SessionStore(application)
+    private val displayPreferences = DisplayPreferences(application)
     private val initialSnapshot = sessionStore.load()
     internal val apiClient = FinanceApiClient(sessionStore = sessionStore)
     private val _uiState = MutableStateFlow(
@@ -26,6 +30,7 @@ class FinanceAppViewModel(application: Application) : AndroidViewModel(applicati
             session = initialSnapshot.session,
             rememberedUsername = initialSnapshot.username,
             rememberAccount = initialSnapshot.rememberAccount,
+            fontScaleMode = displayPreferences.loadFontScaleMode(),
         ),
     )
     val uiState = _uiState.asStateFlow()
@@ -55,6 +60,12 @@ class FinanceAppViewModel(application: Application) : AndroidViewModel(applicati
 
     fun selectDestination(destination: AppDestination) {
         _uiState.value = _uiState.value.copy(destination = destination)
+    }
+
+    fun selectFontScaleMode(mode: FontScaleMode) {
+        if (_uiState.value.fontScaleMode == mode) return
+        displayPreferences.saveFontScaleMode(mode)
+        _uiState.value = _uiState.value.copy(fontScaleMode = mode)
     }
 
     fun signOut() {
