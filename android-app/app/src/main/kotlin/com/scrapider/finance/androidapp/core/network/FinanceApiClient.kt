@@ -67,7 +67,12 @@ class FinanceApiClient(
 
     /** 原页预览仍经过同一鉴权客户端，不将访问令牌交给外部图片加载器。 */
     suspend fun getBytes(path: String): NetworkResult<ByteArray> {
-        val response = executeWithRefresh(requestBuilder(path).get().build())
+        val response = executeWithRefresh(
+            requestBuilder(path)
+                .header("Accept", "image/*")
+                .get()
+                .build(),
+        )
         responseFailure(response.statusCode, response.networkFailure)?.let {
             return NetworkResult.Failure(it)
         }
